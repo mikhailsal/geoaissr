@@ -1,18 +1,10 @@
-import type { BotTurnThumbView } from '../../shared/protocol.ts';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
 import type { BotGuessData, EngineEvent, RoundTarget } from '../engine/types.ts';
-import type { BotImageService, RenderedBotImage } from '../images/bot-image-service.ts';
+import type { BotImageService } from '../images/bot-image-service.ts';
 import type { ServerLogger } from '../log.ts';
 import type { BotToolApiServer } from './api.ts';
 import { cleanupBotHandle, type ActiveBotHandle } from './process.ts';
-
-function makeFakeThumb(
-  turn: number,
-  action: 'observe' | 'look' | 'move',
-  rendered: RenderedBotImage,
-): BotTurnThumbView {
-  return { turn, action, label: rendered.label, thumbUrl: rendered.thumbUrl };
-}
+import { dispatchObserveThumbs, makeThumb } from './thumbs.ts';
 
 function finishFakeBot(
   opts: { matchId: string; gen: number; roundNumber: number; slotId: string },
@@ -61,16 +53,12 @@ export async function runFakeBotSequence(opts: {
   if (isStopped()) return;
 
   const views = await opts.imageService.getObserveViews({ target, size: slot.imageSize });
-  if (views[0]) {
-    dispatch({
-      type: 'bot_thumb_added',
-      matchId: ids.matchId,
-      gen: ids.gen,
-      roundNumber: ids.roundNumber,
-      botId: slot.id,
-      thumb: makeFakeThumb(0, 'observe', views[0]),
-    });
-  }
+  dispatchObserveThumbs(
+    dispatch,
+    { matchId: ids.matchId, gen: ids.gen, roundNumber: ids.roundNumber, botId: slot.id },
+    0,
+    views,
+  );
   await new Promise((r) => setTimeout(r, stepDelayMs));
   if (isStopped()) return;
 
@@ -98,7 +86,7 @@ export async function runFakeBotSequence(opts: {
     gen: ids.gen,
     roundNumber: ids.roundNumber,
     botId: slot.id,
-    thumb: makeFakeThumb(1, 'look', lookView),
+    thumb: makeThumb(1, 'look', lookView),
   });
   await new Promise((r) => setTimeout(r, stepDelayMs));
   if (!isStopped()) finishFakeBot(ids, slot, target, dispatch);

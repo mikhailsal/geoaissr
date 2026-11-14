@@ -1,5 +1,4 @@
 import { mkdirSync } from 'node:fs';
-import type { BotTurnThumbView } from '../../shared/protocol.ts';
 import { getRegionDiagonalKm } from '../../shared/regions.ts';
 import type { BotSlotConfig, RegionId } from '../../shared/storage-schemas.ts';
 import type { EngineEvent, RoundTarget } from '../engine/types.ts';
@@ -25,6 +24,7 @@ import {
   type BotToolQueue,
   type ToolResponsePayload,
 } from './queue.ts';
+import { dispatchObserveThumbs, makeThumb } from './thumbs.ts';
 import { runVisionCheck } from './vision-check.ts';
 
 const REGION_LABELS_RU: Record<RegionId, string> = {
@@ -88,14 +88,6 @@ function toImageBlocks(
     base64: img.jpeg.toString('base64'),
     mimeType: 'image/jpeg',
   }));
-}
-
-function makeThumb(
-  turn: number,
-  action: 'observe' | 'look' | 'move',
-  rendered: RenderedBotImage,
-): BotTurnThumbView {
-  return { turn, action, label: rendered.label, thumbUrl: rendered.thumbUrl };
 }
 
 async function runLookTool(
@@ -184,6 +176,7 @@ function createLoggedToolExecutor<TArgs, TRes extends { isError?: boolean }>(
       slotId,
       roundNumber,
       tool,
+      args, // heading/pitch/fov of a look, direction of a move: where the bot spent its turns
       durationMs: Date.now() - t0,
       ok: !res.isError,
     });
@@ -209,16 +202,12 @@ function buildRoundHandlers(
       const t0 = Date.now();
       try {
         const views = await ctx.imageService.getObserveViews({ target, size: slot.imageSize });
-        if (views[0]) {
-          ctx.dispatch({
-            type: 'bot_thumb_added',
-            matchId,
-            gen,
-            roundNumber,
-            botId: slot.id,
-            thumb: makeThumb(deps.getTurnsUsed(), 'observe', views[0]),
-          });
-        }
+        dispatchObserveThumbs(
+          ctx.dispatch,
+          { matchId, gen, roundNumber, botId: slot.id },
+          deps.getTurnsUsed(),
+          views,
+        );
         ctx.logger?.log('bot_tool_call', {
           slotId: slot.id,
           roundNumber,
@@ -246,6 +235,7 @@ function buildRoundHandlers(
         slotId: slot.id,
         roundNumber,
         tool: 'submit_guess',
+        args: { lat: guess.lat, lng: guess.lng },
         ok: true,
       });
       ctx.dispatch({
