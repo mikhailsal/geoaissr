@@ -2,7 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { HarnessCatalogEntry } from '../../../shared/protocol.ts';
-import type { HarnessId } from '../../../shared/storage-schemas.ts';
+import { botNameFromModel, isAutoBotName } from '../../../shared/bot-tools.ts';
+import type { BotSlotConfig, HarnessId } from '../../../shared/storage-schemas.ts';
 import harnessesMeta from './harnesses.json' with { type: 'json' };
 import type { CommandProbe, HarnessAdapter } from './types.ts';
 
@@ -13,6 +14,37 @@ interface HarnessMetaEntry {
   readsOwnerFiles: boolean;
   defaultModel: string;
   fallbackModels: string[];
+  /** Short names the CLI also accepts, mapped to full model ids (saved bots are migrated). */
+  modelAliases?: Record<string, string>;
+}
+
+/** The harness default goes first: a new bot and a harness switch both take the first model. */
+export function withDefaultFirst(models: readonly string[], defaultModel: string): string[] {
+  const unique = [...new Set(models)];
+  return unique.includes(defaultModel)
+    ? [defaultModel, ...unique.filter((m) => m !== defaultModel)]
+    : unique;
+}
+
+/**
+ * A bot slot as saved by an earlier version, brought up to date: a short alias ("haiku") becomes the
+ * full model id so the slot matches the model list (a passed vision check keeps counting), and a
+ * bot with an old default name picks up the current model-based name.
+ */
+export function migrateSavedBotSlot(stored: BotSlotConfig): BotSlotConfig {
+  const model = resolveModelAlias(stored.harness, stored.model);
+  const check = stored.lastVisionCheck;
+  return {
+    ...stored,
+    model,
+    name: isAutoBotName(stored.name, stored.model) ? botNameFromModel(model) : stored.name,
+    lastVisionCheck: check?.model === stored.model ? { ...check, model } : check,
+  };
+}
+
+/** Full model id for a saved alias ("haiku" -> "claude-haiku-5-5"); other names pass through. */
+export function resolveModelAlias(harness: HarnessId, model: string): string {
+  return getHarnessMeta(harness).modelAliases?.[model] ?? model;
 }
 
 export function getHarnessMeta(id: HarnessId): HarnessMetaEntry {
@@ -123,7 +155,7 @@ export function formatUnavailable(
     fixCommand,
     readsOwnerFiles: meta.readsOwnerFiles,
     versionWarning,
-    models: [...meta.fallbackModels],
+    models: withDefaultFirst(meta.fallbackModels, meta.defaultModel),
   };
 }
 

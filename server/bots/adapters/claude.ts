@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import type { HarnessCatalogEntry } from '../../../shared/protocol.ts';
 import {
@@ -9,6 +11,7 @@ import {
   parseSemverTuple,
   resolveBunBinary,
   resolveMcpToolsPath,
+  withDefaultFirst,
   writeJsonFile,
   type CommandProbe,
   type HarnessAdapter,
@@ -30,6 +33,26 @@ function checkClaudeAuth(probe: CommandProbe): { ok: boolean; reason?: string } 
     }
   }
   return { ok: true };
+}
+
+/**
+ * The claude CLI cannot list models. Claude Code caches extra picker entries (new models offered to
+ * this account) in ~/.claude.json; add those to the known list. The "[1m]" context variants are
+ * reduced to their base model.
+ */
+export function readClaudeCodeModelOptions(
+  configFile = path.join(process.env.CLAUDE_CONFIG_DIR ?? homedir(), '.claude.json'),
+): string[] {
+  try {
+    const parsed = JSON.parse(readFileSync(configFile, 'utf8')) as {
+      additionalModelOptionsCache?: Array<{ value?: unknown }>;
+    };
+    return (parsed.additionalModelOptionsCache ?? [])
+      .map((o) => (typeof o.value === 'string' ? o.value.replace(/\[[^\]]*\]$/, '') : ''))
+      .filter((v) => /^claude-[a-z0-9.-]+$/.test(v));
+  } catch {
+    return [];
+  }
 }
 
 export const claudeAdapter: HarnessAdapter = {
@@ -72,7 +95,10 @@ export const claudeAdapter: HarnessAdapter = {
       available: true,
       readsOwnerFiles: false,
       versionWarning,
-      models: [...meta.fallbackModels],
+      models: withDefaultFirst(
+        [...meta.fallbackModels, ...readClaudeCodeModelOptions()],
+        meta.defaultModel,
+      ),
     };
   },
 

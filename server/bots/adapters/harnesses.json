@@ -5,8 +5,19 @@
       "binary": "claude",
       "deliveryMode": "mcp",
       "readsOwnerFiles": false,
-      "defaultModel": "haiku",
-      "fallbackModels": ["haiku", "sonnet", "opus"]
+      "defaultModel": "claude-haiku-5-5",
+      "fallbackModels": [
+        "claude-haiku-5-5",
+        "claude-sonnet-5-5",
+        "claude-opus-5-5",
+        "claude-fable-5-2"
+      ],
+      "modelAliases": {
+        "haiku": "claude-haiku-5-5",
+        "sonnet": "claude-sonnet-5-5",
+        "opus": "claude-opus-5-5",
+        "fable": "claude-fable-5-2"
+      }
     },
     {
       "id": "codex",
@@ -14,7 +25,16 @@
       "deliveryMode": "mcp",
       "readsOwnerFiles": false,
       "defaultModel": "gpt-6-luna",
-      "fallbackModels": ["gpt-6-luna", "gpt-5.4", "gpt-5.4-mini"]
+      "fallbackModels": [
+        "gpt-6-luna",
+        "gpt-6.1-sol",
+        "gpt-6-astra",
+        "gpt-6.1-terra",
+        "gpt-6-sol",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna"
+      ]
     },
     {
       "id": "agy",

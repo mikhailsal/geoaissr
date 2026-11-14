@@ -9,6 +9,7 @@ import {
   parseSemverTuple,
   resolveBunBinary,
   resolveMcpToolsPath,
+  withDefaultFirst,
   type CommandProbe,
   type HarnessAdapter,
 } from './shared.ts';
@@ -23,6 +24,36 @@ function checkCodexAuth(probe: CommandProbe): { ok: boolean; reason?: string } {
     return { ok: false, reason: 'Сессия Codex CLI не авторизована' };
   }
   return { ok: true };
+}
+
+/**
+ * Models from `codex debug models` (the CLI's own catalog): the ones Codex shows in its picker and
+ * that accept images, in Codex's priority order. Falls back to the list in harnesses.json.
+ */
+export function parseCodexModelsCatalog(stdout: string, fallback: readonly string[]): string[] {
+  try {
+    const parsed = JSON.parse(stdout) as {
+      models?: Array<{
+        slug?: unknown;
+        visibility?: unknown;
+        priority?: unknown;
+        input_modalities?: unknown;
+      }>;
+    };
+    const models = (parsed.models ?? [])
+      .filter(
+        (m) =>
+          typeof m.slug === 'string' &&
+          m.visibility === 'list' &&
+          Array.isArray(m.input_modalities) &&
+          m.input_modalities.includes('image'),
+      )
+      .sort((a, b) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
+      .map((m) => String(m.slug));
+    return models.length > 0 ? models : [...fallback];
+  } catch {
+    return [...fallback];
+  }
 }
 
 export const codexAdapter: HarnessAdapter = {
@@ -56,12 +87,18 @@ export const codexAdapter: HarnessAdapter = {
       );
     }
 
+    const modelsProbe = probe(meta.binary, ['debug', 'models'], 8000);
     return {
       id: 'codex',
       available: true,
       readsOwnerFiles: false,
       versionWarning,
-      models: [...meta.fallbackModels],
+      models: withDefaultFirst(
+        modelsProbe.status === 0
+          ? parseCodexModelsCatalog(modelsProbe.stdout, meta.fallbackModels)
+          : meta.fallbackModels,
+        meta.defaultModel,
+      ),
     };
   },
 

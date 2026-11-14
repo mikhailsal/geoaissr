@@ -28,7 +28,7 @@ function pickHarnessDefaults(availableHarnesses: readonly HarnessCatalogEntry[])
       model:
         usable.models[0] ??
         (usable.id === 'claude'
-          ? 'haiku'
+          ? 'claude-haiku-5-5'
           : usable.id === 'codex'
             ? 'gpt-6-luna'
             : 'gemini-3.8-flash-low'),
@@ -38,7 +38,7 @@ function pickHarnessDefaults(availableHarnesses: readonly HarnessCatalogEntry[])
   const first = availableHarnesses[0];
   return {
     harness: first?.id ?? 'claude',
-    model: first?.models[0] ?? 'haiku',
+    model: first?.models[0] ?? 'claude-haiku-5-5',
     enabled: false,
     disabledReason: first?.reason ?? 'нет доступных харнессов',
   };

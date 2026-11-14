@@ -1,10 +1,12 @@
 import { expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { detectAllHarnesses, getHarnessAdapter } from './index.ts';
 import { buildBotRoundPrompt } from '../prompt.ts';
-import { buildSanitizedChildEnv } from './shared.ts';
+import { readClaudeCodeModelOptions } from './claude.ts';
+import { parseCodexModelsCatalog } from './codex.ts';
+import { buildSanitizedChildEnv, withDefaultFirst } from './shared.ts';
 import { agyEffortArgs } from './agy.ts';
 import type { CommandProbe } from './types.ts';
 
@@ -171,6 +173,42 @@ test('agy guard allows only the exact geo tools, not other MCP servers with a ge
         args: { path: '.agents/plugins/geo/mcp_config.json' },
       }),
     ).toBe('deny');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('codex models come from its catalog: visible, image-capable, by priority; default first', () => {
+  const catalog = JSON.stringify({
+    models: [
+      { slug: 'gpt-b', visibility: 'list', priority: 2, input_modalities: ['text', 'image'] },
+      { slug: 'gpt-hidden', visibility: 'hide', priority: 1, input_modalities: ['text', 'image'] },
+      { slug: 'gpt-text', visibility: 'list', priority: 0, input_modalities: ['text'] },
+      { slug: 'gpt-a', visibility: 'list', priority: 1, input_modalities: ['text', 'image'] },
+    ],
+  });
+  expect(parseCodexModelsCatalog(catalog, ['fb'])).toEqual(['gpt-a', 'gpt-b']);
+  expect(parseCodexModelsCatalog('not json', ['fb'])).toEqual(['fb']);
+  expect(parseCodexModelsCatalog('{"models":[]}', ['fb'])).toEqual(['fb']);
+  expect(withDefaultFirst(['gpt-a', 'gpt-b', 'gpt-a'], 'gpt-b')).toEqual(['gpt-b', 'gpt-a']);
+  expect(withDefaultFirst(['gpt-a'], 'missing')).toEqual(['gpt-a']);
+});
+
+test('claude adds the models Claude Code caches for this account, without context suffixes', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-claude-cfg-'));
+  try {
+    const file = path.join(dir, '.claude.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        additionalModelOptionsCache: [
+          { value: 'claude-fable-5-2[1m]', label: 'Fable' },
+          { value: 'not a model' },
+        ],
+      }),
+    );
+    expect(readClaudeCodeModelOptions(file)).toEqual(['claude-fable-5-2']);
+    expect(readClaudeCodeModelOptions(path.join(dir, 'missing.json'))).toEqual([]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

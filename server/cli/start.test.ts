@@ -85,7 +85,7 @@ test('buildInitialSettings disables saved enabled slot when harness is unavailab
   }
 });
 
-test('buildInitialSettings renames bots that still carry an old default name', () => {
+test('buildInitialSettings renames old default names and expands saved model aliases', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'geo-init-names-'));
   try {
     const file = path.join(root, 'settings.json');
@@ -108,7 +108,18 @@ test('buildInitialSettings renames bots that still carry an old default name', (
     saved.bots = [
       slot('bot-1', 'ИИ Кодекс', 'gpt-6-luna'),
       slot('bot-2', 'Gemini-3.8-flash', 'gemini-3.8-flash-low'),
-      slot('bot-3', 'Гена', 'gpt-6-luna'),
+      {
+        ...slot('bot-3', 'Гена', 'haiku'),
+        harness: 'claude',
+        lastVisionCheck: {
+          passed: true,
+          elapsedMs: 9000,
+          model: 'haiku',
+          effort: 'low',
+          imageSize: 400,
+          checkedAt: '2026-11-14T08:00:00.000Z',
+        },
+      },
     ];
     saveSettings(file, saved);
     const res = buildInitialSettings({
@@ -122,6 +133,9 @@ test('buildInitialSettings renames bots that still carry an old default name', (
       'Gemini 3.8 Flash',
       'Гена',
     ]);
+    // A saved alias becomes the full id (a custom name stays) and its vision check still counts.
+    expect(res.settings.bots[2]?.model).toBe('claude-haiku-5-5');
+    expect(res.settings.bots[2]?.lastVisionCheck?.model).toBe('claude-haiku-5-5');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -11,6 +11,7 @@ import {
   parseSemverTuple,
   resolveBunBinary,
   resolveMcpToolsPath,
+  withDefaultFirst,
   writeJsonFile,
   type HarnessAdapter,
 } from './shared.ts';
@@ -27,10 +28,8 @@ function parseAgyModelsOutput(stdout: string, fallback: readonly string[]): stri
       discovered.push(token);
     }
   }
-  for (const fb of fallback) {
-    if (!discovered.includes(fb)) discovered.push(fb);
-  }
-  return discovered;
+  // The known list is only a stand-in for a failed listing; it must not add models agy lacks.
+  return discovered.length > 0 ? discovered : [...fallback];
 }
 
 /**
@@ -104,10 +103,12 @@ export const agyAdapter: HarnessAdapter = {
         : undefined;
 
     const modelsProbe = probe(meta.binary, ['models'], 4000);
-    const models =
+    const models = withDefaultFirst(
       modelsProbe.status === 0
         ? parseAgyModelsOutput(modelsProbe.stdout, meta.fallbackModels)
-        : [...meta.fallbackModels];
+        : meta.fallbackModels,
+      meta.defaultModel,
+    );
 
     return {
       id: 'agy',
