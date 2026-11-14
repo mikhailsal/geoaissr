@@ -1,0 +1,427 @@
+import { RESULTS_AUTONEXT_MS, RESULTS_PAUSE_CAP_MS } from '../../shared/protocol.ts';
+import { handleEndMatch, handlePlayAgain } from './final.ts';
+import {
+  handleAddBot,
+  handleApplyBotPreset,
+  handlePlayerJoinOrReclaim,
+  handleRemoveBot,
+  handleUpdateBot,
+  handleUpdateLobby,
+} from './lobby.ts';
+import {
+  advanceFromResults,
+  finishActiveRoundToResults,
+  handleResultsPauseChange,
+} from './results.ts';
+import {
+  checkAllHumansConfirmedAndBotsState,
+  createLoadingStateForRound,
+  handleActivePinOrGuess,
+  handleCountdownDone,
+  handlePanoLoadedInRound,
+  handleRoundPrepared,
+  maybeStartCountdown,
+} from './round.ts';
+import type { EngineEvent, ReduceOutput, RoomState } from './types.ts';
+import { computeStartBlockedReasons } from './view.ts';
+
+function handlePlayerDisconnect(state: RoomState, playerId: string, now: number): ReduceOutput {
+  const existing = state.players[playerId];
+  if (!existing) return { state, effects: [] };
+  const nextState: RoomState = {
+    ...state,
+    players: { ...state.players, [playerId]: { ...existing, connected: false } },
+  };
+  if (nextState.phase === 'ROUND_LOADING') {
+    return maybeStartCountdown(nextState, now, false);
+  }
+  if (nextState.phase === 'ROUND_RESULTS') {
+    return handleResultsPauseChange(nextState, 'close', playerId, now);
+  }
+  return { state: nextState, effects: [] };
+}
+
+function handleStartMatch(state: RoomState, playerId: string, now: number): ReduceOutput {
+  if (!state.players[playerId]?.isHost) return { state, effects: [], ack: 'forbidden' };
+  if (state.phase !== 'LOBBY') return { state, effects: [], ack: 'invalid' };
+  if (computeStartBlockedReasons(state).length > 0) {
+    return { state, effects: [], ack: 'invalid' };
+  }
+  const freshState: RoomState = {
+    ...state,
+    matchStartedAt: new Date(now).toISOString(),
+    usedCountryIds: [],
+    playedRounds: [],
+    humanVsAiTotal: { humans: 0, ai: 0 },
+    matchWriteError: undefined,
+    tunnel: { ...state.tunnel, changedSinceStart: false },
+  };
+  const next = createLoadingStateForRound(freshState, 1, now);
+  return { state: next.nextState, effects: next.effects, ack: 'ok' };
+}
+
+function handleBotEvent(state: RoomState, event: EngineEvent, now: number): ReduceOutput {
+  const active = state.loadingOrActive;
+  const allowDuringLoading = state.phase === 'ROUND_LOADING';
+  if ((state.phase !== 'ROUND_ACTIVE' && !allowDuringLoading) || !active) {
+    return { state, effects: [] };
+  }
+  if (
+    event.type !== 'bot_turns_updated' &&
+    event.type !== 'bot_thumb_added' &&
+    event.type !== 'bot_guess_recorded' &&
+    event.type !== 'bot_finished'
+  ) {
+    return { state, effects: [] };
+  }
+  if (
+    event.matchId !== state.matchId ||
+    event.gen !== state.gen ||
+    event.roundNumber !== state.roundNumber
+  ) {
+    return { state, effects: [] };
+  }
+  const bot = active.bots[event.botId];
+  if (!bot || bot.status !== 'thinking') return { state, effects: [] };
+
+  let updatedBot = bot;
+  if (event.type === 'bot_turns_updated') {
+    updatedBot = { ...bot, turnsUsed: event.turnsUsed };
+  } else if (event.type === 'bot_thumb_added') {
+    updatedBot = { ...bot, thumbs: [...bot.thumbs, event.thumb] };
+  } else if (event.type === 'bot_guess_recorded') {
+    updatedBot = {
+      ...bot,
+      firstGuessAt: bot.firstGuessAt ?? now,
+      lastGuessAt: now,
+      guess: event.guess,
+    };
+  } else {
+    updatedBot = {
+      ...bot,
+      status: event.aborted ? 'aborted' : 'done',
+      abortReason: event.aborted ? event.reason : undefined,
+      terminationReason: event.reason,
+      diagnosticsTail: event.diagnosticsTail,
+      finishedAt: now,
+    };
+  }
+
+  const nextState: RoomState = {
+    ...state,
+    loadingOrActive: {
+      ...active,
+      bots: { ...active.bots, [event.botId]: updatedBot },
+    },
+  };
+  if (event.type === 'bot_finished') {
+    return checkAllHumansConfirmedAndBotsState(nextState, now);
+  }
+  return { state: nextState, effects: [] };
+}
+
+function handleDeadlineTick(
+  state: RoomState,
+  event: Extract<EngineEvent, { type: 'deadline_tick' }>,
+  now: number,
+): ReduceOutput {
+  if (
+    event.matchId !== state.matchId ||
+    event.gen !== state.gen ||
+    state.phase !== 'ROUND_ACTIVE' ||
+    !state.loadingOrActive
+  ) {
+    return { state, effects: [] };
+  }
+  if (event.kind === 'round') {
+    return finishActiveRoundToResults(state, now, 'истекло время раунда');
+  }
+  if (event.kind === 'wait') {
+    return finishActiveRoundToResults(state, now, 'истекло окно ожидания ИИ');
+  }
+  const botId = event.botId;
+  const bot = botId ? state.loadingOrActive.bots[botId] : undefined;
+  if (!botId || !bot || bot.status !== 'thinking') return { state, effects: [] };
+  const nextState: RoomState = {
+    ...state,
+    loadingOrActive: {
+      ...state.loadingOrActive,
+      bots: {
+        ...state.loadingOrActive.bots,
+        [botId]: {
+          ...bot,
+          status: 'aborted',
+          abortReason: 'истек бюджет времени бота',
+          terminationReason: 'истек бюджет времени',
+          finishedAt: now,
+        },
+      },
+    },
+  };
+  const checked = checkAllHumansConfirmedAndBotsState(nextState, now);
+  return {
+    state: checked.state,
+    effects: [
+      {
+        type: 'stop_bot_process',
+        matchId: state.matchId,
+        gen: state.gen,
+        botId,
+        reason: 'budget_expired',
+      },
+      ...checked.effects,
+    ],
+  };
+}
+
+function handleResultsTimersAndNext(
+  state: RoomState,
+  event: EngineEvent,
+  now: number,
+): ReduceOutput {
+  if (state.phase !== 'ROUND_RESULTS' || !state.results) {
+    return { state, effects: [], ack: event.type === 'next_round' ? 'round_over' : undefined };
+  }
+  const res = state.results;
+
+  if (event.type === 'results_autonext_tick') {
+    if (
+      event.matchId !== state.matchId ||
+      event.gen !== state.gen ||
+      event.roundNumber !== state.roundNumber
+    ) {
+      return { state, effects: [] };
+    }
+    if (Object.keys(res.readers).length > 0 || res.waitingForHuman) {
+      return { state, effects: [] };
+    }
+    return advanceFromResults(state, now);
+  }
+
+  if (event.type === 'results_pause_cap_tick') {
+    if (
+      event.matchId !== state.matchId ||
+      event.gen !== state.gen ||
+      event.roundNumber !== state.roundNumber ||
+      Object.keys(res.readers).length === 0
+    ) {
+      return { state, effects: [] };
+    }
+    const resumedState: RoomState = {
+      ...state,
+      results: { ...res, pauseUsedMs: RESULTS_PAUSE_CAP_MS, readers: {}, lastResumeAt: now },
+    };
+    if (res.autoNextBaseRemainingMs <= 0) {
+      return advanceFromResults(resumedState, now);
+    }
+    return {
+      state: resumedState,
+      effects: [
+        {
+          type: 'schedule_results_autonext',
+          matchId: state.matchId,
+          gen: state.gen,
+          roundNumber: res.roundNumber,
+          atMs: now + res.autoNextBaseRemainingMs,
+        },
+      ],
+    };
+  }
+
+  if (event.type === 'next_round') {
+    if (!state.players[event.playerId]?.isHost) return { state, effects: [], ack: 'forbidden' };
+    if (event.roundNumber !== state.roundNumber) return { state, effects: [], ack: 'round_over' };
+    const out = advanceFromResults(state, now);
+    return { ...out, ack: 'ok' };
+  }
+  return { state, effects: [] };
+}
+
+function handlePlayerReconnectWithWake(
+  state: RoomState,
+  playerId: string,
+  isHost: boolean,
+  now: number,
+): ReduceOutput {
+  const joined = handlePlayerJoinOrReclaim(state, { kind: 'reconnect', playerId, isHost });
+  if (joined.state.phase === 'ROUND_LOADING') {
+    return maybeStartCountdown(joined.state, now, false);
+  }
+  if (joined.state.phase === 'ROUND_RESULTS' && joined.state.results?.waitingForHuman) {
+    const res = joined.state.results;
+    return {
+      state: {
+        ...joined.state,
+        results: {
+          ...res,
+          waitingForHuman: false,
+          lastResumeAt: now,
+          autoNextBaseRemainingMs: RESULTS_AUTONEXT_MS,
+        },
+      },
+      effects: [
+        ...joined.effects,
+        {
+          type: 'schedule_results_autonext',
+          matchId: joined.state.matchId,
+          gen: joined.state.gen,
+          roundNumber: res.roundNumber,
+          atMs: now + RESULTS_AUTONEXT_MS,
+        },
+      ],
+    };
+  }
+  return joined;
+}
+
+function handleMiscStateEvent(state: RoomState, event: EngineEvent): ReduceOutput | null {
+  switch (event.type) {
+    case 'update_bot_vision_check': {
+      const bots = state.settings.bots.map((b) =>
+        b.id === event.botId ? { ...b, lastVisionCheck: event.check } : b,
+      );
+      const settings = { ...state.settings, bots };
+      return { state: { ...state, settings }, effects: [{ type: 'save_settings', settings }] };
+    }
+    case 'confirm_quota_reset':
+      if (!state.players[event.playerId]?.isHost) return { state, effects: [], ack: 'forbidden' };
+      return {
+        // needsResetConfirm stays set until the reset is persisted and quota_updated arrives.
+        state,
+        effects: [{ type: 'confirm_quota_reset' }],
+        ack: 'ok',
+      };
+    case 'quota_updated':
+      return {
+        state: { ...state, quotaSummary: event.quotaSummary, quotaWarning: event.quotaWarning },
+        effects: [],
+      };
+    case 'tunnel_updated':
+      return {
+        state: {
+          ...state,
+          tunnel: {
+            ...event.tunnel,
+            changedSinceStart: state.phase !== 'LOBBY' || state.tunnel.changedSinceStart,
+          },
+        },
+        effects: [],
+      };
+    case 'match_write_result':
+      return {
+        state: { ...state, matchWriteError: event.ok ? undefined : event.error },
+        effects: [],
+      };
+    case 'client_error': {
+      const p = state.players[event.playerId];
+      if (!p) return { state, effects: [] };
+      const msg = event.code === 'OK' ? undefined : `${event.code}: ${event.message}`;
+      return {
+        state: {
+          ...state,
+          players: { ...state.players, [event.playerId]: { ...p, mapsError: msg } },
+        },
+        effects: [],
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+function reduceRoundPrepAndTimeout(
+  state: RoomState,
+  event: EngineEvent,
+  now: number,
+): ReduceOutput | null {
+  switch (event.type) {
+    case 'round_prepared':
+      return handleRoundPrepared(state, event, now);
+    case 'round_prep_failed':
+      if (
+        event.matchId !== state.matchId ||
+        event.gen !== state.gen ||
+        state.phase !== 'ROUND_LOADING' ||
+        !state.loadingOrActive
+      ) {
+        return { state, effects: [] };
+      }
+      return {
+        state: { ...state, loadingOrActive: { ...state.loadingOrActive, prepError: event.reason } },
+        effects: [],
+      };
+    case 'retry_round': {
+      if (!state.players[event.playerId]?.isHost) return { state, effects: [], ack: 'forbidden' };
+      if (
+        state.phase !== 'ROUND_LOADING' ||
+        event.gen !== state.gen ||
+        !state.loadingOrActive?.prepError
+      ) {
+        return { state, effects: [], ack: 'invalid' };
+      }
+      const next = createLoadingStateForRound(state, state.roundNumber, now);
+      return { state: next.nextState, effects: next.effects, ack: 'ok' };
+    }
+    case 'pano_loaded':
+      return handlePanoLoadedInRound(state, event.playerId, event.roundNumber, now);
+    case 'pano_load_timeout':
+      if (event.matchId !== state.matchId || event.gen !== state.gen) return { state, effects: [] };
+      return maybeStartCountdown(state, now, true);
+    case 'countdown_done':
+      return handleCountdownDone(state, event, now);
+    default:
+      return null;
+  }
+}
+
+export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): ReduceOutput {
+  const misc = handleMiscStateEvent(state, event) ?? reduceRoundPrepAndTimeout(state, event, now);
+  if (misc) return misc;
+
+  switch (event.type) {
+    case 'player_join':
+      return handlePlayerJoinOrReclaim(state, { kind: 'join', ...event });
+    case 'player_reconnect':
+      return handlePlayerReconnectWithWake(state, event.playerId, event.isHost, now);
+    case 'player_reclaim_nick':
+      return handlePlayerJoinOrReclaim(state, { kind: 'reclaim', ...event });
+    case 'player_disconnect':
+      return handlePlayerDisconnect(state, event.playerId, now);
+    case 'update_lobby':
+      return handleUpdateLobby(state, event.playerId, event.patch);
+    case 'add_bot':
+      return handleAddBot(state, event.playerId);
+    case 'remove_bot':
+      return handleRemoveBot(state, event.playerId, event.botId);
+    case 'update_bot':
+      return handleUpdateBot(state, event.playerId, event.botId, event.patch);
+    case 'apply_bot_preset':
+      return handleApplyBotPreset(state, event.playerId, event.botId, event.preset);
+    case 'start_match':
+      return handleStartMatch(state, event.playerId, now);
+    case 'set_pin':
+    case 'submit_guess':
+      return handleActivePinOrGuess(state, event, now);
+    case 'bot_turns_updated':
+    case 'bot_thumb_added':
+    case 'bot_guess_recorded':
+    case 'bot_finished':
+      return handleBotEvent(state, event, now);
+    case 'deadline_tick':
+      return handleDeadlineTick(state, event, now);
+    case 'open_bot_card':
+      return handleResultsPauseChange(state, 'open', event.playerId, now);
+    case 'close_bot_card':
+      return handleResultsPauseChange(state, 'close', event.playerId, now);
+    case 'results_autonext_tick':
+    case 'results_pause_cap_tick':
+    case 'next_round':
+      return handleResultsTimersAndNext(state, event, now);
+    case 'end_match':
+      return handleEndMatch(state, event.playerId, now);
+    case 'play_again':
+      return handlePlayAgain(state, event.playerId);
+    default:
+      return { state, effects: [] };
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+web/dist/
+dist/
+.geoaissr-dev/
+.gstack/
+PLAN.md
+TODOS.md
+shared/regions.data.json
+playwright-report/
+test-results/

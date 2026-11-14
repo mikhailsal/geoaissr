@@ -1,0 +1,28 @@
+{
+  "harnesses": [
+    {
+      "id": "claude",
+      "binary": "claude",
+      "deliveryMode": "mcp",
+      "readsOwnerFiles": false,
+      "defaultModel": "haiku",
+      "fallbackModels": ["haiku", "sonnet", "opus"]
+    },
+    {
+      "id": "codex",
+      "binary": "codex",
+      "deliveryMode": "mcp",
+      "readsOwnerFiles": false,
+      "defaultModel": "gpt-6-luna",
+      "fallbackModels": ["gpt-6-luna", "gpt-5.4", "gpt-5.4-mini"]
+    },
+    {
+      "id": "agy",
+      "binary": "agy",
+      "deliveryMode": "file",
+      "readsOwnerFiles": true,
+      "defaultModel": "gemini-3.8-flash-low",
+      "fallbackModels": ["gemini-3.8-flash-low", "gemini-3.8-flash", "gemini-3-pro"]
+    }
+  ]
+}

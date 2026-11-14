@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "useDefineForClassFields": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "composite": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["svelte", "google.maps"],
+    "paths": {
+      "$shared/*": ["./shared/*"]
+    }
+  },
+  "include": ["web/src/**/*.ts", "web/src/**/*.svelte", "shared/**/*.ts"],
+  "exclude": ["**/*.test.ts"]
+}
