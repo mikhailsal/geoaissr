@@ -101,11 +101,6 @@ export interface RoundResultsState {
     humansTotal: number;
     aiTotal: number;
   };
-  autoNextBaseRemainingMs: number;
-  lastResumeAt: number;
-  pauseUsedMs: number;
-  readers: Record<string, string>;
-  waitingForHuman: boolean;
 }
 
 export interface RoundArchiveRecord {
@@ -249,10 +244,6 @@ export type EngineEvent =
       kind: 'round' | 'wait' | 'bot_budget';
       botId?: string;
     }
-  | { type: 'open_bot_card'; playerId: string }
-  | { type: 'close_bot_card'; playerId: string }
-  | { type: 'results_autonext_tick'; matchId: string; gen: number; roundNumber: number }
-  | { type: 'results_pause_cap_tick'; matchId: string; gen: number; roundNumber: number }
   | { type: 'next_round'; playerId: string; roundNumber: number }
   | { type: 'end_match'; playerId: string }
   | { type: 'play_again'; playerId: string }
@@ -293,21 +284,6 @@ export type EngineEffect =
   | { type: 'stop_all_bots'; reason: string }
   | { type: 'clear_round_images' }
   | { type: 'clear_thumbs' }
-  | {
-      type: 'schedule_results_autonext';
-      matchId: string;
-      gen: number;
-      roundNumber: number;
-      atMs: number;
-    }
-  | {
-      type: 'schedule_results_pause_cap';
-      matchId: string;
-      gen: number;
-      roundNumber: number;
-      atMs: number;
-    }
-  | { type: 'cancel_results_timers' }
   | { type: 'append_match_record'; record: MatchRecord }
   | {
       type: 'log_round_end';

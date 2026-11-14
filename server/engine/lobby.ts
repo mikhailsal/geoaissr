@@ -323,21 +323,12 @@ function reclaimExistingPlayer(
     );
     nextActive = { ...nextActive, humanGuesses: { ...restGuesses, [opts.playerId]: oldGuess } };
   }
-  let nextResults = state.results;
-  const oldReader = nextResults?.readers[opts.oldPlayerId];
-  if (nextResults && oldReader && opts.oldPlayerId !== opts.playerId) {
-    const restReaders = Object.fromEntries(
-      Object.entries(nextResults.readers).filter(([id]) => id !== opts.oldPlayerId),
-    );
-    nextResults = { ...nextResults, readers: { ...restReaders, [opts.playerId]: oldReader } };
-  }
   return {
     state: {
       ...state,
       players: { ...restPlayers, [opts.playerId]: migrated },
       playerOrder: nextOrder,
       loadingOrActive: nextActive,
-      results: nextResults,
     },
     effects: [],
   };

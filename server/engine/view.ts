@@ -1,9 +1,4 @@
-import {
-  COUNTDOWN_MS,
-  RESULTS_PAUSE_CAP_MS,
-  type ClientViewState,
-  type PlayerView,
-} from '../../shared/protocol.ts';
+import { COUNTDOWN_MS, type ClientViewState, type PlayerView } from '../../shared/protocol.ts';
 import { computeFinalRankings } from './results.ts';
 import type { RoomState } from './types.ts';
 
@@ -108,36 +103,15 @@ function projectActive(state: RoomState, viewerId: string): ClientViewState['act
   };
 }
 
-function projectResults(state: RoomState, now: number): ClientViewState['results'] {
+function projectResults(state: RoomState): ClientViewState['results'] {
   const res = state.results;
   if (state.phase !== 'ROUND_RESULTS' || !res) return undefined;
-  const readerNames = Object.values(res.readers);
-  const pausedByReaderName =
-    readerNames.length === 0
-      ? null
-      : readerNames.length === 1
-        ? (readerNames[0] ?? null)
-        : `${readerNames[0] ?? ''} (+${readerNames.length - 1})`;
-  const elapsedSinceResume = Math.max(0, now - res.lastResumeAt);
-  const pauseRemainingMs =
-    pausedByReaderName !== null
-      ? Math.max(0, RESULTS_PAUSE_CAP_MS - res.pauseUsedMs - elapsedSinceResume)
-      : Math.max(0, RESULTS_PAUSE_CAP_MS - res.pauseUsedMs);
-  const autoNextPaused = pausedByReaderName !== null || res.waitingForHuman;
-  const autoNextEndsAt = autoNextPaused
-    ? now + res.autoNextBaseRemainingMs
-    : res.lastResumeAt + res.autoNextBaseRemainingMs;
-
   return {
     targetLat: res.target.lat,
     targetLng: res.target.lng,
     countryNameRu: res.target.countryNameRu,
     entries: res.entries,
     humanVsAi: res.humanVsAi,
-    autoNextEndsAt,
-    autoNextFrozenMs: autoNextPaused ? res.autoNextBaseRemainingMs : null,
-    pausedByReaderName,
-    pauseRemainingMs,
   };
 }
 
@@ -177,7 +151,7 @@ function projectFinal(state: RoomState): ClientViewState['final'] {
   };
 }
 
-export function projectView(state: RoomState, viewerId: string, now = Date.now()): ClientViewState {
+export function projectView(state: RoomState, viewerId: string): ClientViewState {
   const viewer = state.players[viewerId];
   const hostConnected = state.playerOrder.some((id) => {
     const p = state.players[id];
@@ -210,7 +184,7 @@ export function projectView(state: RoomState, viewerId: string, now = Date.now()
     availableHarnesses: state.availableHarnesses,
     loading: projectLoading(state),
     active: projectActive(state, viewerId),
-    results: projectResults(state, now),
+    results: projectResults(state),
     final: projectFinal(state),
   };
 }

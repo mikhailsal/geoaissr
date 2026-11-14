@@ -1,12 +1,7 @@
 import { expect, test } from 'bun:test';
-import {
-  RESULTS_AUTONEXT_MS,
-  RESULTS_PAUSE_CAP_MS,
-  type HarnessCatalogEntry,
-} from '../../shared/protocol.ts';
+import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
 import { reduce } from './reduce.ts';
-import { projectView } from './view.ts';
 import { createInitialRoomState, type RoomState, type RoundTarget } from './types.ts';
 
 function makeSettings(overrides: Partial<SettingsFile> = {}): SettingsFile {
@@ -255,7 +250,7 @@ test('all humans confirmed with thinking bot waits at least 60s from start or ai
   expect(botDone.state.results?.humanVsAi.visible).toBe(true);
 });
 
-test('open_bot_card pauses autonext and enforces 60s cap', () => {
+test('round results stay until the host presses next; no auto-advance timer', () => {
   let s = makeRoom();
   s = reduce(
     s,
@@ -270,38 +265,34 @@ test('open_bot_card pauses autonext and enforces 60s cap', () => {
   ).state;
   s = reduce(s, { type: 'pano_loaded', playerId: 'h', roundNumber: 1 }, 1200).state;
   s = reduce(s, { type: 'countdown_done', matchId: 'm1', gen: s.gen }, 2000).state;
-  s = reduce(
+  const ended = reduce(
     s,
     { type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 55, lng: 37 },
     5000,
-  ).state;
+  );
+  s = ended.state;
   expect(s.phase).toBe('ROUND_RESULTS');
+  expect(ended.effects.some((e) => e.type.startsWith('schedule_results'))).toBe(false);
 
-  const opened = reduce(s, { type: 'open_bot_card', playerId: 'h' }, 5000 + 3000);
-  expect(opened.state.results?.autoNextBaseRemainingMs).toBe(RESULTS_AUTONEXT_MS - 3000);
-  expect(opened.effects.some((e) => e.type === 'schedule_results_pause_cap')).toBe(true);
-  // While paused the client gets a frozen remainder, so its countdown does not tick down.
-  expect(projectView(opened.state, 'h', 5000 + 7000).results?.autoNextFrozenMs).toBe(
-    RESULTS_AUTONEXT_MS - 3000,
-  );
-
-  const closed = reduce(opened.state, { type: 'close_bot_card', playerId: 'h' }, 5000 + 13_000);
-  expect(closed.state.results?.pauseUsedMs).toBe(10_000);
-  expect(closed.effects.some((e) => e.type === 'schedule_results_autonext')).toBe(true);
-  expect(projectView(closed.state, 'h', 5000 + 13_000).results?.autoNextFrozenMs).toBeNull();
-
-  const capped = reduce(
-    opened.state,
+  const guest = reduce(
+    s,
     {
-      type: 'results_pause_cap_tick',
-      matchId: 'm1',
-      gen: opened.state.gen,
-      roundNumber: 1,
+      type: 'player_join',
+      playerId: 'g',
+      secret: 's2',
+      name: 'Гость',
+      color: 'p-2',
+      isHost: false,
     },
-    5000 + RESULTS_PAUSE_CAP_MS + 3000,
-  );
-  expect(capped.state.results?.pauseUsedMs).toBe(RESULTS_PAUSE_CAP_MS);
-  expect(Object.keys(capped.state.results?.readers ?? {}).length).toBe(0);
+    6000,
+  ).state;
+  const byGuest = reduce(guest, { type: 'next_round', playerId: 'g', roundNumber: 1 }, 7000);
+  expect(byGuest.ack).toBe('forbidden');
+  expect(byGuest.state.phase).toBe('ROUND_RESULTS');
+
+  const byHost = reduce(guest, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 10 * 60_000);
+  expect(byHost.ack).toBe('ok');
+  expect(byHost.state.phase).toBe('ROUND_LOADING');
 });
 
 test('last human disconnecting in ROUND_LOADING holds countdown and mapsError resets cleanly', () => {

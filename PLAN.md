@@ -79,7 +79,7 @@ Not verified and moved to the M0 spikes: whether images from MCP tool results re
 - The map zooms out to the correct point, participants' markers appear one by one, an arc is drawn from each to the answer, the distance and points count up.
 - A leaderboard with smooth row reordering.
 - A click on an AI icon opens a card: a short explanation of the guess, the list of moves made with thumbnails of what the AI looked at, time spent on the round.
-- The host presses «Дальше» ("Next"); otherwise an automatic advance after 30 s.
+- The host presses «Дальше» ("Next"). There is no automatic advance: results stay on screen as long as the host wants, so the AI explanations can be read without a timer; other players see «Хост запустит следующий раунд».
 
 ### 4.6 Final
 
@@ -511,8 +511,8 @@ The items below were added by the design review (phase 2) and are likewise manda
   - Sequence: the map flies to the answer (800 ms), the answer flag, then markers one by one from the farthest to the nearest with a 300 ms step; an arc is drawn to each, the participant's row appears in the table, the points count up over 600 ms; after the last marker the rows are reordered (400 ms). The whole sequence takes no longer than 5 s with any number of participants.
   - A click on the map or the space bar shows the outcome immediately. With `prefers-reduced-motion` the outcome is always shown immediately: no fly-over, no timed arcs, no counting numbers and no confetti.
   - In M1 the display is simple: the map immediately in the bounds of all markers, markers and table without a sequence.
-  - The automatic-advance countdown (30 s) starts after the display ends. While any connected human has an AI card open, the countdown stands still, everyone sees the line «Пауза: Оля читает объяснение» ("Pause: Olya is reading the explanation"). The total pause per round is no more than 90 s; the host's «Дальше» always works.
-  - Tests: unit tests on the state machine pause (opening and closing the card, the 90 s limit, the reader disconnecting, «Дальше» during the pause); E2E, after the space bar all markers and final points are on screen without waiting.
+  - Results have no auto-advance countdown (removed after playtesting: players wanted to read AI explanations without a timer). Only the host's «Дальше» moves on.
+  - Tests: unit test that results stay until the host's «Дальше» and that a guest cannot advance; E2E, after the space bar all markers and final points are on screen without waiting.
 - **Interface states.** Milestone M1 (the rows on «Проверить», quip and side score in M2); refines sections 4, 6 and 8. What the person sees:
 
   | Element | Loading | Empty | Error | Success | Partial |
@@ -1100,8 +1100,8 @@ Checked: component boundaries, data flows, the state machine, coupling, failure 
 ```
             «Старт» (host)          all loaded or 5 s              timer | humans confirmed and bots finished
   LOBBY ─────────────────> ROUND_LOADING ───────────────> ROUND_ACTIVE ─────────────────> ROUND_RESULTS
-    ^                         │ preparation failure:                                          │ «Дальше» | 30 s
-    │                         │ host «Повторить» (we stay) | «Завершить партию» ─> FINAL      │ (pause while there are no humans)
+    ^                         │ preparation failure:                                          │ host «Дальше»  
+    │                         │ host «Повторить» (we stay) | «Завершить партию» ─> FINAL      │                                  
     │                                                                                         v
     └──────────── «Ещё раз» ──────────── FINAL <──── rounds are over ──── another round ──> ROUND_LOADING
   Forbidden and rejected by a single transition function: LOBBY→ROUND_ACTIVE, ROUND_ACTIVE→LOBBY,

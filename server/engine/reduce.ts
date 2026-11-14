@@ -1,4 +1,3 @@
-import { RESULTS_AUTONEXT_MS, RESULTS_PAUSE_CAP_MS } from '../../shared/protocol.ts';
 import { handleEndMatch, handlePlayAgain } from './final.ts';
 import {
   handleAddBot,
@@ -8,11 +7,7 @@ import {
   handleUpdateBot,
   handleUpdateLobby,
 } from './lobby.ts';
-import {
-  advanceFromResults,
-  finishActiveRoundToResults,
-  handleResultsPauseChange,
-} from './results.ts';
+import { advanceFromResults, finishActiveRoundToResults } from './results.ts';
 import {
   checkAllHumansConfirmedAndBotsState,
   createLoadingStateForRound,
@@ -34,9 +29,6 @@ function handlePlayerDisconnect(state: RoomState, playerId: string, now: number)
   };
   if (nextState.phase === 'ROUND_LOADING') {
     return maybeStartCountdown(nextState, now, false);
-  }
-  if (nextState.phase === 'ROUND_RESULTS') {
-    return handleResultsPauseChange(nextState, 'close', playerId, now);
   }
   return { state: nextState, effects: [] };
 }
@@ -174,67 +166,18 @@ function handleDeadlineTick(
   };
 }
 
-function handleResultsTimersAndNext(
+/** Results stay on screen until the host moves on; there is no auto-advance timer. */
+function handleNextRound(
   state: RoomState,
-  event: EngineEvent,
+  event: Extract<EngineEvent, { type: 'next_round' }>,
   now: number,
 ): ReduceOutput {
   if (state.phase !== 'ROUND_RESULTS' || !state.results) {
-    return { state, effects: [], ack: event.type === 'next_round' ? 'round_over' : undefined };
+    return { state, effects: [], ack: 'round_over' };
   }
-  const res = state.results;
-
-  if (event.type === 'results_autonext_tick') {
-    if (
-      event.matchId !== state.matchId ||
-      event.gen !== state.gen ||
-      event.roundNumber !== state.roundNumber
-    ) {
-      return { state, effects: [] };
-    }
-    if (Object.keys(res.readers).length > 0 || res.waitingForHuman) {
-      return { state, effects: [] };
-    }
-    return advanceFromResults(state, now);
-  }
-
-  if (event.type === 'results_pause_cap_tick') {
-    if (
-      event.matchId !== state.matchId ||
-      event.gen !== state.gen ||
-      event.roundNumber !== state.roundNumber ||
-      Object.keys(res.readers).length === 0
-    ) {
-      return { state, effects: [] };
-    }
-    const resumedState: RoomState = {
-      ...state,
-      results: { ...res, pauseUsedMs: RESULTS_PAUSE_CAP_MS, readers: {}, lastResumeAt: now },
-    };
-    if (res.autoNextBaseRemainingMs <= 0) {
-      return advanceFromResults(resumedState, now);
-    }
-    return {
-      state: resumedState,
-      effects: [
-        {
-          type: 'schedule_results_autonext',
-          matchId: state.matchId,
-          gen: state.gen,
-          roundNumber: res.roundNumber,
-          atMs: now + res.autoNextBaseRemainingMs,
-        },
-      ],
-    };
-  }
-
-  if (event.type === 'next_round') {
-    if (!state.players[event.playerId]?.isHost) return { state, effects: [], ack: 'forbidden' };
-    if (event.roundNumber !== state.roundNumber) return { state, effects: [], ack: 'round_over' };
-    const out = advanceFromResults(state, now);
-    return { ...out, ack: 'ok' };
-  }
-  return { state, effects: [] };
+  if (!state.players[event.playerId]?.isHost) return { state, effects: [], ack: 'forbidden' };
+  if (event.roundNumber !== state.roundNumber) return { state, effects: [], ack: 'round_over' };
+  return { ...advanceFromResults(state, now), ack: 'ok' };
 }
 
 function handlePlayerReconnectWithWake(
@@ -246,30 +189,6 @@ function handlePlayerReconnectWithWake(
   const joined = handlePlayerJoinOrReclaim(state, { kind: 'reconnect', playerId, isHost });
   if (joined.state.phase === 'ROUND_LOADING') {
     return maybeStartCountdown(joined.state, now, false);
-  }
-  if (joined.state.phase === 'ROUND_RESULTS' && joined.state.results?.waitingForHuman) {
-    const res = joined.state.results;
-    return {
-      state: {
-        ...joined.state,
-        results: {
-          ...res,
-          waitingForHuman: false,
-          lastResumeAt: now,
-          autoNextBaseRemainingMs: RESULTS_AUTONEXT_MS,
-        },
-      },
-      effects: [
-        ...joined.effects,
-        {
-          type: 'schedule_results_autonext',
-          matchId: joined.state.matchId,
-          gen: joined.state.gen,
-          roundNumber: res.roundNumber,
-          atMs: now + RESULTS_AUTONEXT_MS,
-        },
-      ],
-    };
   }
   return joined;
 }
@@ -409,14 +328,8 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
       return handleBotEvent(state, event, now);
     case 'deadline_tick':
       return handleDeadlineTick(state, event, now);
-    case 'open_bot_card':
-      return handleResultsPauseChange(state, 'open', event.playerId, now);
-    case 'close_bot_card':
-      return handleResultsPauseChange(state, 'close', event.playerId, now);
-    case 'results_autonext_tick':
-    case 'results_pause_cap_tick':
     case 'next_round':
-      return handleResultsTimersAndNext(state, event, now);
+      return handleNextRound(state, event, now);
     case 'end_match':
       return handleEndMatch(state, event.playerId, now);
     case 'play_again':

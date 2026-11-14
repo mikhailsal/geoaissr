@@ -31,11 +31,6 @@
       ? null
       : Math.max(1, Math.ceil(store.remainingMs(countdownStartsAt + COUNTDOWN_MS) / 1000)),
   );
-  const autoNextRemainingMs = $derived(
-    view?.results
-      ? (view.results.autoNextFrozenMs ?? store.remainingMs(view.results.autoNextEndsAt))
-      : 0,
-  );
 
   const handleRetryConnect = (): void => {
     store.retryConnect();
@@ -182,7 +177,6 @@
       {view}
       browserMapsKey={store.browserMapsKey}
       activeBotCard={store.activeBotCard}
-      remainingAutoNextMs={autoNextRemainingMs}
       onSelectBotCard={handleSelectBotCard}
       onCloseBotCard={handleCloseBotCard}
       onNextRound={handleNextRound}

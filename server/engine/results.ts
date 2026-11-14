@@ -1,8 +1,4 @@
-import {
-  RESULTS_AUTONEXT_MS,
-  RESULTS_PAUSE_CAP_MS,
-  type RoundResultEntryView,
-} from '../../shared/protocol.ts';
+import type { RoundResultEntryView } from '../../shared/protocol.ts';
 import {
   calculateRoundScore,
   computeHumanVsAiRound,
@@ -180,7 +176,6 @@ function buildResultsState(
   state: RoomState,
   active: ActiveRoundState,
   entries: RoundResultEntryView[],
-  now: number,
 ): {
   results: RoundResultsState;
   humansMean: number;
@@ -209,11 +204,6 @@ function buildResultsState(
       humansTotal,
       aiTotal,
     },
-    autoNextBaseRemainingMs: RESULTS_AUTONEXT_MS,
-    lastResumeAt: now,
-    pauseUsedMs: 0,
-    readers: {},
-    waitingForHuman: false,
   };
   return { results, humansMean, aiMean, humansTotal, aiTotal };
 }
@@ -233,7 +223,7 @@ export function finishActiveRoundToResults(
   const botRes = scoreBotsForRound(state, active, finalizedBots, target, diagonalKm, now);
 
   const entries = rankRoundEntries([...humanRes.rawEntries, ...botRes.rawEntries]);
-  const built = buildResultsState(state, active, entries, now);
+  const built = buildResultsState(state, active, entries);
   const humanWaitMs =
     active.allHumansConfirmedAt !== null && Object.keys(finalizedBots).length > 0
       ? Math.max(0, now - active.allHumansConfirmedAt)
@@ -271,13 +261,6 @@ export function finishActiveRoundToResults(
         target,
         answeredNames: [...humanRes.answeredNames, ...botRes.answeredNames],
         abortedBots,
-      },
-      {
-        type: 'schedule_results_autonext',
-        matchId: state.matchId,
-        gen: nextGen,
-        roundNumber: active.roundNumber,
-        atMs: now + RESULTS_AUTONEXT_MS,
       },
     ],
   };
@@ -371,74 +354,11 @@ export function buildMatchRecord(state: RoomState, now: number): MatchRecord {
   };
 }
 
-export function handleResultsPauseChange(
-  state: RoomState,
-  action: 'open' | 'close',
-  playerId: string,
-  now: number,
-): ReduceOutput {
-  if (state.phase !== 'ROUND_RESULTS' || !state.results) return { state, effects: [] };
-  const res = state.results;
-  const player = state.players[playerId];
-  const wasPaused = Object.keys(res.readers).length > 0;
-  let readers: Record<string, string>;
-
-  if (action === 'open' && player) {
-    if (res.pauseUsedMs >= RESULTS_PAUSE_CAP_MS) return { state, effects: [] };
-    readers = { ...res.readers, [playerId]: player.name };
-  } else {
-    readers = Object.fromEntries(Object.entries(res.readers).filter(([k]) => k !== playerId));
-  }
-
-  const isPaused = Object.keys(readers).length > 0;
-  if (!wasPaused && isPaused) {
-    const elapsed = Math.max(0, now - res.lastResumeAt);
-    const remainingAuto = Math.max(0, res.autoNextBaseRemainingMs - elapsed);
-    const capRemaining = Math.max(0, RESULTS_PAUSE_CAP_MS - res.pauseUsedMs);
-    return {
-      state: {
-        ...state,
-        results: { ...res, readers, autoNextBaseRemainingMs: remainingAuto, lastResumeAt: now },
-      },
-      effects: [
-        { type: 'cancel_results_timers' },
-        {
-          type: 'schedule_results_pause_cap',
-          matchId: state.matchId,
-          gen: state.gen,
-          roundNumber: res.roundNumber,
-          atMs: now + capRemaining,
-        },
-      ],
-    };
-  }
-
-  if (wasPaused && !isPaused) {
-    const pausedDelta = Math.max(0, now - res.lastResumeAt);
-    const pauseUsedMs = Math.min(RESULTS_PAUSE_CAP_MS, res.pauseUsedMs + pausedDelta);
-    return {
-      state: { ...state, results: { ...res, readers, pauseUsedMs, lastResumeAt: now } },
-      effects: [
-        { type: 'cancel_results_timers' },
-        {
-          type: 'schedule_results_autonext',
-          matchId: state.matchId,
-          gen: state.gen,
-          roundNumber: res.roundNumber,
-          atMs: now + res.autoNextBaseRemainingMs,
-        },
-      ],
-    };
-  }
-
-  return { state: { ...state, results: { ...res, readers } }, effects: [] };
-}
-
 export function advanceFromResults(state: RoomState, now: number): ReduceOutput {
   if (state.phase !== 'ROUND_RESULTS' || !state.results) return { state, effects: [] };
   if (state.roundNumber >= state.settings.rounds) {
     const record = buildMatchRecord(state, now);
-    const effects: EngineEffect[] = [{ type: 'cancel_results_timers' }];
+    const effects: EngineEffect[] = [];
     if (record.playedRounds > 0) {
       effects.push({ type: 'append_match_record', record });
     }
@@ -448,17 +368,9 @@ export function advanceFromResults(state: RoomState, now: number): ReduceOutput 
     };
   }
 
-  const anyConnectedHuman = state.playerOrder.some((id) => state.players[id]?.connected);
-  if (!anyConnectedHuman) {
-    return {
-      state: { ...state, results: { ...state.results, waitingForHuman: true } },
-      effects: [{ type: 'cancel_results_timers' }],
-    };
-  }
-
   const next = createLoadingStateForRound(state, state.roundNumber + 1, now);
   return {
     state: next.nextState,
-    effects: [{ type: 'cancel_results_timers' }, ...next.effects],
+    effects: next.effects,
   };
 }

@@ -75,7 +75,6 @@ async function playRoundOne(hostPage: Page, guestPage: Page): Promise<void> {
 
   const whyBtn = hostPage.getByRole('button', { name: 'почему?' }).first();
   await whyBtn.click();
-  await expect(hostPage.getByText(/Пауза: Оля читает объяснение/)).toBeVisible();
   await expect(hostPage.locator('.bot-card')).toBeVisible();
   // All four start frames (N, E, S, W) are shown, not only the first one.
   expect(await hostPage.locator('.bot-card .thumb-item').count()).toBeGreaterThanOrEqual(4);

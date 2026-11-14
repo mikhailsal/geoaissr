@@ -144,11 +144,10 @@ export const RU = {
     noHumanAnswer: 'нет ответа, 0',
     noBotGuess: 'нет догадки',
     nextBtn: 'Дальше',
-    hostWaitNext: 'Следующий раунд через',
-    hostWaitFinal: 'Итоги через',
+    waitHostNext: 'Хост запустит следующий раунд',
+    waitHostFinal: 'Хост покажет итоги',
     whyBtn: 'почему?',
     hideWhyBtn: 'свернуть',
-    pausedBy: (name: string) => `Пауза: ${name} читает объяснение`,
     noMovesMade: 'Ходов не делал, ответил по стартовым снимкам',
   },
   final: {

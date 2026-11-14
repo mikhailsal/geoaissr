@@ -25,8 +25,6 @@ export const MAX_WS_CONNECTIONS = 32;
 export const MAX_PENDING_AUTH_CONNECTIONS = 8;
 export const UNAUTH_TIMEOUT_MS = 5_000;
 export const PANO_LOAD_TIMEOUT_MS = 5_000;
-export const RESULTS_AUTONEXT_MS = 30_000;
-export const RESULTS_PAUSE_CAP_MS = 90_000;
 
 export type GamePhase = 'LOBBY' | 'ROUND_LOADING' | 'ROUND_ACTIVE' | 'ROUND_RESULTS' | 'FINAL';
 
@@ -118,7 +116,7 @@ export const checkBotVisionMessageSchema = z.object({
 });
 
 export const simpleSeqMessageSchema = z.object({
-  type: z.enum(['confirm_quota_reset', 'start_match', 'end_match', 'play_again', 'close_bot_card']),
+  type: z.enum(['confirm_quota_reset', 'start_match', 'end_match', 'play_again']),
   seq: z.number().int().nonnegative(),
 });
 
@@ -171,13 +169,6 @@ export const retryRoundMessageSchema = z.object({
   gen: z.number().int().nonnegative(),
 });
 
-export const openBotCardMessageSchema = z.object({
-  type: z.literal('open_bot_card'),
-  seq: z.number().int().nonnegative(),
-  roundNumber: z.number().int().positive(),
-  botId: z.string().min(1).max(64),
-});
-
 export const clientMessageSchema = z.discriminatedUnion('type', [
   helloMessageSchema,
   joinMessageSchema,
@@ -196,7 +187,6 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   submitGuessMessageSchema,
   nextRoundMessageSchema,
   retryRoundMessageSchema,
-  openBotCardMessageSchema,
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -353,11 +343,6 @@ export interface ClientViewState {
       humansTotal: number;
       aiTotal: number;
     };
-    autoNextEndsAt: number;
-    /** Set while the countdown is paused (a reader has «почему?» open, or no human is online). */
-    autoNextFrozenMs: number | null;
-    pausedByReaderName: string | null;
-    pauseRemainingMs: number;
   };
   final?: {
     playedRounds: number;

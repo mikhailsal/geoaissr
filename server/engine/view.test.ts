@@ -98,7 +98,7 @@ test('active view leaks neither target coordinates nor other players pins or bot
     5500,
   ).state;
 
-  const guestView = projectView(s, 'g', 6000);
+  const guestView = projectView(s, 'g');
   const serialized = JSON.stringify(guestView);
   expect(guestView.phase).toBe('ROUND_ACTIVE');
   expect(serialized).not.toContain('48.8566');
@@ -137,7 +137,7 @@ test('startBlockedReasons blocks quota exceeded and host mapsError in real mode'
     300,
   ).state;
 
-  const view = projectView(s, 'h', 300);
+  const view = projectView(s, 'h');
   expect(view.startBlockedReasons.length).toBe(2);
   expect(reduce(s, { type: 'start_match', playerId: 'h' }, 301).ack).toBe('invalid');
 });
@@ -191,12 +191,12 @@ test('round results and final screen reveal scores and perRound botCards', () =>
   ).state;
   expect(s.phase).toBe('ROUND_RESULTS');
 
-  const resView = projectView(s, 'h', 5500);
+  const resView = projectView(s, 'h');
   expect(resView.results?.countryNameRu).toBe('Франция');
   expect(resView.results?.entries.find((e) => e.isAi)?.roundScore).toBe(5000);
 
   s = reduce(s, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 6000).state;
-  const finalView = projectView(s, 'h', 6000);
+  const finalView = projectView(s, 'h');
   expect(finalView.phase).toBe('FINAL');
   expect(finalView.final?.standings[0]?.isAi).toBe(true);
   expect(finalView.final?.standings[0]?.perRound[0]?.botCard?.explanation).toBe('Эйфелева башня');

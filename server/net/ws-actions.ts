@@ -200,7 +200,6 @@ export function dispatchEngineClientMessage(
   playerId: string,
   msg: ClientMessage,
 ): AckResult {
-  const st = shell.getState();
   switch (msg.type) {
     case 'update_lobby':
       return shell.dispatch({ type: 'update_lobby', playerId, patch: msg.patch }) ?? 'ok';
@@ -257,11 +256,6 @@ export function dispatchEngineClientMessage(
           lng: msg.lng,
         }) ?? 'ok'
       );
-    case 'open_bot_card':
-      if (msg.roundNumber !== st.roundNumber) return 'round_over';
-      return shell.dispatch({ type: 'open_bot_card', playerId }) ?? 'ok';
-    case 'close_bot_card':
-      return shell.dispatch({ type: 'close_bot_card', playerId }) ?? 'ok';
     case 'next_round':
       return shell.dispatch({ type: 'next_round', playerId, roundNumber: msg.roundNumber }) ?? 'ok';
     case 'end_match':

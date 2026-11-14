@@ -5,7 +5,7 @@
   import BotCard from '../components/BotCard.svelte';
   import HostMenu from '../components/HostMenu.svelte';
   import ResultsMap from '../components/ResultsMap.svelte';
-  import { formatDistanceRu, formatNumberRu, formatSecondsOnly } from '../i18n/format';
+  import { formatDistanceRu, formatNumberRu } from '../i18n/format';
   import { attachGlobalKeys, prefersReducedMotion } from '../lib/keys';
   import { RU } from '../i18n/ru';
 
@@ -13,7 +13,6 @@
     view: ClientViewState;
     browserMapsKey: string | null;
     activeBotCard: { roundNumber: number; entry: RoundResultEntryView } | null;
-    remainingAutoNextMs: number;
     onSelectBotCard: (roundNumber: number, entry: RoundResultEntryView) => void;
     onCloseBotCard: () => void;
     onNextRound: (roundNumber: number) => void;
@@ -26,7 +25,6 @@
     view,
     browserMapsKey,
     activeBotCard,
-    remainingAutoNextMs,
     onSelectBotCard,
     onCloseBotCard,
     onNextRound,
@@ -149,10 +147,6 @@
         <p class="muted" role="status">{RU.results.noAnswersAtAll}</p>
       {/if}
 
-      {#if res.pausedByReaderName}
-        <p class="pause-banner" role="status">{RU.results.pausedBy(res.pausedByReaderName)}</p>
-      {/if}
-
       <div class="table-scroll">
         <table class="results-table">
           <thead>
@@ -227,10 +221,11 @@
       </div>
 
       <footer class="next-footer">
-        <span class="muted" role="status">
-          {isFinalRound ? RU.results.hostWaitFinal : RU.results.hostWaitNext}
-          {formatSecondsOnly(remainingAutoNextMs / 1000)}
-        </span>
+        {#if !view.viewerIsHost}
+          <span class="muted" role="status">
+            {isFinalRound ? RU.results.waitHostFinal : RU.results.waitHostNext}
+          </span>
+        {/if}
         {#if view.viewerIsHost}
           <button
             type="button"
@@ -332,15 +327,6 @@
 
   .hva-score {
     font-family: var(--font-display);
-  }
-
-  .pause-banner {
-    margin: 0;
-    padding: 0.45rem 0.75rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--paint);
-    background-color: var(--asphalt-900);
-    font-size: 0.88rem;
   }
 
   .table-scroll {

@@ -447,16 +447,10 @@ export class GameStore {
 
   openBotCard(roundNumber: number, entry: RoundResultEntryView): void {
     this.activeBotCard = { roundNumber, entry };
-    if (this.view?.phase === 'ROUND_RESULTS') {
-      this.wsClient.sendSequenced('open_bot_card', { roundNumber, botId: entry.id });
-    }
   }
 
   closeBotCard(): void {
     if (!this.activeBotCard) return;
     this.activeBotCard = null;
-    if (this.view?.phase === 'ROUND_RESULTS') {
-      this.wsClient.sendSequenced('close_bot_card');
-    }
   }
 }

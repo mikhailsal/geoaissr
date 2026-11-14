@@ -59,7 +59,6 @@ interface TimerRegistry {
   panoTimeout: ReturnType<typeof setTimeout> | null;
   countdown: ReturnType<typeof setTimeout> | null;
   deadline: ReturnType<typeof setTimeout> | null;
-  results: ReturnType<typeof setTimeout> | null;
   botBudgets: Map<string, ReturnType<typeof setTimeout>>;
 }
 
@@ -80,7 +79,6 @@ function clearAllTimers(timers: TimerRegistry): void {
   timers.panoTimeout = clearTimer(timers.panoTimeout);
   timers.countdown = clearTimer(timers.countdown);
   timers.deadline = clearTimer(timers.deadline);
-  timers.results = clearTimer(timers.results);
   for (const t of timers.botBudgets.values()) clearTimeout(t);
   timers.botBudgets.clear();
 }
@@ -174,12 +172,7 @@ function runAsyncEffect(ctx: EffectContext, effect: EngineEffect, state: RoomSta
 type ScheduleEffect = Extract<
   EngineEffect,
   {
-    type:
-      | 'schedule_pano_timeout'
-      | 'schedule_countdown'
-      | 'schedule_deadline'
-      | 'schedule_results_autonext'
-      | 'schedule_results_pause_cap';
+    type: 'schedule_pano_timeout' | 'schedule_countdown' | 'schedule_deadline';
   }
 >;
 
@@ -200,46 +193,32 @@ function runScheduleEffect(ctx: EffectContext, effect: ScheduleEffect): void {
     });
     return;
   }
-  if (effect.type === 'schedule_deadline') {
-    if (effect.kind === 'bot_budget' && effect.botId) {
-      const prev = timers.botBudgets.get(effect.botId);
-      if (prev) clearTimeout(prev);
-      const bId = effect.botId;
-      timers.botBudgets.set(
-        bId,
-        scheduleDelay(ctx, effect.atMs, () => {
-          ctx.dispatch({
-            type: 'deadline_tick',
-            matchId: effect.matchId,
-            gen: effect.gen,
-            kind: 'bot_budget',
-            botId: bId,
-          });
-        }),
-      );
-      return;
-    }
-    timers.deadline = clearTimer(timers.deadline);
-    timers.deadline = scheduleDelay(ctx, effect.atMs, () => {
-      ctx.dispatch({
-        type: 'deadline_tick',
-        matchId: effect.matchId,
-        gen: effect.gen,
-        kind: effect.kind,
-      });
-    });
+  // schedule_deadline
+  if (effect.kind === 'bot_budget' && effect.botId) {
+    const prev = timers.botBudgets.get(effect.botId);
+    if (prev) clearTimeout(prev);
+    const bId = effect.botId;
+    timers.botBudgets.set(
+      bId,
+      scheduleDelay(ctx, effect.atMs, () => {
+        ctx.dispatch({
+          type: 'deadline_tick',
+          matchId: effect.matchId,
+          gen: effect.gen,
+          kind: 'bot_budget',
+          botId: bId,
+        });
+      }),
+    );
     return;
   }
-  timers.results = clearTimer(timers.results);
-  timers.results = scheduleDelay(ctx, effect.atMs, () => {
+  timers.deadline = clearTimer(timers.deadline);
+  timers.deadline = scheduleDelay(ctx, effect.atMs, () => {
     ctx.dispatch({
-      type:
-        effect.type === 'schedule_results_autonext'
-          ? 'results_autonext_tick'
-          : 'results_pause_cap_tick',
+      type: 'deadline_tick',
       matchId: effect.matchId,
       gen: effect.gen,
-      roundNumber: effect.roundNumber,
+      kind: effect.kind,
     });
   });
 }
@@ -249,8 +228,6 @@ function runSyncEffect(ctx: EffectContext, effect: EngineEffect, currentState: R
     case 'schedule_pano_timeout':
     case 'schedule_countdown':
     case 'schedule_deadline':
-    case 'schedule_results_autonext':
-    case 'schedule_results_pause_cap':
       runScheduleEffect(ctx, effect);
       return;
     case 'start_bot_processes': {
@@ -291,9 +268,6 @@ function runSyncEffect(ctx: EffectContext, effect: EngineEffect, currentState: R
     case 'clear_thumbs':
       ctx.deps.clearThumbs();
       return;
-    case 'cancel_results_timers':
-      ctx.timers.results = clearTimer(ctx.timers.results);
-      return;
     case 'log_round_end':
       ctx.deps.logRoundEnd({
         roundNumber: effect.roundNumber,
@@ -318,7 +292,6 @@ export function createRoomShell(initialState: RoomState, deps: ShellDeps): RoomS
     panoTimeout: null,
     countdown: null,
     deadline: null,
-    results: null,
     botBudgets: new Map(),
   };
 
@@ -366,7 +339,7 @@ export function createRoomShell(initialState: RoomState, deps: ShellDeps): RoomS
   return {
     getState: () => state,
     getVersion: () => version,
-    getView: (viewerId) => projectView(state, viewerId, nowFn()),
+    getView: (viewerId) => projectView(state, viewerId),
     dispatch,
     dispose: () => {
       disposed = true;

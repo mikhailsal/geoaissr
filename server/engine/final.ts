@@ -10,7 +10,6 @@ export function handleEndMatch(state: RoomState, playerId: string, now: number):
   const effects: EngineEffect[] = [
     { type: 'stop_all_bots', reason: 'партия завершена хостом' },
     { type: 'clear_round_images' },
-    { type: 'cancel_results_timers' },
   ];
 
   if (state.playedRounds.length > 0) {
