@@ -12,7 +12,7 @@
     "doctor": "bun run server/cli/doctor.ts",
     "build": "vite build",
     "check": "bun run scripts/check.ts",
-    "test": "bun test ./shared/ ./server/ ./test/ ./web/src/",
+    "test": "bun test ./shared/ ./server/ ./test/ ./web/src/ ./scripts/",
     "test:e2e": "bunx playwright test",
     "test:harness": "bun run scripts/test-harness.ts",
     "test:tunnel": "bun run scripts/test-tunnel.ts",

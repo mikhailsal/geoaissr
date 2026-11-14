@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { createBotRunner } from '../server/bots/runner.ts';
 import type { EngineEvent } from '../server/engine/types.ts';
 import { createFakeLocationService } from '../server/location.ts';
-import { loadDataset, parseEvalArgs } from './eval-bots.ts';
+import { type EvalArmMetrics, loadDataset, parseEvalArgs } from './eval-bots.ts';
 
 test('parseEvalArgs validates flags and supports --out cleanly', () => {
   expect(
@@ -128,11 +128,18 @@ test('eval-bots --dataset --dry handles valid dataset dir without hanging on get
       { stdout: 'pipe', stderr: 'pipe' },
     );
     expect(await proc.exited).toBe(0);
+    // The report is a paired comparison: a `baseline` and a `candidate` arm.
     const report = JSON.parse(readFileSync(outFile, 'utf8')) as {
-      arms: Array<{ runs: number; medianKm: number | null }>;
+      baseline: EvalArmMetrics;
+      candidate: EvalArmMetrics;
     };
-    expect(report.arms.length).toBe(3);
-    expect(report.arms.every((a) => a.runs === 1 && typeof a.medianKm === 'number')).toBe(true);
+    expect(report.baseline.armName).toBe('baseline');
+    expect(report.candidate.armName).toBe('candidate');
+    // One sample at one repeat gives exactly one measured run per arm.
+    for (const arm of [report.baseline, report.candidate]) {
+      expect(arm.runs).toBe(1);
+      expect(typeof arm.medianKm).toBe('number');
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
