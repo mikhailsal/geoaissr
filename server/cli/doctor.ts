@@ -175,7 +175,7 @@ function checkBunAndKeys(
     fix:
       browserKey && serverKey
         ? ''
-        : 'Скопируйте .env.example в .env и заполните оба ключа по инструкции README «Как получить ключи»',
+        : 'Скопируйте .env.example в .env и заполните оба ключа по инструкции README «How to get Google Maps Platform keys»',
     context: `browserKey=${browserKey ? 'set' : 'missing'}, serverKey=${serverKey ? 'set' : 'missing'}`,
   });
 

@@ -1,152 +1,152 @@
 <!-- /autoplan restore point: "/home/tass/myprojects/geoaissr/.gstack/tmp/autoplan/HEAD-autoplan-restore-20261113-002039.md" -->
 ## Implementation plan
-# geoaissr: мультиплеерный гео-гессер с ИИ-соперниками
+# geoaissr: a multiplayer geo-guessing game with AI opponents
 
-Статус: утверждён владельцем 2026-11-13 после обзора `/autoplan` (CEO, дизайн, DX, инженерный). Автор плана: Claude по описанию владельца от 2026-11-13.
+Status: approved by the owner on 2026-11-13 after the `/autoplan` review (CEO, design, DX, engineering). Plan author: Claude, from the owner's description of 2026-11-13.
 
-## 1. Задача
+## 1. Task
 
-Трое друзей играют в GeoGuessr в режиме «кто наберёт больше очков». Втроём скучно, новых игроков нет. Нужна своя игра того же жанра, где к трём людям добавляются до трёх ИИ-соперников. ИИ делают свои догадки через локальные харнессы владельца и их подписки: `codex`, `claude`, `agy` (Antigravity). `gemini-cli` не используется (устарел, решение владельца).
+Three friends play GeoGuessr in the "whoever scores more points wins" mode. With just three of them it gets boring, and there are no new players. They need their own game of the same genre in which up to three AI opponents join the three humans. The AIs make their guesses through the owner's local harnesses and their subscriptions: `codex`, `claude`, `agy` (Antigravity). `gemini-cli` is not used (outdated, owner's decision).
 
-Запускает игру владелец на своей машине. Друзья подключаются по ссылке с токеном через публичный туннель. Регистрации нет.
+The owner launches the game on their own machine. Friends join via a link with a token through a public tunnel. There is no registration.
 
-## 2. Требования владельца (дословно по смыслу)
+## 2. Owner's requirements (verbatim in meaning)
 
-1. Мультиплеер без регистрации; вход по ссылке с токеном.
-2. Публичный туннель наружу с локальной машины владельца.
-3. Настройки партии: число раундов и длительность раунда.
-4. Побеждает набравший больше всего очков за все раунды.
-5. До 3 ИИ-соперников, каждый настраивается: харнесс и любая доступная в нём модель со зрением.
-6. ИИ получает скриншоты панорамы с разных сторон с подписью сторон света.
-7. У ИИ есть настраиваемый лимит ходов.
-8. ИИ обязан в конце раунда объяснить свою догадку; клик по иконке ИИ показывает краткое объяснение.
-9. Приятная анимация, быстрая работа.
-10. Настоящие панорамы Google. Карта для ответа может быть бесплатной, типа OSM.
+1. Multiplayer without registration; entry via a link with a token.
+2. A public tunnel to the outside from the owner's local machine.
+3. Match settings: number of rounds and round duration.
+4. The winner is whoever scores the most points over all rounds.
+5. Up to 3 AI opponents, each configurable: harness and any vision-capable model available in it.
+6. The AI receives screenshots of the panorama from different directions with compass-direction captions.
+7. The AI has a configurable move limit.
+8. The AI must explain its guess at the end of the round; a click on the AI icon shows a short explanation.
+9. Pleasant animation, fast performance.
+10. Real Google panoramas. The map for answering may be free, OSM-like.
 
-## 3. Проверенные факты (2026-11-13, живые проверки на машине владельца)
+## 3. Verified facts (2026-11-13, live checks on the owner's machine)
 
-| Факт | Чем проверено | Вывод для плана |
+| Fact | How verified | Conclusion for the plan |
 |---|---|---|
-| Установлены `codex` 0.167.0, `claude` 2.1.322, `agy` 1.5.7, `cloudflared` 2025.11.1, `bun` 1.4.2, `node` 22.16 | `command -v`, `--version` | Стек и туннель берём из того, что уже стоит |
-| `codex` вошёл через ChatGPT, `claude` вошёл через claude.ai | `codex login status`, `claude auth status` | Готовы к работе |
-| `agy models` отвечает `Error: Please sign in to view available models` | живой запуск | Перед игрой нужен вход в `agy`; `doctor` обязан это ловить |
-| `codex exec` принимает картинки флагом `-i`, MCP-серверы задаются через `-c mcp_servers.*` | `codex exec --help`, `codex mcp --help` | Есть путь доставки картинок |
-| `claude -p` и `agy -p` имеют `--output-format json`, `--json-schema` (agy), `--model`, `--effort`; у обоих есть MCP | `--help` | Единый способ: инструменты через MCP |
-| В окружении есть `GOOGLE_API_KEY`, но Street View на нём выключен: `REQUEST_DENIED: This API is not activated on your API project` | бесплатный запрос к `streetview/metadata` | Нужно включить Maps JavaScript API и Street View Static API в проекте с биллингом |
-| Бесплатный месячный объём Google: Dynamic Street View 5 000 загрузок, Static Street View 10 000 картинок, metadata без ограничений и бесплатно | официальная таблица цен Google (через поиск, дата страницы не подтверждена) | Игра укладывается в бесплатный объём, нужен счётчик и жёсткий потолок |
-| Quick Tunnel `cloudflared`: до 200 одновременных запросов, SSE не поддерживается; `~/.cloudflared/config.yaml` у владельца отсутствует | документация Cloudflare, `ls ~/.cloudflared` | Транспорт только WebSocket. Проверено вживую 2026-11-13: через quick tunnel проходят HTTPS 200 и `101 Switching Protocols`; имя туннеля появляется в публичном DNS с задержкой |
+| Installed: `codex` 0.167.0, `claude` 2.1.322, `agy` 1.5.7, `cloudflared` 2025.11.1, `bun` 1.4.2, `node` 22.16 | `command -v`, `--version` | The stack and the tunnel are taken from what is already installed |
+| `codex` is logged in via ChatGPT, `claude` is logged in via claude.ai | `codex login status`, `claude auth status` | Ready to work |
+| `agy models` answers `Error: Please sign in to view available models` | live run | Signing in to `agy` is needed before the game; `doctor` must catch this |
+| `codex exec` accepts images via the `-i` flag, MCP servers are set via `-c mcp_servers.*` | `codex exec --help`, `codex mcp --help` | There is a path for delivering images |
+| `claude -p` and `agy -p` have `--output-format json`, `--json-schema` (agy), `--model`, `--effort`; both have MCP | `--help` | A single approach: tools via MCP |
+| `GOOGLE_API_KEY` is present in the environment, but Street View is disabled on it: `REQUEST_DENIED: This API is not activated on your API project` | free request to `streetview/metadata` | Maps JavaScript API and Street View Static API must be enabled in a project with billing |
+| Google free monthly volume: Dynamic Street View 5,000 loads, Static Street View 10,000 images, metadata unlimited and free | Google's official price table (via search, page date not confirmed) | The game fits within the free volume; a counter and a hard ceiling are needed |
+| `cloudflared` Quick Tunnel: up to 200 concurrent requests, SSE not supported; the owner has no `~/.cloudflared/config.yaml` | Cloudflare documentation, `ls ~/.cloudflared` | WebSocket-only transport. Verified live on 2026-11-13: HTTPS 200 and `101 Switching Protocols` pass through a quick tunnel; the tunnel name appears in public DNS with a delay |
 
-Не проверено и вынесено в спайки вехи M0: доходят ли картинки из результатов MCP-инструментов до модели в каждом из трёх харнессов; время одного хода каждого харнесса. Условия Google прочитаны 2026-11-13 (Google Maps Platform Terms of Service, редакция от 26 августа 2026). Пункт 3.2.3(e) запрещает показывать Street View и не-Google карту на одном экране. Пункт 3.2.3(a) запрещает выносить Google Maps Content за пределы сервисов Google (хранить, передавать дальше). Пункт 3.2.3(c)(vii) запрещает использовать его для улучшения моделей ИИ (обучение, тестирование, проверка, дообучение). Исходный замысел в части карты и ИИ-соперников с этими пунктами расходится; решение за владельцем (раздел 14, «Решения владельца до кода»).
+Not verified and moved to the M0 spikes: whether images from MCP tool results reach the model in each of the three harnesses; the time of one turn for each harness. The Google terms were read on 2026-11-13 (Google Maps Platform Terms of Service, edition of 26 August 2026). Clause 3.2.3(e) forbids showing Street View and a non-Google map on the same screen. Clause 3.2.3(a) forbids taking Google Maps Content outside Google services (storing, passing on). Clause 3.2.3(c)(vii) forbids using it to improve AI models (training, testing, validation, fine-tuning). The original design, as far as the map and the AI opponents are concerned, conflicts with these clauses; the decision is the owner's (section 14, "Owner decisions before code").
 
-## 4. Игровой процесс
+## 4. Gameplay
 
-### 4.1 Роли и вход
+### 4.1 Roles and entry
 
-- Хост: владелец. Запускает `bun run start`, в терминале видит две ссылки: свою (с правами хоста) и пригласительную.
-- Игрок: открывает пригласительную ссылку, вводит ник, выбирает цвет. Всё.
-- Токен живёт во фрагменте URL (`/#t=<token>`), поэтому не попадает в логи туннеля. Клиент шлёт его первым сообщением по WebSocket.
-- Идентичность игрока: `playerId` + секрет в `localStorage`. Обновление страницы или обрыв связи возвращают игрока на его место.
-- Вошедший посреди партии смотрит текущий раунд как зритель и играет со следующего.
-- Лимит: 8 людей и 3 ИИ.
+- Host: the owner. Runs `bun run start`, sees two links in the terminal: their own (with host rights) and the invitation link.
+- Player: opens the invitation link, enters a nickname, picks a color. That is all.
+- The token lives in the URL fragment (`/#t=<token>`), so it does not end up in the tunnel logs. The client sends it as the first WebSocket message.
+- Player identity: `playerId` + a secret in `localStorage`. Refreshing the page or a dropped connection returns the player to their seat.
+- Someone who joins mid-match watches the current round as a spectator and plays from the next one.
+- Limit: 8 humans and 3 AIs.
 
-### 4.2 Лобби (хост настраивает, остальные видят вживую)
+### 4.2 Lobby (the host configures, the others see it live)
 
-- Число раундов: 1–20, по умолчанию 5.
-- Длительность раунда: 30–600 с, по умолчанию 120. Если в партии есть ИИ, минимум 60 с.
-- Движение по панораме: вкл/выкл. Настройка общая для людей и ботов: при выключенном движении инструмент `move` ботам недоступен.
-- Регион: мир или пресет (Европа, Азия, Северная Америка, Южная Америка, Африка, Океания).
-- ИИ-соперники, 0–3 слота. В каждом: имя, цвет, харнесс (`codex` / `claude` / `agy`), модель, уровень рассуждений (effort), лимит ходов 0–20 (по умолчанию 4, как в пресете «Любитель»), размер картинки, бюджет времени, характер, пресет сложности.
-- Список моделей: для `agy` из `agy models`; для `codex` и `claude` из редактируемого файла `harnesses.json` плюс поле «своя модель».
-- Кнопка «Проверить» у каждого слота: быстрый тест зрения (модели показывают картинку с числом, она должна его назвать). Показывает время ответа.
-- Настройки и пресеты ботов сохраняются в `~/.config/geoaissr/settings.json`.
+- Number of rounds: 1–20, default 5.
+- Round duration: 30–600 s, default 120. If the match has an AI, the minimum is 60 s.
+- Movement in the panorama: on/off. The setting is shared by humans and bots: when movement is off, the `move` tool is unavailable to bots.
+- Region: world or a preset (Europe, Asia, North America, South America, Africa, Oceania).
+- AI opponents, 0–3 slots. Each has: name, color, harness (`codex` / `claude` / `agy`), model, reasoning level (effort), move limit 0–20 (default 4, as in the "Любитель" ("Amateur") preset), image size, time budget, personality, difficulty preset.
+- Model list: for `agy` from `agy models`; for `codex` and `claude` from an editable file `harnesses.json` plus a "custom model" field.
+- A «Проверить» ("Check") button on each slot: a quick vision test (the model is shown an image with a number and must name it). Shows the response time.
+- Bot settings and presets are saved in `~/.config/geoaissr/settings.json`.
 
-### 4.3 Раунд
+### 4.3 Round
 
-1. Сервер заранее (во время лобби и экрана результатов) выбирает точку и готовит стартовые картинки для ИИ.
-2. Отсчёт 3-2-1, когда панорама загрузилась у всех (ждём не дольше 5 с).
-3. Человек видит панораму Google на весь экран, таймер, мини-карту. Ставит метку, жмёт «Угадать». До нажатия метку можно двигать.
-4. Сбоку список участников: кто уже ответил; у ИИ видно «ход 3 из 4».
-5. Раунд кончается, когда истёк таймер, либо когда ответили все люди и завершились все боты. Если люди ответили раньше ботов, боты работают ещё 20 с (настраивается), но не меньше чем до 60-й секунды раунда, и затем обрываются.
-6. Кто не поставил метку, получает 0 очков; метка, поставленная, но не подтверждённая к концу таймера, засчитывается как ответ. У ИИ всегда засчитывается последняя записанная догадка, чем бы ни кончилась его работа (дедлайн, бюджет времени, сбой харнесса, лимит подписки); 0 очков бот получает, только если ни одной догадки не записано.
+1. The server, in advance (during the lobby and the results screen), picks a location and prepares the starting images for the AIs.
+2. Countdown 3-2-1, once the panorama has loaded for everyone (we wait no longer than 5 s).
+3. A human sees the Google panorama full screen, a timer, a mini-map. They place a marker and press «Угадать» ("Guess"). Before pressing, the marker can be moved.
+4. A participant list on the side: who has already answered; for an AI it shows «ход 3 из 4» ("move 3 of 4").
+5. The round ends when the timer runs out, or when all humans have answered and all bots have finished. If the humans answered before the bots, the bots keep working for another 20 s (configurable), but not less than until the 60th second of the round, and are then cut off.
+6. Anyone who did not place a marker gets 0 points; a marker that was placed but not confirmed by the end of the timer counts as an answer. For an AI the last recorded guess always counts, however its work ended (deadline, time budget, harness failure, subscription limit); a bot gets 0 points only if no guess was recorded at all.
 
-### 4.4 Очки
+### 4.4 Scoring
 
-- Формула GeoGuessr: `score = round(5000 * exp(-10 * d / D))`, где `d` расстояние в км, `D` диагональ региона (мир: 14 916.862 км). Для каждого пресета региона `D` это расстояние по большому кругу между противоположными углами ограничивающего прямоугольника его полигонов (с учётом 180-го меридиана); значения считает `scripts/build-regions.ts` при подготовке GeoJSON, они записаны константами в `shared/` и закреплены модульным тестом. При `d < 25 м` всегда 5000.
-- Итог: сумма по раундам. При равенстве очков выше тот, у кого больше раундов с ответом, затем тот, у кого меньше суммарная дистанция по раундам с ответом; при полном равенстве место делится.
+- The GeoGuessr formula: `score = round(5000 * exp(-10 * d / D))`, where `d` is the distance in km, `D` is the region diagonal (world: 14 916.862 km). For each region preset, `D` is the great-circle distance between opposite corners of the bounding rectangle of its polygons (taking the 180th meridian into account); the values are computed by `scripts/build-regions.ts` when preparing the GeoJSON, are recorded as constants in `shared/` and pinned by a unit test. For `d < 25 m` it is always 5000.
+- Total: the sum over rounds. On a points tie, the higher place goes to whoever has more rounds with an answer, then to whoever has the smaller total distance over rounds with an answer; on a complete tie the place is shared.
 
-### 4.5 Экран результатов раунда
+### 4.5 Round results screen
 
-- Карта отъезжает к правильной точке, метки участников появляются по очереди, от каждой к ответу рисуется дуга, расстояние и очки набегают счётчиком.
-- Таблица лидеров с плавной перестановкой строк.
-- Клик по иконке ИИ открывает карточку: краткое объяснение догадки, список сделанных ходов с миниатюрами того, что ИИ смотрел, время на раунд.
-- Хост жмёт «Дальше»; иначе автопереход через 30 с.
+- The map zooms out to the correct point, participants' markers appear one by one, an arc is drawn from each to the answer, the distance and points count up.
+- A leaderboard with smooth row reordering.
+- A click on an AI icon opens a card: a short explanation of the guess, the list of moves made with thumbnails of what the AI looked at, time spent on the round.
+- The host presses «Дальше» ("Next"); otherwise an automatic advance after 30 s.
 
-### 4.6 Финал
+### 4.6 Final
 
-- Пьедестал, конфетти победителю, полная таблица по раундам, кнопка «Ещё раз» (в лобби с теми же настройками).
-- Итог партии дописывается в `~/.local/share/geoaissr/matches.jsonl`.
+- A podium, confetti for the winner, a full per-round table, an «Ещё раз» ("Again") button (into the lobby with the same settings).
+- The match result is appended to `~/.local/share/geoaissr/matches.jsonl`.
 
-## 5. ИИ-соперники
+## 5. AI opponents
 
-### 5.1 Что такое «ход»
+### 5.1 What a "move" is
 
-ИИ играет как агент с инструментами. В начале раунда он бесплатно получает 4 картинки: взгляд на север, восток, юг, запад. Дальше каждое действие стоит один ход из лимита:
+The AI plays as an agent with tools. At the start of the round it gets 4 images for free: a view to the north, east, south, west. After that every action costs one move from the limit:
 
-- `look(heading, pitch, fov)`: одна картинка в заданном направлении; маленький `fov` даёт приближение, чтобы прочитать вывеску.
-- `move(heading)`: шаг по дороге в сторону `heading` на соседнюю панораму; возвращает 4 новые картинки N/E/S/W.
+- `look(heading, pitch, fov)`: one image in the given direction; a small `fov` gives a zoom-in so that a sign can be read.
+- `move(heading)`: a step along the road toward `heading` to a neighboring panorama; returns 4 new N/E/S/W images.
 
-Бесплатные действия:
+Free actions:
 
-- `observe()`: повторно получить стартовые 4 картинки.
-- `submit_guess(lat, lng, explanation, quip?)`: записать догадку. Можно вызывать несколько раз, засчитывается последняя. Подсказка в промпте: дай предварительную догадку сразу после первого осмотра, потом уточняй.
+- `observe()`: get the 4 starting images again.
+- `submit_guess(lat, lng, explanation, quip?)`: record a guess. It can be called several times, the last one counts. A hint in the prompt: give a preliminary guess right after the first look, then refine it.
 
-Лимит считает сервер. При исчерпании `look` и `move` возвращают ошибку «ходы кончились, вызови submit_guess». `explanation` обязателен: непустой, до 600 символов, на языке интерфейса.
+The limit is counted by the server. When it is exhausted, `look` and `move` return an error «ходы кончились, вызови submit_guess» ("moves are over, call submit_guess"). `explanation` is mandatory: non-empty, up to 600 characters, in the interface language.
 
-### 5.2 Картинки
+### 5.2 Images
 
-- Источник: Street View Static API, запрос всегда 640x640, по умолчанию `fov=90`, `pitch=0`. Меньший размер для слота получается уменьшением на сервере.
-- На каждую картинку сервер впечатывает подпись стороны света и азимут («С 0°», «В 90°», «ЮЗ 225°») через `sharp`. Та же подпись дублируется текстом в ответе инструмента.
-- Координаты и `pano_id` ИИ не получает никогда.
-- `move` на сервере: берём точку в 25 м по азимуту, спрашиваем бесплатный metadata-эндпоинт о ближайшей панораме; если вернулась та же, пробуем 50 м и 100 м; если нет, ход не списывается и ИИ получает «в эту сторону дороги нет».
-- Стартовые 4 картинки общие для всех ботов (один набор на раунд).
+- Source: Street View Static API, the request is always 640x640, by default `fov=90`, `pitch=0`. A smaller size for a slot is obtained by downscaling on the server.
+- On every image the server imprints a compass-direction caption and azimuth («С 0°», «В 90°», «ЮЗ 225°»; N 0°, E 90°, SW 225°) via `sharp`. The same caption is duplicated as text in the tool response.
+- The AI never receives coordinates or `pano_id`.
+- `move` on the server: take a point 25 m along the azimuth, ask the free metadata endpoint about the nearest panorama; if the same one comes back, try 50 m and 100 m; if none, the move is not charged and the AI gets «в эту сторону дороги нет» ("there is no road in this direction").
+- The 4 starting images are shared by all bots (one set per round).
 
-### 5.3 Запуск харнесса
+### 5.3 Harness launch
 
-На каждый раунд и каждого бота сервер один раз запускает CLI харнесса в пустом временном каталоге. Весь многоходовый цикл идёт внутри одной сессии харнесса: так быстрее, чем запускать CLI на каждый ход.
+For each round and each bot, the server launches the harness CLI once in an empty temporary directory. The whole multi-turn loop runs inside one harness session: this is faster than launching the CLI for every move.
 
-Инструменты бот получает через MCP-сервер `geo` (stdio-прослойка `bot-tools/`), которая ходит на игровой сервер по отдельному порту.
+The bot receives its tools through the MCP server `geo` (a stdio shim `bot-tools/`), which talks to the game server over a separate port.
 
-| Харнесс | Команда (уточняется спайком) | Ограничения |
+| Harness | Command (refined by a spike) | Restrictions |
 |---|---|---|
-| `codex` | `codex exec -m <model> -s read-only -c mcp_servers.geo.command=... --json` | read-only песочница без сети |
-| `claude` | `claude -p --model <model> --mcp-config <file> --strict-mcp-config --allowedTools "mcp__geo__*" --output-format json` | только инструменты `geo` |
-| `agy` | `agy -p --model <model> --settings <json с MCP> --output-format json` | только инструменты `geo`; не трогаем глобальный конфиг `agy mcp` |
+| `codex` | `codex exec -m <model> -s read-only -c mcp_servers.geo.command=... --json` | read-only sandbox without network |
+| `claude` | `claude -p --model <model> --mcp-config <file> --strict-mcp-config --allowedTools "mcp__geo__*" --output-format json` | only `geo` tools |
+| `agy` | `agy -p --model <model> --settings <json with MCP> --output-format json` | only `geo` tools; we do not touch the global `agy mcp` config |
 
-Адаптер каждого харнесса: один файл с одной функцией «собери команду и окружение». Доставка картинок имеет два режима, выбор по итогам спайка для каждого харнесса:
+Each harness adapter: one file with one function "build the command and environment". Image delivery has two modes, chosen per harness based on the spike outcome:
 
-- `mcp`: картинка возвращается прямо в результате MCP-инструмента.
-- `file`: инструмент пишет картинку во временный каталог бота и возвращает путь; харнесс читает её своим штатным средством.
+- `mcp`: the image is returned directly in the MCP tool result.
+- `file`: the tool writes the image to the bot's temporary directory and returns the path; the harness reads it with its standard means.
 
-### 5.4 Изоляция и честность
+### 5.4 Isolation and fairness
 
-- API для ботов слушает отдельный порт только на `127.0.0.1`; туннель на этот порт не смотрит. Токен бота одноразовый, на один раунд.
-- Ответ раунда хранится только в памяти игрового сервера.
-- Веб-поиск и прочие инструменты харнесса для бота выключаются флагами адаптера; что на деле выключено у каждого харнесса, проверяет спайк S1 (раздел 14, «Изоляция процесса бота»).
-- Ники игроков в промпт бота не попадают.
-- Объяснение бота показывается всем только после конца раунда и рисуется как простой текст.
-- По дедлайну сервер убивает процесс харнесса (SIGTERM, через 2 с SIGKILL) и чистит временный каталог.
+- The API for bots listens on a separate port, on `127.0.0.1` only; the tunnel does not point to that port. The bot token is single-use, for one round.
+- The round's answer is kept only in the game server's memory.
+- Web search and other harness tools are turned off for the bot by adapter flags; what is actually turned off for each harness is verified by spike S1 (section 14, "Bot process isolation").
+- Player nicknames do not get into the bot prompt.
+- The bot's explanation is shown to everyone only after the round ends and is rendered as plain text.
+- At the deadline the server kills the harness process (SIGTERM, SIGKILL after 2 s) and cleans the temporary directory.
 
-## 6. Панорамы и карта
+## 6. Panoramas and map
 
-- Люди: Maps JavaScript API, `StreetViewPanorama`. Скрыты адрес, подписи дорог, ссылка «открыть в Google Maps». Движение отключается настройкой (`linksControl`, `clickToGo`).
-- Выбор точки: случайная точка внутри полигонов стран региона (Natural Earth, встроенный GeoJSON) с весами по странам, затем бесплатный metadata-запрос с радиусом. Берём только официальные панорамы (`copyright` содержит «Google», `source=outdoor`). До 30 попыток на точку. Страны внутри одной партии не повторяются, пока это возможно.
-- Карта для ответа: MapLibre GL JS с бесплатными векторными тайлами OpenFreeMap (данные OSM, без ключа).
-- Два ключа Google: браузерный (только Maps JavaScript API, ограничение по referrer `*.trycloudflare.com/*`, `localhost` и адрес из `--public-url`, если он задан) выдаётся клиенту после проверки токена; серверный (Street View Static API) клиентам не отдаётся.
-- Счётчик расхода: сервер считает загрузки панорам и Static-картинки за месяц в `~/.local/share/geoaissr/quota.json`. Потолок приложения по умолчанию 80% бесплатного объёма; правила учёта, проверка перед стартом партии и поведение при достижении потолка описаны в разделе 14 («Учёт квоты»). Счётчик это оценка, а не гарантия биллинга: настоящий предел задают дневные квоты в Cloud Console.
+- Humans: Maps JavaScript API, `StreetViewPanorama`. The address, road labels and the "open in Google Maps" link are hidden. Movement is disabled by a setting (`linksControl`, `clickToGo`).
+- Location selection: a random point inside the polygons of the region's countries (Natural Earth, embedded GeoJSON) with per-country weights, then a free metadata request with a radius. Only official panoramas are taken (`copyright` contains "Google", `source=outdoor`). Up to 30 attempts per point. Countries do not repeat within one match while that is possible.
+- Map for answering: MapLibre GL JS with free OpenFreeMap vector tiles (OSM data, no key).
+- Two Google keys: the browser key (Maps JavaScript API only, referrer restriction `*.trycloudflare.com/*`, `localhost` and the address from `--public-url` if given) is issued to the client after the token check; the server key (Street View Static API) is never given to clients.
+- Usage counter: the server counts panorama loads and Static images per month in `~/.local/share/geoaissr/quota.json`. The application ceiling is by default 80% of the free volume; the counting rules, the pre-match check and the behavior when the ceiling is reached are described in section 14 ("Quota accounting"). The counter is an estimate, not a billing guarantee: the real limit is set by the daily quotas in Cloud Console.
 
-Оценка расхода на партию (5 раундов, 3 человека, 3 бота, лимит 6 ходов): панорам 15 без перезагрузок страниц (проверка перед стартом закладывает 30); Static-картинок в худшем случае 5 × (12 + 3 × (6 + 3) × 4) = 600, где 12 это до трёх наборов стартовых картинок, а «+ 3» бесплатные неудачные вызовы бота за раунд. При потолке 80% (8 000 Static-картинок) это 13 таких партий в месяц в худшем случае; без потолка 16. С лимитом 4 хода худший случай 480 картинок, 16 партий при потолке. Обычный расход в несколько раз меньше: `look` запрашивает одну картинку, а не четыре.
+Usage estimate per match (5 rounds, 3 humans, 3 bots, move limit 6): 15 panoramas without page reloads (the pre-match check reserves 30); Static images in the worst case 5 × (12 + 3 × (6 + 3) × 4) = 600, where 12 is up to three sets of starting images and "+ 3" are the bot's free failed calls per round. With the 80% ceiling (8,000 Static images) that is 13 such matches per month in the worst case; without the ceiling 16. With a 4-move limit the worst case is 480 images, 16 matches at the ceiling. Typical usage is several times smaller: `look` requests one image, not four.
 
-## 7. Архитектура
+## 7. Architecture
 
 ```
 браузеры игроков ──HTTPS/WSS──> cloudflared quick tunnel ──> игровой сервер :PORT (Bun)
@@ -160,283 +160,283 @@
 127.0.0.1:BOT_PORT (не в туннеле) <──HTTP + токен бота────────────────────────────────────┘
 ```
 
-- Язык: TypeScript везде. Сервер на Bun (`Bun.serve`, встроенный WebSocket). Клиент: Svelte 5 + Vite.
-- Каталоги: `shared/` (протокол и zod-схемы, формула очков), `server/`, `web/`, `bot-tools/`, `scripts/`.
-- Сервер авторитетен: состояние игры, таймеры, очки. Клиент присылает только намерения.
-- Конечный автомат: `LOBBY → ROUND_LOADING → ROUND_ACTIVE → ROUND_RESULTS → (следующий раунд | FINAL) → LOBBY`.
-- Все входящие сообщения проходят zod-схему; лимит размера сообщения 16 КБ; ник до 20 символов.
-- Ограничение частоты неудачных входов по адресу клиента и общий потолок неудачных входов (пороги и источник адреса в разделе 14, «Свой публичный адрес и пороги входа»); потолок 32 соединения. `GET /healthz` отвечает без токена.
-- Состояние комнаты в памяти. Падение сервера обрывает партию (осознанно).
+- Language: TypeScript everywhere. The server is on Bun (`Bun.serve`, built-in WebSocket). Client: Svelte 5 + Vite.
+- Directories: `shared/` (protocol and zod schemas, the scoring formula), `server/`, `web/`, `bot-tools/`, `scripts/`.
+- The server is authoritative: game state, timers, scores. The client sends only intents.
+- State machine: `LOBBY → ROUND_LOADING → ROUND_ACTIVE → ROUND_RESULTS → (next round | FINAL) → LOBBY`.
+- All incoming messages pass a zod schema; message size limit 16 KB; nickname up to 20 characters.
+- Rate limiting of failed logins by client address and an overall ceiling on failed logins (thresholds and address source in section 14, "Own public address and login thresholds"); ceiling of 32 connections. `GET /healthz` responds without a token.
+- Room state is in memory. A server crash aborts the match (deliberately).
 
-Экраны клиента: `web/src/screens/Join.svelte`, `Lobby.svelte`, `Round.svelte`, `RoundResults.svelte`, `Final.svelte`. Компоненты: `PanoView.svelte`, `GuessMap.svelte`, `ResultsMap.svelte`, `Leaderboard.svelte`, `PlayerList.svelte`, `BotCard.svelte`, `BotSlotEditor.svelte`, `TimerRing.svelte`.
+Client screens: `web/src/screens/Join.svelte`, `Lobby.svelte`, `Round.svelte`, `RoundResults.svelte`, `Final.svelte`. Components: `PanoView.svelte`, `GuessMap.svelte`, `ResultsMap.svelte`, `Leaderboard.svelte`, `PlayerList.svelte`, `BotCard.svelte`, `BotSlotEditor.svelte`, `TimerRing.svelte`.
 
-## 8. Анимация и скорость
+## 8. Animation and speed
 
-- Переходы между экранами, счётчики очков, перестановка таблицы: встроенные средства Svelte (`transition`, `animate:flip`, `Tween`).
-- Карта результатов: `flyTo`, поочерёдное появление меток, дуги рисуются по времени.
-- Кольцо таймера пульсирует в последние 10 с.
-- `prefers-reduced-motion` отключает движение, оставляя смену состояний.
-- Следующий раунд готовится заранее, поэтому между «Дальше» и отсчётом нет ожидания сети.
-- Maps JavaScript API грузится один раз в лобби; объект панорамы переиспользуется между раундами.
-- Интерфейс на русском; строки в одном модуле `web/src/i18n/ru.ts`.
+- Transitions between screens, score counters, table reordering: Svelte built-ins (`transition`, `animate:flip`, `Tween`).
+- Results map: `flyTo`, markers appearing one by one, arcs drawn over time.
+- The timer ring pulses in the last 10 s.
+- `prefers-reduced-motion` disables motion, leaving only the state changes.
+- The next round is prepared in advance, so there is no network wait between «Дальше» ("Next") and the countdown.
+- The Maps JavaScript API is loaded once in the lobby; the panorama object is reused between rounds.
+- The interface is in Russian; strings live in one module `web/src/i18n/ru.ts`.
 
-## 9. Команды
+## 9. Commands
 
-- `bun run start`: сервер + туннель, печатает ссылки хоста и приглашения.
-- `bun run start --no-tunnel`: только локально.
-- `bun run start --public-url <https://адрес>`: без `cloudflared`, пригласительная ссылка строится от своего адреса.
-- `bun run doctor`: проверяет ключи Google (metadata-запрос), наличие и вход каждого харнесса (`codex login status`, `claude auth status`, `agy models`), наличие `cloudflared`. На каждую проблему печатает причину и точную команду исправления.
-- `bun run dev`: сервер и Vite с перезагрузкой.
+- `bun run start`: server + tunnel, prints the host and invitation links.
+- `bun run start --no-tunnel`: local only.
+- `bun run start --public-url <https://address>`: without `cloudflared`, the invitation link is built from your own address.
+- `bun run doctor`: checks the Google keys (a metadata request), the presence and login of each harness (`codex login status`, `claude auth status`, `agy models`), the presence of `cloudflared`. For each problem it prints the cause and the exact fix command.
+- `bun run dev`: server and Vite with reload.
 
-Настройка: `.env` с `GOOGLE_MAPS_BROWSER_KEY` и `GOOGLE_MAPS_SERVER_KEY`; `.env.example` и раздел README «Как получить ключи» в репозитории.
+Setup: `.env` with `GOOGLE_MAPS_BROWSER_KEY` and `GOOGLE_MAPS_SERVER_KEY`; `.env.example` and a README section "Как получить ключи" ("How to get the keys") in the repository.
 
-## 10. Вехи
+## 10. Milestones
 
-### M0. Основа и спайки (до кода фич)
+### M0. Foundation and spikes (before feature code)
 
-Ворота качества (правило владельца, первая веха):
+Quality gates (the owner's rule, first milestone):
 
-1. ESLint (`typescript-eslint` strict-type-checked, `eslint-plugin-svelte`) с `--max-warnings 0`, Prettier, `tsc --strict`, `svelte-check`; `shellcheck` для shell-скриптов.
-2. Лимиты размера: исходный файл ≤ 500 строк, тестовый ≤ 1000, функция ≤ 80. Проверка: `scripts/check-size.ts` (файлы, со списком исключений `size-allowlist.json`, где записан текущий размер; исключение может только уменьшаться) и правило ESLint `max-lines-per-function: 80`.
-3. Принуждение в двух местах: задача CI (`.github/workflows/ci.yml`) и pre-push хук в репозитории (`.githooks/pre-push`, установка одной командой `bun run hooks:install`), оба запускают `bun run check`. Пока у репозитория нет remote, CI и pre-push не срабатывают, поэтому `bun run hooks:install` ставит ещё и `.githooks/pre-commit` с тем же `bun run check`; создание приватного remote входит в решения владельца до кода.
-4. `CLAUDE.md` проекта с лимитами и командами проверки.
+1. ESLint (`typescript-eslint` strict-type-checked, `eslint-plugin-svelte`) with `--max-warnings 0`, Prettier, `tsc --strict`, `svelte-check`; `shellcheck` for shell scripts.
+2. Size limits: source file ≤ 500 lines, test file ≤ 1000, function ≤ 80. Check: `scripts/check-size.ts` (files, with an exception list `size-allowlist.json` that records the current size; an exception may only shrink) and the ESLint rule `max-lines-per-function: 80`.
+3. Enforcement in two places: a CI job (`.github/workflows/ci.yml`) and a pre-push hook in the repository (`.githooks/pre-push`, installed with one command `bun run hooks:install`), both run `bun run check`. While the repository has no remote, CI and pre-push do not fire, so `bun run hooks:install` also installs `.githooks/pre-commit` with the same `bun run check`; creating a private remote is part of the owner's decisions before code.
+4. The project `CLAUDE.md` with the limits and the check commands.
 
-Решения владельца до кода (раздел 14): карта для ответа, ИИ на снимках Google, приватный remote для CI.
+Owner decisions before code (section 14): the map for answering, AI on Google imagery, a private remote for CI.
 
-Спайки идут сразу после ворот качества, S1 первым (каждый оставляет короткий отчёт в `docs/spikes/` и решение):
+The spikes go right after the quality gates, S1 first (each leaves a short report in `docs/spikes/` and a decision):
 
-- S1. Для `codex`, `claude`, `agy`: видит ли модель картинку из результата MCP-инструмента; если нет, работает ли режим `file`; время холодного старта и одного хода; как передать MCP-конфиг на один запуск без изменения глобальных настроек; какими флагами закрыть харнессу чтение файлов вне временного каталога, веб-поиск и запуск команд; как отключить пользовательские настройки харнесса (общие инструкции, хуки, плагины, память). Затем на одноразовом коде: один полный раунд бота (стартовые картинки, ходы, догадка с объяснением) и три бота одновременно; состав и критерий в разделе 14.
-- S2. WebSocket через quick tunnel `cloudflared`: само соединение уже проверено (раздел 3); остаётся пинг раз в 20 с, удержание соединения 15 минут и восстановление после обрыва.
-- S3. Ключи Google: включены оба API; доля удачных попаданий metadata-выборки по регионам; точные тексты ошибок для `doctor`; сверка бесплатного месячного объёма и единицы тарификации панорам и карт с актуальной таблицей цен; какие дневные квоты выставить в Cloud Console.
-- S4. Час на обзор открытых клонов с проверкой лицензий: есть ли готовая основа для экранов M1. Решение записывается; по умолчанию своя сборка.
+- S1. For `codex`, `claude`, `agy`: does the model see an image from an MCP tool result; if not, does the `file` mode work; cold start time and the time of one turn; how to pass an MCP config for a single run without changing global settings; which flags close off the harness's reading of files outside the temporary directory, web search and command execution; how to disable the harness's user settings (global instructions, hooks, plugins, memory). Then, on throwaway code: one full bot round (starting images, moves, guess with explanation) and three bots simultaneously; composition and criterion in section 14.
+- S2. WebSocket through a `cloudflared` quick tunnel: the connection itself is already verified (section 3); what remains is a ping every 20 s, holding the connection for 15 minutes and recovery after a drop.
+- S3. Google keys: both APIs enabled; the share of successful hits of the metadata selection by region; the exact error texts for `doctor`; reconciling the free monthly volume and the billing unit of panoramas and maps with the current price table; which daily quotas to set in Cloud Console.
+- S4. One hour to survey open-source clones with a license check: is there a ready base for the M1 screens. The decision is recorded; the default is our own build.
 
-### M1. Первая игра (сквозной срез)
+### M1. First game (end-to-end slice)
 
-Всё, что нужно для одного игрового вечера: протокол и схемы, конечный автомат, вход по токену, лобби (раунды, длительность, слоты ИИ на одном харнессе, прошедшем S1), раунд с настоящей панорамой и картой, `bot-tools` (MCP), `BotImageService`, `BotRunner`, один адаптер, лимит ходов, дедлайн, счётчик и потолок квоты Static с проверкой перед стартом партии, очки, результаты с карточкой ИИ и объяснением, финал, переподключение, запуск `cloudflared` из `start` с проверкой готовности ссылки, базовый `doctor`, запись партии в `matches.jsonl`, простые переходы между экранами, README с шагами запуска. Регион: только мир.
+Everything needed for one game evening: protocol and schemas, state machine, token login, lobby (rounds, duration, AI slots on one harness that passed S1), a round with a real panorama and map, `bot-tools` (MCP), `BotImageService`, `BotRunner`, one adapter, move limit, deadline, the Static quota counter and ceiling with a pre-match check, scoring, results with an AI card and explanation, final, reconnection, launching `cloudflared` from `start` with a link readiness check, a basic `doctor`, recording the match to `matches.jsonl`, simple transitions between screens, a README with launch steps. Region: world only.
 
-Ворота «Первая игра» закрывают веху: партия с друзьями и замеры из раздела 14. По её итогам владелец подтверждает или меняет состав M2–M4.
+The "First game" gate closes the milestone: a match with friends and the measurements from section 14. Based on its results, the owner confirms or changes the contents of M2–M4.
 
-### M2. Все харнессы и настройка ИИ
+### M2. All harnesses and AI configuration
 
-Адаптеры остальных харнессов, прошедших S1, список моделей, проверка зрения в лобби, сложность ботов, характер и реплика, счёт «Люди против ИИ», пресеты регионов.
+Adapters for the remaining harnesses that passed S1, the model list, the vision check in the lobby, bot difficulty, personality and quip, the "Humans versus AI" score, region presets.
 
-### M3. Защита и свой адрес
+### M3. Protection and own address
 
-Пороги неудачных входов, учёт панорам в счётчике квоты, полный `doctor`, флаг `--public-url`.
+Failed-login thresholds, panorama accounting in the quota counter, the full `doctor`, the `--public-url` flag.
 
-### M4. Полировка
+### M4. Polish
 
-Анимации результатов и финала, состояния загрузки и ошибок на каждом экране, полный README.
+Animations of results and final, loading and error states on every screen, the full README.
 
-## 11. Тесты
+## 11. Tests
 
-- Модульные: формула очков, конечный автомат (все переходы и запрещённые переходы), схемы протокола, выборка точек с подменённым metadata, учёт ходов и дедлайна бота, счётчик квоты.
-- Интеграционные: полный сценарий партии на настоящем WebSocket с несколькими клиентами, поддельным провайдером панорам и поддельным харнессом (исполняемый скрипт, говорящий по MCP).
-- E2E (Playwright): два браузера играют партию из двух раундов с заглушкой панорамы; проверка переподключения.
-- Контрактные тесты харнессов на настоящих CLI: отдельная команда `bun run test:harness`, по требованию, не в CI.
-- Проверка туннеля: `bun run test:tunnel`, по требованию.
+- Unit: the scoring formula, the state machine (all transitions and forbidden transitions), protocol schemas, location selection with a mocked metadata, accounting of bot moves and deadline, the quota counter.
+- Integration: a full match scenario over a real WebSocket with several clients, a fake panorama provider and a fake harness (an executable script speaking MCP).
+- E2E (Playwright): two browsers play a two-round match with a panorama stub; a reconnection check.
+- Contract tests of harnesses on real CLIs: a separate command `bun run test:harness`, on demand, not in CI.
+- Tunnel check: `bun run test:tunnel`, on demand.
 
-## 12. Риски
+## 12. Risks
 
-| Риск | Что делаем |
+| Risk | What we do |
 |---|---|
-| Картинки из MCP не доходят до модели в каком-то харнессе | Спайк S1 до кода; запасной режим `file` |
-| Харнесс отвечает слишком медленно для раунда | Предварительная догадка после первого осмотра; замер в «Проверить»; предупреждение в лобби, если время из «Проверить» больше половины бюджета времени бота |
-| Условия Google: показ Street View рядом с не-Google картой, передача картинок сторонним моделям | Проверено по тексту (раздел 3): исходный замысел расходится с пунктами 3.2.3(a), 3.2.3(c)(vii) и 3.2.3(e). Решает владелец до начала кода (раздел 14, «Решения владельца до кода»); вариант карты без расхождения: Google Maps JS (ключ уже нужен) |
-| Расход сверх бесплатного объёма | Счётчик и жёсткий потолок; совет выставить квоты в Cloud Console |
-| Лимиты подписок харнессов при 3 ботах подряд | Лимит ходов, effort по умолчанию низкий; ошибка лимита показывается в карточке бота; засчитывается последняя записанная догадка, без неё 0 |
-| Quick tunnel нестабилен или WebSocket не проходит | Спайк S2; клиент переподключается сам; ссылка печатается заново при смене URL |
-| Игрок подсмотрит координаты через инструменты разработчика | Принято: игра для друзей |
+| Images from MCP do not reach the model in some harness | Spike S1 before code; fallback `file` mode |
+| A harness answers too slowly for a round | A preliminary guess after the first look; measurement in «Проверить» ("Check"); a lobby warning if the time from «Проверить» is more than half of the bot's time budget |
+| Google terms: showing Street View next to a non-Google map, passing images to third-party models | Verified against the text (section 3): the original design conflicts with clauses 3.2.3(a), 3.2.3(c)(vii) and 3.2.3(e). The owner decides before code starts (section 14, "Owner decisions before code"); a map option without the conflict: Google Maps JS (the key is needed anyway) |
+| Usage beyond the free volume | A counter and a hard ceiling; advice to set quotas in Cloud Console |
+| Harness subscription limits with 3 bots in a row | Move limit, low default effort; the limit error is shown in the bot card; the last recorded guess counts, without one 0 |
+| The quick tunnel is unstable or WebSocket does not pass | Spike S2; the client reconnects by itself; the link is printed again when the URL changes |
+| A player peeks at the coordinates via developer tools | Accepted: a game for friends |
 
-## 13. Вне рамок первой версии
+## 13. Out of scope for the first version
 
-- Учётные записи, рейтинги между партиями, экран истории партий.
-- Несколько комнат на одном сервере.
-- Свои списки точек и редактор карт.
-- Режимы дуэли и «королевской битвы».
-- Мобильная раскладка как отдельная цель.
-- Голос и чат.
+- Accounts, ratings across matches, a match history screen.
+- Multiple rooms on one server.
+- Custom location lists and a map editor.
+- Duel and "battle royale" modes.
+- A mobile layout as a separate goal.
+- Voice and chat.
 
-## 14. Дополнения, принятые при обзоре
+## 14. Additions accepted during review
 
-Пункты ниже обязательны. Там, где они расходятся с текстом разделов 3–12, действует текст этого раздела. У каждого пункта названа веха и разделы, которые он уточняет.
+The items below are mandatory. Where they diverge from the text of sections 3–12, the text of this section governs. Each item names the milestone and the sections it refines.
 
-- **Решения владельца на финальном утверждении (2026-11-13).** Действуют поверх всех пунктов ниже.
-  - Карта для ответа (UC-1): Google Maps JavaScript API для мини-карты и карты результатов, тот же браузерный ключ. MapLibre и OpenFreeMap из раздела 6 не используются. Отсюда действует пункт «Подделка карты для режима `--fake`» (задача T51 обязательна), а у карты штатная светлая схема Google из пункта «Визуальный язык и `DESIGN.md`».
-  - ИИ на снимках Google (UC-2): замысел владельца сохраняется с мерами из пункта «Решения владельца до кода» (снимки не пишутся на диск вне режима `file`; README просит отключить обучение на данных в аккаунтах харнессов). Риск отключения ключа или проекта Google владелец принимает.
-  - Вопросы вкуса фаз дизайна, DX и инженерной (D-1…D-6, X-1, X-2, E-1…E-3) и трактовка хода (C-MOVE) приняты в рекомендованных вариантах, как они записаны ниже.
-  - Открытым остаётся действие владельца C-REMOTE: создать приватный remote для CI; до него проверки запускает `pre-commit`.
-- **Загрузки карты Google.** Вехи M1 (переиспользование и квота в Cloud Console) и M3 (счётчик); следует из решения UC-1; уточняет пункты «Учёт квоты» и «Ключи Google: пошаговая инструкция и проверка».
-  - Google берёт плату за каждое создание объекта карты (Dynamic Maps: 10 000 бесплатных загрузок в месяц, дальше $7 за 1 000 по прайсу на 2026-11-13; сверяет спайк S3). Поэтому мини-карта и карта результатов создаются один раз за загрузку страницы и переиспользуются между раундами: смена раунда меняет метки, центр и масштаб, а не пересоздаёт карту. Объект панорамы переиспользуется так же (раздел 8).
-  - Клиент шлёт серверу `map_loaded` при каждом создании объекта карты, как `pano_loaded` для панорамы; счётчик в `quota.json` растёт на каждое такое сообщение, потолок приложения 80% бесплатного объёма.
-  - Проверка перед стартом партии добавляет к худшему случаю карты = раунды × число людей × 2 (те же допущения о перезагрузках, что у панорам). Для партии из 5 раундов на 3 людей это 30 загрузок из 10 000.
-  - README «Как получить ключи» и `doctor` называют дневную квоту и для Maps JavaScript API, а не только для Street View Static API; значения из отчёта S3.
-  - Тесты: E2E, что за партию из двух раундов каждый клиент шлёт ровно два `map_loaded` (мини-карта и карта результатов); модульные на худший случай с картами и на рост счётчика от `map_loaded`.
+- **Owner decisions at the final approval (2026-11-13).** They apply on top of all the items below.
+  - Map for answering (UC-1): Google Maps JavaScript API for the mini-map and the results map, the same browser key. MapLibre and OpenFreeMap from section 6 are not used. Hence the item "Map fake for `--fake` mode" applies (task T51 is mandatory), and the map uses the standard light Google scheme from the item "Visual language and `DESIGN.md`".
+  - AI on Google imagery (UC-2): the owner's design is kept, with the measures from the item "Owner decisions before code" (images are not written to disk outside `file` mode; the README asks to turn off training on data in the harness accounts). The owner accepts the risk of Google disabling the key or project.
+  - The taste questions of the design, DX and engineering phases (D-1…D-6, X-1, X-2, E-1…E-3) and the interpretation of a move (C-MOVE) are accepted in the recommended variants as recorded below.
+  - The owner action C-REMOTE remains open: create a private remote for CI; until then the checks are run by `pre-commit`.
+- **Google map loads.** Milestones M1 (reuse and quota in Cloud Console) and M3 (counter); follows from decision UC-1; refines the items "Quota accounting" and "Google keys: step-by-step instructions and check".
+  - Google charges for every creation of a map object (Dynamic Maps: 10,000 free loads per month, then $7 per 1,000 per the price list of 2026-11-13; reconciled by spike S3). Therefore the mini-map and the results map are created once per page load and reused between rounds: a change of round changes markers, center and zoom, rather than recreating the map. The panorama object is reused likewise (section 8).
+  - The client sends the server `map_loaded` on every creation of a map object, like `pano_loaded` for a panorama; the counter in `quota.json` grows on every such message, the application ceiling is 80% of the free volume.
+  - The pre-match check adds to the worst case maps = rounds × number of humans × 2 (the same reload assumptions as for panoramas). For a match of 5 rounds and 3 humans that is 30 loads out of 10,000.
+  - The README "Как получить ключи" and `doctor` name the daily quota for the Maps JavaScript API too, not only for the Street View Static API; values from the S3 report.
+  - Tests: E2E that over a two-round match each client sends exactly two `map_loaded` (mini-map and results map); unit tests on the worst case with maps and on the counter growth from `map_loaded`.
 
 <!-- autoplan-accepted:ceo -->
-- **Решения владельца до кода.** Веха M0; уточняет разделы 6, 10 и 12.
-  - Карта для ответа. Пункт 3.2.3(e) условий Google запрещает Street View и не-Google карту на одном экране. Варианты: Google Maps JS для мини-карты и карты результатов (расхождения нет, тот же браузерный ключ, расход карт сверяет спайк S3) или MapLibre GL JS с OpenFreeMap, как в разделе 6 (расхождение остаётся, риск принимает владелец). До решения владельца в плане действует его исходный вариант.
-  - ИИ на снимках Google. Пункты 3.2.3(a) и 3.2.3(c)(vii) запрещают выносить снимки за пределы сервисов Google и использовать их для улучшения моделей ИИ. Варианты: оставить замысел владельца с мерами ниже (риск: Google может отключить ключ или проект); давать ботам снимки другого источника рядом с той же точкой; играть без ИИ. До решения владельца в плане действует его исходный замысел.
-  - Меры при сохранении замысла: снимки не пишутся на диск вне режима `file`; README просит владельца отключить в аккаунтах харнессов использование его данных для обучения моделей, где такая настройка есть.
-  - Приватный remote для CI: создать или работать с `pre-commit`.
-  - `GuessMap` и `ResultsMap` пишутся сразу под выбранную карту, без слоя подмены. Задачи с картой и ботами в M1 ждут первых двух решений; при отказе от ИИ веха M1 строится без ботов, а ворота «Первая игра» проводятся без них.
-  - Трактовка хода закреплена в разделе 5.1 и отдельного решения не требует.
-- **Спайк S1: полный раунд бота до кода фич.** Веха M0; уточняет разделы 5 и 10.
-  - S1 идёт первым после ворот качества и пишется одноразовым кодом в `spikes/` (в сборку не входит, удаляется после M1; ворота качества и лимиты размера действуют и на него).
-  - Состав: проверка зрения на картинке с числом; один полный раунд бота через MCP (четыре стартовые картинки с подписями, `look`, `move`, `submit_guess` с объяснением); три бота одновременно на одной подписке; пять раундов подряд.
-  - Картинки: до готовности ключей Google (спайк S3) используются свои фотографии улиц; после включения Street View Static API раунд повторяется на настоящих снимках.
-  - Харнесс допускается в игру, если выполнено всё: модель верно называет число с картинки хотя бы в одном режиме доставки (`mcp` или `file`); MCP-конфиг передаётся на один запуск без изменения глобальных настроек; холодный старт плюс первая догадка укладываются в 60 с (картинка 640 px, effort низкий); при трёх ботах одновременно догадка записана не менее чем в 4 раундах из 5 у каждого.
-  - Харнесс, не прошедший критерий, в первой версии скрыт из выбора, `doctor` называет причину, адаптер для него не пишется.
-  - Сохранённый слот с недоступным харнессом (скрыт по S1, не установлен или не вошёл в подписку) загружается выключенным с видимой причиной и в партии не участвует, пока хост не выберет другой харнесс. Тест: модульный на загрузку такого слота.
-  - Если критерий не прошёл ни один харнесс, работа над ботами останавливается до решения владельца.
-- **Ворота «Первая игра».** Веха M1; уточняет раздел 10.
-  - После M1 владелец играет с друзьями партию: 5 раундов по 120 с, три бота одновременно на харнессе, прошедшем S1 (у двух лимит 4 хода, у третьего 0, чтобы увидеть, помогают ли ходы).
-  - Сервер пишет в `matches.jsonl` по каждому боту и раунду: была ли догадка до обрыва, время до первой и до последней догадки, число ходов, очки, причину завершения; по каждому раунду: сколько секунд люди ждали ботов после своего последнего ответа.
-  - Критерий «играбельно»: у каждого бота догадка записана не менее чем в 4 раундах из 5; среднее ожидание людей после последнего ответа не больше 30 с. Если критерий не выполнен, правятся значения по умолчанию (длительность раунда, лимит ходов, effort, окно ожидания) и партия повторяется.
-  - Владелец записывает в `docs/playtest-1.md` ответы на три вопроса: хочется ли играть ещё; что было интереснее всего (счёт, ошибки ИИ, объяснения); сколько раундов были скучными из-за места.
-  - По этим данным владелец подтверждает или меняет состав M2–M4. Если скучных мест больше 2 из 5, в M2 добавляется задача «проверенный список точек» (сейчас она отложена в `TODOS.md`).
-- **Равные правила движения.** Веха M1; уточняет разделы 4.2 и 5.1.
-  - Настройка «Движение по панораме» общая: если она выключена, `move` возвращает боту «движение выключено в этой партии» без списания хода, а промпт бота об этом предупреждает.
-  - Тест: модульный на `move` при выключенном движении.
-- **Время ботов и длительность раунда.** Веха M1; уточняет разделы 4.2 и 4.3.
-  - Если в партии есть хотя бы один ИИ, минимальная длительность раунда 60 с: при добавлении первого бота более короткий раунд поднимается до 60 с с видимым сообщением, а поле длительности не даёт выставить меньше, пока в партии есть бот.
-  - Процесс харнесса запускается в `ROUND_LOADING`, во время отсчёта, чтобы холодный старт не съедал время раунда. Первый ответ `observe()` сервер задерживает до начала `ROUND_ACTIVE`: раньше людей бот картинок не видит.
-  - Бюджет времени бота в M1 равен длительности раунда; отдельное поле появляется в M2. Часы бюджета идут от начала `ROUND_ACTIVE`.
-  - Бот обрывается в самый ранний из трёх моментов: конец таймера раунда; конец его бюджета времени; конец окна ожидания после ответа всех людей. Во всех трёх случаях засчитывается его последняя записанная догадка.
-  - Окно ожидания: если все люди ответили, а боты ещё работают, раунд длится ещё 20 с (поле лобби «Ожидание ИИ после ответов людей», 0–120 с, по умолчанию 20, хранится в `settings.json`), но не меньше чем до 60-й секунды раунда и не дольше таймера раунда. Людям в это время показывается «ИИ думают» с обратным отсчётом.
-  - Раунд кончается досрочно, когда все люди подтвердили ответ кнопкой «Угадать» и завершились процессы всех ботов. Метка без подтверждения досрочный конец не запускает, но к концу таймера засчитывается как ответ.
-  - Тесты: модульные на конечный автомат (люди ответили рано, бот завершился рано, бот не завершился, раунд 60 с, добавление бота при раунде 30 с, метка без подтверждения к концу таймера, `observe()` до начала `ROUND_ACTIVE`).
-- **Слот ИИ в M1 и сложность ботов в M2.** Вехи M1 и M2; уточняет разделы 4.2 и 5.2.
-  - В M1 у слота есть имя, цвет, модель, effort и лимит ходов (по умолчанию 4). Картинка 640 px, бюджет времени равен длительности раунда. Настройки показываются числами, без названий уровней.
-  - В M2 добавляются размер картинки (640, 400 или 256 пикселей по стороне), бюджет времени бота на раунд (от 60 с до длительности раунда; по умолчанию равен ей; если хост делает раунд короче бюджета, действует длительность раунда) и три пресета, которые заполняют размер картинки, лимит ходов и effort разом.
-  - Предварительные числа пресетов: «Новичок» (256 px, 2 хода, effort низкий), «Любитель» (400 px, 4 хода, effort низкий), «Мастер» (640 px, 6 ходов, effort средний). Перед реализацией они сверяются с данными первой игры: пресет получает название уровня только если его результат в записанных партиях отличается от соседнего.
-  - После ручной правки размера картинки, лимита ходов или effort подпись пресета меняется на «Свои настройки»; имя, цвет, характер и бюджет времени подпись не меняют. Уровни effort «низкий / средний / высокий» каждый адаптер переводит в значения своего харнесса.
-  - К Google картинка всегда запрашивается 640x640; меньший размер получается уменьшением на сервере (`sharp`), подпись стороны света впечатывается после уменьшения шрифтом не мельче 14 px. Расход квоты от размера не зависит.
-  - Лобби показывает предупреждение у слота, если время из «Проверить» (холодный старт плюс ответ на текущих настройках слота) больше половины бюджета времени бота.
-  - Тесты: модульные на применение пресета и подпись «Свои настройки», на уменьшение картинки до размера слота, на обрыв по бюджету времени.
-- **Счёт «Люди против ИИ».** Веха M2; уточняет разделы 4.5 и 4.6.
-  - Показывается на экране результатов раунда и в финале, если в партии есть хотя бы один человек и хотя бы один ИИ; иначе строка скрыта.
-  - Значение стороны за раунд: среднее арифметическое очков участников стороны, игравших этот раунд. Зрители и вошедшие посреди раунда не учитываются. Игравший, но не ответивший человек и бот без записанной догадки учитываются с 0 очков.
-  - Значение стороны за партию: сумма её значений по раундам.
-  - Считает чистая функция в `shared/`. Тесты: разное число участников, нулевые очки, поздний вход, бот без догадки, отсутствие одной стороны.
-- **Характер и реплика бота.** Веха M2; уточняет разделы 4.2, 4.5 и 5.1.
-  - У слота ИИ есть поле «характер»: пресет (нейтральный, хвастун, скромник, учёный) или свой текст хоста до 200 символов без переводов строки. Он вставляется одной отмеченной строкой в промпт и влияет только на тон объяснения и реплики; лимиты и набор инструментов задаёт сервер, текст характера их изменить не может.
-  - `submit_guess` получает необязательное поле `quip` (до 120 символов, язык интерфейса). Засчитывается последний успешный вызов `submit_guess` целиком: координаты, объяснение и реплика; если в нём реплики нет, реплика не показывается. В M1 поле `quip` в схеме уже есть, но не показывается.
-  - Реплика показывается рядом с меткой бота на экране результатов и в карточке ИИ, рисуется как простой текст, не влияет на очки и видна только после конца раунда.
-  - Тесты: слишком длинная реплика обрезается до предела, характер с переводом строки схема отклоняет; из двух вызовов берётся последний; интеграционный сценарий с поддельным харнессом показывает реплику только на экране результатов.
-- **Вход и готовность пригласительной ссылки.** Веха M1; уточняет разделы 4.1, 7 и 9.
-  - Игровой сервер во всех режимах слушает только `127.0.0.1`. Токен содержит 128 бит случайности и сравнивается за постоянное время.
-  - Сервер отдаёт `GET /healthz`: без токена, ответ `ok`, без данных об игре.
-  - Пригласительная ссылка печатается после двух проверок: имя хоста разрешается через публичный DNS (DoH-запрос к `cloudflare-dns.com`, при ошибке к `dns.google`; локальный резолвер не используется) и `GET /healthz` по публичному адресу возвращает 200. Ожидание до 60 с, затем ошибка с причиной (DNS или HTTP) и советом перезапустить `start`.
-  - При смене адреса туннеля проверки повторяются и ссылка печатается заново. С `--no-tunnel` проверок нет.
-  - Ссылка хоста всегда локальная: `http://localhost:PORT/#t=<токен хоста>`.
-  - Тесты: модульные с подменёнными DNS и HTTP (успех, задержка, отказ, смена адреса); `bun run test:tunnel` проверяет вживую.
-- **Свой публичный адрес и пороги входа.** Веха M3; уточняет разделы 6, 7 и 9.
-  - `bun run start --public-url <https://адрес>` не запускает `cloudflared`, а строит пригласительную ссылку от указанного адреса и выполняет для него те же проверки готовности. Свой туннель или прокси должен работать на той же машине. Флаги `--public-url` и `--no-tunnel` вместе дают ошибку запуска с объяснением.
-  - README и `bun run doctor --public-url <https://адрес>` напоминают добавить этот адрес в ограничение referrer браузерного ключа; `doctor` печатает точную строку для Cloud Console.
-  - Адрес клиента: в режиме quick tunnel берётся из `CF-Connecting-IP`; в остальных режимах и при отсутствии заголовка из адреса сокета. Заголовкам чужого прокси сервер не верит. Соединение с адреса loopback без заголовка считается локальным и в пороге по адресу не участвует; поэтому с `--public-url` действует только общий порог.
-  - Токен проверяется у каждого соединения, вход с верным токеном не блокирует ни один порог. Пороги касаются только неудачных попыток.
-  - Больше 10 неудачных входов с одного адреса за 60 с: следующие 60 с неудачные попытки с этого адреса закрываются без ответа и без записи в журнал.
-  - Больше 30 неудачных входов за 60 с на весь сервер: до конца минуты так же закрываются все неудачные попытки.
-  - Тесты: модульные на разбор флагов, построение ссылок, выбор адреса клиента (заголовок есть, заголовка нет, loopback), оба порога и вход с верным токеном при достигнутых порогах.
-- **Ошибки Static API.** Веха M1; уточняет разделы 5.1, 5.2 и 6.
-  - Все запросы картинок идут с `return_error_code=true`: при отсутствии снимка Google отвечает HTTP 404, а не серой заглушкой.
-  - Единица учёта неудач это вызов инструмента. `look` неудачен, если его картинка не получена. `move` неудачен, если не получена ни одна из четырёх картинок; если получена хотя бы одна, вызов удачен, а вместо недостающих бот получает текст «снимка в этом направлении нет».
-  - Первые 3 неудачных вызова бота за раунд не списывают ход; начиная с четвёртого неудачный вызов стоит ход. Ответ `move` «в эту сторону дороги нет» по-прежнему бесплатен и в это число не входит: он не запрашивает картинок.
-  - Тесты: модульные с подменённым ответом 404 (ход не списан, четвёртая неудача списана, частично удачный `move`).
-- **Сбои подготовки раунда.** Веха M1; уточняет разделы 4.3, 5.1 и 6.
-  - Точка: если 30 попыток не нашли панораму, сервер повторяет серию для другой страны, всего до 3 серий. После третьей неудачи раунд не начинается: хост видит ошибку «панорама не найдена» и кнопки «Повторить» и «Завершить партию»; сыгранные раунды сохраняются.
-  - Стартовые картинки: если хотя бы одна из четырёх не получена, сервер берёт новую точку, всего до 3 точек; дальше действует то же правило, что для точки. Неудачные запросы идут в счётчик квоты.
-  - Подготовка идёт заранее, пока открыты лобби или экран результатов, поэтому повторы игрокам не видны.
-  - Загрузка панорамы у человека: через 5 с ожидания отсчёт начинается для всех; таймер у опоздавшего общий. Если панорама у клиента не загрузилась, он видит сообщение и кнопку «Повторить», карта для ответа остаётся доступной.
-  - `observe()` отдаёт сохранённый стартовый набор и запросов к Static API не делает.
-  - Тесты: модульные на три серии выборки и замену точки при неудачной стартовой картинке; интеграционный на старт отсчёта без опоздавшего клиента.
-- **Учёт квоты.** Веха M1 (счётчик Static, потолок, проверка перед стартом) и M3 (панорамы); уточняет раздел 6.
-  - Потолок приложения это оценка расхода, а не гарантия биллинга. Настоящий предел задают дневные квоты в Cloud Console: README и `doctor` дают шаги, какие квоты выставить, по отчёту спайка S3. Ограничение referrer `*.trycloudflare.com/*` защищает браузерный ключ слабо (домен общий), README говорит об этом прямо.
-  - Static: счётчик в `quota.json`, потолок и проверка перед стартом партии появляются в M1, до первого настоящего запроса к Static API. Счётчик растёт на каждый запрос, включая неудачный и запросы подготовки раунда, и увеличивается до отправки запроса, поэтому параллельные вызовы не проходят сверх потолка. Повторный запрос картинки с теми же параметрами в пределах раунда берётся из памяти и в счётчик не идёт.
-  - Панорамы (M3): клиент шлёт серверу `pano_loaded` после каждого показа панорамы (каждый раунд, перезагрузка страницы, переподключение, зритель); счётчик растёт на каждое такое сообщение. Это оценка сверху: Google может тарифицировать только создание объекта панорамы; единицу тарификации сверяет спайк S3.
-  - Перед стартом партии сервер считает худший случай: Static = раунды × (12 + сумма по ботам (лимит ходов + 3) × 4), где 12 это до трёх наборов стартовых картинок; панорамы = раунды × число людей × 2. Если текущий расход плюс худший случай превышает потолок, партия не стартует; лобби показывает расход, худший случай и остаток, хост уменьшает число раундов, ботов или ходов.
-  - Если потолок Static всё же достигнут посреди партии, `look` и `move` возвращают боту «квота исчерпана, вызови submit_guess» без списания хода, партия доигрывается. Если достигнут потолок панорам, текущая партия доигрывается, новая не стартует.
-  - Тесты: модульные на расчёт худшего случая, отказ старта, ответ «квота исчерпана», рост счётчика от `pano_loaded`.
-- **Изоляция процесса бота.** Вехи M0 (спайк S1) и M1; уточняет разделы 5.3 и 5.4.
-  - Процесс харнесса запускается с окружением из белого списка (`PATH`, `HOME`, `LANG`, `TERM` и переменные, без которых харнесс не входит в подписку). Ключи Google и содержимое `.env` в него не попадают. Рабочий каталог бота: пустой временный каталог вне репозитория.
-  - Харнесс работает от имени владельца и читает свои файлы входа из `HOME`, поэтому чтение чужих файлов закрывается флагами самого харнесса: у `claude` это `--allowedTools "mcp__geo__*"` и `--strict-mcp-config`; у `codex` и `agy` набор флагов определяет спайк S1 (у `agy` в справке есть только `--sandbox`).
-  - Спайк S1 для каждого харнесса проверяет с выбранными флагами: модель не может назвать содержимое проверочного файла вне временного каталога; веб-поиск и запуск команд недоступны. Результат записывается в отчёт.
-  - Пользовательские настройки харнесса из `HOME` (общие инструкции, хуки, плагины, память) адаптер отключает флагами, если они у харнесса есть. Спайк S1 записывает, что отключить удалось, и как оставшееся влияет на время ответа и на состав инструментов.
-  - Харнесс, который не удалось ограничить, не скрывается автоматически: решение о его допуске принимает владелец по отчёту S1, `doctor` показывает у него пометку «читает файлы владельца».
-  - Остаточный риск принят для игры друзей: процесс бота работает от имени владельца и при обходе флагов мог бы прочитать окружение и память сервера. Лимиты подписок общие с повседневной работой владельца; партия с тремя ботами их расходует.
-  - Тесты: модульный на состав окружения процесса бота; проверка с проверочным файлом входит в `bun run test:harness`.
-- **Порядок вех.** Вехи M0–M4; уточняет раздел 10.
-  - M0: ворота качества, затем спайк S1, затем S2, S3 и S4. Задачи M1 без настоящей панорамы и без ботов (протокол, конечный автомат, лобби, очки, результаты) идут на заглушках сразу после ворот качества. Задачи с ботами ждут S1, задача «настоящая панорама в раунде» ждёт S3 (оба API включены, биллинг подключён).
-  - Спайк S3 сверяет бесплатный месячный объём с актуальной таблицей цен Google; потолок счётчика квоты по умолчанию считается от цифр из отчёта S3.
-  - M2–M4 начинаются после ворот «Первая игра»; их состав владелец подтверждает по её итогам.
-  - Состояния ошибок, названные в этом разделе, входят в ту веху, где названо их правило; веха M4 доводит их вид, а не добавляет их.
-- **Хранение снимков.** Веха M1; уточняет разделы 4.5 и 5.4.
-  - Полноразмерные картинки бота живут только до конца раунда. Для карточки ИИ сервер хранит в памяти миниатюры (JPEG, 160 px по стороне, до 15 КБ) до возврата в лобби после финала.
-  - Верхняя граница памяти: обычная партия (5 раундов, 3 бота, 6 ходов) не больше 600 миниатюр, около 9 МБ; предельная (20 раундов, 3 бота, 20 ходов) не больше 5 760 миниатюр, около 86 МБ.
-  - На диск картинки попадают только в режиме доставки `file`, во временный каталог бота, который удаляется в конце раунда.
-  - Тест: интеграционный, после конца партии миниатюры недоступны, временный каталог удалён.
-- **Сбои во время партии.** Вехи M1 и M3; уточняет разделы 4.1, 5.1, 6 и 9.
-  - Metadata: ответ «панорамы нет» расходует попытку выборки. Отказ ключа, превышение квоты и сетевая ошибка (тайм-аут запроса 5 с, один повтор) прекращают подготовку раунда сразу: хост видит причину и кнопки «Повторить» и «Завершить партию».
-  - Static: ответы 403 и 429 обрабатываются как достигнутый потолок квоты: `look` и `move` возвращают боту «картинки недоступны, вызови submit_guess» без списания хода, хост видит предупреждение с причиной.
-  - Аргументы инструментов проверяет схема. При ошибке бот получает текст с названием поля и допустимыми значениями, ход не списывается, прежняя догадка остаётся. Слишком длинные `explanation` и `quip` обрезаются до предела, а не отклоняются; пустой `explanation` отклоняется.
-  - Если бот не записал ни одной догадки, карточка ИИ показывает причину завершения и последние 300 символов итогового текста харнесса простым текстом (отказ модели, ошибка входа, лимит подписки).
-  - Туннель: `start` следит за процессом `cloudflared`. Если процесс завершился, `start` перезапускает его до 3 раз с паузами 2, 5 и 10 с, повторяет проверки готовности и печатает новую ссылку. Партия на сервере при этом продолжается; после третьей неудачи хост видит ошибку с причиной.
-  - Возврат на место: новый адрес туннеля для браузера другой сайт, и сохранённых `playerId` и секрета на нём нет. Поэтому ники участников уникальны без учёта регистра, а игрок, вошедший по действующему приглашению с ником отключённого участника, занимает его место. Ник подключённого участника занять нельзя: вход получает ответ «ник занят».
-  - Локальные файлы: `settings.json`, `quota.json` и строки `matches.jsonl` несут поле `version` и проверяются схемой. Нечитаемый `settings.json` или `quota.json` переименовывается в файл с окончанием `.bad`, сервер стартует со значениями по умолчанию (счётчик квоты с нуля) и показывает предупреждение в терминале и в лобби хоста. Ошибка записи `matches.jsonl` партию не прерывает и видна хосту на экране финала.
-  - Ошибка загрузки Maps JavaScript API у клиента (блокировщик, ограничение referrer) уходит на сервер сообщением `client_error`; хост видит у игрока пометку с причиной.
-  - Обновление харнесса (M3, полный `doctor`): `bun run test:harness` записывает версии CLI, с которыми прошёл, в `~/.config/geoaissr/harness-verified.json`; `doctor` предупреждает, если установленная версия отличается, и советует запустить `bun run test:harness`.
-  - Тесты: модульные на отказ ключа metadata, 403 от Static, неверные аргументы инструмента, обрезку объяснения, вход с ником отключённого и подключённого участника, нечитаемые файлы настроек и квоты; интеграционный на перезапуск поддельного процесса туннеля.
-- **Порядок событий и граничные случаи.** Веха M1; уточняет разделы 4.1, 4.3, 5.1 и 7.
-  - Ни догадка, ни вызов инструмента не меняют итог раунда после его конца. Каждый обработчик проверяет номер и фазу раунда непосредственно перед изменением состояния, уже после всех ожиданий (чтение тела запроса, ответ Google). Опоздавший вызов получает «раунд окончен», его результат отбрасывается и в следующий раунд не попадает.
-  - Ход резервируется до запроса к Google и возвращается, если вызов признан неудачным по правилам пункта «Ошибки Static API». Поэтому параллельные вызовы одного бота не тратят больше лимита.
-  - Метка человека: клиент отправляет серверу положение метки при каждой постановке, не чаще 5 раз в секунду; сервер хранит последнее. Именно оно засчитывается, если к концу таймера ответ не подтверждён. Повторное нажатие «Угадать» и изменение метки после подтверждения сервер игнорирует.
-  - Долгота метки и догадки бота приводится к диапазону от -180 до 180; широта вне диапазона от -90 до 90 отклоняется.
-  - Сообщение хоста «Дальше» несёт номер раунда: повторное нажатие и нажатие одновременно с автопереходом раунд не пропускают.
-  - Настройки партии меняются только в лобби. Девятый человек получает ответ «комната полна».
-  - Если к концу экрана результатов не подключён ни один человек, следующий раунд не начинается, пока кто-нибудь не вернётся: боты не тратят квоту и подписку впустую.
-  - `GameEngine` и `LocationService` получают часы и генератор случайных чисел параметрами; тесты подставляют управляемые.
-  - Тесты: модульные с управляемыми точками остановки на оба порядка завершения (догадка бота и конец таймера; ответ Google и конец раунда; два параллельных `look` при одном оставшемся ходе); метка без подтверждения; повторное «Дальше»; пауза без людей. Интеграционные сценарии поддельного харнесса: обычный, зависший, завершившийся до догадки, завершившийся после догадки, с неверными аргументами, с параллельными вызовами.
-- **Секреты и токены.** Вехи M0 и M1; уточняет разделы 4.1, 6 и 9.
-  - `.env` внесён в `.gitignore`; `bun run check` падает, если `.env` отслеживается git.
-  - Токены хоста и приглашения создаются заново при каждом запуске `start`. Утёкшее приглашение отзывается перезапуском; исключения игроков хостом в первой версии нет.
-  - Ключи и токены в журнал и в сообщения об ошибках не попадают; там, где нужно отличить один токен от другого, показываются первые 4 символа.
-  - Тесты: модульный на маскировку токена в журнале; проверка отслеживания `.env` входит в `bun run check`.
-- **Журнал сервера и ботов.** Веха M1; уточняет разделы 5.3 и 9.
-  - Сервер пишет события строками JSON в `~/.local/share/geoaissr/logs/<дата>.jsonl`: начало и конец раунда, вход и выход участников, запуск и завершение каждого харнесса (код выхода, причина, последние строки stderr), каждый вызов инструмента бота (имя, длительность, исход), исход запросов к Google, значение счётчика квоты.
-  - Координаты ответа в журнал попадают только после конца раунда. Хранятся файлы за последние 14 дней.
-  - В терминале хоста на каждый раунд печатается одна строка: кто ответил, кто из ботов оборван и почему.
-  - Тест: интеграционный, после партии с поддельным харнессом в журнале есть запуск, вызовы и причина завершения каждого бота, а токенов и ключей нет.
+- **Owner decisions before code.** Milestone M0; refines sections 6, 10 and 12.
+  - Map for answering. Clause 3.2.3(e) of the Google terms forbids Street View and a non-Google map on the same screen. Options: Google Maps JS for the mini-map and the results map (no conflict, the same browser key, the map usage is reconciled by spike S3) or MapLibre GL JS with OpenFreeMap, as in section 6 (the conflict remains, the owner accepts the risk). Until the owner decides, the plan uses their original variant.
+  - AI on Google imagery. Clauses 3.2.3(a) and 3.2.3(c)(vii) forbid taking imagery outside Google services and using it to improve AI models. Options: keep the owner's design with the measures below (risk: Google may disable the key or project); give the bots imagery from another source near the same point; play without AI. Until the owner decides, the plan uses their original design.
+  - Measures if the design is kept: images are not written to disk outside `file` mode; the README asks the owner to turn off, in the harness accounts, the use of their data for model training, where such a setting exists.
+  - A private remote for CI: create one or work with `pre-commit`.
+  - `GuessMap` and `ResultsMap` are written right away for the chosen map, without a substitution layer. The map and bot tasks in M1 wait for the first two decisions; if AI is dropped, milestone M1 is built without bots, and the "First game" gate is held without them.
+  - The interpretation of a move is fixed in section 5.1 and needs no separate decision.
+- **Spike S1: a full bot round before feature code.** Milestone M0; refines sections 5 and 10.
+  - S1 goes first after the quality gates and is written as throwaway code in `spikes/` (not part of the build, deleted after M1; the quality gates and size limits apply to it too).
+  - Composition: a vision check on an image with a number; one full bot round via MCP (four starting images with captions, `look`, `move`, `submit_guess` with an explanation); three bots simultaneously on one subscription; five rounds in a row.
+  - Images: until the Google keys are ready (spike S3), our own street photographs are used; after the Street View Static API is enabled, the round is repeated on real imagery.
+  - A harness is admitted to the game if all of the following hold: the model correctly names the number from the image in at least one delivery mode (`mcp` or `file`); the MCP config is passed for a single run without changing global settings; cold start plus the first guess fit within 60 s (640 px image, low effort); with three bots simultaneously, a guess is recorded in at least 4 of 5 rounds for each.
+  - A harness that fails the criterion is hidden from selection in the first version, `doctor` names the reason, no adapter is written for it.
+  - A saved slot with an unavailable harness (hidden by S1, not installed or not logged in to the subscription) is loaded disabled with a visible reason and does not take part in the match until the host picks another harness. Test: a unit test on loading such a slot.
+  - If no harness passes the criterion, work on bots stops until the owner decides.
+- **"First game" gate.** Milestone M1; refines section 10.
+  - After M1 the owner plays a match with friends: 5 rounds of 120 s, three bots simultaneously on a harness that passed S1 (two with a 4-move limit, the third with 0, to see whether moves help).
+  - The server writes to `matches.jsonl` for each bot and round: whether a guess existed before the cutoff, time to the first and to the last guess, number of moves, points, the reason for finishing; for each round: how many seconds the humans waited for the bots after their last answer.
+  - The "playable" criterion: each bot has a guess recorded in at least 4 of 5 rounds; the average human wait after the last answer is no more than 30 s. If the criterion is not met, the defaults are adjusted (round duration, move limit, effort, wait window) and the match is repeated.
+  - The owner writes into `docs/playtest-1.md` the answers to three questions: do they want to play more; what was the most interesting (the score, the AI's mistakes, the explanations); how many rounds were boring because of the location.
+  - Based on these data the owner confirms or changes the contents of M2–M4. If there are more than 2 of 5 boring locations, M2 gets a task "vetted location list" (currently deferred in `TODOS.md`).
+- **Equal movement rules.** Milestone M1; refines sections 4.2 and 5.1.
+  - The "Movement in the panorama" setting is shared: if it is off, `move` returns to the bot «движение выключено в этой партии» ("movement is off in this match") without charging a move, and the bot prompt warns about this.
+  - Test: a unit test on `move` with movement off.
+- **Bot time and round duration.** Milestone M1; refines sections 4.2 and 4.3.
+  - If the match has at least one AI, the minimum round duration is 60 s: when the first bot is added, a shorter round is raised to 60 s with a visible message, and the duration field does not allow setting less while a bot is in the match.
+  - The harness process is launched in `ROUND_LOADING`, during the countdown, so that the cold start does not eat round time. The server delays the first `observe()` response until the start of `ROUND_ACTIVE`: the bot does not see the images earlier than the humans.
+  - The bot time budget in M1 equals the round duration; a separate field appears in M2. The budget clock runs from the start of `ROUND_ACTIVE`.
+  - The bot is cut off at the earliest of three moments: the end of the round timer; the end of its time budget; the end of the wait window after all humans have answered. In all three cases its last recorded guess counts.
+  - Wait window: if all humans have answered and the bots are still working, the round lasts another 20 s (the lobby field «Ожидание ИИ после ответов людей» ("AI wait after humans' answers"), 0–120 s, default 20, stored in `settings.json`), but not less than until the 60th second of the round and not longer than the round timer. During this time the humans are shown «ИИ думают» ("The AIs are thinking") with a countdown.
+  - The round ends early when all humans have confirmed their answer with the «Угадать» button and all bot processes have finished. A marker without confirmation does not trigger an early end, but counts as an answer by the end of the timer.
+  - Tests: unit tests on the state machine (humans answered early, bot finished early, bot did not finish, 60 s round, adding a bot with a 30 s round, a marker without confirmation at the end of the timer, `observe()` before the start of `ROUND_ACTIVE`).
+- **AI slot in M1 and bot difficulty in M2.** Milestones M1 and M2; refines sections 4.2 and 5.2.
+  - In M1 a slot has a name, color, model, effort and move limit (default 4). Image 640 px, time budget equal to the round duration. Settings are shown as numbers, without level names.
+  - M2 adds image size (640, 400 or 256 pixels per side), the bot's time budget per round (from 60 s to the round duration; by default equal to it; if the host makes the round shorter than the budget, the round duration applies) and three presets that fill in image size, move limit and effort at once.
+  - Preliminary preset numbers: «Новичок» ("Beginner") (256 px, 2 moves, effort low), «Любитель» ("Amateur") (400 px, 4 moves, effort low), «Мастер» ("Master") (640 px, 6 moves, effort medium). Before implementation they are reconciled with the first-game data: a preset gets a level name only if its result in the recorded matches differs from its neighbor's.
+  - After a manual edit of image size, move limit or effort, the preset label changes to «Свои настройки» ("Custom settings"); name, color, personality and time budget do not change the label. The effort levels "low / medium / high" are translated by each adapter into the values of its harness.
+  - The image is always requested from Google at 640x640; a smaller size is obtained by downscaling on the server (`sharp`), the compass caption is imprinted after downscaling with a font no smaller than 14 px. Quota usage does not depend on size.
+  - The lobby shows a warning at the slot if the time from «Проверить» (cold start plus an answer on the slot's current settings) is more than half of the bot's time budget.
+  - Tests: unit tests on applying a preset and the «Свои настройки» label, on downscaling the image to the slot size, on a cutoff by time budget.
+- **"Humans versus AI" score.** Milestone M2; refines sections 4.5 and 4.6.
+  - Shown on the round results screen and in the final if the match has at least one human and at least one AI; otherwise the row is hidden.
+  - A side's value for a round: the arithmetic mean of the points of the side's participants who played that round. Spectators and those who joined mid-round are not counted. A human who played but did not answer and a bot with no recorded guess are counted with 0 points.
+  - A side's value for the match: the sum of its values over rounds.
+  - Computed by a pure function in `shared/`. Tests: different numbers of participants, zero points, late join, a bot without a guess, absence of one side.
+- **Bot personality and quip.** Milestone M2; refines sections 4.2, 4.5 and 5.1.
+  - An AI slot has a "personality" field: a preset (neutral, braggart, modest, scholar) or the host's own text up to 200 characters without line breaks. It is inserted as one marked line into the prompt and affects only the tone of the explanation and quip; the limits and the tool set are set by the server, and the personality text cannot change them.
+  - `submit_guess` gets an optional field `quip` (up to 120 characters, interface language). The last successful `submit_guess` call counts as a whole: coordinates, explanation and quip; if it has no quip, no quip is shown. In M1 the `quip` field is already in the schema but is not shown.
+  - The quip is shown next to the bot's marker on the results screen and in the AI card, is rendered as plain text, does not affect points and is visible only after the round ends.
+  - Tests: a too-long quip is truncated to the limit, a personality with a line break is rejected by the schema; of two calls the last is taken; an integration scenario with a fake harness shows the quip only on the results screen.
+- **Entry and readiness of the invitation link.** Milestone M1; refines sections 4.1, 7 and 9.
+  - The game server listens only on `127.0.0.1` in all modes. The token contains 128 bits of randomness and is compared in constant time.
+  - The server serves `GET /healthz`: no token, the response is `ok`, no game data.
+  - The invitation link is printed after two checks: the host name resolves through public DNS (a DoH request to `cloudflare-dns.com`, on error to `dns.google`; the local resolver is not used) and `GET /healthz` at the public address returns 200. Waiting up to 60 s, then an error with the cause (DNS or HTTP) and advice to restart `start`.
+  - When the tunnel address changes, the checks are repeated and the link is printed again. With `--no-tunnel` there are no checks.
+  - The host link is always local: `http://localhost:PORT/#t=<host token>`.
+  - Tests: unit tests with mocked DNS and HTTP (success, delay, refusal, address change); `bun run test:tunnel` checks it live.
+- **Own public address and login thresholds.** Milestone M3; refines sections 6, 7 and 9.
+  - `bun run start --public-url <https://address>` does not launch `cloudflared`, but builds the invitation link from the given address and performs the same readiness checks for it. The custom tunnel or proxy must run on the same machine. The flags `--public-url` and `--no-tunnel` together give a startup error with an explanation.
+  - The README and `bun run doctor --public-url <https://address>` remind to add this address to the browser key's referrer restriction; `doctor` prints the exact string for Cloud Console.
+  - Client address: in quick tunnel mode it is taken from `CF-Connecting-IP`; in other modes and when the header is absent, from the socket address. The server does not trust headers from someone else's proxy. A connection from a loopback address without the header is considered local and does not take part in the per-address threshold; therefore with `--public-url` only the global threshold applies.
+  - The token is checked on every connection, a login with a correct token is not blocked by any threshold. Thresholds concern only failed attempts.
+  - More than 10 failed logins from one address in 60 s: for the next 60 s failed attempts from that address are closed without a response and without a log entry.
+  - More than 30 failed logins in 60 s for the whole server: until the end of the minute all failed attempts are closed the same way.
+  - Tests: unit tests on flag parsing, link building, client address selection (header present, header absent, loopback), both thresholds and a login with a correct token when thresholds are reached.
+- **Static API errors.** Milestone M1; refines sections 5.1, 5.2 and 6.
+  - All image requests go with `return_error_code=true`: when there is no imagery, Google answers HTTP 404 rather than a gray placeholder.
+  - The unit for counting failures is a tool call. `look` fails if its image was not obtained. `move` fails if none of the four images was obtained; if at least one was obtained, the call succeeds, and in place of the missing ones the bot gets the text «снимка в этом направлении нет» ("there is no image in this direction").
+  - The first 3 failed bot calls per round do not charge a move; starting with the fourth, a failed call costs a move. The `move` answer «в эту сторону дороги нет» is still free and not included in this count: it requests no images.
+  - Tests: unit tests with a mocked 404 response (move not charged, fourth failure charged, partially successful `move`).
+- **Round preparation failures.** Milestone M1; refines sections 4.3, 5.1 and 6.
+  - Location: if 30 attempts did not find a panorama, the server repeats the series for another country, up to 3 series in total. After the third failure the round does not start: the host sees the error «панорама не найдена» ("panorama not found") and the buttons «Повторить» ("Retry") and «Завершить партию» ("End match"); the rounds already played are kept.
+  - Starting images: if at least one of the four was not obtained, the server takes a new location, up to 3 locations in total; after that the same rule applies as for the location. Failed requests count toward the quota counter.
+  - Preparation goes in advance while the lobby or results screen is open, so retries are invisible to players.
+  - Panorama loading for a human: after 5 s of waiting the countdown starts for everyone; the latecomer has the same shared timer. If the panorama did not load on the client, they see a message and a «Повторить» button, the answer map remains available.
+  - `observe()` returns the saved starting set and makes no Static API requests.
+  - Tests: unit tests on three selection series and on replacing the location after a failed starting image; an integration test on the countdown start without a latecomer client.
+- **Quota accounting.** Milestone M1 (Static counter, ceiling, pre-match check) and M3 (panoramas); refines section 6.
+  - The application ceiling is an estimate of usage, not a billing guarantee. The real limit is set by the daily quotas in Cloud Console: the README and `doctor` give steps on which quotas to set, per the S3 spike report. The referrer restriction `*.trycloudflare.com/*` protects the browser key only weakly (the domain is shared), the README says so plainly.
+  - Static: the counter in `quota.json`, the ceiling and the pre-match check appear in M1, before the first real Static API request. The counter grows on every request, including a failed one and round preparation requests, and is incremented before the request is sent, so parallel calls do not get past the ceiling. A repeated image request with the same parameters within a round is served from memory and does not count.
+  - Panoramas (M3): the client sends the server `pano_loaded` after every panorama display (each round, page reload, reconnection, spectator); the counter grows on every such message. This is an upper estimate: Google may bill only the creation of a panorama object; the billing unit is reconciled by spike S3.
+  - Before a match starts, the server computes the worst case: Static = rounds × (12 + sum over bots of (move limit + 3) × 4), where 12 is up to three sets of starting images; panoramas = rounds × number of humans × 2. If current usage plus the worst case exceeds the ceiling, the match does not start; the lobby shows usage, worst case and remainder, and the host reduces the number of rounds, bots or moves.
+  - If the Static ceiling is nevertheless reached mid-match, `look` and `move` return to the bot «квота исчерпана, вызови submit_guess» ("quota exhausted, call submit_guess") without charging a move, and the match is played to the end. If the panorama ceiling is reached, the current match is played to the end and a new one does not start.
+  - Tests: unit tests on the worst-case computation, start refusal, the "quota exhausted" response, counter growth from `pano_loaded`.
+- **Bot process isolation.** Milestones M0 (spike S1) and M1; refines sections 5.3 and 5.4.
+  - The harness process is launched with an environment from an allowlist (`PATH`, `HOME`, `LANG`, `TERM` and the variables without which the harness does not log in to the subscription). The Google keys and the contents of `.env` do not get into it. The bot's working directory: an empty temporary directory outside the repository.
+  - The harness runs as the owner and reads its login files from `HOME`, so reading other files is closed off by the harness's own flags: for `claude` these are `--allowedTools "mcp__geo__*"` and `--strict-mcp-config`; for `codex` and `agy` the flag set is determined by spike S1 (`agy` has only `--sandbox` in its help).
+  - For each harness, spike S1 checks with the chosen flags: the model cannot name the contents of a test file outside the temporary directory; web search and command execution are unavailable. The result is recorded in the report.
+  - The harness's user settings from `HOME` (global instructions, hooks, plugins, memory) are turned off by the adapter with flags, if the harness has them. Spike S1 records what could be turned off and how what remains affects response time and the tool set.
+  - A harness that could not be restricted is not hidden automatically: the decision on its admission is made by the owner based on the S1 report, `doctor` shows a note on it «читает файлы владельца» ("reads the owner's files").
+  - The residual risk is accepted for a game among friends: the bot process runs as the owner and, if the flags were bypassed, could read the server's environment and memory. Subscription limits are shared with the owner's daily work; a match with three bots consumes them.
+  - Tests: a unit test on the composition of the bot process environment; the test-file check is part of `bun run test:harness`.
+- **Milestone order.** Milestones M0–M4; refines section 10.
+  - M0: quality gates, then spike S1, then S2, S3 and S4. The M1 tasks without a real panorama and without bots (protocol, state machine, lobby, scoring, results) go on stubs right after the quality gates. Tasks with bots wait for S1, the task "real panorama in a round" waits for S3 (both APIs enabled, billing connected).
+  - Spike S3 reconciles the free monthly volume with Google's current price table; the default ceiling of the quota counter is computed from the figures in the S3 report.
+  - M2–M4 start after the "First game" gate; the owner confirms their contents based on its results.
+  - The error states named in this section belong to the milestone where their rule is named; milestone M4 refines their look rather than adding them.
+- **Image storage.** Milestone M1; refines sections 4.5 and 5.4.
+  - The bot's full-size images live only until the end of the round. For the AI card the server keeps thumbnails in memory (JPEG, 160 px per side, up to 15 KB) until the return to the lobby after the final.
+  - Upper memory bound: a typical match (5 rounds, 3 bots, 6 moves) at most 600 thumbnails, about 9 MB; the extreme one (20 rounds, 3 bots, 20 moves) at most 5,760 thumbnails, about 86 MB.
+  - Images reach disk only in the `file` delivery mode, in the bot's temporary directory, which is deleted at the end of the round.
+  - Test: an integration test, after the end of the match the thumbnails are unavailable and the temporary directory is deleted.
+- **Failures during a match.** Milestones M1 and M3; refines sections 4.1, 5.1, 6 and 9.
+  - Metadata: a "no panorama" response consumes a selection attempt. A key denial, quota exceeded and a network error (request timeout 5 s, one retry) stop round preparation immediately: the host sees the cause and the buttons «Повторить» and «Завершить партию».
+  - Static: responses 403 and 429 are handled as a reached quota ceiling: `look` and `move` return to the bot «картинки недоступны, вызови submit_guess» ("images are unavailable, call submit_guess") without charging a move, and the host sees a warning with the cause.
+  - Tool arguments are checked by the schema. On error the bot gets a text with the field name and the allowed values, the move is not charged, the previous guess remains. Too-long `explanation` and `quip` are truncated to the limit rather than rejected; an empty `explanation` is rejected.
+  - If the bot recorded no guess at all, the AI card shows the reason for finishing and the last 300 characters of the harness's final text as plain text (model refusal, login error, subscription limit).
+  - Tunnel: `start` watches the `cloudflared` process. If the process exited, `start` restarts it up to 3 times with pauses of 2, 5 and 10 s, repeats the readiness checks and prints the new link. The match on the server continues meanwhile; after the third failure the host sees an error with the cause.
+  - Returning to a seat: a new tunnel address is a different site for the browser, and the saved `playerId` and secret are not there. Therefore participant nicknames are unique case-insensitively, and a player who joined via a valid invitation with the nickname of a disconnected participant takes their seat. The nickname of a connected participant cannot be taken: the login gets the response «ник занят» ("nickname taken").
+  - Local files: `settings.json`, `quota.json` and the `matches.jsonl` lines carry a `version` field and are validated by a schema. An unreadable `settings.json` or `quota.json` is renamed to a file ending in `.bad`, the server starts with defaults (the quota counter from zero) and shows a warning in the terminal and in the host's lobby. A write error of `matches.jsonl` does not abort the match and is visible to the host on the final screen.
+  - A Maps JavaScript API load error on the client (blocker, referrer restriction) goes to the server in a `client_error` message; the host sees a note with the cause at the player.
+  - Harness update (M3, full `doctor`): `bun run test:harness` records the CLI versions it passed with into `~/.config/geoaissr/harness-verified.json`; `doctor` warns if the installed version differs and advises running `bun run test:harness`.
+  - Tests: unit tests on a metadata key denial, a 403 from Static, wrong tool arguments, explanation truncation, login with the nickname of a disconnected and of a connected participant, unreadable settings and quota files; an integration test on restarting a fake tunnel process.
+- **Event order and edge cases.** Milestone M1; refines sections 4.1, 4.3, 5.1 and 7.
+  - Neither a guess nor a tool call changes the round outcome after its end. Each handler checks the round number and phase immediately before changing state, after all the waits (reading the request body, Google's response). A late call gets «раунд окончен» ("round over"), its result is discarded and does not get into the next round.
+  - A move is reserved before the request to Google and returned if the call is deemed failed under the rules of the item "Static API errors". Therefore parallel calls of one bot do not spend more than the limit.
+  - Human marker: the client sends the server the marker position at every placement, no more than 5 times per second; the server keeps the last one. That is the one that counts if the answer is not confirmed by the end of the timer. A repeated press of «Угадать» and a change of the marker after confirmation are ignored by the server.
+  - The longitude of a marker and of a bot guess is normalized to the range from -180 to 180; a latitude outside the range from -90 to 90 is rejected.
+  - The host's «Дальше» message carries the round number: a repeated press and a press simultaneous with the automatic advance do not skip a round.
+  - Match settings change only in the lobby. A ninth human gets the response «комната полна» ("room full").
+  - If by the end of the results screen no human is connected, the next round does not start until someone returns: the bots do not waste quota and subscription.
+  - `GameEngine` and `LocationService` receive the clock and the random number generator as parameters; tests substitute controllable ones.
+  - Tests: unit tests with controllable stop points for both completion orders (bot guess and timer end; Google response and round end; two parallel `look` calls with one move left); a marker without confirmation; a repeated «Дальше»; a pause with no humans. Integration scenarios of the fake harness: normal, hung, finished before a guess, finished after a guess, with wrong arguments, with parallel calls.
+- **Secrets and tokens.** Milestones M0 and M1; refines sections 4.1, 6 and 9.
+  - `.env` is added to `.gitignore`; `bun run check` fails if `.env` is tracked by git.
+  - The host and invitation tokens are created anew at each `start`. A leaked invitation is revoked by restarting; excluding players by the host does not exist in the first version.
+  - Keys and tokens do not get into the log or into error messages; where one token must be told from another, the first 4 characters are shown.
+  - Tests: a unit test on token masking in the log; the check that `.env` is not tracked is part of `bun run check`.
+- **Server and bot log.** Milestone M1; refines sections 5.3 and 9.
+  - The server writes events as JSON lines to `~/.local/share/geoaissr/logs/<date>.jsonl`: round start and end, participants joining and leaving, launch and finish of each harness (exit code, reason, last stderr lines), each bot tool call (name, duration, outcome), the outcome of requests to Google, the quota counter value.
+  - Answer coordinates get into the log only after the round ends. Files for the last 14 days are kept.
+  - In the host's terminal one line is printed per round: who answered, which bots were cut off and why.
+  - Test: an integration test, after a match with a fake harness the log contains the launch, the calls and the reason for finishing of each bot, and no tokens or keys.
 <!-- /autoplan-accepted:ceo -->
 
-Пункты ниже добавлены обзором дизайна (фаза 2) и так же обязательны.
+The items below were added by the design review (phase 2) and are likewise mandatory.
 
-- **Визуальный язык и `DESIGN.md`.** Вехи M0 (файл) и M1 (применение); уточняет разделы 7 и 8.
-  - Образ: асфальт и дорожная разметка. Панорама и карта занимают весь экран, интерфейс лежит поверх них плотными тёмными панелями. Сцена использования: вечер, друзья в голосовом чате, каждый за своим монитором; яркая дневная панорама остаётся главным, панели не слепят.
-  - Текст никогда не лежит прямо на панораме или карте: только на сплошной непрозрачной панели с линией `1px solid var(--line)`, чтобы панель читалась и без тени. Стекла, свечения, градиентов и декоративных иконок нет.
-  - Шрифты (оба с кириллицей, лицензия OFL, лежат в репозитории через пакеты `@fontsource-variable/unbounded` и `@fontsource-variable/onest`, запросов к чужим серверам нет): Unbounded для названия игры, таймера, очков и заголовков экранов; Onest для всего остального. Числа везде табличные (`font-variant-numeric: tabular-nums`). Размеры: 14 (только подписи), 16 (основной), 20, 28, 40, 64 px.
-  - Цвета заданы CSS-переменными в `web/src/styles/tokens.css`: панель `--asphalt-800: #1B1E23`, фон экрана `--asphalt-900: #14171B`, наведение `--asphalt-700: #2A2E35`, линии `--line: #3A3F47`, текст `--paper: #F4F1EA`, вторичный текст `--paper-dim: #B9B4A8`, акцент `--paint: #FFD23F` (тёмный текст `#14171B` поверх), ошибка и последние 10 с таймера `--signal: #FF6369`, «ответил» `--ok: #3DBB7A`. Акцент один и занят под главное действие экрана и кольцо таймера.
-  - Отступы 4, 8, 12, 16, 24, 32, 48 px. Скругления: 4 px у полей и кнопок, 8 px у панелей. Тень панели со смещением: `0 2px 0 rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35)`.
-  - Движение: 120 мс (нажатие, наведение), 240 мс (раскрытие панели), 400 мс (перестановка строк), 800 мс (перелёт карты); кривая `cubic-bezier(0.16, 1, 0.3, 1)`, без отскоков. Авторский момент один: показ результатов раунда.
-  - Поверхности браузера оформлены из той же палитры: кольцо фокуса 2 px цвета `--paint` с отступом 2 px у каждого интерактивного элемента, выделение текста, каретка, тонкая полоса прокрутки.
-  - Карта светлая, тёмной схемы нет: у MapLibre стиль OpenFreeMap `positron`, у Google Maps штатная светлая схема со скрытыми значками заведений. Подписи русские там, где они есть в данных: у Google Maps параметр `language=ru`, у MapLibre поле подписи `name:ru` с запасным `name`.
-  - Иконки: один набор `@lucide/svelte`, только там, где иконка несёт смысл (ответил, копировать, предупреждение, связь, чип ИИ). Эмодзи в интерфейсе нет.
-  - Тексты: язык действий и состояний («Угадать», «Ответ принят», «ИИ думают 0:14»), без приветствий и лозунгов. Все строки в `web/src/i18n/ru.ts`. Там же помощники: склонение числительных через `Intl.PluralRules('ru')` («1 раунд, 2 раунда, 5 раундов»), числа через `Intl.NumberFormat('ru-RU')` («4 872 очка»), расстояние до 1 км в метрах («840 м»), дальше в целых километрах («12 345 км»). Длинный ник обрезается многоточием, полный виден в подсказке.
-  - Общие компоненты состояний: `StatusBanner.svelte` (связь, предупреждения хосту) и `InlineState.svelte` (загрузка, пусто, ошибка с кнопкой действия внутри области). Экраны M1 берут состояния из них, поэтому веха M4 меняет вид, а не код экранов.
-  - В вехе M0 эти решения записываются в `DESIGN.md` в корне репозитория; `CLAUDE.md` проекта на него ссылается. Компонент, которому не хватает переменной, добавляет её в `tokens.css` и `DESIGN.md`, а не пишет цвет или размер на месте.
-  - Макетов нет: у дизайнера gstack на машине владельца нет ключа генерации картинок. Раскладки ниже заданы схемами; владелец может после настройки ключа запустить `/design-shotgun` и поправить `DESIGN.md` до начала экранов M1.
-  - Тесты: `bun run check` падает, если в `web/src/**/*.svelte` встречается цвет в виде `#rrggbb` или `rgb(` (цвета живут только в `tokens.css`); модульный тест считает контраст пар «текст на фоне» из `tokens.css` (не ниже 4.5:1, для чисел от 28 px не ниже 3:1).
-- **Участники: цвет, форма, имя.** Веха M1; уточняет разделы 4.1, 4.2 и 4.5.
-  - Цвет не единственный признак участника. У человека круглый аватар с первой буквой ника, у ИИ квадратный со скруглением 6 px и значком чипа рядом с буквой. Метка на карте повторяет форму и букву аватара; при наведении и на карте результатов рядом с выбранной меткой виден ник.
-  - Палитра участников из 12 цветов в `tokens.css` (`--p-1` … `--p-12`): `#E8590C`, `#D6336C`, `#AE3EC9`, `#7048E8`, `#1C7ED6`, `#1098AD`, `#0CA678`, `#74B816`, `#8D5524`, `#868E96`, `#F06595`, `#22B8CF`. Жёлтого акцента в ней нет. Буква на аватаре тёмная или светлая: берётся та, что даёт контраст не ниже 4.5:1.
-  - Цвет, занятый одним участником, другим недоступен: на экране входа и в слоте ИИ занятые образцы неактивны, первый свободный выбран заранее. Образцы цвета это подписанные радиокнопки («оранжевый», «синий»), выбранный отмечен галочкой, а не только цветом.
-  - Метки на карте и аватары поверх панорамы имеют светлый контур 2 px и тёмную тень со смещением, поэтому читаются на любом фоне.
-  - Имя ИИ по умолчанию это название модели; хост может его изменить. Для программ чтения с экрана у ИИ подпись вида «Клод, ИИ».
-  - Тесты: модульные на выдачу первого свободного цвета, отказ в занятом и контраст буквы на каждом из 12 цветов.
-- **Иерархия экранов.** Веха M1; уточняет разделы 4 и 7.
-  - Переходы: вход → лобби → (отсчёт → раунд → результаты) × число раундов → финал → лобби. На каждом экране после входа в правом верхнем углу стоят индикатор связи и, у хоста, меню.
-  - Вход. Одна колонка по центру. Сверху название `geoaissr` шрифтом Unbounded и строка контекста («В лобби: Миша, Оля и 2 ИИ»). Первое: поле «Ваше имя» с видимой подписью и фокусом при открытии. Второе: выбор цвета. Третье: кнопка «Войти» (клавиша Enter); если идёт партия, кнопка подписана «Смотреть раунд». Если есть отключившиеся участники, под полем строка «Отключились: Оля. Введите тот же ник, чтобы вернуться на своё место». Ошибка показывается рядом со своим полем, введённые значения сохраняются.
-  - Лобби. Первое: кто в комнате (слева люди, под ними слоты ИИ). Второе: настройки партии (справа; хост меняет, гости видят те же строки значениями без полей ввода). Третье: «Начать» у хоста, у гостей строка «Начать может только хост. Ждём: Миша». Это две колонки со строками, а не набор карточек:
+- **Visual language and `DESIGN.md`.** Milestones M0 (the file) and M1 (application); refines sections 7 and 8.
+  - Image: asphalt and road markings. The panorama and the map take the whole screen, the interface lies over them in dense dark panels. Usage scene: an evening, friends in a voice chat, each at their own monitor; the bright daytime panorama remains the main thing, the panels do not dazzle.
+  - Text never lies directly on the panorama or the map: only on a solid opaque panel with a `1px solid var(--line)` line, so the panel reads even without a shadow. No glass effects, glows, gradients or decorative icons.
+  - Fonts (both with Cyrillic, OFL license, kept in the repository via the packages `@fontsource-variable/unbounded` and `@fontsource-variable/onest`, no requests to foreign servers): Unbounded for the game title, the timer, scores and screen headings; Onest for everything else. Numbers are tabular everywhere (`font-variant-numeric: tabular-nums`). Sizes: 14 (captions only), 16 (main), 20, 28, 40, 64 px.
+  - Colors are set by CSS variables in `web/src/styles/tokens.css`: panel `--asphalt-800: #1B1E23`, screen background `--asphalt-900: #14171B`, hover `--asphalt-700: #2A2E35`, lines `--line: #3A3F47`, text `--paper: #F4F1EA`, secondary text `--paper-dim: #B9B4A8`, accent `--paint: #FFD23F` (dark text `#14171B` on top), error and the last 10 s of the timer `--signal: #FF6369`, "answered" `--ok: #3DBB7A`. There is one accent, reserved for the screen's main action and the timer ring.
+  - Spacing 4, 8, 12, 16, 24, 32, 48 px. Corner radii: 4 px for fields and buttons, 8 px for panels. Panel shadow with an offset: `0 2px 0 rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35)`.
+  - Motion: 120 ms (press, hover), 240 ms (panel expansion), 400 ms (row reordering), 800 ms (map fly-over); curve `cubic-bezier(0.16, 1, 0.3, 1)`, no bounces. There is one signature moment: showing the round results.
+  - Browser surfaces are styled from the same palette: a 2 px focus ring of `--paint` with a 2 px offset on every interactive element, text selection, caret, a thin scrollbar.
+  - The map is light, there is no dark scheme: for MapLibre the OpenFreeMap style `positron`, for Google Maps the standard light scheme with venue icons hidden. Labels are Russian where they exist in the data: for Google Maps the parameter `language=ru`, for MapLibre the label field `name:ru` with fallback `name`.
+  - Icons: one set `@lucide/svelte`, only where an icon carries meaning (answered, copy, warning, connection, AI chip). No emoji in the interface.
+  - Texts: the language of actions and states («Угадать», «Ответ принят» ("Answer accepted"), «ИИ думают 0:14»), without greetings or slogans. All strings in `web/src/i18n/ru.ts`. Helpers live there too: Russian numeral declension via `Intl.PluralRules('ru')` («1 раунд, 2 раунда, 5 раундов»), numbers via `Intl.NumberFormat('ru-RU')` («4 872 очка»), distance below 1 km in meters («840 м»), beyond that in whole kilometers («12 345 км»). A long nickname is truncated with an ellipsis, the full one is visible in a tooltip.
+  - Shared state components: `StatusBanner.svelte` (connection, warnings to the host) and `InlineState.svelte` (loading, empty, error with an action button inside the area). The M1 screens take their states from them, so milestone M4 changes the look, not the screens' code.
+  - In milestone M0 these decisions are recorded in `DESIGN.md` at the repository root; the project `CLAUDE.md` links to it. A component that lacks a variable adds it to `tokens.css` and `DESIGN.md` rather than writing a color or size in place.
+  - There are no mockups: the gstack designer on the owner's machine has no image generation key. The layouts below are given as diagrams; the owner may, after setting up a key, run `/design-shotgun` and correct `DESIGN.md` before the M1 screens begin.
+  - Tests: `bun run check` fails if a color in the form `#rrggbb` or `rgb(` occurs in `web/src/**/*.svelte` (colors live only in `tokens.css`); a unit test computes the contrast of "text on background" pairs from `tokens.css` (not below 4.5:1, for numbers from 28 px not below 3:1).
+- **Participants: color, shape, name.** Milestone M1; refines sections 4.1, 4.2 and 4.5.
+  - Color is not the only marker of a participant. A human has a round avatar with the first letter of the nickname, an AI has a square one with a 6 px corner radius and a chip icon next to the letter. The marker on the map repeats the avatar's shape and letter; on hover, and on the results map, the nickname is visible next to the selected marker.
+  - A participant palette of 12 colors in `tokens.css` (`--p-1` … `--p-12`): `#E8590C`, `#D6336C`, `#AE3EC9`, `#7048E8`, `#1C7ED6`, `#1098AD`, `#0CA678`, `#74B816`, `#8D5524`, `#868E96`, `#F06595`, `#22B8CF`. There is no yellow accent in it. The letter on the avatar is dark or light: whichever gives a contrast of at least 4.5:1 is taken.
+  - A color taken by one participant is unavailable to another: on the login screen and in the AI slot, taken swatches are inactive, the first free one is preselected. The color swatches are labeled radio buttons («оранжевый» ("orange"), «синий» ("blue")), the selected one is marked with a check mark, not only by color.
+  - Markers on the map and avatars over the panorama have a light 2 px outline and a dark offset shadow, so they read on any background.
+  - An AI's default name is the model name; the host can change it. For screen readers an AI has a label like «Клод, ИИ» ("Claude, AI").
+  - Tests: unit tests on handing out the first free color, refusing a taken one and the letter's contrast on each of the 12 colors.
+- **Screen hierarchy.** Milestone M1; refines sections 4 and 7.
+  - Transitions: login → lobby → (countdown → round → results) × number of rounds → final → lobby. On every screen after login, in the top right corner there is a connection indicator and, for the host, a menu.
+  - Login. A single centered column. At the top the title `geoaissr` in Unbounded and a context line («В лобби: Миша, Оля и 2 ИИ» ("In the lobby: Misha, Olya and 2 AIs")). First: the field «Ваше имя» ("Your name") with a visible label and focus on open. Second: the color picker. Third: the «Войти» ("Join") button (Enter key); if a match is in progress, the button is labeled «Смотреть раунд» ("Watch the round"). If there are disconnected participants, under the field a line «Отключились: Оля. Введите тот же ник, чтобы вернуться на своё место» ("Disconnected: Olya. Enter the same nickname to return to your seat"). The error is shown next to its own field, the entered values are kept.
+  - Lobby. First: who is in the room (humans on the left, AI slots under them). Second: match settings (on the right; the host changes them, guests see the same rows as values without input fields). Third: «Начать» ("Start") for the host, for guests the line «Начать может только хост. Ждём: Миша» ("Only the host can start. Waiting for: Misha"). This is two columns of rows, not a set of cards:
 
     ```
     +---------------------------------------------------------------+
@@ -453,10 +453,10 @@
     |                               |                  [  Начать  ] |
     +-------------------------------+-------------------------------+
     ```
-  - «Начать» доступна, когда подключён хотя бы один человек, первая точка готова и квоты хватает. Причины, по которым начать нельзя, перечислены строками рядом с кнопкой, у каждой сказано, что изменить. Выключенный слот ИИ и игрок с ошибкой Maps JavaScript API старт не блокируют: слот не играет, у игрока стоит пометка.
-  - Слот ИИ редактируется на месте: строка раскрывается в форму (имя, цвет, модель, effort, лимит ходов), модального окна нет, одновременно раскрыт один слот. Поля M2 (размер картинки, бюджет времени, характер) лежат в этой же форме под раскрытием «Дополнительно». Лимит 0 подписан «Только стартовые снимки»; подсказка у поля: «Ход это дополнительный взгляд или шаг сверх четырёх стартовых снимков». Значение, которое изменилось само (раунд поднят до 60 с, бюджет бота урезан длительностью раунда), объясняется строкой у своего поля.
-  - Результат «Проверить» (M2) относится к настройкам, на которых получен: после смены модели, effort или размера картинки отметка «Зрение проверено, 12 с» сменяется на «Не проверено на этих настройках».
-  - Раунд. Первое: панорама на весь экран. Второе: таймер сверху по центру на сплошной плашке. Третье: мини-карта и кнопка «Угадать» справа внизу, одна зона действия. Список участников слева узкой колонкой, компас слева внизу:
+  - «Начать» is available when at least one human is connected, the first location is ready and the quota suffices. The reasons why starting is impossible are listed as lines next to the button, each says what to change. A disabled AI slot and a player with a Maps JavaScript API error do not block the start: the slot does not play, the player has a note.
+  - An AI slot is edited in place: the row expands into a form (name, color, model, effort, move limit), there is no modal window, one slot is expanded at a time. The M2 fields (image size, time budget, personality) lie in the same form under the «Дополнительно» ("Advanced") disclosure. A limit of 0 is labeled «Только стартовые снимки» ("Starting images only"); the hint on the field: «Ход это дополнительный взгляд или шаг сверх четырёх стартовых снимков» ("A move is an extra look or step beyond the four starting images"). A value that changed by itself (the round raised to 60 s, the bot budget cut by the round duration) is explained by a line at its own field.
+  - The «Проверить» result (M2) relates to the settings on which it was obtained: after a change of model, effort or image size, the mark «Зрение проверено, 12 с» ("Vision checked, 12 s") changes to «Не проверено на этих настройках» ("Not checked on these settings").
+  - Round. First: the panorama full screen. Second: the timer at the top center on a solid plate. Third: the mini-map and the «Угадать» button at the bottom right, one action zone. The participant list on the left as a narrow column, the compass at the bottom left:
 
     ```
     +---------------------------------------------------------------+
@@ -473,13 +473,13 @@
     | Google                              атрибуция Google на виду  |
     +---------------------------------------------------------------+
     ```
-  - Логотип и строка атрибуции Google внизу панорамы и карты остаются видимыми: мини-карта и компас стоят выше них с отступом.
-  - Мини-карта: 320 × 220 px в покое; при наведении, фокусе или нажатии клавиши `M` раскрывается до 45% ширины и 55% высоты окна; кнопка-булавка закрепляет её раскрытой.
-  - Отсчёт: панорама загружается под непрозрачной заслонкой цвета `--asphalt-900`, по центру крупные цифры 3-2-1, под ними строка «Ждём: Дима», пока чья-то панорама грузится. Заслонка снимается на нуле у всех сразу: до начала раунда панораму не видит никто, как и боты.
-  - Таймер считается от времени конца раунда, присланного сервером, с поправкой на разницу часов, поэтому после переподключения он верен. В последние 10 с цифры и кольцо становятся цвета `--signal`.
-  - Таймер на экране один. Когда последний человек подтвердил ответ, а боты ещё работают, подпись таймера меняется на «Все ответили. ИИ думают», и он показывает время до настоящего конца раунда (с учётом окна ожидания и 60-й секунды).
-  - Зритель видит панораму и список участников; вместо мини-карты строка «Вы зритель. Играете со следующего раунда», в последнем раунде «Вы зритель до конца партии».
-  - Результаты раунда. Первое: карта на весь экран с флагом ответа и метками, над таблицей строка своего итога («Вы: 312 км, 2 140 очков»). Второе: таблица раунда справа (место, аватар, имя, расстояние, столбцы «За раунд» и «Всего»), своя строка выделена. Третье: «Дальше» у хоста с обратным отсчётом автоперехода, у гостей строка «Следующий раунд через 0:24». Слева внизу строка «Правильный ответ: <страна>» (русское название из поля `NAME_RU` данных Natural Earth):
+  - The Google logo and attribution line at the bottom of the panorama and the map stay visible: the mini-map and the compass stand above them with a margin.
+  - Mini-map: 320 × 220 px at rest; on hover, focus or pressing the `M` key it expands to 45% of the window width and 55% of its height; a pin button fixes it expanded.
+  - Countdown: the panorama loads under an opaque shutter of color `--asphalt-900`, in the center large digits 3-2-1, under them the line «Ждём: Дима» ("Waiting for: Dima") while someone's panorama is loading. The shutter is lifted at zero for everyone at once: before the round starts nobody sees the panorama, the bots included.
+  - The timer is computed from the round end time sent by the server, corrected for the clock difference, so it is correct after reconnection. In the last 10 s the digits and the ring become `--signal` colored.
+  - There is one timer on screen. When the last human has confirmed their answer and the bots are still working, the timer caption changes to «Все ответили. ИИ думают» ("Everyone has answered. The AIs are thinking"), and it shows the time until the true end of the round (taking the wait window and the 60th second into account).
+  - A spectator sees the panorama and the participant list; instead of the mini-map a line «Вы зритель. Играете со следующего раунда» ("You are a spectator. You play from the next round"), in the last round «Вы зритель до конца партии» ("You are a spectator until the end of the match").
+  - Round results. First: the map full screen with the answer flag and markers, above the table a line with the viewer's own result («Вы: 312 км, 2 140 очков» ("You: 312 km, 2,140 points")). Second: the round table on the right (place, avatar, name, distance, columns «За раунд» ("Round") and «Всего» ("Total")), the viewer's own row is highlighted. Third: «Дальше» for the host with an automatic-advance countdown, for guests the line «Следующий раунд через 0:24» ("Next round in 0:24"). At the bottom left the line «Правильный ответ: <страна>» ("Correct answer: <country>") (the Russian name from the `NAME_RU` field of the Natural Earth data):
 
     ```
     +---------------------------------------------------------------+
@@ -495,76 +495,76 @@
     |                                       [    Дальше 0:24    ]   |
     +---------------------------------------------------------------+
     ```
-  - В строке ИИ под именем видна первая строка его объяснения и кнопка «почему?». Она раскрывает карточку под строкой таблицы, а не модальное окно; щелчок по метке ИИ на карте открывает ту же карточку. Порядок в карточке: объяснение целиком, реплика (M2), лента миниатюр ходов с подписями стороны света, строка «4 хода, 48 с». Esc закрывает карточку и возвращает фокус на кнопку.
-  - Дуги на карте тонкие и полупрозрачные; подпись расстояния на карте есть только у своей метки и у выбранного участника, расстояния всех стоят в таблице. Щелчок по строке или метке выделяет пару на карте и в таблице и поднимает метку поверх соседних. Дуга идёт по кратчайшему пути, границы карты подбираются с учётом 180-го меридиана.
-  - У участника без ответа метки нет; в таблице у человека «нет ответа, 0», у ИИ «нет догадки» и причина («оборван по времени», «сбой харнесса», «лимит подписки»).
-  - Финал. Первое: исход партии: победитель или «Места поделили: Оля и Клод», пьедестал до трёх мест (ступеней столько, сколько участников). Второе: своё место и общий список мест. Третье: «Ещё раз» у хоста, у гостей «Ждём хоста». Таблица по раундам лежит ниже в своей области с горизонтальной прокруткой и закреплённым столбцом имён; раунд, в котором участник не играл, отмечен прочерком (дефис), раунд без ответа нулём, есть столбец «Сыграно раундов».
-  - Если победил человек, конфетти его цвета идёт один раз 2 с у всех (`canvas-confetti`), кнопок не закрывает. Если победил ИИ, конфетти нет; строки «Победил ИИ: Клод» и «Лучший из людей: Оля».
-  - Досрочно завершённая партия подписана «Сыграно 3 из 5 раундов». Если не сыгран ни один раунд, пьедестала нет: «Партия завершена до первого результата».
-  - В вехе M4 щелчок по ячейке раунда у ИИ в таблице финала открывает его карточку за этот раунд (миниатюры хранятся до возврата в лобби).
-- **Ответ человека: подтверждения сервера.** Веха M1; уточняет раздел 4.3 и пункт «Порядок событий и граничные случаи».
-  - Сервер подтверждает каждое положение метки и нажатие «Угадать»; клиент показывает состояние только по подтверждению.
-  - Состояния зоны ответа: метки нет (кнопка неактивна, подпись «Поставьте метку на карте»); метка отправлена, подтверждения ещё нет (кнопка «Угадать» активна); метка сохранена («Метка сохранена: засчитается, если время выйдет»); нажато «Угадать», подтверждения ещё нет (кнопка «Отправляем…»); ответ принят (метка закреплена, вместо кнопки «Ответ принят. Ответили 2 из 6», панораму можно смотреть дальше); время вышло.
-  - При обрыве связи зона ответа показывает последнее подтверждённое состояние и строку «Нет связи: изменения не отправлены»; после переподключения клиент отправляет последнее положение метки заново.
-  - Тесты: интеграционный на подтверждение метки и ответа; E2E на состояние «Нет связи» при обрыве WebSocket после постановки метки.
-- **Показ результатов раунда и пауза чтения.** Веха M1 (простой показ и пауза) и M4 (полная последовательность); уточняет разделы 4.5 и 8.
-  - Последовательность: перелёт карты к ответу (800 мс), флаг ответа, затем метки по одной от самой дальней к самой близкой с шагом 300 мс; к каждой рисуется дуга, строка участника появляется в таблице, очки набегают 600 мс; после последней метки строки переставляются (400 мс). Вся последовательность не дольше 5 с при любом числе участников.
-  - Щелчок по карте или пробел показывает итог сразу. При `prefers-reduced-motion` итог показывается сразу всегда: без перелёта, дуг по времени, набегающих чисел и конфетти.
-  - В M1 показ простой: карта сразу в границах всех меток, метки и таблица без последовательности.
-  - Отсчёт автоперехода (30 с) начинается после конца показа. Пока у кого-то из подключённых людей открыта карточка ИИ, отсчёт стоит, все видят строку «Пауза: Оля читает объяснение». Суммарная пауза за раунд не больше 90 с; «Дальше» у хоста работает всегда.
-  - Тесты: модульные на паузу конечного автомата (открытие и закрытие карточки, предел 90 с, отключение читающего, «Дальше» во время паузы); E2E, после пробела все метки и итоговые очки на экране без ожидания.
-- **Состояния интерфейса.** Веха M1 (строки про «Проверить», реплику и счёт сторон в M2); уточняет разделы 4, 6 и 8. Что видит человек:
+  - In an AI's row, under the name, the first line of its explanation and the «почему?» ("why?") button are visible. It expands the card under the table row, not a modal window; a click on the AI's marker on the map opens the same card. The order in the card: the full explanation, the quip (M2), a strip of move thumbnails with compass captions, the line «4 хода, 48 с» ("4 moves, 48 s"). Esc closes the card and returns focus to the button.
+  - Arcs on the map are thin and semi-transparent; a distance label on the map exists only at the viewer's own marker and at the selected participant, everyone's distances are in the table. A click on a row or a marker highlights the pair on the map and in the table and raises the marker above its neighbors. The arc follows the shortest path, the map bounds are chosen taking the 180th meridian into account.
+  - A participant without an answer has no marker; in the table a human shows «нет ответа, 0» ("no answer, 0"), an AI shows «нет догадки» ("no guess") and the reason («оборван по времени» ("cut off by time"), «сбой харнесса» ("harness failure"), «лимит подписки» ("subscription limit")).
+  - Final. First: the match outcome: the winner or «Места поделили: Оля и Клод» ("Places shared: Olya and Claude"), a podium of up to three places (as many steps as there are participants). Second: the viewer's own place and the overall list of places. Third: «Ещё раз» for the host, for guests «Ждём хоста» ("Waiting for the host"). The per-round table lies below in its own area with horizontal scrolling and a pinned name column; a round in which the participant did not play is marked with a dash (hyphen), a round without an answer with a zero, there is a column «Сыграно раундов» ("Rounds played").
+  - If a human won, confetti in their color goes once for 2 s for everyone (`canvas-confetti`) and does not cover the buttons. If an AI won, there is no confetti; lines «Победил ИИ: Клод» ("AI won: Claude") and «Лучший из людей: Оля» ("Best of the humans: Olya").
+  - A match ended early is labeled «Сыграно 3 из 5 раундов» ("Played 3 of 5 rounds"). If no round was played, there is no podium: «Партия завершена до первого результата» ("Match ended before the first result").
+  - In milestone M4 a click on an AI's round cell in the final table opens its card for that round (thumbnails are kept until the return to the lobby).
+- **Human answer: server confirmations.** Milestone M1; refines section 4.3 and the item "Event order and edge cases".
+  - The server confirms every marker position and every press of «Угадать»; the client shows a state only upon confirmation.
+  - States of the answer zone: no marker (the button is inactive, caption «Поставьте метку на карте» ("Place a marker on the map")); marker sent, no confirmation yet (the «Угадать» button is active); marker saved («Метка сохранена: засчитается, если время выйдет» ("Marker saved: it will count if time runs out")); «Угадать» pressed, no confirmation yet (the button «Отправляем…» ("Sending…")); answer accepted (the marker is pinned, instead of the button «Ответ принят. Ответили 2 из 6» ("Answer accepted. 2 of 6 have answered"), the panorama can still be explored); time is up.
+  - On a connection drop the answer zone shows the last confirmed state and the line «Нет связи: изменения не отправлены» ("No connection: changes not sent"); after reconnection the client sends the last marker position again.
+  - Tests: an integration test on marker and answer confirmation; E2E on the «Нет связи» state on a WebSocket drop after placing a marker.
+- **Showing round results and the reading pause.** Milestone M1 (simple display and the pause) and M4 (the full sequence); refines sections 4.5 and 8.
+  - Sequence: the map flies to the answer (800 ms), the answer flag, then markers one by one from the farthest to the nearest with a 300 ms step; an arc is drawn to each, the participant's row appears in the table, the points count up over 600 ms; after the last marker the rows are reordered (400 ms). The whole sequence takes no longer than 5 s with any number of participants.
+  - A click on the map or the space bar shows the outcome immediately. With `prefers-reduced-motion` the outcome is always shown immediately: no fly-over, no timed arcs, no counting numbers and no confetti.
+  - In M1 the display is simple: the map immediately in the bounds of all markers, markers and table without a sequence.
+  - The automatic-advance countdown (30 s) starts after the display ends. While any connected human has an AI card open, the countdown stands still, everyone sees the line «Пауза: Оля читает объяснение» ("Pause: Olya is reading the explanation"). The total pause per round is no more than 90 s; the host's «Дальше» always works.
+  - Tests: unit tests on the state machine pause (opening and closing the card, the 90 s limit, the reader disconnecting, «Дальше» during the pause); E2E, after the space bar all markers and final points are on screen without waiting.
+- **Interface states.** Milestone M1 (the rows on «Проверить», quip and side score in M2); refines sections 4, 6 and 8. What the person sees:
 
-  | Элемент | Загрузка | Пусто | Ошибка | Успех | Частично |
+  | Element | Loading | Empty | Error | Success | Partial |
   |---|---|---|---|---|---|
-  | Вход | «Проверяем ссылку…», форма неактивна; после нажатия «Входим…», повторное нажатие не действует | в адресе нет токена: «Нужна пригласительная ссылка. Попросите её у хоста»; имя пустое: «Войти» неактивна, подсказка «От 1 до 20 символов» | «Ссылка устарела или неверна. Попросите у хоста новую» (формы нет); «Ник занят» под полем; «Комната полна: 8 из 8»; «Сервер не отвечает. Возможно, хост закрыл игру» и «Повторить» | переход в лобби | идёт партия: «Идёт раунд 2 из 5. Вы посмотрите его как зритель и сыграете со следующего» |
-  | Игроки в лобби | не бывает: список приходит с первым сообщением | хост один: «Пока вы одни. Отправьте друзьям приглашение» и кнопка копирования | отключившийся: строка тусклая, подпись «отключился»; ошибка Maps JavaScript API у игрока: пометка с причиной у хоста | строки с аватаром, у хоста подпись «хост» | «Комната полна» при 8 из 8 |
-  | Приглашение | «Ссылка проверяется…», кнопка неактивна | с `--no-tunnel`: «Игра только на этом компьютере» | причина (DNS или HTTP) и совет перезапустить `start` | «Скопировано» на 2 с | адрес сменился: «Адрес игры сменился. Отправьте друзьям новую ссылку» |
-  | Слоты ИИ | список моделей: «Загружаем модели…»; «Проверить» (M2): «Проверяем зрение…» в кнопке | у хоста «ИИ-соперников нет. Добавьте до трёх» и «Добавить ИИ»; у гостей «Хост пока не добавил ИИ» | недоступный харнесс: слот выключен, причина и команда исправления строкой; проверка не прошла: причина | свёрнутая строка: аватар, имя, харнесс, лимит ходов; «Зрение проверено, 12 с» (M2) | «Не проверено на этих настройках»; «Отвечает медленно: 41 с при бюджете 60 с» (M2) |
-  | «Начать» | «Готовим первый раунд…» в кнопке, пока точка не готова | не бывает | квоты не хватает: кнопка неактивна, рядом расход, худший случай, остаток и что уменьшить | отсчёт | у гостей строка «Начать может только хост» |
-  | Панорама | заслонка `--asphalt-900` и «Загружаем панораму…» | не бывает | «Панорама не загрузилась» и «Повторить», карта доступна; Maps JS не загрузился: «Google Maps не загрузился. Отключите блокировщик для этого сайта и обновите страницу» | панорама | не бывает |
-  | Мини-карта и ответ | «Загружаем карту…» | метки нет: «Поставьте метку на карте» | «Карта не загрузилась» и «Повторить»; «Нет связи: изменения не отправлены» | «Ответ принят. Ответили 2 из 6» | «Метка сохранена: засчитается, если время выйдет»; время вышло с меткой: «Время вышло. Засчитана ваша метка»; без метки: «Время вышло. Ответа нет: 0 очков» |
-  | Участники в раунде | «загружает панораму» до начала раунда | не бывает | человек «отключился»; ИИ «оборван» с причиной в подсказке | «ответил» с галочкой | ИИ «ход 3 из 4»; человек без подписи, пока смотрит |
-  | Подготовка раунда | «Ищем место…» | не бывает | хост: причина и «Повторить», «Завершить партию»; гости: «Раунд не начался. Хост решает, что делать» | отсчёт 3-2-1 | «Ждём: Дима», не дольше 5 с |
-  | Карта результатов | очки и таблица видны сразу, на месте карты «Загружаем карту…» | никто не ответил: только флаг ответа и строка «Никто не ответил» | «Карта не загрузилась»: таблица раунда остаётся | метки, дуги, расстояния | участник без ответа: метки нет, в таблице «нет ответа, 0» или «нет догадки» с причиной |
-  | Карточка ИИ | миниатюра грузится: серый прямоугольник того же размера | догадки нет: причина завершения и последние 300 символов текста харнесса | миниатюра не загрузилась: подпись стороны света без картинки | объяснение, ходы, время | «Оборван по времени. Засчитана последняя догадка»; без ходов: «Ходов не делал, ответил по стартовым снимкам» |
-  | Финал | не бывает: итог приходит одним сообщением | ни одного сыгранного раунда: «Партия завершена до первого результата» | у хоста: «Партия не записана в историю. На экране итог верный» с причиной | пьедестал и список мест | ничья: «Места поделили: Оля и Клод»; досрочный конец: «Сыграно 3 из 5 раундов» |
-  | Связь | баннер «Связь потеряна. Переподключаемся, попытка 3»; кнопки действий неактивны, последнее подтверждённое состояние на месте | не бывает | через 30 с: «Не удаётся подключиться. Возможно, у хоста сменился адрес: попросите новую ссылку» | «Снова на связи» на 2 с | не бывает |
+  | Login | «Проверяем ссылку…» ("Checking the link…"), the form is inactive; after pressing «Входим…» ("Joining…"), a repeated press has no effect | no token in the address: «Нужна пригласительная ссылка. Попросите её у хоста» ("An invitation link is needed. Ask the host for it"); empty name: «Войти» is inactive, hint «От 1 до 20 символов» ("1 to 20 characters") | «Ссылка устарела или неверна. Попросите у хоста новую» ("The link is outdated or wrong. Ask the host for a new one") (no form); «Ник занят» ("Nickname taken") under the field; «Комната полна: 8 из 8» ("Room full: 8 of 8"); «Сервер не отвечает. Возможно, хост закрыл игру» ("The server is not responding. The host may have closed the game") and «Повторить» ("Retry") | transition to the lobby | a match is in progress: «Идёт раунд 2 из 5. Вы посмотрите его как зритель и сыграете со следующего» ("Round 2 of 5 is in progress. You will watch it as a spectator and play from the next one") |
+  | Players in the lobby | does not occur: the list arrives with the first message | the host alone: «Пока вы одни. Отправьте друзьям приглашение» ("You are alone for now. Send your friends the invitation") and a copy button | a disconnected one: the row is dim, caption «отключился» ("disconnected"); a Maps JavaScript API error at a player: a note with the cause at the host | rows with an avatar, for the host the caption «хост» ("host") | «Комната полна» at 8 of 8 |
+  | Invitation | «Ссылка проверяется…» ("The link is being checked…"), the button is inactive | with `--no-tunnel`: «Игра только на этом компьютере» ("The game is on this computer only") | the cause (DNS or HTTP) and advice to restart `start` | «Скопировано» ("Copied") for 2 s | the address changed: «Адрес игры сменился. Отправьте друзьям новую ссылку» ("The game address changed. Send your friends the new link") |
+  | AI slots | model list: «Загружаем модели…» ("Loading models…"); «Проверить» (M2): «Проверяем зрение…» ("Checking vision…") in the button | for the host «ИИ-соперников нет. Добавьте до трёх» ("No AI opponents. Add up to three") and «Добавить ИИ» ("Add AI"); for guests «Хост пока не добавил ИИ» ("The host has not added any AI yet") | an unavailable harness: the slot is disabled, the cause and the fix command as a line; the check failed: the cause | collapsed row: avatar, name, harness, move limit; «Зрение проверено, 12 с» (M2) | «Не проверено на этих настройках»; «Отвечает медленно: 41 с при бюджете 60 с» ("Answers slowly: 41 s with a 60 s budget") (M2) |
+  | «Начать» | «Готовим первый раунд…» ("Preparing the first round…") in the button while the location is not ready | does not occur | the quota is insufficient: the button is inactive, next to it usage, worst case, remainder and what to reduce | countdown | for guests the line «Начать может только хост» ("Only the host can start") |
+  | Panorama | the `--asphalt-900` shutter and «Загружаем панораму…» ("Loading the panorama…") | does not occur | «Панорама не загрузилась» ("The panorama failed to load") and «Повторить», the map is available; Maps JS did not load: «Google Maps не загрузился. Отключите блокировщик для этого сайта и обновите страницу» ("Google Maps failed to load. Disable the blocker for this site and refresh the page") | the panorama | does not occur |
+  | Mini-map and answer | «Загружаем карту…» ("Loading the map…") | no marker: «Поставьте метку на карте» | «Карта не загрузилась» ("The map failed to load") and «Повторить»; «Нет связи: изменения не отправлены» | «Ответ принят. Ответили 2 из 6» | «Метка сохранена: засчитается, если время выйдет»; time ran out with a marker: «Время вышло. Засчитана ваша метка» ("Time is up. Your marker was counted"); without a marker: «Время вышло. Ответа нет: 0 очков» ("Time is up. No answer: 0 points") |
+  | Participants in a round | «загружает панораму» ("loading the panorama") until the round starts | does not occur | a human «отключился»; an AI «оборван» ("cut off") with the cause in a tooltip | «ответил» ("answered") with a check mark | an AI «ход 3 из 4»; a human without a caption while still looking |
+  | Round preparation | «Ищем место…» ("Looking for a place…") | does not occur | host: the cause and «Повторить», «Завершить партию»; guests: «Раунд не начался. Хост решает, что делать» ("The round did not start. The host decides what to do") | countdown 3-2-1 | «Ждём: Дима», no longer than 5 s |
+  | Results map | points and table are visible immediately, in place of the map «Загружаем карту…» | nobody answered: only the answer flag and the line «Никто не ответил» ("Nobody answered") | «Карта не загрузилась»: the round table remains | markers, arcs, distances | a participant without an answer: no marker, in the table «нет ответа, 0» or «нет догадки» with the cause |
+  | AI card | the thumbnail is loading: a gray rectangle of the same size | no guess: the reason for finishing and the last 300 characters of the harness text | the thumbnail failed to load: the compass caption without a picture | explanation, moves, time | «Оборван по времени. Засчитана последняя догадка» ("Cut off by time. The last guess was counted"); without moves: «Ходов не делал, ответил по стартовым снимкам» ("Made no moves, answered from the starting images") |
+  | Final | does not occur: the result arrives in one message | no rounds played: «Партия завершена до первого результата» | for the host: «Партия не записана в историю. На экране итог верный» ("The match was not recorded in the history. The result on screen is correct") with the cause | podium and list of places | a tie: «Места поделили: Оля и Клод»; early end: «Сыграно 3 из 5 раундов» |
+  | Connection | banner «Связь потеряна. Переподключаемся, попытка 3» ("Connection lost. Reconnecting, attempt 3"); action buttons are inactive, the last confirmed state stays in place | does not occur | after 30 s: «Не удаётся подключиться. Возможно, у хоста сменился адрес: попросите новую ссылку» ("Cannot connect. The host's address may have changed: ask for a new link") | «Снова на связи» ("Back online") for 2 s | does not occur |
 
-  - Тест: E2E на состояния входа (нет токена, неверная ссылка, занятый ник, полная комната, идущая партия) и на баннер связи при обрыве WebSocket.
-- **Приглашение в интерфейсе и меню хоста.** Веха M1; уточняет разделы 4.1 и 9.
-  - Сервер сообщает клиентам текущую пригласительную ссылку и состояние её проверки. В лобби кнопка «Скопировать приглашение» видна всем; после нажатия на 2 с подпись меняется на «Скопировано».
-  - Меню хоста (значок в правом верхнем углу на экранах лобби, раунда, результатов и финала): «Скопировать приглашение» и «Завершить партию».
-  - Если адрес туннеля сменился посреди партии, хост видит сообщение «Адрес игры сменился. Отправьте друзьям новую ссылку» с кнопкой копирования; оно не исчезает само.
-  - «Завершить партию» спрашивает подтверждение на месте («Завершить? Сыграно 2 из 5 раундов» и кнопки «Завершить», «Отмена»), обрывает ботов и ведёт всех на финал с сыгранными раундами. Незавершённый раунд в счёт не идёт.
-  - Тесты: модульный на переход конечного автомата из `ROUND_ACTIVE` и `ROUND_RESULTS` в `FINAL` по команде хоста; E2E на копирование приглашения.
-- **Клавиатура, контраст и размеры окна.** Веха M1; уточняет разделы 7 и 8.
-  - Расчётное окно 1280 × 720 и больше. От 900 до 1279 px по ширине список участников в раунде сжимается до аватаров со статусом, колонки лобби сохраняются. Страница не прокручивается по горизонтали ни при какой ширине; своя горизонтальная прокрутка есть только у таблицы по раундам в финале.
-  - Уже 900 px (телефон или масштаб браузера 200%): перед входом строка «Игра рассчитана на компьютер. На телефоне играть неудобно» и кнопка «Всё равно войти». В этом режиме действует одно правило раскладки: колонки лобби и таблица результатов идут друг под другом, мини-карта заменена кнопкой «Карта», которая открывает карту на весь экран с кнопкой «Угадать»; таймер и состояние ответа остаются на виду. Отдельная мобильная раскладка остаётся в `TODOS.md`.
-  - Все кнопки и поля не меньше 44 px по высоте. Настройки лобби собраны из штатных элементов форм (`input`, `select`, `button`, `fieldset` с подписями), поэтому работают с клавиатуры без своего кода. При смене экрана фокус встаёт на его главный элемент.
-  - Клавиши: Enter отправляет форму входа; пробел в раунде равен «Угадать», если метка стоит; пробел или Enter у хоста на результатах равны «Дальше»; `M` раскрывает и сворачивает мини-карту и ставит на неё фокус; Esc закрывает карточку ИИ и подтверждение и уводит фокус с карты. Общие клавиши не срабатывают, пока фокус в поле ввода.
-  - Метка с клавиатуры: когда фокус на мини-карте, в её центре виден прицел; стрелки двигают карту, `+` и `-` меняют масштаб (штатное поведение карты), Enter ставит метку в центр. Клавиатурой панорамы управляет сам виджет Google.
-  - Программы чтения с экрана: область `aria-live="polite"` объявляет начало раунда, остаток 30, 10 и 5 секунд, конец раунда и своё место; таблицы результатов и финала это настоящие `table` с заголовками; у аватаров есть `aria-label`. Игра по своей сути требует зрения; это ограничение записано в README.
-  - Контраст текста не ниже 4.5:1, крупных чисел и границ элементов управления не ниже 3:1; основной текст не мельче 16 px; неактивные поля остаются читаемыми.
-  - Тесты: E2E проходит вход, лобби и постановку метки только клавиатурой; `@axe-core/playwright` на каждом из пяти экранов без нарушений уровня serious и critical; проверка отсутствия горизонтальной прокрутки страницы при окнах 1280 × 720, 1024 × 640 и 390 × 844.
+  - Test: E2E on the login states (no token, wrong link, taken nickname, full room, match in progress) and on the connection banner on a WebSocket drop.
+- **Invitation in the interface and the host menu.** Milestone M1; refines sections 4.1 and 9.
+  - The server tells clients the current invitation link and the state of its check. In the lobby the «Скопировать приглашение» ("Copy invitation") button is visible to everyone; after a press, for 2 s the caption changes to «Скопировано».
+  - Host menu (an icon in the top right corner on the lobby, round, results and final screens): «Скопировать приглашение» and «Завершить партию».
+  - If the tunnel address changed mid-match, the host sees the message «Адрес игры сменился. Отправьте друзьям новую ссылку» with a copy button; it does not disappear by itself.
+  - «Завершить партию» asks for confirmation in place («Завершить? Сыграно 2 из 5 раундов» ("End? Played 2 of 5 rounds") and buttons «Завершить», «Отмена» ("Cancel")), cuts off the bots and takes everyone to the final with the rounds played. An unfinished round does not count.
+  - Tests: a unit test on the state machine transition from `ROUND_ACTIVE` and `ROUND_RESULTS` to `FINAL` on a host command; E2E on copying the invitation.
+- **Keyboard, contrast and window sizes.** Milestone M1; refines sections 7 and 8.
+  - Design window 1280 × 720 and larger. From 900 to 1279 px in width the participant list in a round shrinks to avatars with status, the lobby columns are kept. The page does not scroll horizontally at any width; own horizontal scrolling exists only for the per-round table in the final.
+  - Narrower than 900 px (a phone or browser zoom of 200%): before login a line «Игра рассчитана на компьютер. На телефоне играть неудобно» ("The game is designed for a computer. It is inconvenient to play on a phone") and a button «Всё равно войти» ("Join anyway"). In this mode one layout rule applies: the lobby columns and the results table go one under the other, the mini-map is replaced by a «Карта» ("Map") button that opens the map full screen with the «Угадать» button; the timer and the answer state stay in view. A separate mobile layout remains in `TODOS.md`.
+  - All buttons and fields are at least 44 px high. The lobby settings are built from standard form elements (`input`, `select`, `button`, `fieldset` with labels), so they work from the keyboard without custom code. When the screen changes, focus goes to its main element.
+  - Keys: Enter submits the login form; space in a round equals «Угадать» if a marker is placed; space or Enter for the host on results equals «Дальше»; `M` expands and collapses the mini-map and puts focus on it; Esc closes the AI card and the confirmation and takes focus away from the map. Global keys do not fire while focus is in an input field.
+  - Placing a marker from the keyboard: when focus is on the mini-map, a crosshair is visible in its center; arrows move the map, `+` and `-` change the zoom (standard map behavior), Enter places a marker at the center. The panorama keyboard is controlled by the Google widget itself.
+  - Screen readers: an `aria-live="polite"` region announces the start of the round, the remaining 30, 10 and 5 seconds, the end of the round and the viewer's own place; the results and final tables are real `table` elements with headers; avatars have an `aria-label`. The game by its nature requires sight; this limitation is stated in the README.
+  - Text contrast not below 4.5:1, large numbers and control borders not below 3:1; main text no smaller than 16 px; inactive fields remain readable.
+  - Tests: E2E goes through login, lobby and placing a marker using only the keyboard; `@axe-core/playwright` on each of the five screens without violations of serious and critical level; a check for the absence of horizontal page scrolling at window sizes 1280 × 720, 1024 × 640 and 390 × 844.
 
-Пункты ниже добавлены обзором DX (фаза 2.5) и так же обязательны.
+The items below were added by the DX review (phase 2.5) and are likewise mandatory.
 
-- **Первый запуск и сборка клиента.** Веха M1; уточняет разделы 9 и 10, закрывает WARNING 9.2.
-  - Требования к машине для игры: Bun (версия закреплена в `package.json`, поле `engines`, и в `.bun-version`), `cloudflared`, хотя бы один харнесс, прошедший S1, с выполненным входом. Для разработки ещё `shellcheck`. Поддерживаются Linux и macOS; Windows не проверяется.
-  - Путь из README «Быстрый старт», ровно четыре шага: `bun install`; `cp .env.example .env` и два ключа по разделу «Как получить ключи»; `bun run doctor`; `bun run start`.
-  - `start` собирает клиент при каждом запуске (`vite build`, несколько секунд), поэтому после `git pull` или правки любого входа сборки (`web/`, `shared/`, настройки Vite и Svelte) старый клиент не отдаётся. В терминале строка «Собираю клиент…» и время сборки. Кэш сборки появится, только если замер покажет, что сборка мешает цели повторного запуска.
-  - До запуска сервера `start` делает быстрые проверки без сети: оба ключа есть в `.env`; `cloudflared` найден (кроме `--no-tunnel` и `--public-url`); порт свободен. Порт по умолчанию 5174, меняется флагом `--port` или переменной `PORT`.
-  - Когда ссылка готова, `start` печатает короткий блок: ссылка хоста, пригласительная ссылка, «Ссылка готова за 14 с», расход квоты за месяц, харнессы, доступные для слотов ИИ. Затем открывает ссылку хоста в браузере по умолчанию (`xdg-open` или `open`); флаг `--no-open` это отключает, без графической сессии браузер не открывается и об этом печатается строка.
-  - Тесты: модульные на занятый порт и отсутствие ключа; интеграционный: `start --no-tunnel --no-open` на чистом каталоге собирает клиент и отвечает на `/healthz`.
-- **Ключи Google: пошаговая инструкция и проверка.** Веха M1 (README и `doctor`), уточняется отчётом спайка S3; уточняет разделы 6 и 9.
-  - Раздел README «Как получить ключи» перечисляет шаги с прямыми ссылками на страницы Cloud Console: создать проект; подключить биллинг (нужна банковская карта, Google требует его даже в бесплатном объёме); включить Maps JavaScript API и Street View Static API; создать браузерный ключ с ограничением по referrer и по API (только Maps JavaScript API); создать серверный ключ с ограничением по API (только Street View Static API); выставить дневные квоты по отчёту S3; вписать ключи в `.env`. Там же оценка времени: около 15 минут при первом знакомстве с Cloud Console.
-  - Серверный ключ `doctor` проверяет бесплатным metadata-запросом. Вместе со статусом `doctor` показывает поле `error_message` из ответа Google (ключ из текста вырезается). Известные тексты (ключ неверен, API не включён, биллинг не подключён, ограничение ключа не пускает) сопоставлены своему шагу инструкции; если текст незнаком, `doctor` печатает шаги для проверки по порядку: ключ скопирован целиком, Street View Static API включён, биллинг подключён, ограничение по API разрешает Street View Static API.
-  - Браузерный ключ проверяется там, где он работает: в браузере хоста при открытии лобби. Ошибка загрузки Maps JavaScript API (`RefererNotAllowedMapError`, `ApiNotActivatedMapError`, `InvalidKeyMapError` и другие) уходит на сервер сообщением `client_error`; хост видит в лобби и в терминале код ошибки и шаг инструкции, который её исправляет.
-  - Тест: модульный на разбор ответов metadata (`OK`, `ZERO_RESULTS`, `REQUEST_DENIED` с известным и незнакомым `error_message`, `OVER_QUERY_LIMIT`) в сообщения `doctor`, ключ в выводе отсутствует; модульный на сопоставление кодов ошибок Maps JavaScript API шагам инструкции.
-- **Ошибки командной строки и инструментов бота.** Веха M1 (`start`, базовый `doctor`, инструменты `geo`) и M3 (полный `doctor`); уточняет разделы 5.1 и 9.
-  - Все ошибки, которые видит владелец или агент, собраны в реестре `server/errors.ts`: стабильный код (`GEO_ENV_KEY_MISSING`, `GEO_PORT_BUSY`, `GEO_CLOUDFLARED_MISSING`, `GEO_TUNNEL_NOT_READY`, `GEO_GOOGLE_KEY_DENIED`, `GEO_GOOGLE_QUOTA`, `GEO_HARNESS_NOT_LOGGED_IN`, `GEO_HARNESS_HIDDEN`, `GEO_SETTINGS_UNREADABLE`, `GEO_QUOTA_CEILING`, `GEO_CRASH` и другие), класс, шаблон текста и якорь в `docs/errors.md`. Коды не меняются; текст может меняться.
-  - Вид ошибки в терминале (stderr): первая строка что не получилось, с настоящими значениями и кодом; строка «причина» с исходной ошибкой зависимости; строка «контекст» с версиями (`geoaissr`, Bun, `cloudflared` или харнесса) и именами переменных окружения, но без их значений; последняя строка «исправить:» с точной командой или тем, что должен сделать человек, и можно ли повторять. Пример:
+- **First launch and client build.** Milestone M1; refines sections 9 and 10, closes WARNING 9.2.
+  - Requirements for the machine to play: Bun (version pinned in `package.json`, the `engines` field, and in `.bun-version`), `cloudflared`, at least one harness that passed S1, logged in. For development also `shellcheck`. Linux and macOS are supported; Windows is not verified.
+  - The README "Быстрый старт" ("Quick start") path, exactly four steps: `bun install`; `cp .env.example .env` and two keys per the "Как получить ключи" section; `bun run doctor`; `bun run start`.
+  - `start` builds the client on every launch (`vite build`, a few seconds), so after `git pull` or an edit of any build input (`web/`, `shared/`, Vite and Svelte settings) the old client is not served. The terminal shows the line «Собираю клиент…» ("Building the client…") and the build time. A build cache will appear only if measurement shows that the build hinders the goal of a repeat launch.
+  - Before starting the server, `start` makes quick checks without network: both keys are in `.env`; `cloudflared` is found (except with `--no-tunnel` and `--public-url`); the port is free. The default port is 5174, changed by the `--port` flag or the `PORT` variable.
+  - When the link is ready, `start` prints a short block: the host link, the invitation link, «Ссылка готова за 14 с» ("Link ready in 14 s"), monthly quota usage, the harnesses available for AI slots. Then it opens the host link in the default browser (`xdg-open` or `open`); the `--no-open` flag disables this, without a graphical session the browser is not opened and a line says so.
+  - Tests: unit tests on a busy port and a missing key; an integration test: `start --no-tunnel --no-open` on a clean directory builds the client and answers on `/healthz`.
+- **Google keys: step-by-step instructions and check.** Milestone M1 (README and `doctor`), refined by the S3 spike report; refines sections 6 and 9.
+  - The README section "Как получить ключи" lists the steps with direct links to Cloud Console pages: create a project; connect billing (a bank card is needed, Google requires it even within the free volume); enable the Maps JavaScript API and the Street View Static API; create a browser key with a referrer and API restriction (Maps JavaScript API only); create a server key with an API restriction (Street View Static API only); set daily quotas per the S3 report; put the keys into `.env`. There is also a time estimate: about 15 minutes on a first acquaintance with Cloud Console.
+  - `doctor` checks the server key with a free metadata request. Together with the status `doctor` shows the `error_message` field from Google's response (the key is cut out of the text). Known texts (key invalid, API not enabled, billing not connected, key restriction does not allow it) are mapped to their step of the instructions; if the text is unfamiliar, `doctor` prints the steps to check in order: the key is copied in full, the Street View Static API is enabled, billing is connected, the API restriction allows the Street View Static API.
+  - The browser key is checked where it works: in the host's browser when the lobby opens. A Maps JavaScript API load error (`RefererNotAllowedMapError`, `ApiNotActivatedMapError`, `InvalidKeyMapError` and others) goes to the server in a `client_error` message; the host sees in the lobby and in the terminal the error code and the step of the instructions that fixes it.
+  - Tests: a unit test on parsing metadata responses (`OK`, `ZERO_RESULTS`, `REQUEST_DENIED` with a known and an unfamiliar `error_message`, `OVER_QUERY_LIMIT`) into `doctor` messages, the key is absent from the output; a unit test on mapping Maps JavaScript API error codes to the instruction steps.
+- **Command-line and bot tool errors.** Milestone M1 (`start`, basic `doctor`, `geo` tools) and M3 (full `doctor`); refines sections 5.1 and 9.
+  - All errors that the owner or an agent sees are collected in the registry `server/errors.ts`: a stable code (`GEO_ENV_KEY_MISSING`, `GEO_PORT_BUSY`, `GEO_CLOUDFLARED_MISSING`, `GEO_TUNNEL_NOT_READY`, `GEO_GOOGLE_KEY_DENIED`, `GEO_GOOGLE_QUOTA`, `GEO_HARNESS_NOT_LOGGED_IN`, `GEO_HARNESS_HIDDEN`, `GEO_SETTINGS_UNREADABLE`, `GEO_QUOTA_CEILING`, `GEO_CRASH` and others), a class, a text template and an anchor in `docs/errors.md`. Codes do not change; the text may change.
+  - The form of an error in the terminal (stderr): the first line is what failed, with real values and the code; a «причина» ("cause") line with the original error of the dependency; a «контекст» ("context") line with versions (`geoaissr`, Bun, `cloudflared` or the harness) and environment variable names, but without their values; the last line «исправить:» ("fix:") with the exact command or what the person must do, and whether it is safe to repeat. Example:
 
     ```
     start: публичная ссылка https://….trycloudflare.com не ответила за 60 с: DNS не разрешает имя (GEO_TUNNEL_NOT_READY)
@@ -572,925 +572,925 @@
       контекст: geoaissr 0.1.0, cloudflared 2026.10.1; сервер работает на localhost:5174, партия не начата
       исправить: остановите start (Ctrl+C) и запустите снова `bun run start`; повторять можно, ничего не потеряется (docs/errors.md#GEO_TUNNEL_NOT_READY)
     ```
-  - Коды выхода: 1 неверный вызов (флаги); 2 окружение или настройка (`.env`, порт, нет `cloudflared`); 3 внешняя зависимость (Google, туннель, харнесс); 70 непредвиденный сбой. Ошибка никогда не завершается кодом 0.
-  - `bun run doctor --json` печатает массив проверок `{code, level, ok, what, fix, context}`: агент, который строит или чинит проект, читает его без разбора текста.
-  - Уровни проверок `doctor`. Обязательные: оба ключа есть в `.env`; серверный ключ проходит metadata-запрос; версия Bun подходит; `cloudflared` найден (с `--no-tunnel` и `--public-url` проверка пропускается и помечается «пропущено»); хотя бы один харнесс, прошедший S1, установлен и вошёл в подписку. Необязательные (предупреждение): каждый отдельный харнесс (недоступный только выключает свои слоты ИИ); версия харнесса отличается от проверенной в `harness-verified.json` (харнесс остаётся доступным, совет запустить `bun run test:harness`; в M2 ещё «Проверить» у слота); `shellcheck` и браузеры Playwright (нужны только для разработки). Код выхода `doctor` 0, если прошли все обязательные проверки; предупреждения его не меняют.
-  - `start` при запуске печатает те же предупреждения о версиях харнессов одной строкой на харнесс и запускается.
-  - Непредвиденный сбой сервера: полный стек пишется в `~/.local/share/geoaissr/logs/crash-<время>.log`, в терминал идут первая строка, путь к файлу и строка «исправить: запустите `bun run start` снова; партия потеряна, сыгранные раунды не записаны» (состояние в памяти, раздел 7). Браузеры игроков показывают состояние «Связь» из таблицы состояний интерфейса. Секреты и токены в файл сбоя не попадают (правило пункта «Секреты и токены»).
-  - Ответ инструмента `geo` с ошибкой возвращается с `isError: true` и текстом в том же порядке: что не так, допустимые значения, что делать дальше («вызови submit_guess»), списан ли ход.
-  - Тесты: модульный, что у каждого кода реестра есть раздел в `docs/errors.md` и что ни один шаблон не подставляет значения переменных с ключами; снимки текста трёх ошибок; модульный на схему `doctor --json`; интеграционный, что непредвиденное исключение даёт код 70, файл сбоя без токенов и путь к нему в stderr.
-- **Разработка без ключей и подписок.** Веха M0 (команды) и M1 (подмены); уточняет разделы 9 и 11.
-  - `bun run dev --fake` запускает сервер и Vite с теми же подменами, что в интеграционных тестах: поддельный провайдер панорам (статичная картинка вместо Street View), поддельные картинки ботов и поддельный харнесс. Ключи Google, туннель и подписки не нужны, квота не расходуется. Режим подписан в интерфейсе плашкой «Тестовый режим».
-  - Каталоги данных задаются в одном месте: переменные `GEOAISSR_CONFIG_DIR` и `GEOAISSR_DATA_DIR`, по умолчанию `~/.config/geoaissr` и `~/.local/share/geoaissr`. Ни один модуль не строит эти пути сам. `--fake` использует `.geoaissr-dev/` в репозитории (внесён в `.gitignore`); каждый тест получает свой временный каталог. Тестовая обвязка падает, если путь данных указывает в настоящие каталоги владельца.
-  - Подготовка рабочей копии для разработки одной командой `bun run setup:dev`: `bun install`, установка хуков (`bun run hooks:install`), `bunx playwright install chromium`, проверка `shellcheck` (если его нет, печатается команда установки для Linux и macOS). Затем `bun run check` и `bun run test` проходят без сети и ключей.
-  - Команды для человека и агента: `bun run check` (ворота качества), `bun run test` (модульные и интеграционные, без сети), `bun run test:e2e` (Playwright), `bun run test:harness` и `bun run test:tunnel` (по требованию, с настоящими CLI и сетью). `bun run check` при падении называет шаг и команду, чтобы повторить только его.
-  - `CLAUDE.md` проекта перечисляет эти команды, лимиты размера и ссылку на `DESIGN.md` и `docs/errors.md`.
-  - Тесты: E2E по умолчанию идёт в режиме `--fake`; модульный, что пути данных берутся из переменных и что обвязка отвергает настоящие каталоги.
-- **Обновление.** Веха M1; уточняет разделы 9 и 14 («Сбои во время партии»).
-  - README «Обновление»: `git pull && bun install && bun run start`; клиент пересобирается сам.
-  - `settings.json`, `quota.json` и строки `matches.jsonl` переводятся со старой версии формата функциями миграции по одной на версию, с тестом на каждую.
-  - Файл более новой версии, чем знает программа, не переписывается. `settings.json`: сервер стартует со значениями по умолчанию и предупреждением `GEO_SETTINGS_NEWER`. `quota.json`: `start` не запускается (`GEO_QUOTA_NEWER`, исправить: обновить программу), потому что неизвестный расход нельзя считать нулевым. `matches.jsonl`: новые строки дописываются со своей версией, чужие строки не трогаются.
-  - Нечитаемый `quota.json` по-прежнему переименовывается в `.bad`, но счёт с нуля не начинается молча: до первой партии хост в лобби видит «Расход за месяц неизвестен: файл квоты повреждён. Сверьте расход в Cloud Console» и кнопку «Начать счёт с нуля»; без нажатия партия с ботами не стартует. Это уточняет пункт «Сбои во время партии».
-  - Тесты: модульные на миграцию с каждой прошлой версии, на файл новее программы для каждого из трёх файлов и на подтверждение хоста после повреждённого `quota.json`.
-- **Замер первого запуска.** Ворота «Первая игра»; уточняет пункт «Ворота «Первая игра»».
-  - Владелец записывает в `docs/playtest-1.md` время от `git clone` на чистом каталоге до момента, когда второй человек вошёл в лобби по пригласительной ссылке, а Maps JavaScript API загрузился у обоих без `client_error` (это проверяет и браузерный ключ), и все ошибки, встреченные по пути, с их кодами.
-  - Цели: первый запуск не дольше 20 минут, из них основное время в Cloud Console; повторный запуск в вечер игры не дольше 1 минуты от `bun run start` до скопированной ссылки. Если цель не достигнута, по записанным ошибкам правятся README и тексты ошибок до начала M2.
+  - Exit codes: 1 invalid invocation (flags); 2 environment or configuration (`.env`, port, no `cloudflared`); 3 external dependency (Google, tunnel, harness); 70 unexpected failure. An error never ends with code 0.
+  - `bun run doctor --json` prints an array of checks `{code, level, ok, what, fix, context}`: an agent that builds or repairs the project reads it without parsing text.
+  - `doctor` check levels. Mandatory: both keys are in `.env`; the server key passes a metadata request; the Bun version is suitable; `cloudflared` is found (with `--no-tunnel` and `--public-url` the check is skipped and marked «пропущено» ("skipped")); at least one harness that passed S1 is installed and logged in to the subscription. Optional (warning): each separate harness (an unavailable one merely disables its own AI slots); the harness version differs from the one verified in `harness-verified.json` (the harness stays available, advice to run `bun run test:harness`; in M2 also «Проверить» at the slot); `shellcheck` and Playwright browsers (needed for development only). The `doctor` exit code is 0 if all mandatory checks passed; warnings do not change it.
+  - On launch `start` prints the same harness version warnings, one line per harness, and starts.
+  - An unexpected server failure: the full stack is written to `~/.local/share/geoaissr/logs/crash-<time>.log`, the terminal gets the first line, the path to the file and the line «исправить: запустите `bun run start` снова; партия потеряна, сыгранные раунды не записаны» ("fix: run `bun run start` again; the match is lost, the rounds played were not recorded") (state in memory, section 7). Players' browsers show the "Connection" state from the interface states table. Secrets and tokens do not get into the crash file (the rule of the item "Secrets and tokens").
+  - A `geo` tool response with an error is returned with `isError: true` and a text in the same order: what is wrong, allowed values, what to do next («вызови submit_guess»), whether the move was charged.
+  - Tests: a unit test that each registry code has a section in `docs/errors.md` and that no template substitutes the values of key-bearing variables; snapshots of the text of three errors; a unit test on the `doctor --json` schema; an integration test that an unexpected exception gives exit code 70, a crash file without tokens and the path to it in stderr.
+- **Development without keys and subscriptions.** Milestone M0 (commands) and M1 (fakes); refines sections 9 and 11.
+  - `bun run dev --fake` launches the server and Vite with the same fakes as in the integration tests: a fake panorama provider (a static image instead of Street View), fake bot images and a fake harness. Google keys, tunnel and subscriptions are not needed, quota is not spent. The mode is marked in the interface with a «Тестовый режим» ("Test mode") badge.
+  - Data directories are set in one place: the variables `GEOAISSR_CONFIG_DIR` and `GEOAISSR_DATA_DIR`, by default `~/.config/geoaissr` and `~/.local/share/geoaissr`. No module builds these paths itself. `--fake` uses `.geoaissr-dev/` in the repository (added to `.gitignore`); each test gets its own temporary directory. The test harness fails if a data path points into the owner's real directories.
+  - Preparing a working copy for development with one command `bun run setup:dev`: `bun install`, hook installation (`bun run hooks:install`), `bunx playwright install chromium`, a `shellcheck` check (if it is missing, the install command for Linux and macOS is printed). After that `bun run check` and `bun run test` pass without network and keys.
+  - Commands for a human and an agent: `bun run check` (quality gates), `bun run test` (unit and integration, without network), `bun run test:e2e` (Playwright), `bun run test:harness` and `bun run test:tunnel` (on demand, with real CLIs and network). On failure `bun run check` names the step and the command to repeat only it.
+  - The project `CLAUDE.md` lists these commands, the size limits and a link to `DESIGN.md` and `docs/errors.md`.
+  - Tests: E2E runs in `--fake` mode by default; a unit test that data paths are taken from the variables and that the harness rejects the real directories.
+- **Upgrade.** Milestone M1; refines sections 9 and 14 ("Failures during a match").
+  - README "Обновление" ("Upgrade"): `git pull && bun install && bun run start`; the client rebuilds itself.
+  - `settings.json`, `quota.json` and the `matches.jsonl` lines are migrated from an old format version by migration functions, one per version, with a test for each.
+  - A file of a newer version than the program knows is not rewritten. `settings.json`: the server starts with defaults and the warning `GEO_SETTINGS_NEWER`. `quota.json`: `start` does not launch (`GEO_QUOTA_NEWER`, fix: update the program), because unknown usage cannot be treated as zero. `matches.jsonl`: new lines are appended with their own version, foreign lines are not touched.
+  - An unreadable `quota.json` is still renamed to `.bad`, but counting does not silently start from zero: until the first match the host sees in the lobby «Расход за месяц неизвестен: файл квоты повреждён. Сверьте расход в Cloud Console» ("Monthly usage unknown: the quota file is damaged. Check usage in Cloud Console") and a button «Начать счёт с нуля» ("Start counting from zero"); without pressing it a match with bots does not start. This refines the item "Failures during a match".
+  - Tests: unit tests on migration from each past version, on a file newer than the program for each of the three files and on the host's confirmation after a damaged `quota.json`.
+- **First-launch measurement.** The "First game" gate; refines the item "\"First game\" gate".
+  - The owner records in `docs/playtest-1.md` the time from `git clone` into a clean directory to the moment the second person joined the lobby via the invitation link and the Maps JavaScript API loaded for both without `client_error` (this checks the browser key too), and all errors met along the way with their codes.
+  - Goals: the first launch no longer than 20 minutes, of which most of the time is in Cloud Console; a repeat launch on a game evening no longer than 1 minute from `bun run start` to the copied link. If the goal is not reached, the README and error texts are fixed based on the recorded errors before M2 starts.
 
-Пункты ниже добавлены инженерным обзором (фаза 3) и так же обязательны.
+The items below were added by the engineering review (phase 3) and are likewise mandatory.
 
-- **Устройство репозитория.** Веха M0; уточняет раздел 7.
-  - Один `package.json` в корне и каталоги `shared/`, `server/`, `web/`, `bot-tools/`, `scripts/` без workspaces. Два `tsconfig` (браузер для `web/`, Bun для остального) и общий корневой.
-  - Границы импортов проверяет ESLint (`no-restricted-imports` по путям) в `bun run check`: `web/` и `bot-tools/` импортируют только `shared/`; `server/` не импортирует `web/`; `shared/` не импортирует ничего из проекта. Нарушение валит сборку.
-  - Модульные и интеграционные тесты идут через встроенный `bun test`; E2E через Playwright. Vitest не используется. Логика клиента, которую стоит проверять отдельно (часы, форматирование, проекция состояния на экран), живёт в обычных `.ts` модулях `web/src/lib/` без рун Svelte; компоненты проверяются E2E.
-  - `scripts/check-size.ts` проверяет и `.svelte`: файл компонента ≤ 500 строк. Правило ESLint `max-lines-per-function: 80` действует и в тестах, поэтому `CLAUDE.md` проекта просит не оборачивать файл теста в один большой `describe`.
-- **Ядро игры: одно состояние и чистые переходы.** Веха M1; уточняет разделы 7 и 14 («Порядок событий и граничные случаи»).
-  - Всё изменяемое состояние комнаты (участники, фаза, номер раунда, метки, ответы, счётчики и резервы ходов ботов, пауза чтения, догадки ботов) лежит в одном объекте `RoomState`, у него один владелец: `server/engine/`.
-  - Переходы считает чистая функция `reduce(state, event, now) → {state, effects}` без ожиданий и ввода-вывода. Эффекты (таймер, запуск или остановка харнесса, запрос к Google, рассылка клиентам, запись файла) исполняет `server/engine/shell.ts`; результат эффекта возвращается в ядро событием с меткой операции: идентификатор партии `matchId` и поколение `gen`. Поколение растёт при каждом новом раунде, при каждой повторной подготовке раунда («Повторить»), при смене настроек в лобби и при «Ещё раз». Событие с чужой меткой ядро отбрасывает в одном месте, а не в каждом обработчике; номера раунда для этого мало, потому что повторная подготовка и новая партия используют тот же номер.
-  - Файлы ядра делятся по фазам: `lobby.ts`, `round.ts`, `results.ts`, `final.ts` и общий `reduce.ts`, который выбирает обработчик по фазе. Так ни один файл не подходит к пределу 500 строк.
-  - Что видит каждый участник, решает одна функция `view(state, viewerId)`: во время раунда в ней нет координат ответа, чужих меток и догадок ботов; координаты появляются только в фазе `ROUND_RESULTS`. Сервер рассылает каждому клиенту его вид целиком с номером версии; клиент не собирает состояние из дельт.
-  - Тесты: модульные на `reduce` с управляемыми часами (все переходы из пункта «Порядок событий и граничные случаи» становятся строками одной таблицы); модульный на `view`: в `ROUND_ACTIVE` вид любого игрока не содержит координат ответа, чужих меток и догадок ботов.
-- **Протокол подтверждений и часы.** Веха M1; уточняет пункты «Ответ человека: подтверждения сервера» и «Иерархия экранов» (таймер).
-  - Каждое сообщение клиента несёт `seq`, растущий в пределах соединения. Сервер отвечает `ack {seq, result}`, где `result` это `ok` или код отказа (`round_over`, `already_confirmed`, `not_in_round`, `invalid`). Клиент меняет состояние зоны ответа только по `ack`.
-  - Метка: клиент шлёт `{roundId, lat, lng}` не чаще 5 раз в секунду; сервер хранит последнюю и отвечает `ack` на каждую. «Угадать»: `{roundId, lat, lng}`; сервер записывает эти координаты и подтверждение одним переходом, поэтому метка, сдвинутая перед самым нажатием, не теряется из-за ограничения частоты. Повтор получает `already_confirmed`.
-  - Каждое сообщение сервера несёт `serverNow` (мс). Клиент держит смещение часов по пингу раз в 20 с (из спайка S2): берётся замер с наименьшим временем пинга за последние 5. Таймер считается от `endsAt` из вида состояния плюс смещение.
-  - После переподключения клиент получает вид целиком и, если раунд тот же и ответ не подтверждён, отправляет последнюю метку заново.
-  - Тесты: модульный на расчёт смещения (выбор наименьшего пинга, скачок часов клиента); интеграционный на `ack` метки, повторное «Угадать» и метку с номером прошлого раунда.
-- **Хост, вкладки и возврат посреди раунда.** Веха M1; закрывает вопрос C-HOSTDROP из обзора CEO; уточняет разделы 4.1 и 4.5.
-  - Роль хоста привязана к токену хоста, а не к соединению. Хост, закрывший вкладку, возвращается по той же локальной ссылке из терминала и получает роль обратно.
-  - Пока хоста нет: автопереход результатов идёт как обычно; ошибка подготовки раунда и экран финала ждут хоста, гости видят «Хост отключился. Ждём его возвращения»; лобби ждёт «Начать».
-  - Одна личность в двух вкладках (тот же токен хоста или тот же `playerId`): действует последнее соединение, старое получает сообщение «Игра открыта в другой вкладке» и закрывается.
-  - Участник раунда, вернувшийся до конца раунда, снова играет его: его метка и подтверждённый ответ сохранены. Новый участник посреди раунда остаётся зрителем до следующего (как в разделе 4.1).
-  - Соединение без токена закрывается через 5 с; одновременно ждущих входа соединений не больше 8, лишние закрываются сразу. Потолок 32 соединения из раздела 7 считает и их.
-  - Тесты: модульные на возврат хоста, вторую вкладку, возврат участника посреди раунда и автопереход без хоста; интеграционный на закрытие соединения без токена через 5 с.
-- **Запуск процессов и их остановка.** Веха M1; уточняет разделы 5.3 и 5.4.
-  - Все дочерние процессы (харнессы ботов, `cloudflared`, сборка Vite) запускает одна функция `spawnManaged` в `server/proc/`: каждый процесс в своей группе процессов, вывод собирается в журнал, остановка через SIGTERM группе и SIGKILL группе через 2 с. Иначе процесс харнесса оставляет живыми своих потомков (мост `bot-tools`, вспомогательные процессы).
-  - Каталог данных принадлежит одному серверу: при старте сервер берёт файл блокировки `<DATA_DIR>/run/server.lock` с номером своего процесса и временем его запуска. Второй `start` с тем же каталогом данных завершается ошибкой `GEO_ALREADY_RUNNING` (код 2) и ничего не трогает; блокировка процесса, которого уже нет, снимается.
-  - Группы живых дочерних процессов записываются в `<DATA_DIR>/run/children.json`: номер процесса, время его запуска (на Linux из `/proc/<pid>/stat`, на macOS из `ps -o lstart=`) и команда. Только получив блокировку, сервер читает файл прошлого запуска и останавливает группу, у которой совпали все три признака; так харнессы после аварийного завершения сервера не тратят подписку, а процесс с повторно выданным номером не страдает.
-  - При Ctrl+C, SIGTERM и непредвиденном сбое сервер сначала останавливает все группы, затем пишет файл сбоя и выходит.
-  - Тесты: модульный, что поддельный процесс с потомком останавливается целиком; модульный на зачистку по `children.json` (совпали все три признака: остановлена; другое время запуска или команда: не тронута); модульный на второй `start` при живой блокировке и на снятие блокировки умершего процесса; интеграционный, что код выхода 70 оставляет ноль живых процессов поддельного харнесса.
-- **Адаптеры харнессов: флаги по справке.** Вехи M0 (спайк S1) и M1; уточняет раздел 5.3 и пункт «Изоляция процесса бота».
-  - Список харнессов задан один раз: реестр адаптеров `server/bots/adapters/index.ts`. Из него берут `doctor`, схема `settings.json`, выбор харнесса в лобби и `test:harness`.
-  - `codex`: временный каталог не является git-репозиторием, поэтому нужен `--skip-git-repo-check`; кандидаты для изоляции из справки 0.167: `--ephemeral` (сессия не пишется на диск) и `--ignore-user-config` (не читать `config.toml`, вход сохраняется).
-  - `claude`: `--bare` использовать нельзя: в этом режиме вход через claude.ai не читается, работает только `ANTHROPIC_API_KEY`. Кандидаты: `--tools ""` (выключить встроенные инструменты), `--setting-sources` без `user`, `--no-session-persistence`, вместе с `--strict-mcp-config` и `--allowedTools "mcp__geo__*"`.
-  - `agy`: `--settings` (настройки только на эту сессию), `--print-timeout` как внешний предел времени, `--sandbox`.
-  - Спайк S1 подтверждает каждый кандидат и ещё два вопроса: мост `bot-tools`, запущенный харнессом, достаёт до `127.0.0.1:BOT_PORT` из-под песочницы харнесса; результат вызова инструмента приходит в той форме, которую ждёт адаптер (у `codex` бывают разные формы записи вызова).
-  - Тест: модульный снимок `argv` и окружения каждого адаптера (ключей Google нет, MCP-конфиг указывает на мост с токеном, флаги изоляции на месте).
-- **Место раунда.** Веха M1; уточняет разделы 4.3, 4.4, 5.2 и 6.
-  - Место раунда задаётся один раз и дальше не меняется: `pano_id` и координаты из ответа metadata для этой панорамы (а не случайная точка, от которой шёл поиск).
-  - Люди открывают ровно эту панораму (`StreetViewPanorama` с `pano`), стартовые картинки ботов запрашиваются с параметром `pano=<pano_id>`, очки и дуги на карте результатов считаются от координат панорамы.
-  - Тест: модульный, что очки считаются от координат панорамы, а не от точки выборки; интеграционный, что клиент и стартовые картинки получают тот же `pano_id`.
-- **Ходы бота по очереди.** Веха M1; уточняет разделы 5.1, 5.2 и пункт «Порядок событий и граничные случаи».
-  - Вызовы `look` и `move` одного бота исполняются строго по очереди: следующий ждёт конца предыдущего. У бота одна текущая панорама; `look` смотрит из неё, `move` начинается из неё и меняет её только после успеха. `observe()` и `submit_guess` в очередь не встают.
-  - Шаг `move` принимается, только если найденная панорама отличается от текущей, лежит не дальше 100 м и направление на неё отличается от запрошенного не больше чем на 45°; иначе ответ «в эту сторону дороги нет» без списания хода.
-  - Такой шаг это приближение: соседняя панорама по расстоянию и направлению может оказаться на параллельной улице, а человек ходит по связям панорам Google. Спайк S3 после включения ключей сравнивает на 50 шагах в браузере выбор сервера со связями (`links`) Maps JavaScript API и записывает долю совпадений. Если она ниже 80%, владелец решает, оставить `move` с этой оговоркой или выключить движение для всех в M1.
-  - Тест: модульный, что два одновременных `move` идут друг за другом и второй начинается с панорамы первого; модульный на отказ шага с направлением 90° от запрошенного.
-- **Мост `bot-tools` без логики.** Веха M1; уточняет разделы 5.1 и 5.3.
-  - Мост только переводит MCP по stdio в HTTP к `127.0.0.1:BOT_PORT` и обратно. Список инструментов, их описания и схемы он получает у сервера при старте; схемы описаны один раз в `shared/bot-tools.ts` (zod) и переводятся в JSON Schema там же.
-  - `BOT_PORT` выбирается системой при старте сервера (порт 0); адрес и токен бота мост получает через окружение из MCP-конфига.
-  - Если сервер недоступен, мост отвечает на каждый вызов ошибкой «игра остановлена, заверши работу» и завершается.
-  - Поддельный харнесс в тестах это MCP-клиент, который запускает настоящий мост тем же MCP-конфигом, что адаптер; так интеграционные тесты проходят через мост и API ботов.
-  - Тест: интеграционный, что токен бота прошлого раунда получает отказ.
-- **Подписи на картинках ботов.** Веха M1; уточняет раздел 5.2.
-  - Подпись стороны света рисуется шрифтом из репозитория (файл Onest из `@fontsource`, параметр `fontfile` у `sharp`), а не системным: на машине без кириллических шрифтов подпись иначе выйдет квадратиками, и бот прочтёт мусор без всякой ошибки.
-  - Картинка для бота кодируется заново без метаданных (поведение `sharp` по умолчанию; тест это закрепляет).
-  - Спайк S1 проверяет, что `sharp` ставится и работает под Bun на машине владельца.
-  - Тесты: модульный, что подпись рисуется (картинка с подписью отличается от исходной в области подписи) и что в результате нет EXIF и XMP.
-- **Запись счётчика квоты.** Веха M1; уточняет пункт «Учёт квоты».
-  - `quota.json` пишет один владелец (`server/storage/quota.ts`): запись во временный файл и переименование, по одной записи за раз, после каждого изменения счётчика.
-  - Платные стартовые картинки запрашиваются только для партии, прошедшей проверку квоты: в лобби сервер заранее ищет только место первого раунда (бесплатный metadata-запрос), а его стартовые картинки запрашивает после «Начать», во время отсчёта. Следующие раунды готовятся заранее, как раньше, в пределах уже проверенного худшего случая партии. Смена региона в лобби отменяет найденное место; на расход это не влияет.
-  - Ошибка записи не скрывается: хост видит предупреждение, и до успешной записи старт новой партии с ботами ведёт себя как при повреждённом файле (пункт «Обновление»).
-  - Месяц счётчика определяется по UTC; часовой пояс расчётного месяца Google сверяет спайк S3.
-  - Тесты: модульный на обрыв записи (старый файл цел), на ошибку записи и на смену месяца.
-- **Скорость `start`.** Веха M1; уточняет пункт «Первый запуск и сборка клиента».
-  - Сборка клиента идёт параллельно с запуском `cloudflared` и ожиданием DNS: они не зависят друг от друга, а ожидание DNS бывает дольше сборки. Ссылка печатается, когда готово и то, и другое. Запрос DoH повторяется раз в 2 с.
-- **Журнал запуска бота и файлы сбоя.** Веха M1; уточняет пункты «Журнал сервера и ботов» и «Ошибки командной строки и инструментов бота».
-  - Запись о запуске харнесса: адаптер, версия CLI, `argv` с замаскированным токеном, длительность, код выхода или сигнал, причина завершения, последние 50 строк stderr после маскировки.
-  - Файлы `crash-<время>.log` лежат в том же каталоге журналов и удаляются по тому же правилу 14 дней.
-  - README в разделе про ботов говорит, что боты тратят лимиты подписок владельца и что условия каждой подписки владелец проверяет сам (вопрос C-SUBTERMS из обзора CEO).
-- **Миниатюры для карточки ИИ.** Веха M1; уточняет пункт «Хранение снимков».
-  - Миниатюры отдаются по `GET /thumb/<id>`, где `id` содержит 128 бит случайности; после возврата в лобби адреса отвечают 404. Токен в адресе картинки не нужен и не передаётся.
-  - Тест: модульный, что после возврата в лобби адрес миниатюры отвечает 404.
-- **Подделка карты для режима `--fake`.** Веха M1; уточняет пункты «Решения владельца до кода» и «Разработка без ключей и подписок».
-  - Если владелец выберет Google Maps для карты ответа, `dev --fake` и E2E без сети получают поддельную карту: компонент с теми же свойствами, что `GuessMap` и `ResultsMap`, на простой картинке мира с переводом щелчка в широту и долготу. Это единственная подмена карты; переключателя между двумя настоящими картами нет. При выборе MapLibre подделка не нужна: в режиме `--fake` подставляется пустой стиль без тайлов.
-- **Проверка качества ботов.** Веха M2.
-  - `bun run eval:bots`: набор из 10 и более мест, снятых владельцем (снимки Google не сохраняются, пункт 3.2.3(a)). У каждого места четыре фотографии по сторонам света с подписями и известные координаты. Проверяется только догадка по стартовым снимкам (лимит ходов 0): `look` и `move` на заранее снятых фотографиях честно не воспроизвести.
-  - Сравнение парное: прежняя и новая версия промпта или схем запускаются на одном наборе по 3 раза каждая, в `docs/evals/` пишутся медиана и разброс расстояний. Пресеты сложности и пользу ходов проверяют записанные партии (`matches.jsonl`), а не этот набор.
+- **Repository layout.** Milestone M0; refines section 7.
+  - One `package.json` at the root and the directories `shared/`, `server/`, `web/`, `bot-tools/`, `scripts/` without workspaces. Two `tsconfig` files (browser for `web/`, Bun for the rest) and a shared root one.
+  - Import boundaries are checked by ESLint (`no-restricted-imports` by paths) in `bun run check`: `web/` and `bot-tools/` import only `shared/`; `server/` does not import `web/`; `shared/` imports nothing from the project. A violation fails the build.
+  - Unit and integration tests run through the built-in `bun test`; E2E through Playwright. Vitest is not used. Client logic worth testing separately (clock, formatting, projection of state onto a screen) lives in ordinary `.ts` modules in `web/src/lib/` without Svelte runes; components are checked by E2E.
+  - `scripts/check-size.ts` checks `.svelte` too: a component file ≤ 500 lines. The ESLint rule `max-lines-per-function: 80` applies in tests as well, so the project `CLAUDE.md` asks not to wrap a test file in one big `describe`.
+- **Game core: one state and pure transitions.** Milestone M1; refines sections 7 and 14 ("Event order and edge cases").
+  - All mutable room state (participants, phase, round number, markers, answers, bots' move counters and reservations, reading pause, bot guesses) lies in one object `RoomState` with one owner: `server/engine/`.
+  - Transitions are computed by a pure function `reduce(state, event, now) → {state, effects}` without waits and I/O. Effects (timer, starting or stopping a harness, a request to Google, broadcast to clients, a file write) are executed by `server/engine/shell.ts`; an effect's result returns to the core as an event with an operation tag: the match identifier `matchId` and the generation `gen`. The generation grows at every new round, at every repeated round preparation («Повторить»), at every settings change in the lobby and at «Ещё раз». An event with a foreign tag is discarded by the core in one place, not in each handler; the round number is not enough for this, because a repeated preparation and a new match use the same number.
+  - The core files are split by phase: `lobby.ts`, `round.ts`, `results.ts`, `final.ts` and a shared `reduce.ts` that picks the handler by phase. This way no file approaches the 500-line limit.
+  - What each participant sees is decided by one function `view(state, viewerId)`: during a round it contains no answer coordinates, other people's markers or bot guesses; coordinates appear only in the `ROUND_RESULTS` phase. The server sends each client its view in full with a version number; the client does not assemble state from deltas.
+  - Tests: unit tests on `reduce` with a controllable clock (all transitions from the item "Event order and edge cases" become rows of one table); a unit test on `view`: in `ROUND_ACTIVE` any player's view contains no answer coordinates, other people's markers or bot guesses.
+- **Acknowledgement protocol and clocks.** Milestone M1; refines the items "Human answer: server confirmations" and "Screen hierarchy" (timer).
+  - Each client message carries a `seq` that grows within a connection. The server replies `ack {seq, result}`, where `result` is `ok` or a refusal code (`round_over`, `already_confirmed`, `not_in_round`, `invalid`). The client changes the answer zone state only upon `ack`.
+  - Marker: the client sends `{roundId, lat, lng}` no more than 5 times per second; the server keeps the last one and replies with an `ack` to each. «Угадать»: `{roundId, lat, lng}`; the server records these coordinates and the confirmation in one transition, so a marker moved right before the press is not lost to rate limiting. A repeat gets `already_confirmed`.
+  - Each server message carries `serverNow` (ms). The client keeps a clock offset from a ping every 20 s (from spike S2): the measurement with the smallest ping time over the last 5 is taken. The timer is computed from `endsAt` from the state view plus the offset.
+  - After reconnection the client receives the full view and, if the round is the same and the answer is not confirmed, sends the last marker again.
+  - Tests: a unit test on the offset computation (choosing the smallest ping, a jump of the client clock); an integration test on a marker `ack`, a repeated «Угадать» and a marker with the previous round's number.
+- **Host, tabs and returning mid-round.** Milestone M1; closes question C-HOSTDROP from the CEO review; refines sections 4.1 and 4.5.
+  - The host role is tied to the host token, not to the connection. A host who closed the tab returns via the same local link from the terminal and gets the role back.
+  - While the host is absent: the automatic advance of results goes as usual; a round preparation error and the final screen wait for the host, guests see «Хост отключился. Ждём его возвращения» ("The host disconnected. Waiting for them to return"); the lobby waits for «Начать».
+  - One identity in two tabs (the same host token or the same `playerId`): the last connection wins, the old one gets the message «Игра открыта в другой вкладке» ("The game is open in another tab") and is closed.
+  - A round participant who returned before the end of the round plays it again: their marker and confirmed answer are kept. A new participant mid-round stays a spectator until the next one (as in section 4.1).
+  - A connection without a token is closed after 5 s; no more than 8 connections awaiting login at the same time, extra ones are closed immediately. The ceiling of 32 connections from section 7 counts them too.
+  - Tests: unit tests on the host's return, a second tab, a participant's return mid-round and the automatic advance without a host; an integration test on closing a connection without a token after 5 s.
+- **Process launching and stopping.** Milestone M1; refines sections 5.3 and 5.4.
+  - All child processes (bot harnesses, `cloudflared`, the Vite build) are launched by one function `spawnManaged` in `server/proc/`: each process in its own process group, output is collected into the log, stopping via SIGTERM to the group and SIGKILL to the group after 2 s. Otherwise a harness process leaves its descendants alive (the `bot-tools` bridge, helper processes).
+  - The data directory belongs to one server: at startup the server takes a lock file `<DATA_DIR>/run/server.lock` with its process number and its start time. A second `start` with the same data directory ends with the error `GEO_ALREADY_RUNNING` (code 2) and touches nothing; the lock of a process that no longer exists is released.
+  - The groups of live child processes are recorded in `<DATA_DIR>/run/children.json`: the process number, its start time (on Linux from `/proc/<pid>/stat`, on macOS from `ps -o lstart=`) and the command. Only after acquiring the lock does the server read the previous launch's file and stop a group for which all three attributes match; this way, after an emergency server termination, the harnesses do not waste the subscription, and a process with a reused number is not harmed.
+  - On Ctrl+C, SIGTERM and an unexpected failure the server first stops all groups, then writes the crash file and exits.
+  - Tests: a unit test that a fake process with a descendant is stopped entirely; a unit test on cleanup by `children.json` (all three attributes match: stopped; a different start time or command: untouched); a unit test on a second `start` with a live lock and on releasing the lock of a dead process; an integration test that exit code 70 leaves zero live fake-harness processes.
+- **Harness adapters: flags per the help.** Milestones M0 (spike S1) and M1; refines section 5.3 and the item "Bot process isolation".
+  - The list of harnesses is defined once: the adapter registry `server/bots/adapters/index.ts`. `doctor`, the `settings.json` schema, the harness choice in the lobby and `test:harness` take it from there.
+  - `codex`: the temporary directory is not a git repository, so `--skip-git-repo-check` is needed; isolation candidates from the 0.167 help: `--ephemeral` (the session is not written to disk) and `--ignore-user-config` (do not read `config.toml`, the login is kept).
+  - `claude`: `--bare` cannot be used: in this mode the claude.ai login is not read, only `ANTHROPIC_API_KEY` works. Candidates: `--tools ""` (turn off built-in tools), `--setting-sources` without `user`, `--no-session-persistence`, together with `--strict-mcp-config` and `--allowedTools "mcp__geo__*"`.
+  - `agy`: `--settings` (settings for this session only), `--print-timeout` as an external time limit, `--sandbox`.
+  - Spike S1 confirms each candidate and two more questions: the `bot-tools` bridge launched by the harness reaches `127.0.0.1:BOT_PORT` from under the harness's sandbox; the tool call result arrives in the form the adapter expects (`codex` has different forms of recording a call).
+  - Test: a unit snapshot of each adapter's `argv` and environment (no Google keys, the MCP config points to the bridge with a token, isolation flags in place).
+- **Round location.** Milestone M1; refines sections 4.3, 4.4, 5.2 and 6.
+  - The round location is set once and does not change afterward: the `pano_id` and coordinates from the metadata response for this panorama (not the random point from which the search started).
+  - Humans open exactly this panorama (`StreetViewPanorama` with `pano`), the bots' starting images are requested with the parameter `pano=<pano_id>`, points and arcs on the results map are computed from the panorama's coordinates.
+  - Test: a unit test that points are computed from the panorama's coordinates, not from the sampling point; an integration test that the client and the starting images get the same `pano_id`.
+- **Bot moves in sequence.** Milestone M1; refines sections 5.1, 5.2 and the item "Event order and edge cases".
+  - The `look` and `move` calls of one bot are executed strictly in sequence: the next waits for the end of the previous. A bot has one current panorama; `look` looks from it, `move` starts from it and changes it only after success. `observe()` and `submit_guess` do not join the queue.
+  - A `move` step is accepted only if the found panorama differs from the current one, lies no farther than 100 m and the direction to it differs from the requested one by no more than 45°; otherwise the answer is «в эту сторону дороги нет» without charging a move.
+  - Such a step is an approximation: the neighboring panorama by distance and direction may turn out to be on a parallel street, while a human walks along the links of Google panoramas. After the keys are enabled, spike S3 compares, over 50 steps in a browser, the server's choice with the links (`links`) of the Maps JavaScript API and records the share of matches. If it is below 80%, the owner decides whether to keep `move` with this caveat or to turn movement off for everyone in M1.
+  - Test: a unit test that two simultaneous `move` calls go one after the other and the second starts from the first one's panorama; a unit test on refusing a step with a direction 90° off the requested one.
+- **A `bot-tools` bridge without logic.** Milestone M1; refines sections 5.1 and 5.3.
+  - The bridge only translates MCP over stdio into HTTP to `127.0.0.1:BOT_PORT` and back. It gets the list of tools, their descriptions and schemas from the server at startup; the schemas are described once in `shared/bot-tools.ts` (zod) and translated into JSON Schema there.
+  - `BOT_PORT` is chosen by the system at server startup (port 0); the bridge gets the bot's address and token via the environment from the MCP config.
+  - If the server is unavailable, the bridge answers each call with the error «игра остановлена, заверши работу» ("the game is stopped, finish your work") and exits.
+  - The fake harness in tests is an MCP client that launches the real bridge with the same MCP config as the adapter; this way the integration tests pass through the bridge and the bot API.
+  - Test: an integration test that a previous round's bot token gets a refusal.
+- **Captions on bot images.** Milestone M1; refines section 5.2.
+  - The compass caption is drawn with a font from the repository (the Onest file from `@fontsource`, the `fontfile` parameter of `sharp`), not a system one: on a machine without Cyrillic fonts the caption would otherwise come out as squares, and the bot would read garbage without any error.
+  - The image for the bot is encoded anew without metadata (the default behavior of `sharp`; a test pins this).
+  - Spike S1 checks that `sharp` installs and works under Bun on the owner's machine.
+  - Tests: a unit test that the caption is drawn (the image with the caption differs from the original in the caption area) and that the result has no EXIF and XMP.
+- **Writing the quota counter.** Milestone M1; refines the item "Quota accounting".
+  - `quota.json` is written by one owner (`server/storage/quota.ts`): a write to a temporary file and a rename, one write at a time, after every change of the counter.
+  - Paid starting images are requested only for a match that passed the quota check: in the lobby the server in advance looks for only the first round's location (a free metadata request), and requests its starting images after «Начать», during the countdown. The following rounds are prepared in advance, as before, within the match's already-checked worst case. A region change in the lobby cancels the found location; this does not affect usage.
+  - A write error is not hidden: the host sees a warning, and until a successful write the start of a new match with bots behaves as with a damaged file (the item "Upgrade").
+  - The counter's month is determined by UTC; the time zone of Google's billing month is reconciled by spike S3.
+  - Tests: a unit test on an interrupted write (the old file is intact), on a write error and on a month change.
+- **`start` speed.** Milestone M1; refines the item "First launch and client build".
+  - The client build runs in parallel with launching `cloudflared` and waiting for DNS: they do not depend on each other, and the DNS wait can be longer than the build. The link is printed when both are ready. The DoH request is repeated every 2 s.
+- **Bot launch log and crash files.** Milestone M1; refines the items "Server and bot log" and "Command-line and bot tool errors".
+  - The harness launch record: the adapter, the CLI version, `argv` with the token masked, the duration, the exit code or signal, the reason for finishing, the last 50 stderr lines after masking.
+  - The `crash-<time>.log` files lie in the same log directory and are deleted by the same 14-day rule.
+  - The README, in the section about bots, says that bots spend the owner's subscription limits and that the terms of each subscription are checked by the owner themselves (question C-SUBTERMS from the CEO review).
+- **Thumbnails for the AI card.** Milestone M1; refines the item "Image storage".
+  - Thumbnails are served at `GET /thumb/<id>`, where `id` contains 128 bits of randomness; after the return to the lobby the addresses answer 404. A token is not needed in the image address and is not passed.
+  - Test: a unit test that after the return to the lobby the thumbnail address answers 404.
+- **Map fake for `--fake` mode.** Milestone M1; refines the items "Owner decisions before code" and "Development without keys and subscriptions".
+  - If the owner chooses Google Maps for the answer map, `dev --fake` and E2E without network get a fake map: a component with the same properties as `GuessMap` and `ResultsMap`, on a simple world image with a click translated into latitude and longitude. This is the only map substitution; there is no switch between two real maps. If MapLibre is chosen, the fake is not needed: in `--fake` mode an empty style without tiles is substituted.
+- **Bot quality evaluation.** Milestone M2.
+  - `bun run eval:bots`: a set of 10 or more locations photographed by the owner (Google imagery is not saved, clause 3.2.3(a)). Each location has four photographs by compass direction with captions and known coordinates. Only the guess from the starting images is checked (move limit 0): `look` and `move` cannot be honestly reproduced on pre-shot photographs.
+  - The comparison is paired: the previous and the new version of the prompt or schemas are run on the same set 3 times each, the median and the spread of distances are written to `docs/evals/`. The difficulty presets and the usefulness of moves are checked by recorded matches (`matches.jsonl`), not by this set.
 
 ## Review record
 
 <!-- autoplan-baseline-edits:ceo {"sourceSha256":"19686c49705d9ba726fd6d4d9bf8bd6a7b4c85fbec40dc6303d9b08460f4ec7e","replacements":[{"oldText":"панорам 15; Static-картинок в худшем случае 5 × (4 + 3 × 6 × 4) = 380. Бесплатного объёма хватает минимум на 26 таких партий в месяц в худшем случае.","newText":"панорам 15 без перезагрузок страниц (проверка перед стартом закладывает 30); Static-картинок в худшем случае 5 × (12 + 3 × (6 + 3) × 4) = 600, где 12 это до трёх наборов стартовых картинок, а «+ 3» бесплатные неудачные вызовы бота за раунд. При потолке 80% (8 000 Static-картинок) это 13 таких партий в месяц в худшем случае; без потолка 16. С лимитом 4 хода худший случай 480 картинок, 16 партий при потолке. Обычный расход в несколько раз меньше: `look` запрашивает одну картинку, а не четыре."},{"oldText":"Транспорт только WebSocket; работу WebSocket через quick tunnel проверяем отдельным спайком","newText":"Транспорт только WebSocket. Проверено вживую 2026-11-13: через quick tunnel проходят HTTPS 200 и `101 Switching Protocols`; имя туннеля появляется в публичном DNS с задержкой"},{"oldText":"- S2. WebSocket через quick tunnel `cloudflared`: соединение, пинг раз в 20 с, восстановление после обрыва.","newText":"- S2. WebSocket через quick tunnel `cloudflared`: само соединение уже проверено (раздел 3); остаётся пинг раз в 20 с, удержание соединения 15 минут и восстановление после обрыва."},{"oldText":"время одного хода каждого харнесса; условия Google о показе Street View рядом с не-Google картой.","newText":"время одного хода каждого харнесса. Условия Google прочитаны 2026-11-13 (Google Maps Platform Terms of Service, редакция от 26 августа 2026). Пункт 3.2.3(e) запрещает показывать Street View и не-Google карту на одном экране. Пункт 3.2.3(a) запрещает выносить Google Maps Content за пределы сервисов Google (хранить, передавать дальше). Пункт 3.2.3(c)(vii) запрещает использовать его для улучшения моделей ИИ (обучение, тестирование, проверка, дообучение). Исходный замысел в части карты и ИИ-соперников с этими пунктами расходится; решение за владельцем (раздел 14, «Решения владельца до кода»)."},{"oldText":"- Длительность раунда: 30–600 с, по умолчанию 120.","newText":"- Длительность раунда: 30–600 с, по умолчанию 120. Если в партии есть ИИ, минимум 60 с."},{"oldText":"лимит ходов 0–20 (по умолчанию 6)","newText":"лимит ходов 0–20 (по умолчанию 4, как в пресете «Любитель»), размер картинки, бюджет времени, характер, пресет сложности"},{"oldText":"Раунд кончается, когда истёк таймер или ответили все люди. Если все люди ответили раньше, ИИ получают ещё 20 с (настраивается) и затем обрываются.","newText":"Раунд кончается, когда истёк таймер, либо когда ответили все люди и завершились все боты. Если люди ответили раньше ботов, боты работают ещё 20 с (настраивается), но не меньше чем до 60-й секунды раунда, и затем обрываются."},{"oldText":"Кто не ответил, получает 0 очков. У ИИ засчитывается последняя предварительная догадка, если она была.","newText":"Кто не поставил метку, получает 0 очков; метка, поставленная, но не подтверждённая к концу таймера, засчитывается как ответ. У ИИ всегда засчитывается последняя записанная догадка, чем бы ни кончилась его работа (дедлайн, бюджет времени, сбой харнесса, лимит подписки); 0 очков бот получает, только если ни одной догадки не записано."},{"oldText":"`D` диагональ региона (мир: 14 916.862 км).","newText":"`D` диагональ региона (мир: 14 916.862 км). Для каждого пресета региона `D` это расстояние по большому кругу между противоположными углами ограничивающего прямоугольника его полигонов (с учётом 180-го меридиана); значения считает `scripts/build-regions.ts` при подготовке GeoJSON, они записаны константами в `shared/` и закреплены модульным тестом."},{"oldText":"- Итог: сумма по раундам. При равенстве выигрывает меньшая суммарная дистанция.","newText":"- Итог: сумма по раундам. При равенстве очков выше тот, у кого больше раундов с ответом, затем тот, у кого меньше суммарная дистанция по раундам с ответом; при полном равенстве место делится."},{"oldText":"- `submit_guess(lat, lng, explanation)`: записать догадку.","newText":"- `submit_guess(lat, lng, explanation, quip?)`: записать догадку."},{"oldText":"- Источник: Street View Static API, 640x640, по умолчанию `fov=90`, `pitch=0`.","newText":"- Источник: Street View Static API, запрос всегда 640x640, по умолчанию `fov=90`, `pitch=0`. Меньший размер для слота получается уменьшением на сервере."},{"oldText":"- Веб-поиск и прочие инструменты харнесса для бота выключены.","newText":"- Веб-поиск и прочие инструменты харнесса для бота выключаются флагами адаптера; что на деле выключено у каждого харнесса, проверяет спайк S1 (раздел 14, «Изоляция процесса бота»)."},{"oldText":"ограничение по referrer `*.trycloudflare.com/*` и `localhost`","newText":"ограничение по referrer `*.trycloudflare.com/*`, `localhost` и адрес из `--public-url`, если он задан"},{"oldText":"- Ограничение частоты неудачных входов по `CF-Connecting-IP`; потолок 32 соединения.","newText":"- Ограничение частоты неудачных входов по адресу клиента и общий потолок неудачных входов (пороги и источник адреса в разделе 14, «Свой публичный адрес и пороги входа»); потолок 32 соединения. `GET /healthz` отвечает без токена."},{"oldText":"- `bun run start --no-tunnel`: только локально.","newText":"- `bun run start --no-tunnel`: только локально.\n- `bun run start --public-url <https://адрес>`: без `cloudflared`, пригласительная ссылка строится от своего адреса."},{"oldText":"оба запускают `bun run check`.","newText":"оба запускают `bun run check`. Пока у репозитория нет remote, CI и pre-push не срабатывают, поэтому `bun run hooks:install` ставит ещё и `.githooks/pre-commit` с тем же `bun run check`; создание приватного remote входит в решения владельца до кода."},{"oldText":"Спайки (каждый оставляет короткий отчёт в `docs/spikes/` и решение):","newText":"Решения владельца до кода (раздел 14): карта для ответа, ИИ на снимках Google, приватный remote для CI.\n\nСпайки идут сразу после ворот качества, S1 первым (каждый оставляет короткий отчёт в `docs/spikes/` и решение):"},{"oldText":"как передать MCP-конфиг на один запуск без изменения глобальных настроек.","newText":"как передать MCP-конфиг на один запуск без изменения глобальных настроек; какими флагами закрыть харнессу чтение файлов вне временного каталога, веб-поиск и запуск команд; как отключить пользовательские настройки харнесса (общие инструкции, хуки, плагины, память). Затем на одноразовом коде: один полный раунд бота (стартовые картинки, ходы, догадка с объяснением) и три бота одновременно; состав и критерий в разделе 14."},{"oldText":"- S3. Ключи Google: включены оба API; доля удачных попаданий metadata-выборки по регионам; точные тексты ошибок для `doctor`.","newText":"- S3. Ключи Google: включены оба API; доля удачных попаданий metadata-выборки по регионам; точные тексты ошибок для `doctor`; сверка бесплатного месячного объёма и единицы тарификации панорам и карт с актуальной таблицей цен; какие дневные квоты выставить в Cloud Console.\n- S4. Час на обзор открытых клонов с проверкой лицензий: есть ли готовая основа для экранов M1. Решение записывается; по умолчанию своя сборка."},{"oldText":"состояния загрузки и ошибок на каждом экране, история партий, README.","newText":"состояния загрузки и ошибок на каждом экране, полный README."},{"oldText":"предупреждение в лобби, если ход дольше 1/3 раунда","newText":"предупреждение в лобби, если время из «Проверить» больше половины бюджета времени бота"},{"oldText":"Не проверено. Уточнить по тексту условий; запасной вариант карты: Google Maps JS (ключ уже нужен)","newText":"Проверено по тексту (раздел 3): исходный замысел расходится с пунктами 3.2.3(a), 3.2.3(c)(vii) и 3.2.3(e). Решает владелец до начала кода (раздел 14, «Решения владельца до кода»); вариант карты без расхождения: Google Maps JS (ключ уже нужен)"},{"oldText":"ошибка лимита показывается в карточке бота, бот получает 0","newText":"ошибка лимита показывается в карточке бота; засчитывается последняя записанная догадка, без неё 0"},{"oldText":"- Голос и чат.","newText":"- Голос и чат.\n\n## 14. Дополнения, принятые при обзоре\n\nПункты ниже обязательны. Там, где они расходятся с текстом разделов 3–12, действует текст этого раздела. У каждого пункта названа веха и разделы, которые он уточняет."},{"oldText":"- Движение людей по панораме: вкл/выкл.","newText":"- Движение по панораме: вкл/выкл. Настройка общая для людей и ботов: при выключенном движении инструмент `move` ботам недоступен."},{"oldText":"Жёсткий потолок по умолчанию 80% бесплатного объёма; при достижении новая партия не стартует, хост видит причину.","newText":"Потолок приложения по умолчанию 80% бесплатного объёма; правила учёта, проверка перед стартом партии и поведение при достижении потолка описаны в разделе 14 («Учёт квоты»). Счётчик это оценка, а не гарантия биллинга: настоящий предел задают дневные квоты в Cloud Console."},{"oldText":"### M1. Игра без ИИ\n\nПротокол и схемы, конечный автомат, вход по токену, лобби, раунд с настоящей панорамой и картой, очки, результаты, финал, переподключение.","newText":"### M1. Первая игра (сквозной срез)\n\nВсё, что нужно для одного игрового вечера: протокол и схемы, конечный автомат, вход по токену, лобби (раунды, длительность, слоты ИИ на одном харнессе, прошедшем S1), раунд с настоящей панорамой и картой, `bot-tools` (MCP), `BotImageService`, `BotRunner`, один адаптер, лимит ходов, дедлайн, счётчик и потолок квоты Static с проверкой перед стартом партии, очки, результаты с карточкой ИИ и объяснением, финал, переподключение, запуск `cloudflared` из `start` с проверкой готовности ссылки, базовый `doctor`, запись партии в `matches.jsonl`, простые переходы между экранами, README с шагами запуска. Регион: только мир.\n\nВорота «Первая игра» закрывают веху: партия с друзьями и замеры из раздела 14. По её итогам владелец подтверждает или меняет состав M2–M4."},{"oldText":"### M2. ИИ-соперники\n\n`bot-tools` (MCP), `BotImageService`, `BotRunner`, три адаптера, лимит ходов, дедлайн, карточка ИИ, проверка зрения в лобби, список моделей.","newText":"### M2. Все харнессы и настройка ИИ\n\nАдаптеры остальных харнессов, прошедших S1, список моделей, проверка зрения в лобби, сложность ботов, характер и реплика, счёт «Люди против ИИ», пресеты регионов."},{"oldText":"### M3. Туннель и защита\n\nЗапуск `cloudflared` из `start`, разбор URL, ссылки в терминале, ограничение частоты входов, счётчик квоты и потолок, `doctor`.","newText":"### M3. Защита и свой адрес\n\nПороги неудачных входов, учёт панорам в счётчике квоты, полный `doctor`, флаг `--public-url`."}]} -->
 
-### Фаза 1. CEO-обзор (режим SELECTIVE EXPANSION)
+### Phase 1. CEO review (SELECTIVE EXPANSION mode)
 
-#### Журнал чтения инструкций
+#### Instruction reading log
 
-- `autoplan/sections/ceo-phase.md`: строки 1–196 из 196 (до конца файла).
-- Методика CEO (`plan-ceo-review/SKILL.md` + `sections/review-sections.md`, сводный файл 2224 строки): диапазоны 1–600, 601–1200, 1201–1720, 1721–2224 (до конца файла). Перечитано повторно после сжатия контекста.
-- Части, которые план добавляет в gstack (навык, шаг, инструкция, проверка, значение по умолчанию): нет. План описывает отдельный проект.
+- `autoplan/sections/ceo-phase.md`: lines 1–196 of 196 (to the end of the file).
+- CEO methodology (`plan-ceo-review/SKILL.md` + `sections/review-sections.md`, combined file of 2224 lines): ranges 1–600, 601–1200, 1201–1720, 1721–2224 (to the end of the file). Re-read after context compaction.
+- Parts the plan adds to gstack (skill, step, instruction, check, default value): none. The plan describes a separate project.
 
-#### Аудит до обзора
+#### Pre-review audit
 
-- Репозиторий пустой: коммитов нет, удалённого репозитория нет, `CLAUDE.md` и архитектурных документов нет, отложенных изменений (stash) нет. В рабочем каталоге только `PLAN.md` и созданный этим обзором `TODOS.md`.
-- Design doc от `/office-hours` нет: владелец выбрал пропуск (ответ на D1).
-- Прошлых обзоров этого плана нет, повторяющихся проблемных мест нет.
-- UI-область: есть (5 экранов, 8 компонентов). Раздел 11 и фаза дизайна выполняются.
-- DX-область: есть (команды `start`, `doctor`, `dev`, настройка ключей, адаптеры харнессов). Фаза DX выполняется.
-- Калибровка вкуса. Кода в репозитории нет, поэтому образцы взяты из самого плана. Держаться: авторитетный сервер с конечным автоматом и zod-схемами протокола; адаптер харнесса в один файл с одной функцией. Избегать: запуск CLI на каждый ход бота; таймеры и подсчёт очков на стороне клиента.
+- The repository is empty: no commits, no remote repository, no `CLAUDE.md` and no architecture documents, no stashes. The working directory contains only `PLAN.md` and the `TODOS.md` created by this review.
+- There is no design doc from `/office-hours`: the owner chose to skip it (answer to D1).
+- There are no prior reviews of this plan and no recurring trouble spots.
+- UI scope: present (5 screens, 8 components). Section 11 and the design phase are executed.
+- DX scope: present (the `start`, `doctor`, `dev` commands, key setup, harness adapters). The DX phase is executed.
+- Taste calibration. There is no code in the repository, so the examples are taken from the plan itself. Keep: an authoritative server with a state machine and zod protocol schemas; a harness adapter in one file with one function. Avoid: launching a CLI for every bot turn; timers and score calculation on the client side.
 
-#### Обзор рынка (три слоя)
+#### Market review (three layers)
 
-- Слой 1, проверенное. Жанр устоялся: панорама Street View, метка на карте, очки по экспоненте от расстояния, сумма по раундам. Открытые клоны существуют (WorldGuessr, GeoGuess и другие), но сведения об их лицензиях и составе взяты из поиска и на месте не проверялись.
-- Слой 2, новое. Публикации 2025–2026 годов сообщают, что сильные модели со зрением определяют место по фото на уровне сильных игроков. Ни один найденный клон не даёт ИИ-соперников, которые играют через локальные CLI-харнессы и подписки владельца.
-- Слой 3, из первых принципов. Ценность проекта не в ещё одном клоне, а в том, что ИИ сидят за столом как игроки: видят то же, ограничены ходами, объясняют ответ. Из этого два вывода. Первый: сила ботов должна настраиваться, иначе трое людей будут проигрывать каждую партию и станет скучно уже по другой причине. Второй: единственная незаменимая зависимость здесь Street View; всё остальное (карта, туннель, харнесс) заменяется.
+- Layer 1, established. The genre is settled: a Street View panorama, a marker on a map, exponential scoring by distance, a sum over rounds. Open-source clones exist (WorldGuessr, GeoGuess and others), but the information about their licenses and composition comes from search and was not verified on site.
+- Layer 2, new. Publications from 2025–2026 report that strong vision models locate a place from a photo at the level of strong players. None of the clones found offers AI opponents that play through local CLI harnesses and the owner's subscriptions.
+- Layer 3, from first principles. The value of the project is not yet another clone, but that the AIs sit at the table as players: they see the same thing, are limited by turns, and explain their answer. Two conclusions follow. First: bot strength must be tunable, otherwise three humans will lose every match and it will get boring for a different reason. Second: the only irreplaceable dependency here is Street View; everything else (map, tunnel, harness) is replaceable.
 
-#### Реестр решений
+#### Decision register
 
-| ID и владелец | Контракт и основание | Текущее | Предложено | Статус | Точное одобрение и объём |
+| ID and owner | Contract and basis | Current | Proposed | Status | Exact approval and scope |
 |---|---|---|---|---|---|
-| C-MODE (0E) | Режим обзора; правило `/autoplan` | SELECTIVE EXPANSION | нет | approved | Задано `/autoplan`, владелец запустил `/autoplan` |
-| C-APPROACH (0D) | Способ постройки; раздел 7 плана | Своя сборка: Bun + Svelte, боты через MCP внутри одной сессии харнесса | Форк открытого клона; хостинг вне машины владельца | approved | Авторешение, принцип 1 (полнота): только своя сборка покрывает требования 2, 5, 6, 7, 8 |
-| C-E1 (0G) | Гандикап ботов и пресеты сложности | нет | Добавить | approved | Авторешение, принцип 2: в радиусе плана, меньше дня работы. Веха M2, после ворот «Первая игра» |
-| C-E2 (0G) | Счёт «Люди против ИИ» | нет | Добавить | approved | Авторешение, принцип 2. Веха M2 |
-| C-E4 (0G) | Характер и реплика бота | нет | Добавить | approved | Авторешение, принцип 2. Веха M2 |
-| C-E14 (0G) | Флаг `--public-url` | нет | Добавить | approved | Авторешение, принцип 2. Веха M3 |
-| C-D1…C-D5 (0G) | Звуки; экран истории; свои списки точек; восстановление после перезапуска; мобильная раскладка | вне рамок | В `TODOS.md` | deferred | Авторешение, принцип 3: вне радиуса первой версии. Записано в `TODOS.md` |
-| C-X1…C-X5 (0G) | Лента мыслей бота; повтор хода человека; бонус за скорость; подсказки ИИ людям; ссылка зрителя | нет | Не делать | declined | Авторешение: лента мыслей и подсказки ломают честность раунда, остальное не нужно для цели |
-| C-F1 (0B) | Оценка расхода и число партий в месяц | 380 картинок, 26 партий | 600 картинок, 13 партий при потолке 80%, 16 без потолка; с лимитом 4 хода 480 картинок и 16 партий | approved | Механическая правка, пересчёт ниже; после замечания Codex 7 в худший случай вошли повторные стартовые наборы |
-| C-F2 (обзорный раздел 2) | Ошибки Static API | не описано | `return_error_code=true`; единица учёта неудач это вызов инструмента; 3 бесплатных неудачных вызова за раунд | approved | Механическая правка |
-| C-F3 (0B) | Готовность пригласительной ссылки | ссылка печатается сразу | после проверки DNS и `/healthz` | approved | Механическая правка по живой проверке туннеля |
-| C-F4 (0I) | Критерий спайка S1 | критерия нет | go/no-go по каждому харнессу | approved | Авторешение, принцип 5 (явное) |
-| C-F5 (0I, 0.5) | Порядок вех | M1 игра без ИИ, M2 ИИ, M3 туннель и защита | M0: ворота качества, S1, затем S2–S4; M1 сквозной срез «Первая игра» с ботами и туннелем; M2–M4 после ворот «Первая игра» | approved | Авторешение по общему выводу обоих голосов; требования владельца не меняются, меняется порядок работ. Показывается на финальных воротах |
-| C-F6 (0H) | Время ботов | раунд от 30 с, отсрочка 20 с | минимум раунда и бюджета бота 60 с; бот обрывается в самый ранний из трёх моментов; предупреждение считается от бюджета | approved | Авторешение, принцип 5 (явное): иначе критерий S1 противоречит раунду |
-| C-F7 (0H) | Хранение снимков | не описано | полные картинки до конца раунда; миниатюры 160 px в памяти до конца партии, до 86 МБ | approved | Авторешение, принцип 1 (полнота) |
-| C-F8 (0H) | Ворота качества без remote | CI и pre-push | плюс `pre-commit` с тем же `bun run check`, пока нет remote | approved | Авторешение, принцип 1: правило владельца о двух местах принуждения без remote не выполняется; лимиты не менялись |
-| C-F9 (0H) | Очки бота при сбое | два разных правила | всегда последняя записанная догадка; 0 только без догадки | approved | Механическая правка противоречия |
-| C-F10 (0H) | Тай-брейк и `D` региона | меньшая суммарная дистанция; `D` только для мира | число раундов с ответом, затем дистанция; `D` для каждого пресета | approved | Авторешение, принцип 1 |
-| C-F11 (0H) | Учёт квоты | сервер «считает загрузки панорам» | `pano_loaded` от клиента; проверка худшего случая перед стартом; поведение при потолке посреди партии | approved | Авторешение, принцип 5 |
-| C-F12 (0H) | Защита входа | по `CF-Connecting-IP`, порогов нет | 10 неудач за 60 с на адрес, 30 на сервер; пороги касаются только неудачных попыток; `CF-Connecting-IP` учитывается только в режиме quick tunnel | approved | Авторешение, принцип 1. Флаг `--trust-proxy` снят после третьей проверки (принцип 5) |
-| C-F14 (0H) | Сбои подготовки раунда | не описано | три серии выборки точки; замена точки при неудачной стартовой картинке; отсчёт без опоздавшего клиента | approved | Авторешение, принцип 1 |
-| C-F15 (0H) | Веха счётчика квоты Static; метка без подтверждения | счётчик в M3; правило не задано | счётчик и потолок Static вместе с первыми ботами (теперь M1); метка к концу таймера засчитывается | approved | Механическая правка порядка; правило метки по обычаю жанра |
-| C-F13 (0H) | Изоляция процесса бота | «инструменты выключены» без проверки | окружение из белого списка; проверка флагов в S1; допуск неограничиваемого харнесса решает владелец | approved | Авторешение, принцип 5; допуск харнесса не решается за владельца |
-| C-PRESET (0H, 0.5) | Значения нового слота | лимит ходов 6 | 4 хода и 640 px в M1; пресеты с названиями уровней в M2 после сверки с данными первой игры | approved | Авторешение, принцип 5; названия уровней до калибровки не показываются (замечание Codex 6) |
-| C-TOS (0A, 0.5) | ИИ на снимках Google; требования 5, 6 и 10 владельца; условия Google 3.2.3(a) и 3.2.3(c)(vii) | снимки Street View Static передаются моделям харнессов | снимки другого источника для ботов либо игра без ИИ | unresolved | User Challenge UC-2. Не авторешается: решает владелец на финальных воротах. До решения действует его исходный замысел |
-| C-REMOTE (0H) | Приватный remote для CI | remote нет | создать | unresolved | Действие владельца, выносится на финальные ворота; до него работает `pre-commit` |
-| C-MAP (0A, 0.5) | Карта для ответа; требование 10 владельца: «карту можно бесплатную типа OSM»; условия Google 3.2.3(e) | MapLibre + OpenFreeMap | Google Maps JS (тот же ключ) | unresolved | User Challenge UC-1. Не авторешается: решает владелец на финальных воротах. До решения действует его исходный вариант |
-| C-MOVE (0A) | Что считается ходом ИИ; требование 7 владельца | `look` и `move` стоят ход; стартовый осмотр и ответ бесплатны | Считать ходом каждое обращение к модели | approved | Вкусовое авторешение: трактовка плана оставлена и закреплена в разделе 5.1; на финальных воротах владельцу показывается сама трактовка |
-| C-GATE1 (0.5) | Ворота «Первая игра» после M1 | нет | партия с друзьями, замеры по ботам, три вопроса владельцу, подтверждение состава M2–M4 | approved | Авторешение по общему выводу обоих голосов (Claude 9, Codex 2), принцип 1 |
-| C-S1FULL (0.5) | Состав спайка S1 | зрение и время одного хода | плюс полный раунд бота, три бота одновременно, пять раундов; S1 первым после ворот качества | approved | Авторешение (Claude 2, Codex 3), принцип 5. Раньше ворот качества не ставится: правило владельца |
-| C-EXP-ORDER (0.5) | Место расширений E1, E2, E4, E14 | в M2 и M3 вперемешку с основой | оставить в плане после ворот «Первая игра»; альтернатива голосов: убрать в `TODOS.md` | approved | Вкусовое авторешение, принцип 2; показывается на финальных воротах, владелец может снять любое |
-| C-EQMOVE (0.5) | Движение по панораме для ботов | настройка только для людей | общая настройка для людей и ботов | approved | Авторешение, принцип 5 (Codex 6) |
-| C-PREWARM (0.5) | Момент запуска харнесса | в `ROUND_ACTIVE` | в `ROUND_LOADING`, первый `observe()` задержан до начала раунда | approved | Авторешение, принцип 3 (Claude 12) |
-| C-S4 (0.5) | Обзор открытых клонов | не проводился | спайк S4 на один час с проверкой лицензий | approved | Авторешение, принцип 6 (Claude 11) |
-| C-DIRECT-API (0.5) | Боты через прямой API моделей; требование 5 владельца | харнессы и подписки | прямые вызовы API | declined | Вкусовое: замечание одного голоса (Claude 7), противоречит прямой просьбе владельца о подписках. Показывается на воротах как справка |
-| C-DEADLINE (0.5) | Фиксированный дедлайн бота | три момента обрыва и окно ожидания | один фиксированный дедлайн | declined | Вкусовое: замечание одного голоса (Claude 12); правила уже заданы и покрыты тестами, досрочный конец раунда нужен для темпа |
-| C-SUBTERMS (0.5) | Условия подписок харнессов при запуске из игры | не проверено | проверить по тексту условий каждого провайдера | unresolved | Замечание одного голоса (Claude 5). Режимы `codex exec`, `claude -p`, `agy -p` штатные неинтерактивные; тексты условий не читались. Показывается владельцу на воротах; общие лимиты подписок записаны как остаточный риск |
-| C-R1 (разделы 1 и 2) | Сбои во время партии | не описано | остановка подготовки при отказе ключа; 403 и 429 как потолок; обрезка объяснения; причина при отсутствии догадки; перезапуск туннеля; место по нику; версии локальных файлов; `client_error`; сверка версий харнессов | approved | Авторешение, принцип 1: правила в пункте «Сбои во время партии» |
-| C-R4 (раздел 4) | Порядок событий и граничные случаи | не описано | проверка фазы после ожиданий; резерв хода и квоты; положение метки на сервере; номер раунда в «Дальше»; пауза без людей; часы и генератор параметрами | approved | Авторешение, принцип 1: правила в пункте «Порядок событий и граничные случаи» |
-| C-R3 (раздел 3) | Секреты и токены | не описано | `.env` вне git с проверкой; новые токены при каждом `start`; маска в журнале | approved | Авторешение, принцип 1 |
-| C-R5 (раздел 5) | Лимиты размера для `spikes/` | исключение из лимитов | исключение снято | approved | Правило владельца: исключение из лимитов требует его согласия; авторешение в сторону правила |
-| C-R8 (раздел 8) | Журнал сервера и ботов | не описано | события в `logs/<дата>.jsonl`, 14 дней, строка на раунд в терминале | approved | Авторешение, принцип 1 |
-| C-HOSTDROP (раздел 1) | Отключение хоста посреди партии | автопереходы | не выбрано | unresolved | Не блокирует; владелец выбора: инженерная фаза |
-| C-BUILD (раздел 9) | Собирает ли `start` клиент сам | не сказано | не выбрано | unresolved | Не блокирует; владелец выбора: фаза DX |
-| C-UI (раздел 11) | Визуальный язык, узкие экраны, кнопка приглашения в лобби | не описано | не выбрано | unresolved | Не блокирует; владелец выбора: фаза дизайна |
+| C-MODE (0E) | Review mode; `/autoplan` rule | SELECTIVE EXPANSION | none | approved | Set by `/autoplan`, the owner ran `/autoplan` |
+| C-APPROACH (0D) | Build approach; section 7 of the plan | Own build: Bun + Svelte, bots via MCP inside a single harness session | Fork an open-source clone; hosting off the owner's machine | approved | Auto-decision, principle 1 (completeness): only an own build covers requirements 2, 5, 6, 7, 8 |
+| C-E1 (0G) | Bot handicap and difficulty presets | none | Add | approved | Auto-decision, principle 2: within the plan's radius, less than a day of work. Milestone M2, after the "First game" gate |
+| C-E2 (0G) | "Humans vs AI" score | none | Add | approved | Auto-decision, principle 2. Milestone M2 |
+| C-E4 (0G) | Bot persona and quip | none | Add | approved | Auto-decision, principle 2. Milestone M2 |
+| C-E14 (0G) | `--public-url` flag | none | Add | approved | Auto-decision, principle 2. Milestone M3 |
+| C-D1…C-D5 (0G) | Sounds; history screen; custom point lists; recovery after restart; mobile layout | out of scope | To `TODOS.md` | deferred | Auto-decision, principle 3: outside the radius of the first version. Recorded in `TODOS.md` |
+| C-X1…C-X5 (0G) | Bot thought feed; replay of a human's turn; speed bonus; AI hints to humans; spectator link | none | Do not do | declined | Auto-decision: the thought feed and hints break round fairness, the rest are not needed for the goal |
+| C-F1 (0B) | Cost estimate and number of matches per month | 380 images, 26 matches | 600 images, 13 matches at the 80% cap, 16 without a cap; with a 4-turn limit 480 images and 16 matches | approved | Mechanical fix, recalculation below; after Codex remark 7 the repeated starting sets entered the worst case |
+| C-F2 (review section 2) | Static API errors | not described | `return_error_code=true`; the unit for counting failures is a tool call; 3 free failed calls per round | approved | Mechanical fix |
+| C-F3 (0B) | Readiness of the invitation link | the link is printed immediately | after a DNS and `/healthz` check | approved | Mechanical fix based on a live tunnel check |
+| C-F4 (0I) | Spike S1 criterion | no criterion | go/no-go per harness | approved | Auto-decision, principle 5 (explicit) |
+| C-F5 (0I, 0.5) | Milestone order | M1 game without AI, M2 AI, M3 tunnel and protection | M0: quality gates, S1, then S2–S4; M1 end-to-end "First game" slice with bots and tunnel; M2–M4 after the "First game" gate | approved | Auto-decision by the shared conclusion of both voices; the owner's requirements do not change, the order of work does. Shown at the final gate |
+| C-F6 (0H) | Bot time | round from 30 s, grace period 20 s | minimum round and bot budget 60 s; the bot is cut off at the earliest of three moments; the warning is computed from the budget | approved | Auto-decision, principle 5 (explicit): otherwise the S1 criterion contradicts the round |
+| C-F7 (0H) | Snapshot storage | not described | full images until the end of the round; 160 px thumbnails in memory until the end of the match, up to 86 MB | approved | Auto-decision, principle 1 (completeness) |
+| C-F8 (0H) | Quality gates without a remote | CI and pre-push | plus `pre-commit` with the same `bun run check` while there is no remote | approved | Auto-decision, principle 1: the owner's rule about two enforcement places is not satisfied without a remote; limits were not changed |
+| C-F9 (0H) | Bot score on failure | two different rules | always the last recorded guess; 0 only without a guess | approved | Mechanical fix of a contradiction |
+| C-F10 (0H) | Tie-break and region `D` | smaller total distance; `D` only for the world | number of rounds with an answer, then distance; `D` for each preset | approved | Auto-decision, principle 1 |
+| C-F11 (0H) | Quota accounting | the server "counts panorama loads" | `pano_loaded` from the client; worst-case check before start; behavior at the cap mid-match | approved | Auto-decision, principle 5 |
+| C-F12 (0H) | Login protection | by `CF-Connecting-IP`, no thresholds | 10 failures per 60 s per address, 30 per server; thresholds apply only to failed attempts; `CF-Connecting-IP` is honored only in quick tunnel mode | approved | Auto-decision, principle 1. The `--trust-proxy` flag was dropped after the third check (principle 5) |
+| C-F14 (0H) | Round preparation failures | not described | three point-sampling series; point replacement on a failed starting image; countdown without the late client | approved | Auto-decision, principle 1 |
+| C-F15 (0H) | Static quota counter milestone; unconfirmed marker | counter in M3; rule not set | Static counter and cap together with the first bots (now M1); a marker at the end of the timer is counted | approved | Mechanical fix of order; marker rule per genre custom |
+| C-F13 (0H) | Bot process isolation | "tools disabled" without verification | environment from an allowlist; flag verification in S1; admission of an unrestrictable harness is decided by the owner | approved | Auto-decision, principle 5; harness admission is not decided on the owner's behalf |
+| C-PRESET (0H, 0.5) | Values of the new slot | turn limit 6 | 4 turns and 640 px in M1; presets with level names in M2 after reconciling with first-game data | approved | Auto-decision, principle 5; level names are not shown before calibration (Codex remark 6) |
+| C-TOS (0A, 0.5) | AI on Google imagery; owner's requirements 5, 6 and 10; Google terms 3.2.3(a) and 3.2.3(c)(vii) | Street View Static images are passed to harness models | imagery from another source for bots, or a game without AI | unresolved | User Challenge UC-2. Not auto-decided: the owner decides at the final gate. Until the decision, the owner's original design applies |
+| C-REMOTE (0H) | Private remote for CI | no remote | create | unresolved | Owner action, raised at the final gate; until then `pre-commit` works |
+| C-MAP (0A, 0.5) | Map for the answer; owner's requirement 10: "the map can be a free one like OSM"; Google terms 3.2.3(e) | MapLibre + OpenFreeMap | Google Maps JS (same key) | unresolved | User Challenge UC-1. Not auto-decided: the owner decides at the final gate. Until the decision, the owner's original option applies |
+| C-MOVE (0A) | What counts as an AI turn; owner's requirement 7 | `look` and `move` cost a turn; the starting look and the answer are free | Count every call to the model as a turn | approved | Taste auto-decision: the plan's interpretation is kept and fixed in section 5.1; at the final gate the owner is shown the interpretation itself |
+| C-GATE1 (0.5) | "First game" gate after M1 | none | a match with friends, bot measurements, three questions to the owner, confirmation of the M2–M4 composition | approved | Auto-decision by the shared conclusion of both voices (Claude 9, Codex 2), principle 1 |
+| C-S1FULL (0.5) | Composition of spike S1 | vision and the time of one turn | plus a full bot round, three bots at once, five rounds; S1 first after the quality gates | approved | Auto-decision (Claude 2, Codex 3), principle 5. Not placed before the quality gates: owner's rule |
+| C-EXP-ORDER (0.5) | Place of extensions E1, E2, E4, E14 | in M2 and M3 mixed in with the core | keep in the plan after the "First game" gate; the voices' alternative: move to `TODOS.md` | approved | Taste auto-decision, principle 2; shown at the final gate, the owner may remove any of them |
+| C-EQMOVE (0.5) | Panorama movement for bots | setting for humans only | a shared setting for humans and bots | approved | Auto-decision, principle 5 (Codex 6) |
+| C-PREWARM (0.5) | Moment of harness launch | in `ROUND_ACTIVE` | in `ROUND_LOADING`, the first `observe()` is delayed until the round starts | approved | Auto-decision, principle 3 (Claude 12) |
+| C-S4 (0.5) | Survey of open-source clones | not conducted | a one-hour spike S4 with license checks | approved | Auto-decision, principle 6 (Claude 11) |
+| C-DIRECT-API (0.5) | Bots via the direct model API; owner's requirement 5 | harnesses and subscriptions | direct API calls | declined | Taste: remark of one voice (Claude 7), contradicts the owner's direct request for subscriptions. Shown at the gate as a reference |
+| C-DEADLINE (0.5) | Fixed bot deadline | three cut-off moments and a waiting window | a single fixed deadline | declined | Taste: remark of one voice (Claude 12); the rules are already set and covered by tests, an early end of the round is needed for pacing |
+| C-SUBTERMS (0.5) | Harness subscription terms when launched from the game | not verified | verify against each provider's terms text | unresolved | Remark of one voice (Claude 5). The modes `codex exec`, `claude -p`, `agy -p` are standard non-interactive; the terms texts were not read. Shown to the owner at the gate; shared subscription limits are recorded as a residual risk |
+| C-R1 (sections 1 and 2) | Failures during a match | not described | stop preparation on key rejection; 403 and 429 as a cap; truncation of the explanation; reason when there is no guess; tunnel restart; seat by nickname; local file versions; `client_error`; harness version check | approved | Auto-decision, principle 1: rules in the item "Failures during a match" |
+| C-R4 (section 4) | Event order and edge cases | not described | phase check after waits; turn and quota reserve; marker position on the server; round number in «Дальше» ("Next"); pause with no humans; clock and generator as parameters | approved | Auto-decision, principle 1: rules in the item "Event order and edge cases" |
+| C-R3 (section 3) | Secrets and tokens | not described | `.env` outside git with a check; new tokens on every `start`; mask in the log | approved | Auto-decision, principle 1 |
+| C-R5 (section 5) | Size limits for `spikes/` | exemption from limits | exemption removed | approved | Owner's rule: an exemption from limits requires his agreement; auto-decision in favor of the rule |
+| C-R8 (section 8) | Server and bot log | not described | events in `logs/<date>.jsonl`, 14 days, one line per round in the terminal | approved | Auto-decision, principle 1 |
+| C-HOSTDROP (section 1) | Host disconnect mid-match | auto-transitions | not chosen | unresolved | Not blocking; owner of the choice: engineering phase |
+| C-BUILD (section 9) | Whether `start` builds the client itself | not stated | not chosen | unresolved | Not blocking; owner of the choice: DX phase |
+| C-UI (section 11) | Visual language, narrow screens, invite button in the lobby | not described | not chosen | unresolved | Not blocking; owner of the choice: design phase |
 
-Approval readiness: PASS. Проверены строки C-MODE, C-APPROACH, C-E1, C-E2, C-E4, C-E14, C-D1…C-D5, C-X1…C-X5, C-F1…C-F15, C-PRESET, C-MOVE, C-GATE1, C-S1FULL, C-EXP-ORDER, C-EQMOVE, C-PREWARM, C-S4, C-R1, C-R3, C-R4, C-R5, C-R8: у каждой основание это авторешение `/autoplan` по названному принципу или правило владельца, и план содержит только её объём. Строки C-MAP, C-TOS, C-REMOTE, C-SUBTERMS, C-HOSTDROP, C-BUILD, C-UI остаются unresolved: план хранит исходный замысел владельца, изменения по ним не применены.
+Approval readiness: PASS. Rows checked: C-MODE, C-APPROACH, C-E1, C-E2, C-E4, C-E14, C-D1…C-D5, C-X1…C-X5, C-F1…C-F15, C-PRESET, C-MOVE, C-GATE1, C-S1FULL, C-EXP-ORDER, C-EQMOVE, C-PREWARM, C-S4, C-R1, C-R3, C-R4, C-R5, C-R8: for each, the basis is an `/autoplan` auto-decision under a named principle or an owner rule, and the plan contains only its scope. The rows C-MAP, C-TOS, C-REMOTE, C-SUBTERMS, C-HOSTDROP, C-BUILD, C-UI remain unresolved: the plan keeps the owner's original design, and no changes have been applied for them.
 
-#### 0A. Проверка предпосылок
+#### 0A. Premise check
 
-Настоящая проблема: троим играть скучно, нужны дополнительные соперники. Цель: вечер игры на 6 участников без поиска новых людей. Цена бездействия: всё остаётся как есть, игра втроём. План решает боль напрямую: добавляет соперников, а не суррогат вроде «режима против рекордов».
+The real problem: three people find it boring to play, they need additional opponents. Goal: a game night for 6 participants without looking for new people. Cost of inaction: everything stays as is, playing as three. The plan addresses the pain directly: it adds opponents, not a surrogate such as a "play against records mode".
 
-Предпосылки, которые могут оказаться неверными:
+Premises that may turn out to be wrong:
 
-1. Боты окажутся интересными соперниками, а не слишком сильными или слишком слабыми. Проверяется воротами «Первая игра» (C-GATE1); настройка силы (C-E1) и счёт «Люди против ИИ» (C-E2) идут после неё.
-2. Харнессы успевают ответить за раунд. Не проверено, закрывается спайком S1 с явным критерием (C-F4).
-3. Картинки из MCP-инструмента доходят до модели в каждом харнессе. Не проверено, спайк S1.
-4. Условия Google допускают такую игру. Проверено по тексту 2026-11-13 и не подтвердилось: пункт 3.2.3(e) запрещает Street View и не-Google карту на одном экране, пункты 3.2.3(a) и 3.2.3(c)(vii) запрещают выносить снимки за пределы сервисов Google и использовать их для улучшения моделей ИИ. Это единственный риск, который может отнять незаменимую зависимость: Google вправе отключить ключ или проект. Выносится на ворота двумя User Challenge (C-MAP, C-TOS).
-5. Владелец понимает «ход» так же, как план. Выносится на ворота (C-MOVE).
+1. The bots will turn out to be interesting opponents, neither too strong nor too weak. Checked by the "First game" gate (C-GATE1); strength tuning (C-E1) and the "Humans vs AI" score (C-E2) come after it.
+2. The harnesses manage to answer within a round. Not verified, closed by spike S1 with an explicit criterion (C-F4).
+3. Images from the MCP tool reach the model in every harness. Not verified, spike S1.
+4. Google's terms allow such a game. Checked against the text on 2026-11-13 and not confirmed: clause 3.2.3(e) forbids Street View and a non-Google map on one screen, clauses 3.2.3(a) and 3.2.3(c)(vii) forbid taking imagery outside Google services and using it to improve AI models. This is the only risk that can take away an irreplaceable dependency: Google may disable the key or the project. Raised at the gate as two User Challenges (C-MAP, C-TOS).
+5. The owner understands "turn" the same way as the plan. Raised at the gate (C-MOVE).
 
-После чтения условий Google предпосылка 4 в исходном виде неверна; она вынесена на финальные ворота двумя User Challenge, а план до решения владельца хранит его замысел. Остальные предпосылки приняты.
+After reading Google's terms, premise 4 in its original form is wrong; it was raised at the final gate as two User Challenges, and until the owner decides the plan keeps his design. The other premises are accepted.
 
-#### 0B. Что уже есть и строки реальности
+#### 0B. What already exists and reality lines
 
-Кода нет, переиспользовать внутри репозитория нечего. Вне репозитория план опирается на готовое: `cloudflared` (туннель), три CLI-харнесса (исполнение моделей), Maps JavaScript API и Street View Static API (панорамы), MapLibre GL и OpenFreeMap (карта), встроенные WebSocket и HTTP-сервер Bun, анимации Svelte. Своя сборка вместо форка клона: у клонов нет серверной модели «один хост, ссылка с токеном, боты через локальные CLI», а переделка чужого состояния и протокола под авторитетный сервер больше, чем написать пять экранов заново.
+There is no code, so there is nothing to reuse inside the repository. Outside the repository the plan relies on ready-made pieces: `cloudflared` (tunnel), three CLI harnesses (model execution), Maps JavaScript API and Street View Static API (panoramas), MapLibre GL and OpenFreeMap (map), Bun's built-in WebSocket and HTTP server, Svelte animations. An own build instead of a clone fork: the clones have no server model of "one host, a link with a token, bots via local CLIs", and reworking someone else's state and protocol into an authoritative server is more work than writing five screens from scratch.
 
-Таблица предпосылок:
+Premise table:
 
-| Предпосылка | Утверждение | Квитанция | Вердикт |
+| Premise | Claim | Receipt | Verdict |
 |---|---|---|---|
-| P1 | Втроём скучно, нужны соперники | `PLAN.md:9` (слова владельца) | принято |
-| P2 | Инструменты установлены, версии названы | `PLAN.md:30` | проверено |
-| P3 | `codex` и `claude` вошли в подписки | `PLAN.md:31` | проверено |
-| P4 | `agy` не вошёл | `PLAN.md:32` | проверено |
-| P5 | Флаги CLI существуют | `PLAN.md:33` | проверено по `--help` |
-| P6 | Бесплатный объём Google | `PLAN.md:36` | unverified |
-| P7 | WebSocket проходит через quick tunnel | `PLAN.md:37` | проверено вживую |
-| P8 | Картинки из MCP доходят до модели | `PLAN.md:39` | unverified |
-| P9 | Ход харнесса укладывается в раунд | `PLAN.md:39` | unverified |
-| P10 | Условия Google допускают раскладку и передачу снимков | `PLAN.md:39` | проверено по тексту: не допускают (3.2.3(a), 3.2.3(c)(vii), 3.2.3(e)) |
-| P11 | Константа `D` в формуле очков | `PLAN.md:74` | unverified |
-| P12 | `agy --settings` принимает MCP на один запуск | `PLAN.md:123` | unverified |
-| P13 | Модели играют на уровне сильных игроков | обзор рынка выше, `PLAN.md:300` | unverified |
-| P14 | Подписки харнессов допускают запуск из игры и выдерживают три бота одновременно | `PLAN.md:355` | unverified |
+| P1 | Three players is boring, opponents are needed | `PLAN.md:9` (the owner's words) | accepted |
+| P2 | The tools are installed, versions are named | `PLAN.md:30` | verified |
+| P3 | `codex` and `claude` are signed in to subscriptions | `PLAN.md:31` | verified |
+| P4 | `agy` is not signed in | `PLAN.md:32` | verified |
+| P5 | The CLI flags exist | `PLAN.md:33` | verified via `--help` |
+| P6 | Google free volume | `PLAN.md:36` | unverified |
+| P7 | WebSocket passes through a quick tunnel | `PLAN.md:37` | verified live |
+| P8 | Images from MCP reach the model | `PLAN.md:39` | unverified |
+| P9 | A harness turn fits into a round | `PLAN.md:39` | unverified |
+| P10 | Google's terms allow laying out and passing on the imagery | `PLAN.md:39` | verified against the text: they do not allow it (3.2.3(a), 3.2.3(c)(vii), 3.2.3(e)) |
+| P11 | The constant `D` in the scoring formula | `PLAN.md:74` | unverified |
+| P12 | `agy --settings` accepts MCP for a single run | `PLAN.md:123` | unverified |
+| P13 | The models play at the level of strong players | market review above, `PLAN.md:300` | unverified |
+| P14 | Harness subscriptions allow launching from the game and withstand three bots at once | `PLAN.md:355` | unverified |
 
-Пересчёт числа из раздела 6: Static-картинок на партию в худшем случае `5 × (12 + 3 × (6 + 3) × 4) = 600` [estimated], где `12` это до трёх наборов стартовых картинок, а `+ 3` бесплатные неудачные вызовы бота за раунд; потолок 80% от бесплатного объёма равен `8000` [estimated]; `8000 / 600 = 13,3`, то есть 13 партий; без потолка `10000 / 600 = 16,7`, то есть 16. С лимитом 4 хода (значение нового слота): `5 × (12 + 3 × 7 × 4) = 480`, `8000 / 480 = 16,7`, то есть 16 партий. В плане стояло 380 картинок и 26 партий при действующем потолке, исправлено записью правки.
+Recalculation of the number from section 6: Static images per match in the worst case `5 × (12 + 3 × (6 + 3) × 4) = 600` [estimated], where `12` is up to three sets of starting images and `+ 3` are the bot's free failed calls per round; the 80% cap of the free volume equals `8000` [estimated]; `8000 / 600 = 13.3`, that is 13 matches; without the cap `10000 / 600 = 16.7`, that is 16. With a 4-turn limit (the new slot's value): `5 × (12 + 3 × 7 × 4) = 480`, `8000 / 480 = 16.7`, that is 16 matches. The plan said 380 images and 26 matches at the active cap; corrected by the edit record.
 
-REALITY: premise-table finding 14 предпосылок, unverified=7; все семь закрыты спайками M0 или вынесены на ворота; предпосылка P10 проверена и не подтвердилась PLAN.md:39
-REALITY: already-done pass репозиторий без коммитов и без remote, выполненной ранее работы нет PLAN.md:5
-REALITY: surface-check pass флаги `codex exec`, `claude -p`, `agy -p`, `cloudflared tunnel --url` сверены с `--help`; передача MCP через `agy --settings` остаётся за спайком S1 PLAN.md:119
-REALITY: binding-decisions pass раздела Binding decisions в плане нет, записанных решений по ветке нет PLAN.md:13
-REALITY: numbers finding число партий в месяц пересчитано с учётом потолка и исправлено [estimated] PLAN.md:147
-REALITY: deferred-asks pass связанной задачи нет; все десять требований владельца остаются в плане PLAN.md:15
-REALITY: pr-count pass файла ship-policy нет, действует значение по умолчанию: один PR на волну PLAN.md:193
+REALITY: premise-table finding 14 premises, unverified=7; all seven are closed by M0 spikes or raised at the gate; premise P10 was checked and not confirmed PLAN.md:39
+REALITY: already-done pass repository without commits and without a remote, no previously completed work PLAN.md:5
+REALITY: surface-check pass the flags `codex exec`, `claude -p`, `agy -p`, `cloudflared tunnel --url` were checked against `--help`; passing MCP via `agy --settings` remains for spike S1 PLAN.md:119
+REALITY: binding-decisions pass there is no Binding decisions section in the plan, no recorded decisions for the branch PLAN.md:13
+REALITY: numbers finding the number of matches per month was recalculated with the cap and corrected [estimated] PLAN.md:147
+REALITY: deferred-asks pass no related task; all ten owner requirements remain in the plan PLAN.md:15
+REALITY: pr-count pass there is no ship-policy file, the default applies: one PR per wave PLAN.md:193
 
-#### 0C. Карта мечты
+#### 0C. Dream map
 
 ```
-  СЕЙЧАС                        ЭТОТ ПЛАН                          ЧЕРЕЗ 12 МЕСЯЦЕВ
-  Трое играют в обычный   --->  Своя игра на 3 людей + 3 ИИ,  ---> Постоянный игровой вечер: история
-  GeoGuessr, скучно             ссылка с токеном, боты через       партий, зал славы людей и моделей,
-                                подписки, объяснения ответов,      свои списки точек, звуки, телефон,
-                                гандикап, счёт «Люди vs ИИ»        партия переживает перезапуск
+  NOW                           THIS PLAN                          IN 12 MONTHS
+  Three people play regular --> Own game for 3 humans + 3 AIs, --> A permanent game night: match
+  GeoGuessr, it is boring       link with a token, bots via        history, a hall of fame of humans and
+                                subscriptions, explanations,       models, custom point lists, sounds,
+                                handicap, "Humans vs AI" score     phone, a match survives a restart
 ```
 
-План движется к идеалу: всё отложенное (`TODOS.md`) строится поверх тех же сервера, протокола и файла `matches.jsonl` без переделки.
+The plan moves toward the ideal: everything deferred (`TODOS.md`) is built on top of the same server, protocol and `matches.jsonl` file without rework.
 
-#### 0D. Альтернативы
+#### 0D. Alternatives
 
-| | A. Своя сборка (план) | B. Форк открытого клона | C. Внешний хостинг вместо туннеля |
+| | A. Own build (the plan) | B. Fork of an open-source clone | C. External hosting instead of a tunnel |
 |---|---|---|---|
-| Требования 1–10 | покрывает все | нет ботов через локальные CLI, нет модели «хост + ссылка» | нарушает требование 2 и ломает доступ к локальным подпискам |
-| Объём | 5 экранов, сервер, MCP-прослойка | разбор чужого кода + те же боты | тот же код + развёртывание |
-| Риск | спайк S1 | лицензии не проверены | подписки харнессов привязаны к машине владельца |
+| Requirements 1–10 | covers all | no bots via local CLIs, no "host + link" model | violates requirement 2 and breaks access to local subscriptions |
+| Scope | 5 screens, server, MCP layer | studying someone else's code + the same bots | the same code + deployment |
+| Risk | spike S1 | licenses not checked | harness subscriptions are bound to the owner's machine |
 
-Выбор: A. B и C не закрывают требования, поэтому вопрос владельцу не нужен. Внутри A цикл бота идёт в одной сессии харнесса через MCP; запасной вариант (сервер ведёт цикл сам и вызывает CLI на каждый ход с приложенными файлами) остаётся за решением спайка S1. Два дополнения после двух голосов. Прямые вызовы API моделей вместо харнессов (C-DIRECT-API) не приняты: владелец прямо просил подписки, а расхождение с условиями Google этот вариант не снимает. Час на обзор открытых клонов добавлен спайком S4: решение о форке принимается по его отчёту, по умолчанию своя сборка.
+Choice: A. B and C do not satisfy the requirements, so no question to the owner is needed. Within A the bot loop runs in a single harness session via MCP; the fallback (the server runs the loop itself and calls the CLI for each turn with attached files) is left to the decision of spike S1. Two additions after two voices. Direct model API calls instead of harnesses (C-DIRECT-API) were not accepted: the owner explicitly asked for subscriptions, and this option does not remove the conflict with Google's terms. An hour for surveying open-source clones was added as spike S4: the fork decision is made from its report, by default an own build.
 
-#### 0E. Режим
+#### 0E. Mode
 
-SELECTIVE EXPANSION, задан правилами `/autoplan`. Передача режима выполнена (`gstack-ceo-mode-handoff`), сообщение в чат отправлено. Оценка объёма: около 60 новых файлов (оценка), проект с нуля.
+SELECTIVE EXPANSION, set by the `/autoplan` rules. The mode handoff was done (`gstack-ceo-mode-handoff`), the message to chat was sent. Scope estimate: about 60 new files (estimate), a project from scratch.
 
-#### 0F и 0G. Расширения
+#### 0F and 0G. Expansions
 
-Проверки HOLD SCOPE. Сложность: частей много, но каждая соответствует требованию владельца; убирать нечего. Минимум для цели: всё из разделов 4–7 нужно для первой партии с ботами. Инварианты (секрет ответа, авторитетный сервер, изоляция ботов) сохраняются. Из исходного объёма ничего не отложено.
+HOLD SCOPE checks. Complexity: there are many parts, but each corresponds to an owner requirement; there is nothing to remove. Minimum for the goal: everything from sections 4–7 is needed for the first match with bots. The invariants (answer secrecy, authoritative server, bot isolation) are preserved. Nothing was deferred from the original scope.
 
-Замысел на 10x: игра, в которой интересно именно состязание людей с моделями, а не просто заполненные слоты.
+The 10x vision: a game where the contest between humans and models is what is interesting, not just filled slots.
 
-| № | Предложение | Что почувствует игрок | Объём | Риск | Решение | Почему |
+| No. | Proposal | What the player will feel | Scope | Risk | Decision | Why |
 |---|---|---|---|---|---|---|
-| E1 | Гандикап ботов: размер картинки, бюджет времени, три пресета сложности | Бота можно сделать равным себе | S | низкий | ПРИНЯТО | Гипотеза (P13, не проверена): сильные модели иначе выигрывают каждую партию; настройка дешёвая, замер в спайке S1 |
-| E2 | Счёт «Люди против ИИ» | Общая цель у троих друзей | S | низкий | ПРИНЯТО | Чистая функция и одна строка интерфейса |
-| E4 | Характер (4 пресета или свой текст) и короткая реплика бота | Боты ощущаются как игроки | M | низкий | ПРИНЯТО | Затрагивает схему `submit_guess`, промпт, редактор слота, экран результатов и тесты; оценка поднята с S до M после проверки спецификации |
-| E14 | Флаг `--public-url` | Работает и без quick tunnel | S | низкий | ПРИНЯТО | Quick tunnel без гарантий, адрес меняется при каждом запуске |
-| D1 | Звуки | Сильнее эмоция | S | низкий | ОТЛОЖЕНО | Не нужно для первой партии |
-| D2 | Экран истории и зал славы | Видно, кто сильнее за месяц | M | низкий | ОТЛОЖЕНО | Данные уже пишутся, экран потом |
-| D3 | Свои списки точек | Тематические партии | M | низкий | ОТЛОЖЕНО | Отдельный источник точек, вне первой версии |
-| D4 | Восстановление после перезапуска | Партия не теряется | M | средний | ОТЛОЖЕНО | Осознанное упрощение первой версии |
-| D5 | Мобильная раскладка | Игра с телефона | M | средний | ОТЛОЖЕНО | Владелец её не просил |
-| X1 | Лента мыслей бота во время раунда | Видно, как бот думает | M | высокий | ПРОПУЩЕНО | Подсказывает людям ответ |
-| X2 | Повтор хода человека | Разбор чужой игры | M | низкий | ПРОПУЩЕНО | Не нужно для цели |
-| X3 | Бонус за скорость и серии | Больше азарта | S | средний | ПРОПУЩЕНО | Меняет правило «побеждает сумма очков» |
-| X4 | Подсказки ИИ людям | Обучение | M | средний | ПРОПУЩЕНО | Другой продукт |
-| X5 | Ссылка зрителя | Можно смотреть без игры | S | низкий | ПРОПУЩЕНО | Поздний вход уже даёт режим зрителя |
+| E1 | Bot handicap: image size, time budget, three difficulty presets | A bot can be made equal to yourself | S | low | ACCEPTED | Hypothesis (P13, not verified): strong models otherwise win every match; the setting is cheap, measured in spike S1 |
+| E2 | "Humans vs AI" score | A shared goal for three friends | S | low | ACCEPTED | A pure function and one interface line |
+| E4 | Persona (4 presets or custom text) and a short bot quip | Bots feel like players | M | low | ACCEPTED | Touches the `submit_guess` schema, the prompt, the slot editor, the results screen and tests; the estimate was raised from S to M after checking the specification |
+| E14 | `--public-url` flag | Works without a quick tunnel too | S | low | ACCEPTED | Quick tunnel has no guarantees, the address changes at every launch |
+| D1 | Sounds | Stronger emotion | S | low | DEFERRED | Not needed for the first match |
+| D2 | History screen and hall of fame | You can see who is stronger over a month | M | low | DEFERRED | The data is already written, the screen comes later |
+| D3 | Custom point lists | Themed matches | M | low | DEFERRED | A separate source of points, outside the first version |
+| D4 | Recovery after restart | A match is not lost | M | medium | DEFERRED | A deliberate simplification of the first version |
+| D5 | Mobile layout | Playing from a phone | M | medium | DEFERRED | The owner did not ask for it |
+| X1 | Bot thought feed during a round | You can see how the bot thinks | M | high | SKIPPED | Hints the answer to humans |
+| X2 | Replay of a human's turn | Review of someone else's game | M | low | SKIPPED | Not needed for the goal |
+| X3 | Speed bonus and streaks | More excitement | S | medium | SKIPPED | Changes the rule "the highest sum of points wins" |
+| X4 | AI hints to humans | Learning | M | medium | SKIPPED | A different product |
+| X5 | Spectator link | You can watch without playing | S | low | SKIPPED | Late joining already gives a spectator mode |
 
-Итог: предложено 14, принято 4, отложено 5, пропущено 5. Пропущенные расширения обозначены X1–X5, чтобы не путать их со спайками S1–S4. Расширений E1, E4 и E14 владелец не просил: все четыре принятых показываются ему на финальных воротах, и он может снять любое. После двух голосов все четыре поставлены после ворот «Первая игра» (E1, E2, E4 в M2, E14 в M3): оба голоса советовали не строить их до первой настоящей партии.
+Total: 14 proposed, 4 accepted, 5 deferred, 5 skipped. The skipped extensions are labeled X1–X5 so they are not confused with spikes S1–S4. The owner did not ask for extensions E1, E4 and E14: all four accepted ones are shown to him at the final gate, and he may remove any. After two voices all four are placed after the "First game" gate (E1, E2, E4 in M2, E14 in M3): both voices advised not building them before the first real match.
 
-#### Принятые обязательства CEO-фазы
+#### Commitments accepted in the CEO phase
 
 <!-- autoplan-accepted:ceo -->
-- **Решения владельца до кода.** Веха M0; уточняет разделы 6, 10 и 12.
-  - Карта для ответа. Пункт 3.2.3(e) условий Google запрещает Street View и не-Google карту на одном экране. Варианты: Google Maps JS для мини-карты и карты результатов (расхождения нет, тот же браузерный ключ, расход карт сверяет спайк S3) или MapLibre GL JS с OpenFreeMap, как в разделе 6 (расхождение остаётся, риск принимает владелец). До решения владельца в плане действует его исходный вариант.
-  - ИИ на снимках Google. Пункты 3.2.3(a) и 3.2.3(c)(vii) запрещают выносить снимки за пределы сервисов Google и использовать их для улучшения моделей ИИ. Варианты: оставить замысел владельца с мерами ниже (риск: Google может отключить ключ или проект); давать ботам снимки другого источника рядом с той же точкой; играть без ИИ. До решения владельца в плане действует его исходный замысел.
-  - Меры при сохранении замысла: снимки не пишутся на диск вне режима `file`; README просит владельца отключить в аккаунтах харнессов использование его данных для обучения моделей, где такая настройка есть.
-  - Приватный remote для CI: создать или работать с `pre-commit`.
-  - `GuessMap` и `ResultsMap` пишутся сразу под выбранную карту, без слоя подмены. Задачи с картой и ботами в M1 ждут первых двух решений; при отказе от ИИ веха M1 строится без ботов, а ворота «Первая игра» проводятся без них.
-  - Трактовка хода закреплена в разделе 5.1 и отдельного решения не требует.
-- **Спайк S1: полный раунд бота до кода фич.** Веха M0; уточняет разделы 5 и 10.
-  - S1 идёт первым после ворот качества и пишется одноразовым кодом в `spikes/` (в сборку не входит, удаляется после M1; ворота качества и лимиты размера действуют и на него).
-  - Состав: проверка зрения на картинке с числом; один полный раунд бота через MCP (четыре стартовые картинки с подписями, `look`, `move`, `submit_guess` с объяснением); три бота одновременно на одной подписке; пять раундов подряд.
-  - Картинки: до готовности ключей Google (спайк S3) используются свои фотографии улиц; после включения Street View Static API раунд повторяется на настоящих снимках.
-  - Харнесс допускается в игру, если выполнено всё: модель верно называет число с картинки хотя бы в одном режиме доставки (`mcp` или `file`); MCP-конфиг передаётся на один запуск без изменения глобальных настроек; холодный старт плюс первая догадка укладываются в 60 с (картинка 640 px, effort низкий); при трёх ботах одновременно догадка записана не менее чем в 4 раундах из 5 у каждого.
-  - Харнесс, не прошедший критерий, в первой версии скрыт из выбора, `doctor` называет причину, адаптер для него не пишется.
-  - Сохранённый слот с недоступным харнессом (скрыт по S1, не установлен или не вошёл в подписку) загружается выключенным с видимой причиной и в партии не участвует, пока хост не выберет другой харнесс. Тест: модульный на загрузку такого слота.
-  - Если критерий не прошёл ни один харнесс, работа над ботами останавливается до решения владельца.
-- **Ворота «Первая игра».** Веха M1; уточняет раздел 10.
-  - После M1 владелец играет с друзьями партию: 5 раундов по 120 с, три бота одновременно на харнессе, прошедшем S1 (у двух лимит 4 хода, у третьего 0, чтобы увидеть, помогают ли ходы).
-  - Сервер пишет в `matches.jsonl` по каждому боту и раунду: была ли догадка до обрыва, время до первой и до последней догадки, число ходов, очки, причину завершения; по каждому раунду: сколько секунд люди ждали ботов после своего последнего ответа.
-  - Критерий «играбельно»: у каждого бота догадка записана не менее чем в 4 раундах из 5; среднее ожидание людей после последнего ответа не больше 30 с. Если критерий не выполнен, правятся значения по умолчанию (длительность раунда, лимит ходов, effort, окно ожидания) и партия повторяется.
-  - Владелец записывает в `docs/playtest-1.md` ответы на три вопроса: хочется ли играть ещё; что было интереснее всего (счёт, ошибки ИИ, объяснения); сколько раундов были скучными из-за места.
-  - По этим данным владелец подтверждает или меняет состав M2–M4. Если скучных мест больше 2 из 5, в M2 добавляется задача «проверенный список точек» (сейчас она отложена в `TODOS.md`).
-- **Равные правила движения.** Веха M1; уточняет разделы 4.2 и 5.1.
-  - Настройка «Движение по панораме» общая: если она выключена, `move` возвращает боту «движение выключено в этой партии» без списания хода, а промпт бота об этом предупреждает.
-  - Тест: модульный на `move` при выключенном движении.
-- **Время ботов и длительность раунда.** Веха M1; уточняет разделы 4.2 и 4.3.
-  - Если в партии есть хотя бы один ИИ, минимальная длительность раунда 60 с: при добавлении первого бота более короткий раунд поднимается до 60 с с видимым сообщением, а поле длительности не даёт выставить меньше, пока в партии есть бот.
-  - Процесс харнесса запускается в `ROUND_LOADING`, во время отсчёта, чтобы холодный старт не съедал время раунда. Первый ответ `observe()` сервер задерживает до начала `ROUND_ACTIVE`: раньше людей бот картинок не видит.
-  - Бюджет времени бота в M1 равен длительности раунда; отдельное поле появляется в M2. Часы бюджета идут от начала `ROUND_ACTIVE`.
-  - Бот обрывается в самый ранний из трёх моментов: конец таймера раунда; конец его бюджета времени; конец окна ожидания после ответа всех людей. Во всех трёх случаях засчитывается его последняя записанная догадка.
-  - Окно ожидания: если все люди ответили, а боты ещё работают, раунд длится ещё 20 с (поле лобби «Ожидание ИИ после ответов людей», 0–120 с, по умолчанию 20, хранится в `settings.json`), но не меньше чем до 60-й секунды раунда и не дольше таймера раунда. Людям в это время показывается «ИИ думают» с обратным отсчётом.
-  - Раунд кончается досрочно, когда все люди подтвердили ответ кнопкой «Угадать» и завершились процессы всех ботов. Метка без подтверждения досрочный конец не запускает, но к концу таймера засчитывается как ответ.
-  - Тесты: модульные на конечный автомат (люди ответили рано, бот завершился рано, бот не завершился, раунд 60 с, добавление бота при раунде 30 с, метка без подтверждения к концу таймера, `observe()` до начала `ROUND_ACTIVE`).
-- **Слот ИИ в M1 и сложность ботов в M2.** Вехи M1 и M2; уточняет разделы 4.2 и 5.2.
-  - В M1 у слота есть имя, цвет, модель, effort и лимит ходов (по умолчанию 4). Картинка 640 px, бюджет времени равен длительности раунда. Настройки показываются числами, без названий уровней.
-  - В M2 добавляются размер картинки (640, 400 или 256 пикселей по стороне), бюджет времени бота на раунд (от 60 с до длительности раунда; по умолчанию равен ей; если хост делает раунд короче бюджета, действует длительность раунда) и три пресета, которые заполняют размер картинки, лимит ходов и effort разом.
-  - Предварительные числа пресетов: «Новичок» (256 px, 2 хода, effort низкий), «Любитель» (400 px, 4 хода, effort низкий), «Мастер» (640 px, 6 ходов, effort средний). Перед реализацией они сверяются с данными первой игры: пресет получает название уровня только если его результат в записанных партиях отличается от соседнего.
-  - После ручной правки размера картинки, лимита ходов или effort подпись пресета меняется на «Свои настройки»; имя, цвет, характер и бюджет времени подпись не меняют. Уровни effort «низкий / средний / высокий» каждый адаптер переводит в значения своего харнесса.
-  - К Google картинка всегда запрашивается 640x640; меньший размер получается уменьшением на сервере (`sharp`), подпись стороны света впечатывается после уменьшения шрифтом не мельче 14 px. Расход квоты от размера не зависит.
-  - Лобби показывает предупреждение у слота, если время из «Проверить» (холодный старт плюс ответ на текущих настройках слота) больше половины бюджета времени бота.
-  - Тесты: модульные на применение пресета и подпись «Свои настройки», на уменьшение картинки до размера слота, на обрыв по бюджету времени.
-- **Счёт «Люди против ИИ».** Веха M2; уточняет разделы 4.5 и 4.6.
-  - Показывается на экране результатов раунда и в финале, если в партии есть хотя бы один человек и хотя бы один ИИ; иначе строка скрыта.
-  - Значение стороны за раунд: среднее арифметическое очков участников стороны, игравших этот раунд. Зрители и вошедшие посреди раунда не учитываются. Игравший, но не ответивший человек и бот без записанной догадки учитываются с 0 очков.
-  - Значение стороны за партию: сумма её значений по раундам.
-  - Считает чистая функция в `shared/`. Тесты: разное число участников, нулевые очки, поздний вход, бот без догадки, отсутствие одной стороны.
-- **Характер и реплика бота.** Веха M2; уточняет разделы 4.2, 4.5 и 5.1.
-  - У слота ИИ есть поле «характер»: пресет (нейтральный, хвастун, скромник, учёный) или свой текст хоста до 200 символов без переводов строки. Он вставляется одной отмеченной строкой в промпт и влияет только на тон объяснения и реплики; лимиты и набор инструментов задаёт сервер, текст характера их изменить не может.
-  - `submit_guess` получает необязательное поле `quip` (до 120 символов, язык интерфейса). Засчитывается последний успешный вызов `submit_guess` целиком: координаты, объяснение и реплика; если в нём реплики нет, реплика не показывается. В M1 поле `quip` в схеме уже есть, но не показывается.
-  - Реплика показывается рядом с меткой бота на экране результатов и в карточке ИИ, рисуется как простой текст, не влияет на очки и видна только после конца раунда.
-  - Тесты: слишком длинная реплика обрезается до предела, характер с переводом строки схема отклоняет; из двух вызовов берётся последний; интеграционный сценарий с поддельным харнессом показывает реплику только на экране результатов.
-- **Вход и готовность пригласительной ссылки.** Веха M1; уточняет разделы 4.1, 7 и 9.
-  - Игровой сервер во всех режимах слушает только `127.0.0.1`. Токен содержит 128 бит случайности и сравнивается за постоянное время.
-  - Сервер отдаёт `GET /healthz`: без токена, ответ `ok`, без данных об игре.
-  - Пригласительная ссылка печатается после двух проверок: имя хоста разрешается через публичный DNS (DoH-запрос к `cloudflare-dns.com`, при ошибке к `dns.google`; локальный резолвер не используется) и `GET /healthz` по публичному адресу возвращает 200. Ожидание до 60 с, затем ошибка с причиной (DNS или HTTP) и советом перезапустить `start`.
-  - При смене адреса туннеля проверки повторяются и ссылка печатается заново. С `--no-tunnel` проверок нет.
-  - Ссылка хоста всегда локальная: `http://localhost:PORT/#t=<токен хоста>`.
-  - Тесты: модульные с подменёнными DNS и HTTP (успех, задержка, отказ, смена адреса); `bun run test:tunnel` проверяет вживую.
-- **Свой публичный адрес и пороги входа.** Веха M3; уточняет разделы 6, 7 и 9.
-  - `bun run start --public-url <https://адрес>` не запускает `cloudflared`, а строит пригласительную ссылку от указанного адреса и выполняет для него те же проверки готовности. Свой туннель или прокси должен работать на той же машине. Флаги `--public-url` и `--no-tunnel` вместе дают ошибку запуска с объяснением.
-  - README и `bun run doctor --public-url <https://адрес>` напоминают добавить этот адрес в ограничение referrer браузерного ключа; `doctor` печатает точную строку для Cloud Console.
-  - Адрес клиента: в режиме quick tunnel берётся из `CF-Connecting-IP`; в остальных режимах и при отсутствии заголовка из адреса сокета. Заголовкам чужого прокси сервер не верит. Соединение с адреса loopback без заголовка считается локальным и в пороге по адресу не участвует; поэтому с `--public-url` действует только общий порог.
-  - Токен проверяется у каждого соединения, вход с верным токеном не блокирует ни один порог. Пороги касаются только неудачных попыток.
-  - Больше 10 неудачных входов с одного адреса за 60 с: следующие 60 с неудачные попытки с этого адреса закрываются без ответа и без записи в журнал.
-  - Больше 30 неудачных входов за 60 с на весь сервер: до конца минуты так же закрываются все неудачные попытки.
-  - Тесты: модульные на разбор флагов, построение ссылок, выбор адреса клиента (заголовок есть, заголовка нет, loopback), оба порога и вход с верным токеном при достигнутых порогах.
-- **Ошибки Static API.** Веха M1; уточняет разделы 5.1, 5.2 и 6.
-  - Все запросы картинок идут с `return_error_code=true`: при отсутствии снимка Google отвечает HTTP 404, а не серой заглушкой.
-  - Единица учёта неудач это вызов инструмента. `look` неудачен, если его картинка не получена. `move` неудачен, если не получена ни одна из четырёх картинок; если получена хотя бы одна, вызов удачен, а вместо недостающих бот получает текст «снимка в этом направлении нет».
-  - Первые 3 неудачных вызова бота за раунд не списывают ход; начиная с четвёртого неудачный вызов стоит ход. Ответ `move` «в эту сторону дороги нет» по-прежнему бесплатен и в это число не входит: он не запрашивает картинок.
-  - Тесты: модульные с подменённым ответом 404 (ход не списан, четвёртая неудача списана, частично удачный `move`).
-- **Сбои подготовки раунда.** Веха M1; уточняет разделы 4.3, 5.1 и 6.
-  - Точка: если 30 попыток не нашли панораму, сервер повторяет серию для другой страны, всего до 3 серий. После третьей неудачи раунд не начинается: хост видит ошибку «панорама не найдена» и кнопки «Повторить» и «Завершить партию»; сыгранные раунды сохраняются.
-  - Стартовые картинки: если хотя бы одна из четырёх не получена, сервер берёт новую точку, всего до 3 точек; дальше действует то же правило, что для точки. Неудачные запросы идут в счётчик квоты.
-  - Подготовка идёт заранее, пока открыты лобби или экран результатов, поэтому повторы игрокам не видны.
-  - Загрузка панорамы у человека: через 5 с ожидания отсчёт начинается для всех; таймер у опоздавшего общий. Если панорама у клиента не загрузилась, он видит сообщение и кнопку «Повторить», карта для ответа остаётся доступной.
-  - `observe()` отдаёт сохранённый стартовый набор и запросов к Static API не делает.
-  - Тесты: модульные на три серии выборки и замену точки при неудачной стартовой картинке; интеграционный на старт отсчёта без опоздавшего клиента.
-- **Учёт квоты.** Веха M1 (счётчик Static, потолок, проверка перед стартом) и M3 (панорамы); уточняет раздел 6.
-  - Потолок приложения это оценка расхода, а не гарантия биллинга. Настоящий предел задают дневные квоты в Cloud Console: README и `doctor` дают шаги, какие квоты выставить, по отчёту спайка S3. Ограничение referrer `*.trycloudflare.com/*` защищает браузерный ключ слабо (домен общий), README говорит об этом прямо.
-  - Static: счётчик в `quota.json`, потолок и проверка перед стартом партии появляются в M1, до первого настоящего запроса к Static API. Счётчик растёт на каждый запрос, включая неудачный и запросы подготовки раунда, и увеличивается до отправки запроса, поэтому параллельные вызовы не проходят сверх потолка. Повторный запрос картинки с теми же параметрами в пределах раунда берётся из памяти и в счётчик не идёт.
-  - Панорамы (M3): клиент шлёт серверу `pano_loaded` после каждого показа панорамы (каждый раунд, перезагрузка страницы, переподключение, зритель); счётчик растёт на каждое такое сообщение. Это оценка сверху: Google может тарифицировать только создание объекта панорамы; единицу тарификации сверяет спайк S3.
-  - Перед стартом партии сервер считает худший случай: Static = раунды × (12 + сумма по ботам (лимит ходов + 3) × 4), где 12 это до трёх наборов стартовых картинок; панорамы = раунды × число людей × 2. Если текущий расход плюс худший случай превышает потолок, партия не стартует; лобби показывает расход, худший случай и остаток, хост уменьшает число раундов, ботов или ходов.
-  - Если потолок Static всё же достигнут посреди партии, `look` и `move` возвращают боту «квота исчерпана, вызови submit_guess» без списания хода, партия доигрывается. Если достигнут потолок панорам, текущая партия доигрывается, новая не стартует.
-  - Тесты: модульные на расчёт худшего случая, отказ старта, ответ «квота исчерпана», рост счётчика от `pano_loaded`.
-- **Изоляция процесса бота.** Вехи M0 (спайк S1) и M1; уточняет разделы 5.3 и 5.4.
-  - Процесс харнесса запускается с окружением из белого списка (`PATH`, `HOME`, `LANG`, `TERM` и переменные, без которых харнесс не входит в подписку). Ключи Google и содержимое `.env` в него не попадают. Рабочий каталог бота: пустой временный каталог вне репозитория.
-  - Харнесс работает от имени владельца и читает свои файлы входа из `HOME`, поэтому чтение чужих файлов закрывается флагами самого харнесса: у `claude` это `--allowedTools "mcp__geo__*"` и `--strict-mcp-config`; у `codex` и `agy` набор флагов определяет спайк S1 (у `agy` в справке есть только `--sandbox`).
-  - Спайк S1 для каждого харнесса проверяет с выбранными флагами: модель не может назвать содержимое проверочного файла вне временного каталога; веб-поиск и запуск команд недоступны. Результат записывается в отчёт.
-  - Пользовательские настройки харнесса из `HOME` (общие инструкции, хуки, плагины, память) адаптер отключает флагами, если они у харнесса есть. Спайк S1 записывает, что отключить удалось, и как оставшееся влияет на время ответа и на состав инструментов.
-  - Харнесс, который не удалось ограничить, не скрывается автоматически: решение о его допуске принимает владелец по отчёту S1, `doctor` показывает у него пометку «читает файлы владельца».
-  - Остаточный риск принят для игры друзей: процесс бота работает от имени владельца и при обходе флагов мог бы прочитать окружение и память сервера. Лимиты подписок общие с повседневной работой владельца; партия с тремя ботами их расходует.
-  - Тесты: модульный на состав окружения процесса бота; проверка с проверочным файлом входит в `bun run test:harness`.
-- **Порядок вех.** Вехи M0–M4; уточняет раздел 10.
-  - M0: ворота качества, затем спайк S1, затем S2, S3 и S4. Задачи M1 без настоящей панорамы и без ботов (протокол, конечный автомат, лобби, очки, результаты) идут на заглушках сразу после ворот качества. Задачи с ботами ждут S1, задача «настоящая панорама в раунде» ждёт S3 (оба API включены, биллинг подключён).
-  - Спайк S3 сверяет бесплатный месячный объём с актуальной таблицей цен Google; потолок счётчика квоты по умолчанию считается от цифр из отчёта S3.
-  - M2–M4 начинаются после ворот «Первая игра»; их состав владелец подтверждает по её итогам.
-  - Состояния ошибок, названные в этом разделе, входят в ту веху, где названо их правило; веха M4 доводит их вид, а не добавляет их.
-- **Хранение снимков.** Веха M1; уточняет разделы 4.5 и 5.4.
-  - Полноразмерные картинки бота живут только до конца раунда. Для карточки ИИ сервер хранит в памяти миниатюры (JPEG, 160 px по стороне, до 15 КБ) до возврата в лобби после финала.
-  - Верхняя граница памяти: обычная партия (5 раундов, 3 бота, 6 ходов) не больше 600 миниатюр, около 9 МБ; предельная (20 раундов, 3 бота, 20 ходов) не больше 5 760 миниатюр, около 86 МБ.
-  - На диск картинки попадают только в режиме доставки `file`, во временный каталог бота, который удаляется в конце раунда.
-  - Тест: интеграционный, после конца партии миниатюры недоступны, временный каталог удалён.
-- **Сбои во время партии.** Вехи M1 и M3; уточняет разделы 4.1, 5.1, 6 и 9.
-  - Metadata: ответ «панорамы нет» расходует попытку выборки. Отказ ключа, превышение квоты и сетевая ошибка (тайм-аут запроса 5 с, один повтор) прекращают подготовку раунда сразу: хост видит причину и кнопки «Повторить» и «Завершить партию».
-  - Static: ответы 403 и 429 обрабатываются как достигнутый потолок квоты: `look` и `move` возвращают боту «картинки недоступны, вызови submit_guess» без списания хода, хост видит предупреждение с причиной.
-  - Аргументы инструментов проверяет схема. При ошибке бот получает текст с названием поля и допустимыми значениями, ход не списывается, прежняя догадка остаётся. Слишком длинные `explanation` и `quip` обрезаются до предела, а не отклоняются; пустой `explanation` отклоняется.
-  - Если бот не записал ни одной догадки, карточка ИИ показывает причину завершения и последние 300 символов итогового текста харнесса простым текстом (отказ модели, ошибка входа, лимит подписки).
-  - Туннель: `start` следит за процессом `cloudflared`. Если процесс завершился, `start` перезапускает его до 3 раз с паузами 2, 5 и 10 с, повторяет проверки готовности и печатает новую ссылку. Партия на сервере при этом продолжается; после третьей неудачи хост видит ошибку с причиной.
-  - Возврат на место: новый адрес туннеля для браузера другой сайт, и сохранённых `playerId` и секрета на нём нет. Поэтому ники участников уникальны без учёта регистра, а игрок, вошедший по действующему приглашению с ником отключённого участника, занимает его место. Ник подключённого участника занять нельзя: вход получает ответ «ник занят».
-  - Локальные файлы: `settings.json`, `quota.json` и строки `matches.jsonl` несут поле `version` и проверяются схемой. Нечитаемый `settings.json` или `quota.json` переименовывается в файл с окончанием `.bad`, сервер стартует со значениями по умолчанию (счётчик квоты с нуля) и показывает предупреждение в терминале и в лобби хоста. Ошибка записи `matches.jsonl` партию не прерывает и видна хосту на экране финала.
-  - Ошибка загрузки Maps JavaScript API у клиента (блокировщик, ограничение referrer) уходит на сервер сообщением `client_error`; хост видит у игрока пометку с причиной.
-  - Обновление харнесса (M3, полный `doctor`): `bun run test:harness` записывает версии CLI, с которыми прошёл, в `~/.config/geoaissr/harness-verified.json`; `doctor` предупреждает, если установленная версия отличается, и советует запустить `bun run test:harness`.
-  - Тесты: модульные на отказ ключа metadata, 403 от Static, неверные аргументы инструмента, обрезку объяснения, вход с ником отключённого и подключённого участника, нечитаемые файлы настроек и квоты; интеграционный на перезапуск поддельного процесса туннеля.
-- **Порядок событий и граничные случаи.** Веха M1; уточняет разделы 4.1, 4.3, 5.1 и 7.
-  - Ни догадка, ни вызов инструмента не меняют итог раунда после его конца. Каждый обработчик проверяет номер и фазу раунда непосредственно перед изменением состояния, уже после всех ожиданий (чтение тела запроса, ответ Google). Опоздавший вызов получает «раунд окончен», его результат отбрасывается и в следующий раунд не попадает.
-  - Ход резервируется до запроса к Google и возвращается, если вызов признан неудачным по правилам пункта «Ошибки Static API». Поэтому параллельные вызовы одного бота не тратят больше лимита.
-  - Метка человека: клиент отправляет серверу положение метки при каждой постановке, не чаще 5 раз в секунду; сервер хранит последнее. Именно оно засчитывается, если к концу таймера ответ не подтверждён. Повторное нажатие «Угадать» и изменение метки после подтверждения сервер игнорирует.
-  - Долгота метки и догадки бота приводится к диапазону от -180 до 180; широта вне диапазона от -90 до 90 отклоняется.
-  - Сообщение хоста «Дальше» несёт номер раунда: повторное нажатие и нажатие одновременно с автопереходом раунд не пропускают.
-  - Настройки партии меняются только в лобби. Девятый человек получает ответ «комната полна».
-  - Если к концу экрана результатов не подключён ни один человек, следующий раунд не начинается, пока кто-нибудь не вернётся: боты не тратят квоту и подписку впустую.
-  - `GameEngine` и `LocationService` получают часы и генератор случайных чисел параметрами; тесты подставляют управляемые.
-  - Тесты: модульные с управляемыми точками остановки на оба порядка завершения (догадка бота и конец таймера; ответ Google и конец раунда; два параллельных `look` при одном оставшемся ходе); метка без подтверждения; повторное «Дальше»; пауза без людей. Интеграционные сценарии поддельного харнесса: обычный, зависший, завершившийся до догадки, завершившийся после догадки, с неверными аргументами, с параллельными вызовами.
-- **Секреты и токены.** Вехи M0 и M1; уточняет разделы 4.1, 6 и 9.
-  - `.env` внесён в `.gitignore`; `bun run check` падает, если `.env` отслеживается git.
-  - Токены хоста и приглашения создаются заново при каждом запуске `start`. Утёкшее приглашение отзывается перезапуском; исключения игроков хостом в первой версии нет.
-  - Ключи и токены в журнал и в сообщения об ошибках не попадают; там, где нужно отличить один токен от другого, показываются первые 4 символа.
-  - Тесты: модульный на маскировку токена в журнале; проверка отслеживания `.env` входит в `bun run check`.
-- **Журнал сервера и ботов.** Веха M1; уточняет разделы 5.3 и 9.
-  - Сервер пишет события строками JSON в `~/.local/share/geoaissr/logs/<дата>.jsonl`: начало и конец раунда, вход и выход участников, запуск и завершение каждого харнесса (код выхода, причина, последние строки stderr), каждый вызов инструмента бота (имя, длительность, исход), исход запросов к Google, значение счётчика квоты.
-  - Координаты ответа в журнал попадают только после конца раунда. Хранятся файлы за последние 14 дней.
-  - В терминале хоста на каждый раунд печатается одна строка: кто ответил, кто из ботов оборван и почему.
-  - Тест: интеграционный, после партии с поддельным харнессом в журнале есть запуск, вызовы и причина завершения каждого бота, а токенов и ключей нет.
+- **Owner decisions before code.** Milestone M0; refines sections 6, 10 and 12.
+  - Map for the answer. Clause 3.2.3(e) of Google's terms forbids Street View and a non-Google map on one screen. Options: Google Maps JS for the minimap and the results map (no conflict, the same browser key, map usage is checked by spike S3) or MapLibre GL JS with OpenFreeMap, as in section 6 (the conflict remains, the owner accepts the risk). Until the owner decides, the plan applies his original option.
+  - AI on Google imagery. Clauses 3.2.3(a) and 3.2.3(c)(vii) forbid taking imagery outside Google services and using it to improve AI models. Options: keep the owner's design with the measures below (risk: Google may disable the key or the project); give the bots imagery from another source near the same point; play without AI. Until the owner decides, the plan applies his original design.
+  - Measures if the design is kept: imagery is not written to disk outside `file` mode; the README asks the owner to disable the use of his data for model training in the harness accounts where such a setting exists.
+  - A private remote for CI: create one or work with `pre-commit`.
+  - `GuessMap` and `ResultsMap` are written right away for the chosen map, without a substitution layer. The map and bot tasks in M1 wait for the first two decisions; if AI is abandoned, milestone M1 is built without bots, and the "First game" gate is held without them.
+  - The interpretation of a turn is fixed in section 5.1 and requires no separate decision.
+- **Spike S1: a full bot round before feature code.** Milestone M0; refines sections 5 and 10.
+  - S1 goes first after the quality gates and is written as throwaway code in `spikes/` (not part of the build, deleted after M1; the quality gates and size limits apply to it too).
+  - Composition: a vision check on an image with a number; one full bot round via MCP (four starting images with captions, `look`, `move`, `submit_guess` with an explanation); three bots at once on one subscription; five rounds in a row.
+  - Images: until the Google keys are ready (spike S3), our own street photos are used; after Street View Static API is enabled the round is repeated on real imagery.
+  - A harness is admitted to the game if everything holds: the model correctly names the number from the image in at least one delivery mode (`mcp` or `file`); the MCP config is passed for a single run without changing global settings; cold start plus the first guess fit into 60 s (640 px image, low effort); with three bots at once, a guess is recorded in at least 4 of 5 rounds for each.
+  - A harness that does not pass the criterion is hidden from the choice in the first version, `doctor` names the reason, and no adapter is written for it.
+  - A saved slot with an unavailable harness (hidden by S1, not installed, or not signed in to a subscription) loads disabled with a visible reason and does not take part in the match until the host picks another harness. Test: a unit test for loading such a slot.
+  - If no harness passes the criterion, work on bots stops until the owner decides.
+- **"First game" gate.** Milestone M1; refines section 10.
+  - After M1 the owner plays a match with friends: 5 rounds of 120 s, three bots at once on a harness that passed S1 (two with a 4-turn limit, the third with 0, to see whether turns help).
+  - The server writes to `matches.jsonl` for each bot and round: whether there was a guess before the cut-off, time to the first and to the last guess, number of turns, score, the reason for finishing; for each round: how many seconds the humans waited for the bots after their last answer.
+  - The "playable" criterion: for each bot a guess is recorded in at least 4 of 5 rounds; the average wait of humans after the last answer is at most 30 s. If the criterion is not met, the defaults are adjusted (round duration, turn limit, effort, waiting window) and the match is repeated.
+  - The owner writes the answers to three questions into `docs/playtest-1.md`: does he want to play more; what was most interesting (the score, the AI's mistakes, the explanations); how many rounds were boring because of the location.
+  - From this data the owner confirms or changes the composition of M2–M4. If there are more than 2 boring locations out of 5, the task "verified list of points" is added to M2 (currently deferred in `TODOS.md`).
+- **Equal movement rules.** Milestone M1; refines sections 4.2 and 5.1.
+  - The "Panorama movement" setting is shared: if it is off, `move` returns to the bot «движение выключено в этой партии» ("movement is disabled in this match") without deducting a turn, and the bot's prompt warns about this.
+  - Test: a unit test for `move` with movement disabled.
+- **Bot time and round duration.** Milestone M1; refines sections 4.2 and 4.3.
+  - If the match has at least one AI, the minimum round duration is 60 s: when the first bot is added, a shorter round is raised to 60 s with a visible message, and the duration field does not allow setting less while the match has a bot.
+  - The harness process is started in `ROUND_LOADING`, during the countdown, so that a cold start does not eat into round time. The server delays the first `observe()` response until the start of `ROUND_ACTIVE`: the bot does not see images before the humans do.
+  - The bot's time budget in M1 equals the round duration; a separate field appears in M2. The budget clock runs from the start of `ROUND_ACTIVE`.
+  - The bot is cut off at the earliest of three moments: the end of the round timer; the end of its time budget; the end of the waiting window after all humans have answered. In all three cases its last recorded guess is counted.
+  - Waiting window: if all humans have answered and the bots are still working, the round lasts another 20 s (lobby field "AI wait after human answers", 0–120 s, default 20, stored in `settings.json`), but not less than until the 60th second of the round and not longer than the round timer. During this time humans are shown «ИИ думают» ("AIs are thinking") with a countdown.
+  - The round ends early when all humans have confirmed their answer with the «Угадать» ("Guess") button and the processes of all bots have finished. An unconfirmed marker does not trigger an early end, but at the end of the timer it is counted as an answer.
+  - Tests: unit tests for the state machine (humans answered early, bot finished early, bot did not finish, 60 s round, adding a bot with a 30 s round, unconfirmed marker at the end of the timer, `observe()` before the start of `ROUND_ACTIVE`).
+- **AI slot in M1 and bot difficulty in M2.** Milestones M1 and M2; refines sections 4.2 and 5.2.
+  - In M1 the slot has a name, color, model, effort and turn limit (default 4). The image is 640 px, the time budget equals the round duration. The settings are shown as numbers, without level names.
+  - In M2 the following are added: image size (640, 400 or 256 pixels per side), the bot's time budget per round (from 60 s to the round duration; by default equal to it; if the host makes the round shorter than the budget, the round duration applies) and three presets that fill the image size, turn limit and effort all at once.
+  - Preliminary preset numbers: «Новичок» ("Novice") (256 px, 2 turns, low effort), «Любитель» ("Amateur") (400 px, 4 turns, low effort), «Мастер» ("Master") (640 px, 6 turns, medium effort). Before implementation they are reconciled with the first game's data: a preset gets a level name only if its result in the recorded matches differs from its neighbor's.
+  - After a manual edit of the image size, turn limit or effort, the preset caption changes to «Свои настройки» ("Custom settings"); name, color, persona and time budget do not change the caption. Each adapter translates the effort levels "low / medium / high" into the values of its harness.
+  - The image is always requested from Google at 640x640; a smaller size is obtained by downscaling on the server (`sharp`), and the compass-direction caption is stamped after downscaling in a font no smaller than 14 px. Quota consumption does not depend on size.
+  - The lobby shows a warning at the slot if the time from «Проверить» ("Check") (cold start plus an answer at the slot's current settings) is more than half of the bot's time budget.
+  - Tests: unit tests for applying a preset and the «Свои настройки» caption, for downscaling an image to the slot size, for cut-off by time budget.
+- **"Humans vs AI" score.** Milestone M2; refines sections 4.5 and 4.6.
+  - Shown on the round results screen and in the final if the match has at least one human and at least one AI; otherwise the line is hidden.
+  - A side's value for a round: the arithmetic mean of the scores of the side's participants who played that round. Spectators and those who joined mid-round are not counted. A human who played but did not answer, and a bot without a recorded guess, are counted with 0 points.
+  - A side's value for the match: the sum of its per-round values.
+  - Computed by a pure function in `shared/`. Tests: different numbers of participants, zero scores, late joining, a bot without a guess, the absence of one side.
+- **Bot persona and quip.** Milestone M2; refines sections 4.2, 4.5 and 5.1.
+  - The AI slot has a "persona" field: a preset (neutral, braggart, modest, scholar) or the host's own text of up to 200 characters without line breaks. It is inserted as a single marked line into the prompt and affects only the tone of the explanation and the quip; limits and the toolset are set by the server, and the persona text cannot change them. The preset names in the interface are «нейтральный» ("neutral"), «хвастун» ("braggart"), «скромник» ("modest"), «учёный» ("scholar").
+  - `submit_guess` gets an optional `quip` field (up to 120 characters, in the interface language). The last successful `submit_guess` call is counted as a whole: coordinates, explanation and quip; if the quip is absent from it, no quip is shown. In M1 the `quip` field is already in the schema but is not shown.
+  - The quip is shown next to the bot's marker on the results screen and in the AI card, rendered as plain text, does not affect scores and is visible only after the end of the round.
+  - Tests: a too-long quip is truncated to the limit, a persona with a line break is rejected by the schema; of two calls the last is taken; an integration scenario with a fake harness shows the quip only on the results screen.
+- **Login and readiness of the invitation link.** Milestone M1; refines sections 4.1, 7 and 9.
+  - In all modes the game server listens only on `127.0.0.1`. The token contains 128 bits of randomness and is compared in constant time.
+  - The server serves `GET /healthz`: without a token, the response is `ok`, with no game data.
+  - The invitation link is printed after two checks: the host name resolves through public DNS (a DoH request to `cloudflare-dns.com`, on error to `dns.google`; the local resolver is not used) and `GET /healthz` at the public address returns 200. Wait up to 60 s, then an error with the cause (DNS or HTTP) and advice to restart `start`.
+  - When the tunnel address changes, the checks are repeated and the link is printed again. With `--no-tunnel` there are no checks.
+  - The host's link is always local: `http://localhost:PORT/#t=<host token>`.
+  - Tests: unit tests with substituted DNS and HTTP (success, delay, refusal, address change); `bun run test:tunnel` checks live.
+- **Own public address and login thresholds.** Milestone M3; refines sections 6, 7 and 9.
+  - `bun run start --public-url <https://address>` does not launch `cloudflared`, but builds the invitation link from the given address and runs the same readiness checks for it. The own tunnel or proxy must run on the same machine. The flags `--public-url` and `--no-tunnel` together give a launch error with an explanation.
+  - The README and `bun run doctor --public-url <https://address>` remind you to add this address to the referrer restriction of the browser key; `doctor` prints the exact string for the Cloud Console.
+  - Client address: in quick tunnel mode it is taken from `CF-Connecting-IP`; in other modes and when the header is absent, from the socket address. The server does not trust headers from a foreign proxy. A connection from a loopback address without the header is considered local and does not take part in the per-address threshold; therefore with `--public-url` only the global threshold applies.
+  - The token is checked on every connection; a login with the correct token is not blocked by any threshold. The thresholds apply only to failed attempts.
+  - More than 10 failed logins from one address in 60 s: for the next 60 s failed attempts from that address are closed without a response and without a log entry.
+  - More than 30 failed logins in 60 s across the whole server: until the end of the minute all failed attempts are closed the same way.
+  - Tests: unit tests for flag parsing, link building, choice of client address (header present, header absent, loopback), both thresholds, and a login with the correct token when the thresholds have been reached.
+- **Static API errors.** Milestone M1; refines sections 5.1, 5.2 and 6.
+  - All image requests go with `return_error_code=true`: when there is no imagery, Google responds with HTTP 404 rather than a gray placeholder.
+  - The unit for counting failures is a tool call. `look` fails if its image was not received. `move` fails if none of the four images was received; if at least one was received, the call succeeds, and instead of the missing ones the bot gets the text «снимка в этом направлении нет» ("there is no imagery in this direction").
+  - The first 3 failed bot calls per round do not deduct a turn; starting from the fourth, a failed call costs a turn. The `move` response «в эту сторону дороги нет» ("there is no road in this direction") is still free and is not counted in this number: it requests no images.
+  - Tests: unit tests with a substituted 404 response (turn not deducted, the fourth failure deducted, partially successful `move`).
+- **Round preparation failures.** Milestone M1; refines sections 4.3, 5.1 and 6.
+  - Point: if 30 attempts did not find a panorama, the server repeats the series for another country, up to 3 series in total. After the third failure the round does not start: the host sees the error «панорама не найдена» ("panorama not found") and the buttons «Повторить» ("Retry") and «Завершить партию» ("End match"); the rounds already played are saved.
+  - Starting images: if at least one of the four was not received, the server takes a new point, up to 3 points in total; after that the same rule applies as for a point. Failed requests go into the quota counter.
+  - Preparation runs in advance, while the lobby or the results screen is open, so players do not see the retries.
+  - A human's panorama loading: after 5 s of waiting the countdown starts for everyone; the late player's timer is the shared one. If the panorama did not load on the client, they see a message and a «Повторить» button, and the answer map stays available.
+  - `observe()` returns the stored starting set and makes no requests to the Static API.
+  - Tests: unit tests for the three sampling series and point replacement on a failed starting image; an integration test for the countdown starting without the late client.
+- **Quota accounting.** Milestone M1 (Static counter, cap, pre-start check) and M3 (panoramas); refines section 6.
+  - The application cap is an estimate of consumption, not a billing guarantee. The real limit is set by the daily quotas in the Cloud Console: the README and `doctor` give steps on which quotas to set, per the S3 spike report. The referrer restriction `*.trycloudflare.com/*` protects the browser key only weakly (the domain is shared), and the README says so plainly.
+  - Static: the counter in `quota.json`, the cap and the pre-start check appear in M1, before the first real request to the Static API. The counter grows with every request, including a failed one and round-preparation requests, and is incremented before the request is sent, so parallel calls do not get through above the cap. A repeated request for an image with the same parameters within a round is taken from memory and does not go into the counter.
+  - Panoramas (M3): the client sends the server `pano_loaded` after each panorama display (every round, page reload, reconnection, spectator); the counter grows with each such message. This is an upper-bound estimate: Google may bill only the creation of the panorama object; the billing unit is verified by spike S3.
+  - Before the match starts the server computes the worst case: Static = rounds × (12 + sum over bots (turn limit + 3) × 4), where 12 is up to three sets of starting images; panoramas = rounds × number of humans × 2. If current consumption plus the worst case exceeds the cap, the match does not start; the lobby shows the consumption, the worst case and the remainder, and the host reduces the number of rounds, bots or turns.
+  - If the Static cap is nevertheless reached mid-match, `look` and `move` return to the bot «квота исчерпана, вызови submit_guess» ("quota exhausted, call submit_guess") without deducting a turn, and the match is played to the end. If the panorama cap is reached, the current match is played to the end and a new one does not start.
+  - Tests: unit tests for the worst-case computation, start refusal, the «квота исчерпана» response, counter growth from `pano_loaded`.
+- **Bot process isolation.** Milestones M0 (spike S1) and M1; refines sections 5.3 and 5.4.
+  - The harness process is launched with an environment from an allowlist (`PATH`, `HOME`, `LANG`, `TERM` and the variables without which the harness does not sign in to the subscription). The Google keys and the contents of `.env` do not get into it. The bot's working directory: an empty temporary directory outside the repository.
+  - The harness runs as the owner and reads its login files from `HOME`, so reading other files is closed off by the harness's own flags: for `claude` these are `--allowedTools "mcp__geo__*"` and `--strict-mcp-config`; for `codex` and `agy` the set of flags is determined by spike S1 (in the `agy` help there is only `--sandbox`).
+  - For each harness, spike S1 checks with the chosen flags: the model cannot name the contents of a test file outside the temporary directory; web search and command execution are unavailable. The result is recorded in the report.
+  - The harness's user settings from `HOME` (global instructions, hooks, plugins, memory) are disabled by the adapter with flags, if the harness has them. Spike S1 records that disabling succeeded, and how what remains affects response time and the toolset.
+  - A harness that could not be restricted is not hidden automatically: the decision on its admission is made by the owner from the S1 report, and `doctor` shows a note next to it: «читает файлы владельца» ("reads the owner's files").
+  - The residual risk is accepted for a game among friends: the bot process runs as the owner and, if the flags were bypassed, could read the server's environment and memory. The subscription limits are shared with the owner's everyday work; a match with three bots consumes them.
+  - Tests: a unit test for the composition of the bot process environment; the check with the test file is part of `bun run test:harness`.
+- **Milestone order.** Milestones M0–M4; refines section 10.
+  - M0: quality gates, then spike S1, then S2, S3 and S4. The M1 tasks without a real panorama and without bots (protocol, state machine, lobby, scoring, results) go on stubs right after the quality gates. The tasks with bots wait for S1, the task "real panorama in a round" waits for S3 (both APIs enabled, billing attached).
+  - Spike S3 reconciles the free monthly volume with Google's current price table; the default cap of the quota counter is computed from the figures in the S3 report.
+  - M2–M4 begin after the "First game" gate; the owner confirms their composition based on its outcome.
+  - The error states named in this section belong to the milestone where their rule is named; milestone M4 polishes their appearance, it does not add them.
+- **Snapshot storage.** Milestone M1; refines sections 4.5 and 5.4.
+  - The bot's full-size images live only until the end of the round. For the AI card the server keeps thumbnails in memory (JPEG, 160 px per side, up to 15 KB) until the return to the lobby after the final.
+  - The upper bound of memory: an ordinary match (5 rounds, 3 bots, 6 turns) no more than 600 thumbnails, about 9 MB; the maximum (20 rounds, 3 bots, 20 turns) no more than 5,760 thumbnails, about 86 MB.
+  - Images reach disk only in the `file` delivery mode, in the bot's temporary directory, which is deleted at the end of the round.
+  - Test: an integration test, after the match ends the thumbnails are unavailable and the temporary directory is deleted.
+- **Failures during a match.** Milestones M1 and M3; refines sections 4.1, 5.1, 6 and 9.
+  - Metadata: a "no panorama" response consumes a sampling attempt. Key rejection, quota exceeded and a network error (request timeout 5 s, one retry) stop round preparation immediately: the host sees the cause and the buttons «Повторить» and «Завершить партию».
+  - Static: the responses 403 and 429 are handled as a reached quota cap: `look` and `move` return to the bot «картинки недоступны, вызови submit_guess» ("images unavailable, call submit_guess") without deducting a turn, and the host sees a warning with the cause.
+  - Tool arguments are validated by the schema. On error the bot gets text with the field name and permitted values, the turn is not deducted, the previous guess remains. Too-long `explanation` and `quip` are truncated to the limit rather than rejected; an empty `explanation` is rejected.
+  - If the bot recorded no guess at all, the AI card shows the reason for finishing and the last 300 characters of the harness's final text as plain text (model refusal, login error, subscription limit).
+  - Tunnel: `start` watches the `cloudflared` process. If the process exited, `start` restarts it up to 3 times with pauses of 2, 5 and 10 s, repeats the readiness checks and prints the new link. The match on the server continues meanwhile; after the third failure the host sees an error with the cause.
+  - Returning to a seat: to the browser a new tunnel address is a different site, and the saved `playerId` and secret are not there. Therefore participants' nicknames are unique case-insensitively, and a player who joined via a valid invitation with the nickname of a disconnected participant takes their seat. The nickname of a connected participant cannot be taken: the login gets the response «ник занят» ("nickname taken").
+  - Local files: `settings.json`, `quota.json` and the lines of `matches.jsonl` carry a `version` field and are checked by a schema. An unreadable `settings.json` or `quota.json` is renamed to a file ending in `.bad`, the server starts with default values (the quota counter from zero) and shows a warning in the terminal and in the host's lobby. A write error of `matches.jsonl` does not interrupt the match and is visible to the host on the final screen.
+  - A client's Maps JavaScript API loading error (ad blocker, referrer restriction) goes to the server as a `client_error` message; the host sees a note with the cause next to the player.
+  - Harness update (M3, full `doctor`): `bun run test:harness` records the CLI versions it passed with into `~/.config/geoaissr/harness-verified.json`; `doctor` warns if the installed version differs and advises running `bun run test:harness`.
+  - Tests: unit tests for metadata key rejection, 403 from Static, wrong tool arguments, explanation truncation, login with the nickname of a disconnected and of a connected participant, unreadable settings and quota files; an integration test for restarting a fake tunnel process.
+- **Event order and edge cases.** Milestone M1; refines sections 4.1, 4.3, 5.1 and 7.
+  - Neither a guess nor a tool call changes the round's outcome after its end. Each handler checks the round number and phase immediately before changing state, after all the waits (reading the request body, Google's response). A late call gets «раунд окончен» ("round over"), its result is discarded and does not leak into the next round.
+  - A turn is reserved before the request to Google and returned if the call is deemed failed by the rules of the item "Static API errors". Therefore parallel calls of one bot do not spend more than the limit.
+  - A human's marker: the client sends the server the marker position on every placement, no more than 5 times per second; the server keeps the latest. It is the one counted if the answer is not confirmed by the end of the timer. A repeated press of «Угадать» and a marker change after confirmation are ignored by the server.
+  - The longitude of the marker and of the bot's guess is brought to the range from -180 to 180; a latitude outside the range from -90 to 90 is rejected.
+  - The host's «Дальше» message carries the round number: a repeated press and a press simultaneous with the auto-transition do not skip a round.
+  - Match settings change only in the lobby. The ninth human gets the response «комната полна» ("room full").
+  - If no human is connected by the end of the results screen, the next round does not begin until someone returns: bots do not waste quota and subscription.
+  - `GameEngine` and `LocationService` receive the clock and the random number generator as parameters; the tests substitute controllable ones.
+  - Tests: unit tests with controllable stopping points for both completion orders (a bot's guess and the end of the timer; Google's response and the end of the round; two parallel `look` calls with one turn left); an unconfirmed marker; a repeated «Дальше»; a pause with no humans. Integration scenarios with a fake harness: ordinary, hung, finished before a guess, finished after a guess, with wrong arguments, with parallel calls.
+- **Secrets and tokens.** Milestones M0 and M1; refines sections 4.1, 6 and 9.
+  - `.env` is added to `.gitignore`; `bun run check` fails if `.env` is tracked by git.
+  - The host and invitation tokens are created anew on every `start`. A leaked invitation is revoked by restarting; there is no way for the host to kick players in the first version.
+  - Keys and tokens do not get into the log or into error messages; where one token must be distinguished from another, the first 4 characters are shown.
+  - Tests: a unit test for token masking in the log; the check for `.env` tracking is part of `bun run check`.
+- **Server and bot log.** Milestone M1; refines sections 5.3 and 9.
+  - The server writes events as JSON lines to `~/.local/share/geoaissr/logs/<date>.jsonl`: round start and end, participants joining and leaving, launch and completion of each harness (exit code, reason, last stderr lines), each bot tool call (name, duration, outcome), the outcome of requests to Google, the value of the quota counter.
+  - The answer coordinates get into the log only after the end of the round. Files for the last 14 days are kept.
+  - In the host's terminal one line is printed per round: who answered, which bot was cut off and why.
+  - Test: an integration test, after a match with a fake harness the log contains the launch, calls and completion reason of each bot, and no tokens or keys.
 <!-- /autoplan-accepted:ceo -->
 
-Правки исходного текста (записаны строкой `autoplan-baseline-edits:ceo` в начале раздела): 30 точных замен. Они убирают расхождения базового текста с принятыми обязательствами: оценка расхода (C-F1), строка факта о туннеле и спайк S2 (живая проверка WebSocket), условия Google (C-MAP, C-TOS), длительность раунда и конец раунда (C-F6), значения слота ИИ (C-PRESET), движение по панораме (C-EQMOVE), очки бота и метка без подтверждения (C-F9, C-F15), диагональ региона и тай-брейк (C-F10), подпись `submit_guess` (C-E4), размер запроса Static (C-E1), изоляция (C-F13), ограничение referrer и команды (C-E14), счётчик квоты (C-F11), защита входа (C-F12), ворота качества (C-F8), строка решений владельца в M0, спайки S1, S3 и S4 (C-S1FULL, C-S4), состав M1, M2, M3 и M4 (C-F5), три строки таблицы рисков и заголовок раздела 14.
+Edits to the source text (recorded in the `autoplan-baseline-edits:ceo` line at the start of the section): 30 exact replacements. They remove discrepancies between the baseline text and the accepted commitments: the cost estimate (C-F1), the tunnel fact line and spike S2 (live WebSocket check), Google's terms (C-MAP, C-TOS), round duration and round end (C-F6), AI slot values (C-PRESET), panorama movement (C-EQMOVE), bot score and unconfirmed marker (C-F9, C-F15), region diagonal and tie-break (C-F10), the `submit_guess` signature (C-E4), the Static request size (C-E1), isolation (C-F13), the referrer restriction and commands (C-E14), the quota counter (C-F11), login protection (C-F12), quality gates (C-F8), the owner-decisions line in M0, spikes S1, S3 and S4 (C-S1FULL, C-S4), the composition of M1, M2, M3 and M4 (C-F5), three rows of the risk table and the heading of section 14.
 
-Отложенное записано в `TODOS.md`: «Звуки», «Экран истории партий и зал славы», «Свои списки точек», «Восстановление партии после перезапуска сервера», «Мобильная раскладка».
+The deferred items are recorded in `TODOS.md`: «Звуки» ("Sounds"), «Экран истории партий и зал славы» ("Match history screen and hall of fame"), «Свои списки точек» ("Custom point lists"), «Восстановление партии после перезапуска сервера» ("Recovering a match after a server restart"), «Мобильная раскладка» ("Mobile layout").
 
-#### 0H. Сводка CEO и проверка спецификации
+#### 0H. CEO summary and specification check
 
-Сводка: `~/.gstack/projects/tass/ceo-plans/2026-11-13-geoaissr.md`. Рецензент спецификации запускался три раза (предел). Первая проверка: 14 замечаний, 6/10. Вторая: 12 новых, 6/10. Третья: PASS, 7/10, блокирующих нет, 8 мелких. После третьей проверки все 8 исправлены и сверены с текстом плана без нового запуска: issues verified: 8 of 8 (это применённые правки, а не вердикт рецензента). Метрики записаны в `spec-review.jsonl`: 3 запуска, найдено 34, подтверждено рецензентом 26, осталось по последнему отчёту 8.
+Summary: `~/.gstack/projects/tass/ceo-plans/2026-11-13-geoaissr.md`. The specification reviewer was run three times (the limit). First check: 14 remarks, 6/10. Second: 12 new, 6/10. Third: PASS, 7/10, no blocking ones, 8 minor. After the third check all 8 were fixed and reconciled with the plan text without a new run: issues verified: 8 of 8 (these are applied fixes, not the reviewer's verdict). Metrics are recorded in `spec-review.jsonl`: 3 runs, 34 found, 26 confirmed by the reviewer, 8 remaining per the last report.
 
-Одобрение документов (вопрос методики A/B/C): авторешение A, оба документа отражают принятые решения. Это одобрение версий документов, а не реализации; итоговое слово за владельцем на финальных воротах.
+Document approval (methodology question A/B/C): auto-decision A, both documents reflect the accepted decisions. This is approval of document versions, not of the implementation; the final word belongs to the owner at the final gate.
 
-#### 0I. Временной разбор
+#### 0I. Time breakdown
 
 ```
-  ЧАС 1 (основа):       решения владельца (карта, согласие на передачу снимков, remote), ключи Google
-                        с биллингом, вход в agy; ворота качества и каркас каталогов; отчёты спайков S1–S4
-  ЧАСЫ 2-3 (ядро):      конечный автомат с тремя дедлайнами бота, очки и тай-брейк, протокол;
-                        правила заданы в разделах 4 и 14. Не задано: что происходит, когда отключается хост;
-                        что видит игрок, вернувшийся посреди раунда
-  ЧАСЫ 4-5 (стыковка):  доставка картинок через MCP в каждом харнессе, холодный старт, пользовательские
-                        настройки харнесса, 404 от Static, задержка DNS туннеля, единица тарификации панорам
-  ЧАС 6+ (отделка):     поддельный харнесс для интеграционных тестов, заглушка панорамы для E2E,
-                        журнал работы бота (что делал, почему оборван), состояния ошибок на экранах
+  HOUR 1 (foundation):  owner decisions (map, consent to passing imagery, remote), Google keys
+                        with billing, login to agy; quality gates and directory skeleton; spike reports S1–S4
+  HOURS 2-3 (core):     state machine with three bot deadlines, scoring and tie-break, protocol;
+                        the rules are set in sections 4 and 14. Not set: what happens when the host disconnects;
+                        what a player who returns mid-round sees
+  HOURS 4-5 (joining):  delivering images via MCP in each harness, cold start, the harness's user
+                        settings, 404 from Static, tunnel DNS delay, the panorama billing unit
+  HOUR 6+ (polish):     a fake harness for integration tests, a panorama stub for E2E,
+                        a bot work log (what it did, why it was cut off), error states on screens
 ```
 
-- Блокеры осуществимости: вход в `agy` и включение двух API Google с биллингом (действия владельца); исход спайка S1 неизвестен. Ни один не мешает утвердить план; S1 имеет явный критерий и правило остановки.
-- Отложенные выборы для следующих фаз: поведение при отключении хоста и возвращении игрока посреди раунда (инженерная фаза); журнал работы бота (обзорный раздел 8); тексты ошибок и пустых состояний (фаза дизайна).
-- Трудоёмкость (оценка): команда людей около 3–4 недель; CC + gstack около 2–3 дней работы с учётом ожидания владельца на спайках.
+- Feasibility blockers: signing in to `agy` and enabling two Google APIs with billing (owner actions); the outcome of spike S1 is unknown. None prevents approving the plan; S1 has an explicit criterion and a stop rule.
+- Choices deferred to the next phases: behavior when the host disconnects and when a player returns mid-round (engineering phase); the bot work log (review section 8); texts of errors and empty states (design phase).
+- Effort (estimate): a human team about 3–4 weeks; CC + gstack about 2–3 days of work, accounting for the owner's waiting on spikes.
 
-#### 0.5. Два голоса
+#### 0.5. Two voices
 
-Оба голоса читали один снимок плана: `autoplan-ceo-JNXIhJ/ceo-implementation.md`, sha256 `f0007b49…be5a`, до перестановки вех.
+Both voices read one snapshot of the plan: `autoplan-ceo-JNXIhJ/ceo-implementation.md`, sha256 `f0007b49…be5a`, before the milestone reordering.
 
-- Голос Claude (нативный субагент, источник `in-host`): завершён, строка `INPUT: ceo f0007b49…` совпала со снимком. 12 замечаний (номера 1–13, номера 6 в отчёте нет): 3 critical, 4 high, 5 medium.
-- Голос Codex (внешний CLI, модель `gpt-6-astra`, источник `codex`): `OUTSIDE_STATUS: completed provider=codex host=claude`, `VERDICT: findings`, `FINDINGS: P1`. 7 замечаний: 4 High, 3 Medium. Итоговая строка: «Recommendation: Build and play a thin end-to-end prototype before expanding M1 because the plan has not yet established that concurrent subscription bots produce a feasible, well-paced game the three friends want to repeat.»
+- The Claude voice (native subagent, source `in-host`): completed, the line `INPUT: ceo f0007b49…` matched the snapshot. 12 remarks (numbers 1–13, number 6 is absent in the report): 3 critical, 4 high, 5 medium.
+- The Codex voice (external CLI, model `gpt-6-astra`, source `codex`): `OUTSIDE_STATUS: completed provider=codex host=claude`, `VERDICT: findings`, `FINDINGS: P1`. 7 remarks: 4 High, 3 Medium. The closing line: «Recommendation: Build and play a thin end-to-end prototype before expanding M1 because the plan has not yet established that concurrent subscription bots produce a feasible, well-paced game the three friends want to repeat.»
 
-| Голос и № | Важность | Замечание | Что сделано |
+| Voice and no. | Severity | Remark | What was done |
 |---|---|---|---|
-| Claude 1 | critical | Объём продукта, а не игры для троих: пороги входа, пресеты, характеры, счёт сторон | Вехи переставлены: M1 это сквозной срез «Первая игра»; расширения E1, E2, E4, E14 идут после неё (C-F5, C-EXP-ORDER) |
-| Claude 2 | critical | Самое рискованное допущение (S1) проверяется последним | S1 идёт первым после ворот качества и расширен до полного раунда (C-S1FULL). Раньше ворот качества не поставлен: правило владельца требует их первыми |
-| Claude 3 | critical | Условия Google это факт, а не предпочтение; нужен запасной источник снимков | Условия прочитаны, расхождение записано в разделе 3 плана; два User Challenge на финальных воротах (C-MAP, C-TOS) |
-| Claude 4 | high | Цифры бесплатного объёма не проверены; настоящий предел в Cloud Console | Спайк S3 сверяет цены; потолок назван оценкой; дневные квоты Cloud Console в README и `doctor` |
-| Claude 5 | high | Подписочные CLI как игровой сервер: условия подписок, общие лимиты, смена флагов | Остаточный риск и общие лимиты записаны; `doctor` сверяет версии с `test:harness`. Условия подписок по тексту не проверены (P14, C-SUBTERMS) |
-| Claude 7 | high | Прямые вызовы API моделей не рассмотрены | Не принято: владелец прямо просил подписки (C-DIRECT-API). На воротах показано как справка; первая игра идёт на одном харнессе |
-| Claude 8 | medium | Нет данных, что ходы улучшают результат; нужен вариант без ходов | В партии ворот «Первая игра» один бот играет с лимитом 0 ходов |
-| Claude 9 | high | Через полгода: отполированная игра, в которую не сыграли | Ворота «Первая игра» с замерами и тремя вопросами (C-GATE1) |
-| Claude 10 | medium | Quick tunnel временный; ограничение referrer по общему домену почти ничего не защищает | README говорит об этом прямо; `--public-url` остаётся запасным путём |
-| Claude 11 | medium | Сначала час на обзор открытых клонов | Спайк S4 (C-S4) |
-| Claude 12 | medium | Правила конца раунда сложны; раунд 60 с не оставляет времени после холодного старта | Харнесс стартует в `ROUND_LOADING` (C-PREWARM). Фиксированный дедлайн не принят (C-DEADLINE) |
-| Claude 13 | medium | Бот работает от имени владельца и при обходе флагов прочитал бы память сервера | Остаточный риск записан в пункте «Изоляция процесса бота» |
-| Codex 1 | High | План может «удаться», потеряв ИИ; условия Google не проверены | Условия прочитаны; при отказе от ИИ это отдельное решение владельца, а не тихий запасной путь (C-TOS) |
-| Codex 2 | High | «С ботами веселее» не проверено | Ворота «Первая игра»: три вопроса владельцу после настоящей партии (C-GATE1) |
-| Codex 3 | High | S1 проверяет деталь, а не игровой вечер | S1: три бота одновременно, пять раундов; ворота меряют ожидание людей (C-S1FULL, C-GATE1) |
-| Codex 4 | High | Решающий опыт отложен за настраиваемым продуктом | Перестановка вех (C-F5) |
-| Codex 5 | Medium | Случайные точки не значит интересные раунды | Вопрос о скучных местах на воротах; при более чем 2 из 5 в M2 входит «проверенный список точек» |
-| Codex 6 | Medium | Названия уровней обещают калибровку, которой нет; разные правила движения | Названия уровней только после данных первой игры (C-PRESET); настройка движения общая (C-EQMOVE) |
-| Codex 7 | Medium | «Жёсткий потолок» обещает больше, чем считает | Потолок назван оценкой; в худший случай входят повторные стартовые наборы; счётчик растёт до отправки запроса (C-F1, C-F11) |
+| Claude 1 | critical | The scope of a product, not of a game for three: login thresholds, presets, personas, side score | The milestones were reordered: M1 is the "First game" end-to-end slice; extensions E1, E2, E4, E14 come after it (C-F5, C-EXP-ORDER) |
+| Claude 2 | critical | The riskiest assumption (S1) is checked last | S1 goes first after the quality gates and is expanded to a full round (C-S1FULL). Not placed before the quality gates: the owner's rule requires them first |
+| Claude 3 | critical | Google's terms are a fact, not a preference; a fallback imagery source is needed | The terms were read, the conflict is recorded in section 3 of the plan; two User Challenges at the final gate (C-MAP, C-TOS) |
+| Claude 4 | high | The free-volume figures are not verified; the real limit is in the Cloud Console | Spike S3 reconciles prices; the cap is called an estimate; the Cloud Console daily quotas in the README and `doctor` |
+| Claude 5 | high | Subscription CLIs as a game server: subscription terms, shared limits, flag changes | The residual risk and shared limits are recorded; `doctor` compares versions with `test:harness`. Subscription terms were not verified against the text (P14, C-SUBTERMS) |
+| Claude 7 | high | Direct model API calls were not considered | Not accepted: the owner explicitly asked for subscriptions (C-DIRECT-API). Shown at the gate as a reference; the first game runs on one harness |
+| Claude 8 | medium | There is no data that turns improve the result; a variant without turns is needed | In the "First game" gate match one bot plays with a limit of 0 turns |
+| Claude 9 | high | In six months: a polished game that nobody played | The "First game" gate with measurements and three questions (C-GATE1) |
+| Claude 10 | medium | Quick tunnel is temporary; a referrer restriction on a shared domain protects almost nothing | The README says so plainly; `--public-url` remains the fallback path |
+| Claude 11 | medium | First, an hour to survey open-source clones | Spike S4 (C-S4) |
+| Claude 12 | medium | The round-end rules are complex; a 60 s round leaves no time after a cold start | The harness starts in `ROUND_LOADING` (C-PREWARM). A fixed deadline was not accepted (C-DEADLINE) |
+| Claude 13 | medium | The bot runs as the owner and, if the flags were bypassed, would read the server's memory | The residual risk is recorded in the item "Bot process isolation" |
+| Codex 1 | High | The plan may "succeed" while losing AI; Google's terms are not verified | The terms were read; abandoning AI is a separate owner decision, not a silent fallback (C-TOS) |
+| Codex 2 | High | "It's more fun with bots" is not verified | The "First game" gate: three questions to the owner after a real match (C-GATE1) |
+| Codex 3 | High | S1 checks a detail, not a game night | S1: three bots at once, five rounds; the gate measures the humans' waiting (C-S1FULL, C-GATE1) |
+| Codex 4 | High | The decisive experience is deferred behind a configurable product | Milestone reordering (C-F5) |
+| Codex 5 | Medium | Random points do not mean interesting rounds | A question about boring locations at the gate; with more than 2 of 5, "verified point list" enters M2 |
+| Codex 6 | Medium | Level names promise a calibration that does not exist; different movement rules | Level names only after the first game's data (C-PRESET); the movement setting is shared (C-EQMOVE) |
+| Codex 7 | Medium | A "hard cap" promises more than it counts | The cap is called an estimate; repeated starting sets enter the worst case; the counter grows before the request is sent (C-F1, C-F11) |
 
 ```
 CEO DUAL VOICES — CONSENSUS TABLE:
   Dimension                              Claude                     Codex                      Consensus
-  1. Premises valid?                     нет (условия Google,       нет (условия Google,       CONFIRMED: ключевые предпосылки
-                                         темп харнессов)            «с ботами веселее»)        не проверены
-  2. Right problem to solve?             да, но срез должен         да, но сначала             CONFIRMED: задача верная,
-                                         быть тоньше                пробная партия             доказательство раньше объёма
-  3. Scope calibration correct?          нет, critical              нет, High                  CONFIRMED: первая веха велика,
-                                                                                               расширения преждевременны
-  4. Alternatives sufficiently explored? нет (прямой API,           частично (свой пул         DISAGREE: вкусовое решение,
-                                         форк клона)                точек)                     см. C-DIRECT-API, C-S4
-  5. Competitive/market risks covered?   да, риск низкий            не оценивал                один голос [subagent-only]
-  6. 6-month trajectory sound?           нет: игра, в которую       нет: решающий опыт         CONFIRMED: нужна партия
-                                         не сыграли                 отложен                    с друзьями до полировки
+  1. Premises valid?                     no (Google terms,          no (Google terms,          CONFIRMED: key premises
+                                         harness pace)              "more fun with bots")      are not verified
+  2. Right problem to solve?             yes, but the slice must    yes, but a trial           CONFIRMED: the task is right,
+                                         be thinner                 match first                proof before scope
+  3. Scope calibration correct?          no, critical               no, High                   CONFIRMED: the first milestone is big,
+                                                                                               extensions are premature
+  4. Alternatives sufficiently explored? no (direct API,            partially (own pool        DISAGREE: taste decision,
+                                         clone fork)                of points)                 see C-DIRECT-API, C-S4
+  5. Competitive/market risks covered?   yes, low risk              did not assess             one voice [subagent-only]
+  6. 6-month trajectory sound?           no: a game nobody          no: the decisive           CONFIRMED: a match with friends
+                                         played                     experience is deferred     is needed before polishing
 CONFIRMED = completed subagent + outside; primary cannot replace outside.
 ```
 
-Критические замечания одного голоса: Claude 1, 2 и 3 помечены critical только у Claude, но по сути совпадают с Codex 4, 3 и 1; расхождения здесь нет.
+Critical remarks from one voice: Claude 1, 2 and 3 are marked critical only by Claude, but in substance coincide with Codex 4, 3 and 1; there is no disagreement here.
 
-Решения по итогам голосов:
+Decisions following the voices:
 
-- Механические (применены): перестановка вех и ворота «Первая игра»; расширение S1; общая настройка движения; запуск харнесса во время отсчёта; спайк S4; потолок как оценка; запись остаточного риска.
-- Вкусовые (показываются на финальных воротах): расширения E1, E2, E4, E14 оставлены в плане после ворот «Первая игра», хотя оба голоса советуют не строить их до первой партии (C-EXP-ORDER); прямой API не принят (C-DIRECT-API); фиксированный дедлайн бота не принят (C-DEADLINE).
-- User Challenge (не авторешаются, план сохраняет исходный замысел владельца):
-  - UC-1, карта для ответа (C-MAP). Владелец сказал: «карту можно бесплатную типа OSM». Предлагается Google Maps JS. Почему: пункт 3.2.3(e) условий Google запрещает Street View и не-Google карту на одном экране. Чего модели могут не знать: насколько владельцу важна карта без Google и готов ли он принять риск для частной игры. Цена ошибки: Google вправе отключить ключ или проект, игра останется без панорам; замена карты после кода это переписывание двух компонентов.
-  - UC-2, ИИ на снимках Google (C-TOS). Владелец сказал: ИИ получает скриншоты панорамы Google с разных сторон. Варианты изменения: снимки другого источника для ботов или игра без ИИ. Почему: пункты 3.2.3(a) и 3.2.3(c)(vii) запрещают выносить снимки за пределы сервисов Google и использовать их для улучшения моделей ИИ; подписки могут обучаться на присланных данных, если это не отключено. Чего модели могут не знать: готовность владельца принять риск для игры троих друзей. Цена ошибки: отключение ключа или проекта Google. Цена изменения: снимки другого источника не совпадают с тем, что видят люди, и покрывают меньше мест; без ИИ пропадает смысл проекта.
+- Mechanical (applied): milestone reordering and the "First game" gate; the S1 expansion; a shared movement setting; launching the harness during the countdown; spike S4; the cap as an estimate; recording the residual risk.
+- Taste (shown at the final gate): extensions E1, E2, E4, E14 were left in the plan after the "First game" gate, although both voices advise not building them before the first match (C-EXP-ORDER); direct API not accepted (C-DIRECT-API); a fixed bot deadline not accepted (C-DEADLINE).
+- User Challenge (not auto-decided, the plan keeps the owner's original design):
+  - UC-1, map for the answer (C-MAP). The owner said: «карту можно бесплатную типа OSM» ("the map can be a free one like OSM"). Google Maps JS is proposed. Why: clause 3.2.3(e) of Google's terms forbids Street View and a non-Google map on one screen. What the models may not know: how important a non-Google map is to the owner and whether he is willing to accept the risk for a private game. Cost of error: Google may disable the key or the project, and the game is left without panoramas; replacing the map after the code is written means rewriting two components.
+  - UC-2, AI on Google imagery (C-TOS). The owner said: the AI receives screenshots of the Google panorama from different directions. Options for change: imagery from another source for bots, or a game without AI. Why: clauses 3.2.3(a) and 3.2.3(c)(vii) forbid taking imagery outside Google services and using it to improve AI models; subscriptions may train on submitted data unless that is disabled. What the models may not know: the owner's readiness to accept the risk for a game among three friends. Cost of error: disabling of the Google key or project. Cost of change: imagery from another source does not match what the humans see and covers fewer places; without AI the point of the project disappears.
 
-#### Обзорные разделы 1–11
+#### Review sections 1–11
 
-Текущий объём перед разделом 1. Режим SELECTIVE EXPANSION (C-MODE). Принято: своя сборка (C-APPROACH); исправления C-F1…C-F15; порядок вех и ворота «Первая игра» (C-F5, C-GATE1, C-S1FULL); расширения C-E1, C-E2, C-E4, C-E14 после ворот. Отложено: C-D1…C-D5 (`TODOS.md`). Отклонено: C-X1…C-X5, C-DIRECT-API, C-DEADLINE. Ждут владельца: C-MAP, C-TOS, C-REMOTE.
+Current scope before section 1. Mode SELECTIVE EXPANSION (C-MODE). Accepted: own build (C-APPROACH); fixes C-F1…C-F15; milestone order and the "First game" gate (C-F5, C-GATE1, C-S1FULL); extensions C-E1, C-E2, C-E4, C-E14 after the gate. Deferred: C-D1…C-D5 (`TODOS.md`). Declined: C-X1…C-X5, C-DIRECT-API, C-DEADLINE. Waiting for the owner: C-MAP, C-TOS, C-REMOTE.
 
-##### Раздел 1. Архитектура
+##### Section 1. Architecture
 
-Проверены границы компонентов, потоки данных, конечный автомат, связность, точки отказа, поверхности доступа и откат.
+Checked: component boundaries, data flows, the state machine, coupling, failure points, access surfaces and rollback.
 
 ```
-  [браузер игрока] ──WSS, токен приглашения──┐
-  [браузер хоста]  ──WS localhost, токен хоста┤          граница доверия: всё слева недоверенное
+  [player's browser] ──WSS, invitation token──┐
+  [host's browser]   ──WS localhost, host token┤         trust boundary: everything on the left is untrusted
                                                v
-  cloudflared ──> игровой сервер 127.0.0.1:PORT ──┬─ статика web/dist (без секретов)
-                    │  GET /healthz (без токена)   ├─ WebSocket /ws ─> схема ─> GameEngine (одна комната)
-                    │                              ├─ LocationService ──> Google metadata (серверный ключ)
-                    │                              ├─ BotImageService ──> Google Static ──> sharp
-                    │                              └─ BotRunner ──spawn──> харнесс (окружение из белого списка)
-                    │                                                        └─ MCP stdio: bot-tools
-                    └─ API ботов 127.0.0.1:BOT_PORT <── HTTP + токен бота на раунд ──┘
-  файлы владельца: settings.json, quota.json, matches.jsonl, logs/*.jsonl, harness-verified.json
+  cloudflared ──> game server 127.0.0.1:PORT ──┬─ static web/dist (no secrets)
+                    │  GET /healthz (no token)  ├─ WebSocket /ws ─> schema ─> GameEngine (one room)
+                    │                           ├─ LocationService ──> Google metadata (server key)
+                    │                           ├─ BotImageService ──> Google Static ──> sharp
+                    │                           └─ BotRunner ──spawn──> harness (allowlisted environment)
+                    │                                                     └─ MCP stdio: bot-tools
+                    └─ bot API 127.0.0.1:BOT_PORT <── HTTP + per-round bot token ──┘
+  owner's files: settings.json, quota.json, matches.jsonl, logs/*.jsonl, harness-verified.json
 ```
 
 ```
-            «Старт» (хост)          все загрузили или 5 с          таймер | люди подтвердили и боты завершились
+            «Старт» (host)          all loaded or 5 s              timer | humans confirmed and bots finished
   LOBBY ─────────────────> ROUND_LOADING ───────────────> ROUND_ACTIVE ─────────────────> ROUND_RESULTS
-    ^                         │ сбой подготовки:                                              │ «Дальше» | 30 с
-    │                         │ хост «Повторить» (остаёмся) | «Завершить партию» ─> FINAL     │ (пауза, пока нет людей)
+    ^                         │ preparation failure:                                          │ «Дальше» | 30 s
+    │                         │ host «Повторить» (we stay) | «Завершить партию» ─> FINAL      │ (pause while there are no humans)
     │                                                                                         v
-    └──────────── «Ещё раз» ──────────── FINAL <──── раунды кончились ──── есть ещё раунд ──> ROUND_LOADING
-  Запрещено и отклоняется единой функцией перехода: LOBBY→ROUND_ACTIVE, ROUND_ACTIVE→LOBBY,
-  ROUND_RESULTS→ROUND_ACTIVE, догадка и вызов инструмента вне ROUND_ACTIVE, смена настроек вне LOBBY.
+    └──────────── «Ещё раз» ──────────── FINAL <──── rounds are over ──── another round ──> ROUND_LOADING
+  Forbidden and rejected by a single transition function: LOBBY→ROUND_ACTIVE, ROUND_ACTIVE→LOBBY,
+  ROUND_RESULTS→ROUND_ACTIVE, a guess or tool call outside ROUND_ACTIVE, a settings change outside LOBBY.
 ```
 
-Четыре пути потока «догадка»: обычный (метка, подтверждение, очки); пустой (метки нет, 0 очков); отсутствующий (игрок отключился: остаётся последняя метка на сервере); ошибочный (сообщение не прошло схему или пришло после конца раунда: отказ с причиной, состояние не меняется).
+Four paths of the "guess" flow: ordinary (marker, confirmation, score); empty (no marker, 0 points); missing (the player disconnected: the last marker remains on the server); erroneous (the message failed the schema or arrived after the end of the round: refused with a cause, the state does not change).
 
-- Связность: сервер зависит от трёх CLI только через адаптеры в один файл; клиент зависит от Maps JavaScript API только через `PanoView`. Выбор карты (C-MAP) определяет `GuessMap` и `ResultsMap`; слой подмены не делается.
-- Нагрузка: комната одна, до 8 людей и 3 ботов. Первым кончается не процессор, а квота Static и лимит подписки; оба имеют потолок и проверку перед стартом.
-- Точки отказа: машина владельца, quick tunnel, ключ Google, подписка харнесса. Приняты как свойства игры «с машины владельца».
-- Откат: приложение локальное, откат это возврат к прошлой метке git и перезапуск (минуты).
-- Артефакты о работе: отчёты `docs/spikes/` (по ним решается допуск харнесса, после M1 не нужны), `docs/playtest-1.md` (по нему владелец подтверждает M2–M4). Оба имеют потребителя и срок жизни.
-- **WARNING 1.1.** Локальные файлы без версии формата: старый или битый `settings.json` или `quota.json` ломал бы запуск. Решено: поле `version`, проверка схемой, файл `.bad` и значения по умолчанию (пункт «Сбои во время партии»).
-- **WARNING 1.2.** Не задано поведение при отключении хоста. Автопереход через 30 с и общий таймер покрывают раунды; остаётся выбор, кто жмёт «Ещё раз» и «Повторить». Не блокирует; владелец выбора: инженерная фаза.
+- Coupling: the server depends on the three CLIs only through adapters of one file each; the client depends on the Maps JavaScript API only through `PanoView`. The choice of map (C-MAP) determines `GuessMap` and `ResultsMap`; no substitution layer is built.
+- Load: there is one room, up to 8 humans and 3 bots. What runs out first is not the processor but the Static quota and the subscription limit; both have a cap and a pre-start check.
+- Failure points: the owner's machine, quick tunnel, the Google key, the harness subscription. Accepted as properties of a game run "from the owner's machine".
+- Rollback: the application is local, rollback is returning to the previous git tag and restarting (minutes).
+- Artifacts about the work: reports in `docs/spikes/` (they decide harness admission, not needed after M1), `docs/playtest-1.md` (the owner confirms M2–M4 from it). Both have a consumer and a lifetime.
+- **WARNING 1.1.** Local files without a format version: an old or corrupt `settings.json` or `quota.json` would break startup. Decided: a `version` field, schema validation, a `.bad` file and default values (item "Failures during a match").
+- **WARNING 1.2.** Behavior when the host disconnects is not set. The auto-transition after 30 s and the shared timer cover the rounds; the choice of who presses «Ещё раз» ("Play again") and «Повторить» remains. Not blocking; owner of the choice: engineering phase.
 
-##### Раздел 2. Карта ошибок и спасения
+##### Section 2. Error and rescue map
 
-Глубина: готовность к реализации на уровне компонентов плана (методов ещё нет). Полная таблица в реестре ниже. Найдено 7 пробелов, все закрыты правилами пункта «Сбои во время партии»:
+Depth: implementation readiness at the level of the plan's components (there are no methods yet). The full table is in the register below. 7 gaps were found, all closed by the rules of the item "Failures during a match":
 
-- **GAP 2.1.** Отказ ключа или сеть при metadata-запросе сжигали бы 90 попыток. Теперь подготовка прекращается сразу с причиной.
-- **GAP 2.2.** Ответы 403 и 429 от Static посреди партии. Теперь это путь «картинки недоступны».
-- **GAP 2.3.** Объяснение длиннее 600 символов отклонялось, и единственная догадка бота могла пропасть. Теперь обрезается.
-- **GAP 2.4.** Бот без догадки молчал. Теперь карточка показывает причину и хвост текста харнесса (в том числе отказ модели).
-- **GAP 2.5.** Завершение `cloudflared` посреди партии и потеря места игроком на новом адресе. Теперь перезапуск и вход по нику отключённого участника.
-- **GAP 2.6.** Нечитаемые локальные файлы (см. 1.1).
-- **GAP 2.7.** Ошибка загрузки Maps JavaScript API у одного игрока была не видна хосту. Теперь `client_error`.
+- **GAP 2.1.** Key rejection or the network on a metadata request would burn 90 attempts. Now preparation stops immediately with a cause.
+- **GAP 2.2.** Responses 403 and 429 from Static mid-match. Now this is the "images unavailable" path.
+- **GAP 2.3.** An explanation longer than 600 characters was rejected, and the bot's only guess could be lost. Now it is truncated.
+- **GAP 2.4.** A bot without a guess stayed silent. Now the card shows the cause and the tail of the harness text (including a model refusal).
+- **GAP 2.5.** `cloudflared` exiting mid-match and a player losing their seat at the new address. Now restart and login by the nickname of the disconnected participant.
+- **GAP 2.6.** Unreadable local files (see 1.1).
+- **GAP 2.7.** A Maps JavaScript API loading error for one player was invisible to the host. Now `client_error`.
 
-Для вызовов моделей разобраны отдельно: неверные аргументы (текст ошибки, ход не списан), пустой ответ (нет догадки, причина в карточке), выдуманные координаты вне диапазона (отклонение с диапазоном), отказ модели (причина в карточке).
+For model calls the following are analyzed separately: wrong arguments (error text, turn not deducted), an empty response (no guess, cause in the card), invented coordinates out of range (rejection with the range), a model refusal (cause in the card).
 
-##### Раздел 3. Безопасность
+##### Section 3. Security
 
-| Угроза | Вероятность | Ущерб | Что в плане |
+| Threat | Likelihood | Damage | What the plan has |
 |---|---|---|---|
-| Утечка пригласительной ссылки, чужой игрок | низкая | низкий | Токен 128 бит во фрагменте URL; новый токен при каждом `start`; лимит 8 людей. Исключения игрока нет (принято) |
-| Кража браузерного ключа Google у вошедшего игрока | низкая | средний | Ограничение referrer слабое (общий домен), сказано прямо; предел задают дневные квоты Cloud Console |
-| Харнесс читает файлы владельца | средняя | высокий | Белый список окружения, флаги харнесса, проверка проверочным файлом в S1, допуск решает владелец; остаточный риск записан |
-| Текст на снимке управляет моделью | низкая | низкий | У бота только инструменты `geo`; объяснение и реплика рисуются простым текстом |
-| Чужой процесс на машине зовёт API ботов | низкая | низкий | Порт только на `127.0.0.1`, токен бота на один раунд |
-| Перебор токена | низкая | низкий | 128 бит, сравнение за постоянное время, пороги неудачных входов (M3) |
-| Ключи в репозитории или журнале | средняя | средний | Пункт «Секреты и токены» |
-| Подсмотр координат через инструменты разработчика | высокая | низкий | Принято в разделе 12 плана |
+| Leak of the invitation link, a stranger joins | low | low | A 128-bit token in the URL fragment; a new token at every `start`; a limit of 8 humans. No kicking of players (accepted) |
+| Theft of the Google browser key from a joined player | low | medium | The referrer restriction is weak (shared domain), stated plainly; the limit is set by the Cloud Console daily quotas |
+| The harness reads the owner's files | medium | high | Environment allowlist, harness flags, a check with a test file in S1, admission decided by the owner; the residual risk is recorded |
+| Text in an image controls the model | low | low | The bot has only the `geo` tools; the explanation and quip are rendered as plain text |
+| A foreign process on the machine calls the bot API | low | low | The port is only on `127.0.0.1`, the bot token is for one round |
+| Token brute-forcing | low | low | 128 bits, constant-time comparison, failed-login thresholds (M3) |
+| Keys in the repository or log | medium | medium | The item "Secrets and tokens" |
+| Peeking at the coordinates via developer tools | high | low | Accepted in section 12 of the plan |
 
-- **WARNING 3.1.** `.env` мог попасть в git. Решено: `.gitignore` и проверка в `bun run check`.
-- **WARNING 3.2.** Срок жизни токенов и их запись в журнал не были заданы. Решено: новые при каждом `start`, в журнале маска.
-- **OK 3.3.** Исключения игрока хостом нет. Принято: приглашение отзывается перезапуском.
+- **WARNING 3.1.** `.env` could end up in git. Decided: `.gitignore` and a check in `bun run check`.
+- **WARNING 3.2.** The lifetime of tokens and their writing to the log were not set. Decided: new ones on every `start`, masked in the log.
+- **OK 3.3.** There is no kicking of players by the host. Accepted: an invitation is revoked by restarting.
 
-Угроз высокой важности без меры нет. Передача снимков сторонним моделям это вопрос условий Google (UC-2), а не защиты.
+There are no high-severity threats without a measure. Passing imagery to third-party models is a question of Google's terms (UC-2), not of protection.
 
-##### Раздел 4. Потоки данных и граничные случаи
+##### Section 4. Data flows and edge cases
 
 ```
-  модель ─> харнесс ─> bot-tools (MCP) ─> HTTP 127.0.0.1 ─> схема ─> резерв хода и квоты ─> Google Static ─> sharp ─> ответ
+  model ─> harness ─> bot-tools (MCP) ─> HTTP 127.0.0.1 ─> schema ─> turn and quota reserve ─> Google Static ─> sharp ─> response
      │          │            │                 │              │              │                    │            │
-  отказ     зависание   нет токена,      раунд окончен   неверные поля   ходы кончились,     404, 403, 429,  битая картинка
-  модели    (дедлайн)   чужой раунд      (после ожидания) (текст ошибки) квота исчерпана     тайм-аут        (неудачный вызов)
+  model     hang         no token,        round over     wrong fields   turns exhausted,    404, 403, 429,  broken image
+  refusal   (deadline)   foreign round    (after a wait) (error text)   quota exhausted     timeout         (failed call)
 
-  клик по карте ─> метка (WS, до 5 в секунду) ─> схема ─> фаза ROUND_ACTIVE? ─> запись ─> «Угадать» ─> подтверждение ─> очки
-  тени: метки нет (0) · сообщение больше 16 КБ (закрытие) · после конца раунда (отказ) · повтор (игнор) · обрыв (метка остаётся)
+  map click ─> marker (WS, up to 5 per second) ─> schema ─> phase ROUND_ACTIVE? ─> write ─> «Угадать» ─> confirmation ─> score
+  shadows: no marker (0) · message larger than 16 KB (close) · after the end of the round (refusal) · repeat (ignored) · disconnect (marker stays)
 ```
 
-Порядок асинхронных событий. Общее состояние: фаза раунда, записанные догадки, счётчики ходов и квоты. Инвариант: после конца раунда его итог не меняется, а бот не тратит больше лимита.
+Order of asynchronous events. Shared state: the round phase, recorded guesses, the turn and quota counters. Invariant: after the end of the round its outcome does not change, and a bot does not spend more than its limit.
 
 ```
-  вызов submit_guess         таймер раунда            состояние
-  читает тело запроса ...    срабатывает              ROUND_ACTIVE -> ROUND_RESULTS
-  возобновился               -                        проверка фазы перед записью: отказ «раунд окончен»
-  (обратный порядок)         срабатывает после записи догадка записана, засчитана
+  submit_guess call          round timer              state
+  reads the request body ... fires                    ROUND_ACTIVE -> ROUND_RESULTS
+  resumed                    -                        phase check before writing: refusal «раунд окончен»
+  (reverse order)            fires after the write    the guess is recorded, counted
 
-  look №1                    look №2 (параллельно)    осталось ходов: 1
-  резервирует ход            -                        0
-  ждёт Google                резерва нет: отказ       0, «ходы кончились»
+  look #1                    look #2 (parallel)       turns left: 1
+  reserves a turn            -                        0
+  waits for Google           no reserve: refusal      0, «ходы кончились» ("turns exhausted")
 ```
 
-Механизм: проверка номера и фазы раунда непосредственно перед изменением и резерв хода и квоты до ожидания. Однопоточность Bun сама порядок через `await` не гарантирует, поэтому правило записано явно и проверяется тестами с точками остановки.
+Mechanism: checking the round number and phase immediately before the change and reserving the turn and quota before the wait. Bun's single-threadedness does not by itself guarantee ordering across `await`, so the rule is written explicitly and verified by tests with stopping points.
 
-| Действие | Граничный случай | Покрыто? | Как |
+| Action | Edge case | Covered? | How |
 |---|---|---|---|
-| «Угадать» | двойное нажатие | да | повтор игнорируется |
-| «Угадать» | после конца таймера | да | отказ; засчитана последняя метка |
-| Метка | не подтверждена к концу таймера | да, теперь | клиент шлёт положение метки, сервер хранит последнее |
-| Метка | долгота за 180-м меридианом | да, теперь | приведение к диапазону |
-| Вход | девятый игрок | да, теперь | «комната полна» |
-| Вход | ник занят | да, теперь | «ник занят»; ник отключённого возвращает место |
-| Вход | посреди раунда | да | зритель до следующего раунда |
-| Вход | новый адрес туннеля, `localStorage` пуст | да, теперь | место по нику |
-| «Дальше» | двойное нажатие, гонка с автопереходом | да, теперь | номер раунда в сообщении |
-| Лобби | настройки меняются посреди партии | да, теперь | только в лобби |
-| Раунд | все люди отключились | да, теперь | пауза перед следующим раундом |
-| Раунд | панорама не загрузилась у одного игрока | да | отсчёт через 5 с, «Повторить» у игрока |
-| Бот | параллельные вызовы инструментов | да, теперь | резерв хода |
-| Бот | вызов после конца раунда | да, теперь | «раунд окончен» |
-| Бот | слот с недоступным харнессом | да | загружается выключенным |
-| Хост | отключился посреди партии | частично | автопереходы; остальное за инженерной фазой (1.2) |
+| «Угадать» | double press | yes | the repeat is ignored |
+| «Угадать» | after the timer ends | yes | refusal; the last marker is counted |
+| Marker | not confirmed by the end of the timer | yes, now | the client sends the marker position, the server keeps the last |
+| Marker | longitude beyond the 180th meridian | yes, now | brought into range |
+| Login | the ninth player | yes, now | «комната полна» |
+| Login | nickname taken | yes, now | «ник занят»; the nickname of a disconnected player returns the seat |
+| Login | mid-round | yes | a spectator until the next round |
+| Login | new tunnel address, empty `localStorage` | yes, now | seat by nickname |
+| «Дальше» | double press, race with the auto-transition | yes, now | round number in the message |
+| Lobby | settings change mid-match | yes, now | only in the lobby |
+| Round | all humans disconnected | yes, now | a pause before the next round |
+| Round | the panorama did not load for one player | yes | countdown after 5 s, «Повторить» for the player |
+| Bot | parallel tool calls | yes, now | turn reserve |
+| Bot | a call after the end of the round | yes, now | «раунд окончен» |
+| Bot | a slot with an unavailable harness | yes | loads disabled |
+| Host | disconnected mid-match | partially | auto-transitions; the rest is for the engineering phase (1.2) |
 
-Разобрано 16 случаев; 10 не были покрыты и закрыты пунктом «Порядок событий и граничные случаи» и входом по нику, один передан инженерной фазе.
+16 cases were analyzed; 10 were not covered and are closed by the item "Event order and edge cases" and by login by nickname, one is passed to the engineering phase.
 
-##### Раздел 5. Качество кода
+##### Section 5. Code quality
 
-Проверены состав каталогов, повторы, имена, избыточность. Кода ещё нет, поэтому оценивается замысел: `shared/` держит протокол, очки и счёт сторон в одном месте; адаптер харнесса это один файл с одной функцией; правило обрыва бота это чистая функция от трёх моментов.
+Checked: directory composition, duplication, names, redundancy. There is no code yet, so the design is assessed: `shared/` keeps the protocol, scoring and side score in one place; a harness adapter is one file with one function; the bot cut-off rule is a pure function of three moments.
 
-- **WARNING 5.1.** Одноразовый код спайка S1 был выведен из-под лимитов размера. Это исключение из правила владельца о лимитах, а оно требует его согласия. Решено: исключение снято, ворота качества действуют и на `spikes/`.
+- **WARNING 5.1.** The throwaway code of spike S1 was exempted from the size limits. That is an exception to the owner's rule on limits, and it requires his agreement. Decided: the exception is removed, the quality gates apply to `spikes/` too.
 
-Избыточность расширений отмечена обоими голосами и вынесена на ворота (C-EXP-ORDER). Других замечаний нет.
+The redundancy of the extensions was noted by both voices and raised at the gate (C-EXP-ORDER). There are no other remarks.
 
-##### Раздел 6. Тесты
-
-```
-  НОВОЕ В ПЛАНЕ                          ТИП ТЕСТА                  ЕСТЬ В ПЛАНЕ
-  формула очков, тай-брейк, D региона    модульный                  да
-  конечный автомат, три момента обрыва   модульный, управляемые часы да (часы параметром: добавлено)
-  протокол и схемы                       модульный                  да
-  выборка точки, три серии               модульный, подмена metadata да
-  ошибки Static, квота, резерв           модульный                  да
-  порядок событий (гонки)                модульный, точки остановки добавлено
-  полная партия, 2 клиента, 3 бота       интеграционный, поддельный харнесс и панорамы   да
-  сбои харнесса (6 сценариев)            интеграционный             добавлено
-  готовность ссылки, перезапуск туннеля  модульный и интеграционный да / добавлено
-  вход, пороги, место по нику            модульный                  да / добавлено
-  два браузера, переподключение          E2E Playwright             да
-  настоящие CLI, проверочный файл        контрактный, по требованию да
-  настоящий туннель                      по требованию              да
-  журнал без секретов                    интеграционный             добавлено
-```
-
-- Тест, с которым не страшно выпускать: полная партия на настоящем WebSocket с двумя клиентами и тремя поддельными ботами через все состояния, с проверкой итоговых очков.
-- Тест враждебного тестировщика: догадка после дедлайна, сообщение 17 КБ, повтор токена бота из прошлого раунда, вход с ником подключённого игрока.
-- Хаос: харнесс убит посреди раунда; `cloudflared` завершился; Static отвечает 403 с третьего раунда.
-- Пирамида правильная: много модульных, меньше интеграционных, один E2E-сценарий.
-- Чего зелёные тесты не доказывают: поведение настоящих харнессов и моделей (поддельный харнесс стоит вместо них; доказывают `bun run test:harness`, спайк S1 и ворота «Первая игра»); приём запросов Google (подменённый провайдер; доказывает спайк S3).
-- **WARNING 6.1.** Тесты автомата и выборки зависели бы от времени и случая. Решено: часы и генератор параметрами.
-- **WARNING 6.2.** Не были перечислены сценарии сбоя поддельного харнесса. Решено: шесть сценариев.
-- **WARNING 6.3.** Не было тестов порядка событий. Решено: тесты с точками остановки.
-
-Наборов оценки моделей (eval) в проекте нет, `CLAUDE.md` ещё не написан. Качество промпта бота проверяется воротами «Первая игра» по записанным партиям.
-
-##### Раздел 7. Производительность
-
-Проверены память, кэширование, медленные пути, число соединений. Память ограничена: миниатюры не больше 86 МБ в предельной партии. Соединений к Google одновременно до 12 (три бота по четыре картинки). Три самых медленных пути: холодный старт харнесса (неизвестно, меряет S1), ход модели (неизвестно, меряет S1), набор из четырёх картинок Static (оценка 1–2 с при параллельных запросах). Холодный старт вынесен из времени раунда запуском в `ROUND_LOADING`.
-
-- **OK 7.1.** Одинаковые запросы картинок разных ботов в одном раунде шли бы в Google дважды. Решено: повтор в пределах раунда берётся из памяти (пункт «Учёт квоты»).
-
-##### Раздел 8. Наблюдаемость
-
-- **GAP 8.1.** Нельзя было восстановить, почему бот вчера получил 0. Решено: пункт «Журнал сервера и ботов» (события раунда, вызовы инструментов, причина завершения, хвост stderr), строка в терминале на раунд, срок хранения 14 дней.
-
-Метрика «работает»: доля раундов с догадкой у каждого бота и ожидание людей; обе пишутся в `matches.jsonl` и входят в критерий ворот «Первая игра». Оповещения и панели для локальной игры не нужны: расход квоты и остаток видны в лобби.
-
-##### Раздел 9. Развёртывание
+##### Section 6. Tests
 
 ```
-  git clone ─> bun install ─> bun run hooks:install ─> .env (два ключа) ─> bun run doctor ─> bun run start ─> ссылка друзьям
-  откат: Ctrl+C ─> git switch --detach <прошлая метка> ─> bun install ─> bun run start
-         файлы в ~/.config и ~/.local/share читаются по полю version; нечитаемые уходят в .bad
+  NEW IN THE PLAN                        TEST TYPE                  IN THE PLAN
+  scoring formula, tie-break, region D   unit                       yes
+  state machine, three cut-off moments   unit, controllable clock   yes (clock as a parameter: added)
+  protocol and schemas                   unit                       yes
+  point sampling, three series           unit, metadata substitution yes
+  Static errors, quota, reserve          unit                       yes
+  event order (races)                    unit, stopping points      added
+  full match, 2 clients, 3 bots          integration, fake harness and panoramas   yes
+  harness failures (6 scenarios)         integration                added
+  link readiness, tunnel restart         unit and integration       yes / added
+  login, thresholds, seat by nickname    unit                       yes / added
+  two browsers, reconnection             E2E Playwright             yes
+  real CLIs, test file                   contract, on demand        yes
+  real tunnel                            on demand                  yes
+  log without secrets                    integration                added
 ```
 
-Миграций, флагов функций и окна «старый код рядом с новым» нет: процесс один. Проверка после запуска: `doctor`, затем ссылка проходит проверку готовности. Дымовой тест: `bun run test:tunnel` по требованию.
+- The test you are not afraid to ship with: a full match over a real WebSocket with two clients and three fake bots through all states, with a check of the final scores.
+- The hostile-tester test: a guess after the deadline, a 17 KB message, reuse of a bot token from a previous round, login with the nickname of a connected player.
+- Chaos: the harness killed mid-round; `cloudflared` exited; Static answers 403 from the third round.
+- The pyramid is right: many unit tests, fewer integration tests, one E2E scenario.
+- What green tests do not prove: the behavior of real harnesses and models (a fake harness stands in for them; proven by `bun run test:harness`, spike S1 and the "First game" gate); acceptance of requests by Google (a substituted provider; proven by spike S3).
+- **WARNING 6.1.** The tests of the state machine and sampling would depend on time and chance. Decided: the clock and generator as parameters.
+- **WARNING 6.2.** The failure scenarios of the fake harness were not listed. Decided: six scenarios.
+- **WARNING 6.3.** There were no event-order tests. Decided: tests with stopping points.
 
-- **WARNING 9.1.** Харнессы обновляются и меняют флаги (замечание Claude 5). Решено: `doctor` сверяет версии с последним успешным `test:harness`.
-- **WARNING 9.2.** Не сказано, собирает ли `start` клиент сам. Не блокирует; владелец выбора: фаза DX.
+There are no model evaluation (eval) suites in the project, and `CLAUDE.md` is not yet written. The quality of the bot prompt is checked by the "First game" gate against the recorded matches.
 
-##### Раздел 10. Долгая траектория
+##### Section 7. Performance
 
-- Долг: одноразовый код `spikes/` (удаляется после M1); три адаптера под чужие CLI; расхождение с условиями Google, если владелец оставит исходный замысел.
-- Обратимость: 4 из 5. Данных в чужих системах нет. Единственная дорогая развилка это выбор карты: два компонента пишутся под неё без слоя подмены.
-- Через год новому человеку план понятен: состояние в одном автомате, протокол в схемах, решения спайков в `docs/spikes/`.
-- Оглядка на расширения: оба голоса считают E1, E4 и E14 преждевременными, поэтому они стоят после ворот и подтверждаются владельцем по данным партии. Отложенные «свои списки точек» могут оказаться нужными раньше (замечание Codex 5): для этого есть правило ворот.
-- После первой версии: экран истории, зал славы людей и моделей, постоянный адрес. Журнал партий с замерами по ботам уже даёт данные для сравнения моделей.
+Checked: memory, caching, slow paths, number of connections. Memory is bounded: thumbnails at most 86 MB in the maximum match. Up to 12 simultaneous connections to Google (three bots by four images). The three slowest paths: the harness cold start (unknown, measured by S1), the model's turn (unknown, measured by S1), a set of four Static images (estimate 1–2 s with parallel requests). The cold start is moved out of round time by launching in `ROUND_LOADING`.
 
-##### Раздел 11. Дизайн и UX
+- **OK 7.1.** Identical image requests from different bots in one round would go to Google twice. Decided: a repeat within a round is taken from memory (item "Quota accounting").
+
+##### Section 8. Observability
+
+- **GAP 8.1.** It was impossible to reconstruct why a bot got 0 yesterday. Decided: the item "Server and bot log" (round events, tool calls, completion reason, stderr tail), a line in the terminal per round, a retention of 14 days.
+
+The "it works" metric: the share of rounds with a guess for each bot and the humans' waiting; both are written to `matches.jsonl` and are part of the "First game" gate criterion. Alerts and dashboards are not needed for a local game: quota consumption and the remainder are visible in the lobby.
+
+##### Section 9. Deployment
 
 ```
-  ссылка ─> Join (ник, цвет) ─> Lobby ─> отсчёт 3-2-1 ─> Round ─> RoundResults ─┬─> отсчёт ─> Round ...
-              │ ошибки: токен,     │ хост: настройки,       │ «ИИ думают»,         │ карточка ИИ
-              │ комната полна,     │ слоты ИИ, квота        │ ожидание             └─> Final ─> «Ещё раз» ─> Lobby
-              │ ник занят          │ гость: только смотрит  │ панорама не загрузилась: «Повторить»
+  git clone ─> bun install ─> bun run hooks:install ─> .env (two keys) ─> bun run doctor ─> bun run start ─> link to friends
+  rollback: Ctrl+C ─> git switch --detach <previous tag> ─> bun install ─> bun run start
+            files in ~/.config and ~/.local/share are read by the version field; unreadable ones go to .bad
 ```
 
-| Экран | Загрузка | Пусто | Ошибка | Успех | Частично |
+There are no migrations, feature flags or an "old code beside new" window: there is one process. Post-launch verification: `doctor`, then the link passes the readiness check. Smoke test: `bun run test:tunnel` on demand.
+
+- **WARNING 9.1.** Harnesses update and change flags (Claude's remark 5). Decided: `doctor` compares versions with the last successful `test:harness`.
+- **WARNING 9.2.** It is not said whether `start` builds the client itself. Not blocking; owner of the choice: DX phase.
+
+##### Section 10. Long-term trajectory
+
+- Debt: the throwaway code of `spikes/` (deleted after M1); three adapters for other people's CLIs; the conflict with Google's terms if the owner keeps the original design.
+- Reversibility: 4 of 5. There is no data in other systems. The only expensive fork is the choice of map: two components are written for it without a substitution layer.
+- A year later the plan is understandable to a newcomer: state in one state machine, protocol in schemas, spike decisions in `docs/spikes/`.
+- A look at the extensions: both voices consider E1, E4 and E14 premature, so they stand after the gate and are confirmed by the owner from match data. The deferred "custom point lists" may turn out to be needed sooner (Codex's remark 5): the gate rule exists for this.
+- After the first version: a history screen, a hall of fame of humans and models, a permanent address. The match log with per-bot measurements already provides data for comparing models.
+
+##### Section 11. Design and UX
+
+```
+  link ─> Join (nickname, color) ─> Lobby ─> countdown 3-2-1 ─> Round ─> RoundResults ─┬─> countdown ─> Round ...
+              │ errors: token,       │ host: settings,           │ «ИИ думают»,         │ AI card
+              │ room full,           │ AI slots, quota           │ waiting              └─> Final ─> «Ещё раз» ─> Lobby
+              │ nickname taken       │ guest: view only          │ panorama did not load: «Повторить»
+```
+
+| Screen | Loading | Empty | Error | Success | Partial |
 |---|---|---|---|---|---|
-| Join | соединение | нет | неверный токен, комната полна, ник занят | вход в лобби | нет |
-| Lobby | проверка слота ИИ | нет слотов ИИ | квоты не хватает, харнесс недоступен, файл настроек сброшен | старт | слот выключен с причиной |
-| Round | панорама грузится | метка не поставлена | панорама не загрузилась, обрыв связи | ответ принят | «ИИ думают», ожидание |
-| RoundResults | метки появляются по очереди | никто не ответил | бот без догадки с причиной | таблица и дуги | часть ботов оборвана |
-| Final | нет | партия из одного раунда | запись партии не удалась | пьедестал | места поделены |
+| Join | connecting | none | wrong token, room full, nickname taken | entering the lobby | none |
+| Lobby | AI slot check | no AI slots | not enough quota, harness unavailable, settings file reset | start | a slot disabled with a cause |
+| Round | the panorama is loading | marker not placed | the panorama did not load, connection lost | answer accepted | «ИИ думают», waiting |
+| RoundResults | markers appear one by one | nobody answered | a bot without a guess, with a cause | table and arcs | some bots cut off |
+| Final | none | a match of one round | saving the match failed | podium | places shared |
 
-Первое, второе, третье на экране раунда: панорама, таймер, мини-карта; список участников сбоку. Эмоциональная дуга: ожидание в отсчёте, напряжение таймера, развязка на карте результатов, разбор объяснений ИИ.
+First, second, third on the round screen: the panorama, the timer, the minimap; the participant list at the side. The emotional arc: anticipation in the countdown, the tension of the timer, the payoff on the results map, the review of the AI's explanations.
 
-- **WARNING 11.1.** Состояния ошибок были отнесены к M4, а нужны уже в первой игре. Решено: состояние входит в ту веху, где названо его правило (пункт «Порядок вех»).
-- **WARNING 11.2.** Визуального языка нет (`DESIGN.md` отсутствует), описание экранов общее. Владелец: фаза дизайна.
-- **WARNING 11.3.** Узкие экраны: мобильная раскладка отложена, но друг может открыть ссылку с телефона. Владелец: фаза дизайна.
-- **WARNING 11.4.** Пригласительная ссылка видна только в терминале; кнопки «скопировать приглашение» в лобби нет. Владелец: фаза дизайна.
+- **WARNING 11.1.** Error states were assigned to M4, yet they are needed already in the first game. Decided: a state belongs to the milestone where its rule is named (item "Milestone order").
+- **WARNING 11.2.** There is no visual language (`DESIGN.md` is absent), the description of the screens is general. Owner: design phase.
+- **WARNING 11.3.** Narrow screens: the mobile layout is deferred, but a friend may open the link from a phone. Owner: design phase.
+- **WARNING 11.4.** The invitation link is visible only in the terminal; there is no «copy invitation» button in the lobby. Owner: design phase.
 
-Доступность: `prefers-reduced-motion` учтён; клавиатура, контраст и различимость цветов участников переданы фазе дизайна. После реализации нужен `/design-review` на живой игре.
+Accessibility: `prefers-reduced-motion` is accounted for; keyboard, contrast and distinguishability of participants' colors are passed to the design phase. After implementation a `/design-review` on the live game is needed.
 
-#### Обязательные выходы CEO-фазы
+#### Mandatory outputs of the CEO phase
 
-##### Вне рамок
+##### Not in scope
 
-Отложено (записано в `TODOS.md`):
+Deferred (recorded in `TODOS.md`):
 
-- C-D1 «Звуки»: не нужно для первой партии.
-- C-D2 «Экран истории партий и зал славы»: данные уже пишутся, экран потом.
-- C-D3 «Свои списки точек»: отдельный источник точек; входит в M2, если ворота «Первая игра» покажут скучные места.
-- C-D4 «Восстановление партии после перезапуска сервера»: осознанное упрощение.
-- C-D5 «Мобильная раскладка»: владелец её не просил.
+- C-D1 «Звуки» ("Sounds"): not needed for the first match.
+- C-D2 «Экран истории партий и зал славы» ("Match history screen and hall of fame"): the data is already written, the screen comes later.
+- C-D3 «Свои списки точек» ("Custom point lists"): a separate source of points; included in M2 if the "First game" gate shows boring locations.
+- C-D4 «Восстановление партии после перезапуска сервера» ("Recovering a match after a server restart"): a deliberate simplification.
+- C-D5 «Мобильная раскладка» ("Mobile layout"): the owner did not ask for it.
 
-Отклонено (в `TODOS.md` не идёт):
+Declined (does not go into `TODOS.md`):
 
-- C-X1 лента мыслей бота: подсказывает людям ответ.
-- C-X2 повтор хода человека: не нужно для цели.
-- C-X3 бонус за скорость: меняет правило победы.
-- C-X4 подсказки ИИ людям: другой продукт.
-- C-X5 ссылка зрителя: поздний вход уже даёт режим зрителя.
-- C-DIRECT-API боты через прямой API: владелец просил подписки.
-- C-DEADLINE фиксированный дедлайн бота: правила конца раунда уже заданы и покрыты тестами.
-- Исключение игрока хостом: приглашение отзывается перезапуском.
-- Набор оценки моделей на фиксированных точках: первая калибровка идёт по записанным партиям.
+- C-X1 bot thought feed: hints the answer to humans.
+- C-X2 replay of a human's turn: not needed for the goal.
+- C-X3 speed bonus: changes the winning rule.
+- C-X4 AI hints to humans: a different product.
+- C-X5 spectator link: late joining already gives a spectator mode.
+- C-DIRECT-API bots via the direct API: the owner asked for subscriptions.
+- C-DEADLINE a fixed bot deadline: the round-end rules are already set and covered by tests.
+- Kicking a player by the host: an invitation is revoked by restarting.
+- A model evaluation set on fixed points: the first calibration goes by the recorded matches.
 
-##### Что уже есть
+##### What already exists
 
-Кода в репозитории нет. Готовое вне репозитория, на которое план опирается: `cloudflared` (туннель), CLI `codex`, `claude`, `agy` (исполнение моделей и MCP), Maps JavaScript API и Street View Static API, MapLibre GL и OpenFreeMap (пока действует исходный выбор карты), `Bun.serve` с WebSocket, анимации Svelte, `sharp`, `zod`. Открытые клоны жанра проверяет спайк S4; по умолчанию своя сборка.
+There is no code in the repository. Ready-made pieces outside the repository that the plan relies on: `cloudflared` (tunnel), the CLIs `codex`, `claude`, `agy` (model execution and MCP), Maps JavaScript API and Street View Static API, MapLibre GL and OpenFreeMap (while the original map choice applies), `Bun.serve` with WebSocket, Svelte animations, `sharp`, `zod`. Open-source clones of the genre are surveyed by spike S4; by default an own build.
 
-##### Разрыв с идеалом через 12 месяцев
+##### Gap to the 12-month ideal
 
-После этого плана есть игровой вечер на троих людей и троих ИИ с объяснениями и записью партий. До идеала остаются: история и зал славы, свои списки точек, звуки, телефон, партия, переживающая перезапуск, постоянный адрес. Всё это строится поверх того же сервера и файлов без переделки. Главный разрыв не технический: соответствие условиям Google зависит от решений владельца UC-1 и UC-2.
+After this plan there is a game night for three humans and three AIs with explanations and match recording. What remains to the ideal: history and hall of fame, custom point lists, sounds, phone, a match that survives a restart, a permanent address. All of this is built on top of the same server and files without rework. The main gap is not technical: compliance with Google's terms depends on the owner's decisions UC-1 and UC-2.
 
-##### Реестр ошибок и спасения
+##### Error and rescue register
 
-| Компонент | Что может пойти не так | Спасено? | Действие | Что видит человек |
+| Component | What can go wrong | Rescued? | Action | What the person sees |
 |---|---|---|---|---|
-| `LocationService` | панорамы рядом нет | да | до 30 попыток, до 3 серий | ничего, подготовка заранее |
-| `LocationService` | три серии без результата | да | раунд не начинается | хост: «панорама не найдена», «Повторить», «Завершить партию» |
-| `LocationService` | отказ ключа, квота metadata | да | остановка сразу | хост: причина и те же кнопки |
-| `LocationService` | сеть, тайм-аут 5 с | да | один повтор, затем остановка | хост: причина |
-| `BotImageService` | 404, снимка нет | да | неудачный вызов; 3 бесплатных за раунд | бот: текст; люди: ничего |
-| `BotImageService` | 403, 429 | да | «картинки недоступны» | хост: предупреждение с причиной |
-| `BotImageService` | стартовая картинка не получена | да | новая точка, до 3 | ничего |
-| `BotImageService` | битая картинка в `sharp` | да | неудачный вызов | бот: текст |
-| Счётчик квоты | потолок до старта партии | да | партия не стартует | лобби: расход, худший случай, остаток |
-| Счётчик квоты | потолок посреди партии | да | «квота исчерпана» без списания хода | партия доигрывается |
-| Счётчик квоты | `quota.json` не читается | да | `.bad`, счётчик с нуля | предупреждение в терминале и лобби |
-| `BotRunner` | CLI не найден или не вошёл | да | слот выключен | причина у слота, `doctor` даёт команду |
-| `BotRunner` | харнесс завис | да | SIGTERM, через 2 с SIGKILL по дедлайну | «оборван»; засчитана последняя догадка |
-| `BotRunner` | харнесс упал | да | последняя догадка, иначе 0 | причина в карточке ИИ |
-| `BotRunner` | лимит подписки | да | последняя догадка, иначе 0 | ошибка лимита в карточке ИИ |
-| `BotRunner` | модель отказалась угадывать | да | 0 очков | причина и хвост текста в карточке ИИ |
-| Инструменты `geo` | неверные аргументы | да | текст ошибки, ход не списан | ничего |
-| Инструменты `geo` | длинное объяснение или реплика | да | обрезка | обрезанный текст |
-| Инструменты `geo` | вызов после конца раунда, чужой токен | да | «раунд окончен» | ничего |
-| Инструменты `geo` | ходы кончились | да | ошибка «вызови submit_guess» | счётчик ходов в списке участников |
-| WebSocket | неверный токен | да | закрытие; учёт в порогах (M3) | экран входа: «ссылка недействительна» |
-| WebSocket | сообщение не по схеме или больше 16 КБ | да | отказ или закрытие | игрок: сообщение об ошибке |
-| WebSocket | обрыв связи | да | переподключение, место сохраняется | «соединение восстанавливается» |
-| Туннель | имя не появилось в DNS за 60 с | да | ошибка с причиной | хост: совет перезапустить `start` |
-| Туннель | `cloudflared` завершился | да | до 3 перезапусков, новая ссылка | хост: новая ссылка; игроки входят по нику |
-| Клиент | Maps JavaScript API не загрузился | да | `client_error`, «Повторить» | игрок: сообщение; хост: пометка |
-| Запись партии | ошибка записи `matches.jsonl` | да | партия не прерывается | хост: сообщение на экране финала |
+| `LocationService` | no panorama nearby | yes | up to 30 attempts, up to 3 series | nothing, preparation is in advance |
+| `LocationService` | three series without a result | yes | the round does not start | host: «панорама не найдена», «Повторить», «Завершить партию» |
+| `LocationService` | key rejection, metadata quota | yes | stop immediately | host: the cause and the same buttons |
+| `LocationService` | network, 5 s timeout | yes | one retry, then stop | host: the cause |
+| `BotImageService` | 404, no imagery | yes | a failed call; 3 free per round | bot: text; humans: nothing |
+| `BotImageService` | 403, 429 | yes | «картинки недоступны» | host: a warning with the cause |
+| `BotImageService` | starting image not received | yes | new point, up to 3 | nothing |
+| `BotImageService` | broken image in `sharp` | yes | a failed call | bot: text |
+| Quota counter | cap before the match starts | yes | the match does not start | lobby: consumption, worst case, remainder |
+| Quota counter | cap mid-match | yes | «квота исчерпана» without deducting a turn | the match is played to the end |
+| Quota counter | `quota.json` is unreadable | yes | `.bad`, counter from zero | a warning in the terminal and lobby |
+| `BotRunner` | CLI not found or not signed in | yes | the slot is disabled | the cause at the slot, `doctor` gives the command |
+| `BotRunner` | the harness hung | yes | SIGTERM, after 2 s SIGKILL at the deadline | «оборван» ("cut off"); the last guess is counted |
+| `BotRunner` | the harness crashed | yes | the last guess, otherwise 0 | the cause in the AI card |
+| `BotRunner` | subscription limit | yes | the last guess, otherwise 0 | the limit error in the AI card |
+| `BotRunner` | the model refused to guess | yes | 0 points | the cause and the text tail in the AI card |
+| `geo` tools | wrong arguments | yes | error text, turn not deducted | nothing |
+| `geo` tools | long explanation or quip | yes | truncation | truncated text |
+| `geo` tools | a call after the end of the round, a foreign token | yes | «раунд окончен» | nothing |
+| `geo` tools | turns exhausted | yes | the error «вызови submit_guess» ("call submit_guess") | the turn counter in the participant list |
+| WebSocket | wrong token | yes | close; counted in the thresholds (M3) | login screen: «ссылка недействительна» ("the link is invalid") |
+| WebSocket | a message not matching the schema or larger than 16 KB | yes | refusal or close | player: an error message |
+| WebSocket | connection lost | yes | reconnection, the seat is kept | «соединение восстанавливается» ("connection is being restored") |
+| Tunnel | the name did not appear in DNS within 60 s | yes | an error with the cause | host: advice to restart `start` |
+| Tunnel | `cloudflared` exited | yes | up to 3 restarts, a new link | host: the new link; players log in by nickname |
+| Client | Maps JavaScript API did not load | yes | `client_error`, «Повторить» | player: a message; host: a note |
+| Match recording | a write error of `matches.jsonl` | yes | the match is not interrupted | host: a message on the final screen |
 
-27 строк, пробелов без решения нет.
+27 rows, no gaps without a decision.
 
-##### Реестр видов отказа
+##### Failure mode register
 
-| Путь | Отказ | Спасено? | Тест? | Что видит человек | В журнале? |
+| Path | Failure | Rescued? | Test? | What the person sees | In the log? |
 |---|---|---|---|---|---|
-| Подготовка раунда | панорама не найдена | да | да | хост: ошибка и кнопки | да |
-| Подготовка раунда | отказ ключа Google | да | да | хост: причина | да |
-| Картинки бота | 404 | да | да | ничего | да |
-| Картинки бота | 403, 429 | да | да | хост: предупреждение | да |
-| Квота | потолок до старта | да | да | лобби: расчёт | да |
-| Квота | потолок посреди партии | да | да | партия доигрывается | да |
-| Харнесс | зависание | да | да | «оборван» | да |
-| Харнесс | падение до догадки | да | да | причина в карточке | да |
-| Харнесс | отказ модели | да | да (поддельный харнесс) | причина в карточке | да |
-| Харнесс | настоящий CLI сменил флаги | частично | по требованию (`test:harness`) | `doctor`: версия изменилась | да |
-| Инструменты | параллельные вызовы сверх лимита | да | да | ничего | да |
-| Инструменты | вызов после конца раунда | да | да | ничего | да |
-| Вход | новый адрес туннеля, место потеряно | да | да | вход по нику | да |
-| Туннель | процесс завершился | да | да (поддельный процесс) | новая ссылка | да |
-| Клиент | панорама не загрузилась | да | E2E с заглушкой | «Повторить»; пометка у хоста | да |
-| Файлы | нечитаемые настройки или квота | да | да | предупреждение | да |
-| Хост | отключился посреди партии | частично | не задан | автопереходы | да |
+| Round preparation | panorama not found | yes | yes | host: error and buttons | yes |
+| Round preparation | Google key rejection | yes | yes | host: the cause | yes |
+| Bot images | 404 | yes | yes | nothing | yes |
+| Bot images | 403, 429 | yes | yes | host: a warning | yes |
+| Quota | cap before the start | yes | yes | lobby: the calculation | yes |
+| Quota | cap mid-match | yes | yes | the match is played to the end | yes |
+| Harness | hang | yes | yes | «оборван» | yes |
+| Harness | crash before a guess | yes | yes | the cause in the card | yes |
+| Harness | model refusal | yes | yes (fake harness) | the cause in the card | yes |
+| Harness | the real CLI changed its flags | partially | on demand (`test:harness`) | `doctor`: the version changed | yes |
+| Tools | parallel calls beyond the limit | yes | yes | nothing | yes |
+| Tools | a call after the end of the round | yes | yes | nothing | yes |
+| Login | new tunnel address, seat lost | yes | yes | login by nickname | yes |
+| Tunnel | the process exited | yes | yes (fake process) | a new link | yes |
+| Client | the panorama did not load | yes | E2E with a stub | «Повторить»; a note for the host | yes |
+| Files | unreadable settings or quota | yes | yes | a warning | yes |
+| Host | disconnected mid-match | partially | not set | auto-transitions | yes |
 
-17 строк. Строк «не спасено, без теста, молча» нет: критических пробелов 0. Две строки «частично» имеют владельцев: смена флагов CLI (контрактные тесты по требованию) и отключение хоста (инженерная фаза).
+17 rows. There are no rows "not rescued, no test, silent": critical gaps 0. The two "partially" rows have owners: CLI flag changes (contract tests on demand) and host disconnection (engineering phase).
 
-##### Решения о расширениях
+##### Extension decisions
 
-Полная запись в сводке `~/.gstack/projects/tass/ceo-plans/2026-11-13-geoaissr.md`.
+The full record is in the summary `~/.gstack/projects/tass/ceo-plans/2026-11-13-geoaissr.md`.
 
-- Принято: E1 (сложность ботов), E2 (счёт «Люди против ИИ»), E4 (характер и реплика), E14 (`--public-url`); все после ворот «Первая игра».
-- Отложено: D1–D5, записаны в `TODOS.md`.
-- Пропущено: X1–X5.
+- Accepted: E1 (bot difficulty), E2 (the "Humans vs AI" score), E4 (persona and quip), E14 (`--public-url`); all after the "First game" gate.
+- Deferred: D1–D5, recorded in `TODOS.md`.
+- Skipped: X1–X5.
 
-##### Диаграммы
+##### Diagrams
 
-Составлено 7: архитектура с границей доверия (раздел 1), конечный автомат (раздел 1), потоки данных с теневыми путями (раздел 4), порядок асинхронных событий (раздел 4), карта тестов (раздел 6), развёртывание и откат (раздел 9), путь игрока по экранам (раздел 11). Схема ошибок дана реестром выше. Устаревших диаграмм нет: единственная диаграмма рабочего плана (раздел 7) верна.
+7 were drawn up: architecture with the trust boundary (section 1), the state machine (section 1), data flows with shadow paths (section 4), the order of asynchronous events (section 4), the test map (section 6), deployment and rollback (section 9), the player's path through the screens (section 11). The error scheme is given by the register above. There are no stale diagrams: the one diagram of the working plan (section 7) is correct.
 
 ##### Implementation Tasks
 
 Synthesized from this review's findings. Each task derives from a specific
 finding above. Run with Claude Code or Codex; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~30min / CC: n/a)** — решения владельца — выбрать карту, решить вопрос ИИ на снимках Google, создать приватный remote
-  - Surfaced by: 0.5 Два голоса, UC-1 и UC-2; C-REMOTE
+- [ ] **T1 (P1, human: ~30min / CC: n/a)** — owner decisions — choose the map, decide the question of AI on Google imagery, create a private remote
+  - Surfaced by: 0.5 Two voices, UC-1 and UC-2; C-REMOTE
   - Files: PLAN.md
-  - Verify: решения записаны в плане до начала кода M1
-- [ ] **T2 (P1, human: ~2h / CC: ~10min)** — ворота качества — `pre-commit` с `bun run check`, пока нет remote; проверка отслеживания `.env`
-  - Surfaced by: C-F8; раздел 3, замечание 3.1
+  - Verify: the decisions are recorded in the plan before M1 code begins
+- [ ] **T2 (P1, human: ~2h / CC: ~10min)** — quality gates — `pre-commit` with `bun run check` while there is no remote; a check for `.env` tracking
+  - Surfaced by: C-F8; section 3, remark 3.1
   - Files: .githooks/pre-commit, .githooks/pre-push, .gitignore, package.json
-  - Verify: `bun run hooks:install`, затем коммит с нарушением лимита отклоняется
-- [ ] **T3 (P1, human: ~2d / CC: ~3h)** — спайк S1 — полный раунд бота на каждом харнессе, три бота одновременно, проверка изоляции
+  - Verify: `bun run hooks:install`, then a commit violating a limit is rejected
+- [ ] **T3 (P1, human: ~2d / CC: ~3h)** — spike S1 — a full bot round on each harness, three bots at once, an isolation check
   - Surfaced by: Claude 2, Codex 3; C-S1FULL, C-F13
   - Files: spikes/, docs/spikes/
-  - Verify: отчёт в `docs/spikes/` с решением по критерию допуска для каждого харнесса
-- [ ] **T4 (P1, human: ~1d / CC: ~1h)** — спайки S2, S3, S4 — туннель 15 минут, ключи и цены Google, обзор клонов
+  - Verify: a report in `docs/spikes/` with a decision against the admission criterion for each harness
+- [ ] **T4 (P1, human: ~1d / CC: ~1h)** — spikes S2, S3, S4 — tunnel for 15 minutes, Google keys and prices, a survey of clones
   - Surfaced by: Claude 4, Claude 11, Codex 7
   - Files: docs/spikes/
-  - Verify: три отчёта с решениями; дневные квоты выставлены в Cloud Console
-- [ ] **T5 (P1, human: ~3d / CC: ~2h)** — `GameEngine` — три момента обрыва бота, окно ожидания, запуск харнесса в `ROUND_LOADING`, пауза без людей
-  - Surfaced by: C-F6, C-PREWARM; раздел 4
+  - Verify: three reports with decisions; daily quotas set in the Cloud Console
+- [ ] **T5 (P1, human: ~3d / CC: ~2h)** — `GameEngine` — three bot cut-off moments, the waiting window, launching the harness in `ROUND_LOADING`, a pause with no humans
+  - Surfaced by: C-F6, C-PREWARM; section 4
   - Files: to be determined
-  - Verify: модульные тесты автомата с управляемыми часами
-- [ ] **T6 (P1, human: ~2d / CC: ~1h)** — порядок событий — проверка фазы после ожиданий, резерв хода и квоты, положение метки на сервере
-  - Surfaced by: раздел 4, порядок асинхронных событий
+  - Verify: unit tests of the state machine with a controllable clock
+- [ ] **T6 (P1, human: ~2d / CC: ~1h)** — event order — phase check after waits, turn and quota reserve, marker position on the server
+  - Surfaced by: section 4, order of asynchronous events
   - Files: to be determined
-  - Verify: модульные тесты с точками остановки на оба порядка завершения
-- [ ] **T7 (P1, human: ~2d / CC: ~1h)** — картинки и квота — `return_error_code=true`, неудачные вызовы, 403 и 429, счётчик и проверка перед стартом
-  - Surfaced by: C-F2, C-F11; раздел 2, пробелы 2.1 и 2.2
+  - Verify: unit tests with stopping points for both completion orders
+- [ ] **T7 (P1, human: ~2d / CC: ~1h)** — images and quota — `return_error_code=true`, failed calls, 403 and 429, the counter and the pre-start check
+  - Surfaced by: C-F2, C-F11; section 2, gaps 2.1 and 2.2
   - Files: to be determined
-  - Verify: модульные тесты с подменёнными ответами Google
-- [ ] **T8 (P1, human: ~2d / CC: ~1h)** — подготовка раунда — три серии выборки, замена точки, мгновенная остановка при отказе ключа
-  - Surfaced by: C-F14; раздел 2, пробел 2.1
+  - Verify: unit tests with substituted Google responses
+- [ ] **T8 (P1, human: ~2d / CC: ~1h)** — round preparation — three sampling series, point replacement, immediate stop on key rejection
+  - Surfaced by: C-F14; section 2, gap 2.1
   - Files: to be determined
-  - Verify: модульные тесты выборки с управляемым генератором
-- [ ] **T9 (P1, human: ~2d / CC: ~1h)** — ссылка и туннель — проверка готовности, перезапуск `cloudflared`, место по нику
-  - Surfaced by: C-F3; раздел 2, пробел 2.5
+  - Verify: unit tests of sampling with a controllable generator
+- [ ] **T9 (P1, human: ~2d / CC: ~1h)** — link and tunnel — readiness check, `cloudflared` restart, seat by nickname
+  - Surfaced by: C-F3; section 2, gap 2.5
   - Files: to be determined
-  - Verify: модульные тесты с подменёнными DNS и HTTP; `bun run test:tunnel`
-- [ ] **T10 (P1, human: ~1d / CC: ~45min)** — изоляция бота — окружение из белого списка, флаги харнесса, рабочий каталог вне репозитория
+  - Verify: unit tests with substituted DNS and HTTP; `bun run test:tunnel`
+- [ ] **T10 (P1, human: ~1d / CC: ~45min)** — bot isolation — allowlisted environment, harness flags, a working directory outside the repository
   - Surfaced by: C-F13; Claude 13
   - Files: to be determined
-  - Verify: модульный тест состава окружения; `bun run test:harness` с проверочным файлом
-- [ ] **T11 (P1, human: ~1d / CC: ~45min)** — инструменты `geo` — проверка аргументов, обрезка объяснения, причина при отсутствии догадки
-  - Surfaced by: раздел 2, пробелы 2.3 и 2.4
+  - Verify: a unit test of the environment composition; `bun run test:harness` with a test file
+- [ ] **T11 (P1, human: ~1d / CC: ~45min)** — `geo` tools — argument validation, explanation truncation, a cause when there is no guess
+  - Surfaced by: section 2, gaps 2.3 and 2.4
   - Files: to be determined
-  - Verify: модульные тесты схемы; интеграционный сценарий «харнесс без догадки»
-- [ ] **T12 (P1, human: ~1d / CC: ~45min)** — ворота «Первая игра» — замеры по ботам в `matches.jsonl`, шаблон `docs/playtest-1.md`
+  - Verify: unit tests of the schema; an integration scenario "harness without a guess"
+- [ ] **T12 (P1, human: ~1d / CC: ~45min)** — "First game" gate — per-bot measurements in `matches.jsonl`, a `docs/playtest-1.md` template
   - Surfaced by: Claude 9, Codex 2; C-GATE1
   - Files: docs/playtest-1.md
-  - Verify: после партии с поддельным харнессом запись содержит все поля замеров
-- [ ] **T13 (P2, human: ~1d / CC: ~30min)** — журнал — события сервера и ботов в `logs/<дата>.jsonl`, строка на раунд в терминале
-  - Surfaced by: раздел 8, пробел 8.1
+  - Verify: after a match with a fake harness the record contains all the measurement fields
+- [ ] **T13 (P2, human: ~1d / CC: ~30min)** — log — server and bot events in `logs/<date>.jsonl`, a line per round in the terminal
+  - Surfaced by: section 8, gap 8.1
   - Files: to be determined
-  - Verify: интеграционный тест: в журнале есть причина завершения каждого бота и нет токенов
-- [ ] **T14 (P2, human: ~1d / CC: ~30min)** — локальные файлы — поле `version`, схема, файл `.bad`, сообщение при ошибке записи партии
-  - Surfaced by: раздел 1, замечание 1.1
+  - Verify: an integration test: the log contains the completion reason of each bot and no tokens
+- [ ] **T14 (P2, human: ~1d / CC: ~30min)** — local files — a `version` field, a schema, a `.bad` file, a message on a match-write error
+  - Surfaced by: section 1, remark 1.1
   - Files: to be determined
-  - Verify: модульные тесты на нечитаемые файлы
-- [ ] **T15 (P2, human: ~1d / CC: ~30min)** — очки — последняя догадка бота, тай-брейк, `D` для пресетов регионов
+  - Verify: unit tests for unreadable files
+- [ ] **T15 (P2, human: ~1d / CC: ~30min)** — scoring — the bot's last guess, tie-break, `D` for region presets
   - Surfaced by: C-F9, C-F10
   - Files: shared/, scripts/build-regions.ts
-  - Verify: модульные тесты формулы и тай-брейка
-- [ ] **T16 (P2, human: ~1d / CC: ~30min)** — снимки бота — миниатюры в памяти до лобби, полные картинки до конца раунда, повтор запроса из памяти
-  - Surfaced by: C-F7; раздел 7, замечание 7.1
+  - Verify: unit tests of the formula and tie-break
+- [ ] **T16 (P2, human: ~1d / CC: ~30min)** — bot snapshots — thumbnails in memory until the lobby, full images until the end of the round, a repeated request served from memory
+  - Surfaced by: C-F7; section 7, remark 7.1
   - Files: to be determined
-  - Verify: интеграционный тест: после партии миниатюры недоступны, временный каталог удалён
-- [ ] **T17 (P2, human: ~3d / CC: ~2h)** — M2 после ворот — сложность ботов, счёт «Люди против ИИ», характер и реплика
+  - Verify: an integration test: after the match the thumbnails are unavailable, the temporary directory is deleted
+- [ ] **T17 (P2, human: ~3d / CC: ~2h)** — M2 after the gate — bot difficulty, the "Humans vs AI" score, persona and quip
   - Surfaced by: C-E1, C-E2, C-E4; C-EXP-ORDER
   - Files: to be determined
-  - Verify: модульные тесты пресетов, счёта сторон и схемы реплики
-- [ ] **T18 (P2, human: ~2d / CC: ~1h)** — M3 после ворот — `--public-url`, пороги входа, учёт панорам, сверка версий харнессов в `doctor`
-  - Surfaced by: C-E14, C-F12, C-F11; раздел 9, замечание 9.1
+  - Verify: unit tests of presets, the side score and the quip schema
+- [ ] **T18 (P2, human: ~2d / CC: ~1h)** — M3 after the gate — `--public-url`, login thresholds, panorama accounting, harness version check in `doctor`
+  - Surfaced by: C-E14, C-F12, C-F11; section 9, remark 9.1
   - Files: to be determined
-  - Verify: модульные тесты флагов, порогов и `pano_loaded`
+  - Verify: unit tests of flags, thresholds and `pano_loaded`
 
-Допущение оценок: человек считает полную команду с проверкой; CC считает работу агента без ожидания владельца.
+Estimate assumption: the human figure counts a full team with verification; CC counts the agent's work without waiting for the owner.
 
-##### Незакрытые решения
+##### Unresolved decisions
 
-- UC-1 (C-MAP): карта для ответа. Решает владелец на финальных воротах.
-- UC-2 (C-TOS): ИИ на снимках Google. Решает владелец на финальных воротах.
-- C-REMOTE: приватный remote. Действие владельца.
-- 1.2: поведение при отключении хоста. Инженерная фаза.
-- 9.2: собирает ли `start` клиент сам. Фаза DX.
-- 11.2, 11.3, 11.4: визуальный язык, узкие экраны, кнопка приглашения в лобби. Фаза дизайна.
+- UC-1 (C-MAP): the map for the answer. Decided by the owner at the final gate.
+- UC-2 (C-TOS): AI on Google imagery. Decided by the owner at the final gate.
+- C-REMOTE: a private remote. Owner action.
+- 1.2: behavior when the host disconnects. Engineering phase.
+- 9.2: whether `start` builds the client itself. DX phase.
+- 11.2, 11.3, 11.4: visual language, narrow screens, the invite button in the lobby. Design phase.
 
-##### Строки реальности и итог
+##### Reality lines and summary
 
-Семь строк `REALITY:` записаны в шаге 0B выше. Проверка `gstack-plan-reality check --phase ceo --plan <снимок autoplan-ceo-Tg3Hze>` напечатала:
+Seven `REALITY:` lines are recorded in step 0B above. The check `gstack-plan-reality check --phase ceo --plan <snapshot autoplan-ceo-Tg3Hze>` printed:
 
 `PLAN_REALITY: phase=ceo rows=7/7 missing=none unverified=7 verdict=complete`
 
@@ -1499,277 +1499,277 @@ finding above. Run with Claude Code or Codex; checkbox as you ship.
   |            MEGA PLAN REVIEW — COMPLETION SUMMARY                   |
   +====================================================================+
   | Mode selected        | SELECTIVE EXPANSION                         |
-  | System Audit         | пустой репозиторий, нет remote и CLAUDE.md  |
-  | Step 0               | SELECTIVE EXPANSION; своя сборка; 4 принято |
-  |                      | 5 отложено, 5 пропущено; 15 исправлений     |
+  | System Audit         | empty repository, no remote or CLAUDE.md    |
+  | Step 0               | SELECTIVE EXPANSION; own build; 4 accepted  |
+  |                      | 5 deferred, 5 skipped; 15 fixes             |
   | Section 1  (Arch)    | 2 issues found                              |
-  | Section 2  (Errors)  | 27 error paths mapped, 7 GAPS (все закрыты) |
+  | Section 2  (Errors)  | 27 error paths mapped, 7 GAPS (all closed)  |
   | Section 3  (Security)| 3 issues found, 0 High severity             |
-  | Section 4  (Data/UX) | 16 edge cases mapped, 1 unhandled (к Eng)   |
+  | Section 4  (Data/UX) | 16 edge cases mapped, 1 unhandled (to Eng)  |
   | Section 5  (Quality) | 1 issues found                              |
-  | Section 6  (Tests)   | Diagram produced, 3 gaps (все закрыты)      |
+  | Section 6  (Tests)   | Diagram produced, 3 gaps (all closed)       |
   | Section 7  (Perf)    | 1 issues found                              |
-  | Section 8  (Observ)  | 1 gaps found (закрыт)                       |
+  | Section 8  (Observ)  | 1 gaps found (closed)                       |
   | Section 9  (Deploy)  | 2 risks flagged                             |
   | Section 10 (Future)  | Reversibility: 4/5, debt items: 3           |
-  | Section 11 (Design)  | 4 issues (1 решено, 3 к фазе дизайна)       |
+  | Section 11 (Design)  | 4 issues (1 resolved, 3 to the design phase)|
   +--------------------------------------------------------------------+
   | NOT in scope         | written (14 items)                          |
   | What already exists  | written                                     |
   | Dream state delta    | written                                     |
   | Error/rescue registry| 27 rows, 0 CRITICAL GAPS                    |
   | Failure modes        | 17 total, 0 CRITICAL GAPS                   |
-  | TODOS.md updates     | 5 items proposed (все записаны)             |
+  | TODOS.md updates     | 5 items proposed (all recorded)             |
   | Scope proposals      | 14 proposed, 4 accepted (EXP + SEL)         |
   | CEO plan             | written                                     |
   | Outside voice        | codex completed                             |
-  | Lake Score           | N/A (вопросов владельцу не было)            |
-  | Diagrams produced    | 7 (арх., автомат, потоки, порядок, тесты,   |
-  |                      | развёртывание, путь игрока)                 |
+  | Lake Score           | N/A (there were no questions to the owner)  |
+  | Diagrams produced    | 7 (arch., state machine, flows, order,      |
+  |                      | tests, deployment, player path)             |
   | Stale diagrams found | 0                                           |
-  | Unresolved decisions | 8 (список выше)                             |
+  | Unresolved decisions | 8 (list above)                              |
   | Reality rows         | 7/7 rows (PLAN_REALITY), 7 unverified       |
   +====================================================================+
 ```
 
-#### Журнал авторешений
+#### Autonomous decision log
 
 <!-- AUTONOMOUS DECISION LOG -->
 
-| № | Фаза | Решение | Класс | Принцип | Обоснование | Отвергнуто |
+| No. | Phase | Decision | Class | Principle | Rationale | Rejected |
 |---|---|---|---|---|---|---|
-| 1 | CEO | Режим SELECTIVE EXPANSION | механическое | правило `/autoplan` | Задано конвейером | остальные режимы |
-| 2 | CEO | Подход: своя сборка | механическое | 1, полнота | Только она покрывает требования 2, 5–8 | форк клона, внешний хостинг |
-| 3 | CEO | Принять E1, гандикап ботов | механическое | 2 | В радиусе, меньше дня | отложить |
-| 4 | CEO | Принять E2, «Люди против ИИ» | механическое | 2 | В радиусе, меньше дня | отложить |
-| 5 | CEO | Принять E4, характер и реплика | механическое | 2 | В радиусе, меньше дня | отложить |
-| 6 | CEO | Принять E14, `--public-url` | механическое | 2 | Снимает зависимость от quick tunnel | отложить |
-| 7 | CEO | Отложить D1–D5 в `TODOS.md` | механическое | 3 | Вне первой версии | принять сейчас |
-| 8 | CEO | Пропустить X1–X5 | механическое | 3, 4 | Ломают честность или дублируют режим зрителя | принять |
-| 9 | CEO | Исправить оценку расхода: 560 картинок, 14 партий при потолке | механическое | 5 | Пересчёт с неудачными вызовами | оставить 26 |
-| 10 | CEO | `return_error_code=true`, ход не списывается | механическое | 1 | Иначе бот получает серую заглушку и теряет ход | оставить как есть |
-| 11 | CEO | Ссылка после проверки DNS и `/healthz` | механическое | 1 | Живая проверка показала задержку DNS | печатать сразу |
-| 12 | CEO | Критерий go/no-go для S1 | механическое | 5 | Спайк без критерия не даёт решения | оставить без критерия |
-| 13 | CEO | M1 после S3 | механическое | 5 | Без ключей нет настоящей панорамы | параллельно |
-| 14 | CEO | Карта для ответа: оставить MapLibre + OSM | вкусовое | направление владельца | Владелец прямо допустил OSM; условия Google по актуальному тексту не проверены | Google Maps JS |
-| 15 | CEO | «Ход» = `look` или `move` | вкусовое | 5 | Простое правило, совпадает с действиями бота | ход = обращение к модели |
-| 16 | CEO | Минимум раунда и бюджета бота 60 с; самый ранний из трёх дедлайнов | механическое | 5 | Критерий S1 иначе противоречит раунду | оставить 30 с |
-| 17 | CEO | Миниатюры 160 px в памяти до конца партии | механическое | 1 | Нужна граница памяти и правило хранения | хранить полные картинки |
-| 18 | CEO | `pre-commit` с `bun run check`, пока нет remote | механическое | 1 | Без remote не работают ни CI, ни pre-push | ждать remote |
-| 19 | CEO | Очки бота: последняя записанная догадка | механическое | 5 | В плане было два правила | 0 при любой ошибке |
-| 20 | CEO | Тай-брейк: раунды с ответом, затем дистанция; `D` на каждый пресет | механическое | 1 | У не ответившего нет дистанции | только дистанция |
-| 21 | CEO | Квота: `pano_loaded`, проверка худшего случая перед стартом | механическое | 5 | Сервер не видит загрузок в браузере | оценка по числу раундов |
-| 22 | CEO | Защита входа: пороги 10 и 30, `--trust-proxy` | механическое | 1 | Заголовки подделываются | верить заголовкам всегда |
-| 23 | CEO | Изоляция бота: белый список окружения, проверка в S1 | механическое | 5 | Read-only песочница не мешает читать файлы | пустой `HOME` (ломает вход в подписку) |
-| 24 | CEO | Новый слот с пресетом «Любитель» | механическое | 5 | Совпадает с пресетом критерия S1 | 6 ходов |
-| 25 | CEO | Передача снимков моделям: оставить, подтверждение владельца на воротах | вкусовое | направление владельца | Основа требований 5 и 6; условия Google не проверены | убрать ИИ на снимках Google |
-| 26 | CEO | Приватный remote: вынести на ворота | вкусовое | 6 | Внешнее действие делает владелец | создать самому |
-| 27 | CEO | Оценка E4 поднята с S до M, расширение оставлено | вкусовое | 2 | В радиусе плана, меньше дня | сократить до одной реплики |
-| 28 | CEO | Сбои подготовки раунда: три серии, замена точки | механическое | 1 | Поведение не было описано | оставить на реализацию |
-| 29 | CEO | Счётчик и потолок Static в M2 | механическое | 5 | Боты M2 иначе тратят квоту без потолка | оставить в M3 |
-| 30 | CEO | Метка без подтверждения к концу таймера засчитывается | механическое | 5 | Обычай жанра | 0 очков |
-| 31 | CEO | Снять `--trust-proxy`, E14 оставить | вкусовое | 5 | Своего прокси у владельца нет; общий порог достаточен | убрать E14 целиком |
-| 32 | CEO | Предупреждение в лобби от половины бюджета бота | механическое | 5 | При трети харнесс, прошедший S1, предупреждался бы всегда | треть |
-| 33 | CEO | Одобрение документов шага 0H: вариант A | механическое | 6 | Документы отражают решения; проверка PASS | пересмотр |
-| 34 | CEO | Пересчёт расхода: 600 картинок, 13 партий при потолке (заменяет строку 9) | механическое | 5 | В худший случай вошли повторные стартовые наборы (Codex 7) | оставить 560 |
-| 35 | CEO | Карта для ответа: User Challenge UC-1 (заменяет строку 14) | User Challenge | не авторешается | Условия Google прочитаны, пункт 3.2.3(e) | решить за владельца |
-| 36 | CEO | ИИ на снимках Google: User Challenge UC-2 (заменяет строку 25) | User Challenge | не авторешается | Условия Google, пункты 3.2.3(a) и 3.2.3(c)(vii) | решить за владельца |
-| 37 | CEO | Порядок вех: M1 это сквозной срез «Первая игра» (заменяет строку 13) | вкусовое | 6 | Общий вывод обоих голосов; требования владельца не меняются | прежний порядок: игра без ИИ, затем ИИ, затем туннель |
-| 38 | CEO | Ворота «Первая игра» с замерами и тремя вопросами | механическое | 1 | «С ботами веселее» и темп ботов не проверены (Claude 9, Codex 2, 3) | без пробной партии |
-| 39 | CEO | S1 расширен до полного раунда и трёх ботов; идёт первым после ворот качества | механическое | 5 | Самое рискованное допущение проверяется первым | S1 раньше ворот качества (против правила владельца) |
-| 40 | CEO | Расширения E1, E2, E4, E14 оставлены в плане после ворот «Первая игра» | вкусовое | 2 | Оба голоса советуют не строить до первой партии; состав M2–M4 подтверждает владелец | убрать в `TODOS.md` |
-| 41 | CEO | Счётчик и потолок Static в M1 (заменяет строку 29) | механическое | 5 | Первые боты теперь в M1 | оставить в M2 |
-| 42 | CEO | Настройка движения общая для людей и ботов | механическое | 5 | Равные правила (Codex 6) | движение только у ботов |
-| 43 | CEO | Харнесс стартует в `ROUND_LOADING`, `observe()` задержан | механическое | 3 | Холодный старт не съедает время раунда (Claude 12) | поднять минимум раунда до 90–120 с |
-| 44 | CEO | Названия уровней сложности только после данных первой игры | механическое | 5 | Названия обещают калибровку (Codex 6) | назвать сразу |
-| 45 | CEO | Спайк S4: час на обзор открытых клонов | механическое | 6 | Дешёвая проверка до M1 (Claude 11) | не смотреть |
-| 46 | CEO | Прямой API вместо подписок: не принято | вкусовое | направление владельца | Один голос; владелец просил подписки | заменить харнессы на API |
-| 47 | CEO | Фиксированный дедлайн бота: не принято | вкусовое | 5 | Правила заданы и покрыты тестами; досрочный конец нужен для темпа | один дедлайн |
-| 48 | CEO | Потолок приложения назван оценкой; настоящий предел в Cloud Console | механическое | 5 | Счётчик не гарантирует биллинг (Codex 7, Claude 4) | оставить «жёсткий потолок» |
-| 49 | CEO | Остаточный риск изоляции и общие лимиты подписок записаны; условия подписок вынесены владельцу | механическое | 5 | Claude 5 и 13 | умолчать |
-| 50 | CEO | Правила сбоев во время партии (metadata, 403 и 429, обрезка объяснения, причина без догадки, туннель, место по нику, версии файлов, `client_error`) | механическое | 1 | Семь пробелов карты ошибок | оставить на реализацию |
-| 51 | CEO | Место отключённого игрока возвращается по нику | вкусовое | 3 | Новый адрес туннеля это другой сайт, `localStorage` пуст | код возврата в личной ссылке |
-| 52 | CEO | Порядок событий: проверка фазы после ожиданий, резерв хода и квоты, положение метки на сервере | механическое | 1 | Гонки вызова инструмента с концом раунда | положиться на однопоточность |
-| 53 | CEO | Пауза перед следующим раундом, если нет ни одного человека | механическое | 3 | Боты не тратят квоту и подписку впустую | играть дальше |
-| 54 | CEO | Секреты: `.env` вне git с проверкой, новые токены при каждом `start`, маска в журнале | механическое | 1 | Ключи могли попасть в git или журнал | без проверки |
-| 55 | CEO | Исключение `spikes/` из лимитов размера снято | механическое | правило владельца | Исключение из лимитов требует согласия владельца | оставить исключение |
-| 56 | CEO | Журнал сервера и ботов, 14 дней | механическое | 1 | Иначе не восстановить, почему бот получил 0 | только `matches.jsonl` |
-| 57 | CEO | Повтор запроса картинки в пределах раунда берётся из памяти | механическое | 3 | Экономит квоту при одинаковых ходах ботов | каждый раз запрашивать |
-| 58 | CEO | `doctor` сверяет версии харнессов с последним успешным `test:harness` | механическое | 5 | CLI меняют флаги (Claude 5) | закрепить версии вручную |
-| 59 | CEO | Состояния ошибок входят в веху своего правила, а не в M4 | механическое | 5 | Они нужны уже в первой игре | оставить в M4 |
-| 60 | CEO | Отключение хоста, сборка клиента в `start`, визуальный язык: переданы следующим фазам | механическое | 6 | Не блокируют, у каждого назван владелец | решить в CEO-фазе |
+| 1 | CEO | Mode SELECTIVE EXPANSION | mechanical | `/autoplan` rule | Set by the pipeline | the other modes |
+| 2 | CEO | Approach: own build | mechanical | 1, completeness | Only it covers requirements 2, 5–8 | clone fork, external hosting |
+| 3 | CEO | Accept E1, bot handicap | mechanical | 2 | Within the radius, less than a day | defer |
+| 4 | CEO | Accept E2, "Humans vs AI" | mechanical | 2 | Within the radius, less than a day | defer |
+| 5 | CEO | Accept E4, persona and quip | mechanical | 2 | Within the radius, less than a day | defer |
+| 6 | CEO | Accept E14, `--public-url` | mechanical | 2 | Removes the dependency on quick tunnel | defer |
+| 7 | CEO | Defer D1–D5 to `TODOS.md` | mechanical | 3 | Outside the first version | accept now |
+| 8 | CEO | Skip X1–X5 | mechanical | 3, 4 | Break fairness or duplicate the spectator mode | accept |
+| 9 | CEO | Fix the cost estimate: 560 images, 14 matches at the cap | mechanical | 5 | Recalculation with failed calls | keep 26 |
+| 10 | CEO | `return_error_code=true`, the turn is not deducted | mechanical | 1 | Otherwise the bot gets a gray placeholder and loses a turn | leave as is |
+| 11 | CEO | The link after a DNS and `/healthz` check | mechanical | 1 | A live check showed the DNS delay | print immediately |
+| 12 | CEO | A go/no-go criterion for S1 | mechanical | 5 | A spike without a criterion gives no decision | leave without a criterion |
+| 13 | CEO | M1 after S3 | mechanical | 5 | Without keys there is no real panorama | in parallel |
+| 14 | CEO | Map for the answer: keep MapLibre + OSM | taste | owner's direction | The owner explicitly allowed OSM; Google's terms were not verified against the current text | Google Maps JS |
+| 15 | CEO | "Turn" = `look` or `move` | taste | 5 | A simple rule, matches the bot's actions | turn = a call to the model |
+| 16 | CEO | Minimum round and bot budget 60 s; the earliest of three deadlines | mechanical | 5 | The S1 criterion otherwise contradicts the round | keep 30 s |
+| 17 | CEO | 160 px thumbnails in memory until the end of the match | mechanical | 1 | A memory bound and a storage rule are needed | keep full images |
+| 18 | CEO | `pre-commit` with `bun run check` while there is no remote | mechanical | 1 | Without a remote neither CI nor pre-push works | wait for a remote |
+| 19 | CEO | Bot score: the last recorded guess | mechanical | 5 | The plan had two rules | 0 on any error |
+| 20 | CEO | Tie-break: rounds with an answer, then distance; `D` per preset | mechanical | 1 | One who did not answer has no distance | distance only |
+| 21 | CEO | Quota: `pano_loaded`, a worst-case check before the start | mechanical | 5 | The server does not see loads in the browser | an estimate by the number of rounds |
+| 22 | CEO | Login protection: thresholds 10 and 30, `--trust-proxy` | mechanical | 1 | Headers can be forged | always trust headers |
+| 23 | CEO | Bot isolation: environment allowlist, a check in S1 | mechanical | 5 | A read-only sandbox does not prevent reading files | an empty `HOME` (breaks subscription login) |
+| 24 | CEO | A new slot with the «Любитель» preset | mechanical | 5 | Matches the preset of the S1 criterion | 6 turns |
+| 25 | CEO | Passing imagery to models: keep, owner's confirmation at the gate | taste | owner's direction | The basis of requirements 5 and 6; Google's terms not verified | remove AI on Google imagery |
+| 26 | CEO | Private remote: raise at the gate | taste | 6 | An external action is done by the owner | create it myself |
+| 27 | CEO | The E4 estimate raised from S to M, the extension kept | taste | 2 | Within the plan's radius, less than a day | cut to a single quip |
+| 28 | CEO | Round preparation failures: three series, point replacement | mechanical | 1 | The behavior was not described | leave for implementation |
+| 29 | CEO | Static counter and cap in M2 | mechanical | 5 | Otherwise the M2 bots spend quota without a cap | leave in M3 |
+| 30 | CEO | An unconfirmed marker at the end of the timer is counted | mechanical | 5 | Genre custom | 0 points |
+| 31 | CEO | Drop `--trust-proxy`, keep E14 | taste | 5 | The owner has no proxy of his own; the shared threshold suffices | remove E14 entirely |
+| 32 | CEO | A lobby warning from half of the bot budget | mechanical | 5 | At a third, a harness that passed S1 would always be warned | a third |
+| 33 | CEO | Approval of the step 0H documents: option A | mechanical | 6 | The documents reflect the decisions; the check is PASS | review |
+| 34 | CEO | Cost recalculation: 600 images, 13 matches at the cap (replaces row 9) | mechanical | 5 | Repeated starting sets entered the worst case (Codex 7) | keep 560 |
+| 35 | CEO | Map for the answer: User Challenge UC-1 (replaces row 14) | User Challenge | not auto-decided | Google's terms were read, clause 3.2.3(e) | decide on the owner's behalf |
+| 36 | CEO | AI on Google imagery: User Challenge UC-2 (replaces row 25) | User Challenge | not auto-decided | Google's terms, clauses 3.2.3(a) and 3.2.3(c)(vii) | decide on the owner's behalf |
+| 37 | CEO | Milestone order: M1 is the "First game" end-to-end slice (replaces row 13) | taste | 6 | The shared conclusion of both voices; the owner's requirements do not change | the previous order: a game without AI, then AI, then the tunnel |
+| 38 | CEO | The "First game" gate with measurements and three questions | mechanical | 1 | "It's more fun with bots" and the bots' pace are not verified (Claude 9, Codex 2, 3) | without a trial match |
+| 39 | CEO | S1 expanded to a full round and three bots; goes first after the quality gates | mechanical | 5 | The riskiest assumption is checked first | S1 before the quality gates (against the owner's rule) |
+| 40 | CEO | Extensions E1, E2, E4, E14 left in the plan after the "First game" gate | taste | 2 | Both voices advise not building before the first match; the owner confirms the composition of M2–M4 | move to `TODOS.md` |
+| 41 | CEO | Static counter and cap in M1 (replaces row 29) | mechanical | 5 | The first bots are now in M1 | leave in M2 |
+| 42 | CEO | The movement setting is shared by humans and bots | mechanical | 5 | Equal rules (Codex 6) | movement for bots only |
+| 43 | CEO | The harness starts in `ROUND_LOADING`, `observe()` is delayed | mechanical | 3 | The cold start does not eat round time (Claude 12) | raise the minimum round to 90–120 s |
+| 44 | CEO | Difficulty level names only after the first game's data | mechanical | 5 | The names promise a calibration (Codex 6) | name them right away |
+| 45 | CEO | Spike S4: an hour to survey open-source clones | mechanical | 6 | A cheap check before M1 (Claude 11) | do not look |
+| 46 | CEO | Direct API instead of subscriptions: not accepted | taste | owner's direction | One voice; the owner asked for subscriptions | replace the harnesses with the API |
+| 47 | CEO | A fixed bot deadline: not accepted | taste | 5 | The rules are set and covered by tests; an early end is needed for pacing | a single deadline |
+| 48 | CEO | The application cap is called an estimate; the real limit is in the Cloud Console | mechanical | 5 | The counter does not guarantee billing (Codex 7, Claude 4) | keep the "hard cap" |
+| 49 | CEO | The residual isolation risk and shared subscription limits are recorded; subscription terms are raised to the owner | mechanical | 5 | Claude 5 and 13 | stay silent |
+| 50 | CEO | Failure rules during a match (metadata, 403 and 429, explanation truncation, a cause without a guess, tunnel, seat by nickname, file versions, `client_error`) | mechanical | 1 | Seven gaps of the error map | leave for implementation |
+| 51 | CEO | A disconnected player's seat is returned by nickname | taste | 3 | A new tunnel address is a different site, `localStorage` is empty | a return code in a personal link |
+| 52 | CEO | Event order: phase check after waits, turn and quota reserve, marker position on the server | mechanical | 1 | Races of a tool call with the end of the round | rely on single-threadedness |
+| 53 | CEO | A pause before the next round if there is not a single human | mechanical | 3 | Bots do not waste quota and subscription | keep playing |
+| 54 | CEO | Secrets: `.env` outside git with a check, new tokens on every `start`, a mask in the log | mechanical | 1 | Keys could end up in git or the log | without a check |
+| 55 | CEO | The exemption of `spikes/` from size limits is removed | mechanical | owner's rule | An exemption from limits requires the owner's agreement | keep the exemption |
+| 56 | CEO | Server and bot log, 14 days | mechanical | 1 | Otherwise it is impossible to reconstruct why a bot got 0 | `matches.jsonl` only |
+| 57 | CEO | A repeated image request within a round is taken from memory | mechanical | 3 | Saves quota on identical bot turns | request every time |
+| 58 | CEO | `doctor` compares harness versions with the last successful `test:harness` | mechanical | 5 | CLIs change flags (Claude 5) | pin versions by hand |
+| 59 | CEO | Error states belong to the milestone of their rule, not to M4 | mechanical | 5 | They are needed already in the first game | leave in M4 |
+| 60 | CEO | Host disconnection, client build in `start`, visual language: passed to the next phases | mechanical | 6 | Not blocking, each has a named owner | decide in the CEO phase |
 
-### Фаза 2. Обзор дизайна
+### Phase 2. Design review
 
-#### Как шла фаза
+#### How the phase went
 
-- Вход в фазу 2 через конвейер `/autoplan` был отклонён его охранным хуком (`close_required`), хотя фаза 1 закрыта и опубликована. Причина: хук читает журнал сессии только до первой границы сжатия контекста и не видит закрытия. Хук не обходился. Фаза проведена запасным путём из документации gstack: отдельным навыком `/plan-design-review` с правилами авторешений `/autoplan`.
-- Макеты не сгенерированы: `No image API key found (OpenAI or Gemini)`. Обзор текстовый; раскладки заданы схемами в разделе 14. Исправление: `~/.claude/skills/gstack/design/dist/design setup` или переменная `GEMINI_API_KEY`.
-- Записи gstack по ключу проекта `tass` (документ дизайна, прежние задачи дизайн-обзора, выученные уроки) относятся к другому проекту с тем же ключом и не использованы.
+- Entering phase 2 through the `/autoplan` pipeline was rejected by its guard hook (`close_required`), even though phase 1 is closed and published. Cause: the hook reads the session log only up to the first context-compaction boundary and does not see the closure. The hook was not bypassed. The phase was run by the fallback path from the gstack documentation: the separate `/plan-design-review` skill with the `/autoplan` auto-decision rules.
+- No mockups were generated: `No image API key found (OpenAI or Gemini)`. The review is text-only; layouts are given as diagrams in section 14. Fix: `~/.claude/skills/gstack/design/dist/design setup` or the `GEMINI_API_KEY` variable.
+- The gstack records under the project key `tass` (design document, earlier design-review tasks, learned lessons) belong to a different project with the same key and were not used.
 
-#### Аудит до обзора
+#### Pre-review audit
 
-- Область интерфейса: 5 экранов (`Join`, `Lobby`, `Round`, `RoundResults`, `Final`) и 8 компонентов из раздела 7. Кода нет, коммитов нет.
-- `DESIGN.md` и `CLAUDE.md` отсутствуют. Это пробел: без них каждый экран M1 получил бы свой вид.
-- Прежних дизайн-обзоров этого плана нет.
-- Унаследовано от фазы 1: C-UI и WARNING 11.2 (нет визуального языка), 11.3 (узкие экраны), 11.4 (приглашение только в терминале).
+- UI scope: 5 screens (`Join`, `Lobby`, `Round`, `RoundResults`, `Final`) and 8 components from section 7. No code, no commits.
+- `DESIGN.md` and `CLAUDE.md` are absent. This is a gap: without them every M1 screen would get its own look.
+- There are no earlier design reviews of this plan.
+- Inherited from phase 1: C-UI and WARNING 11.2 (no visual language), 11.3 (narrow screens), 11.4 (invitation only in the terminal).
 
-#### Шаг 0
+#### Step 0
 
-- **0A. Оценка: 3 из 10.** План подробно описывал поведение и сбои, а вид почти не описывал: названия экранов и компонентов, «пульсирует», «конфетти», «на весь экран». На 10 план называет шрифты, цвета, отступы и движение, даёт каждому экрану порядок «первое, второе, третье» и схему, перечисляет, что человек видит в каждом состоянии, и задаёт клавиатуру, контраст и поведение узкого окна.
-- **0B. `DESIGN.md`:** нет. Решение: файл создаётся в M0 из пункта «Визуальный язык и `DESIGN.md`».
-- **0C. Что уже есть:** кода нет, переиспользовать нечего. Опираемся на штатные элементы форм, встроенные переходы Svelte, готовые карты (MapLibre или Google Maps), набор иконок Lucide.
-- **0D. Фокус:** все 7 проходов (правило `/autoplan`: полная глубина).
+- **0A. Rating: 3 out of 10.** The plan described behavior and failures in detail but barely described appearance: names of screens and components, "pulses", "confetti", "full screen". A 10 plan names fonts, colors, spacing and motion, gives every screen a "first, second, third" order and a diagram, lists what a person sees in each state, and specifies keyboard, contrast and narrow-window behavior.
+- **0B. `DESIGN.md`:** absent. Decision: the file is created in M0 from the item "Visual language and `DESIGN.md`".
+- **0C. What already exists:** there is no code, nothing to reuse. We rely on standard form elements, built-in Svelte transitions, ready-made maps (MapLibre or Google Maps), the Lucide icon set.
+- **0D. Focus:** all 7 passes (the `/autoplan` rule: full depth).
 
-#### Два голоса
+#### Two voices
 
-Оба голоса получили полный текст плана (397 строк) без моих выводов.
+Both voices received the full plan text (397 lines) without my conclusions.
 
-**CODEX SAYS (design critique)**, 13 замечаний, критических нет, 9 высоких. Обёртка вернула `unverified` (метки серьёзности не в её формате); текст обзора получен полностью.
+**CODEX SAYS (design critique)**, 13 findings, no critical ones, 9 high. The wrapper returned `unverified` (severity labels are not in its format); the review text was received in full.
 
-1. Высокое. Нет визуального и раскладочного контракта: шрифт, шкалы, поверхности, порядок слоёв.
-2. Высокое. Клавиатура, контраст, масштаб 200% и узкое окно не заданы как критерии.
-3. Высокое. Правила восстановления есть, общего вида состояний связи нет.
-4. Высокое. Вход: нет порядка проверки, вида ошибок, объяснения роли зрителя и возврата на место.
-5. Высокое. Лобби это перечень настроек без иерархии старта; не задано, когда можно начать.
-6. Среднее. Отметка «Проверить» устаревает после смены настроек; сами изменившиеся значения не объяснены.
-7. Высокое. Главное действие раунда без подтверждений: игрок не знает, принят ли ответ.
-8. Высокое. Отсечка 5 с на загрузку панорамы делает сбой сети частью соревнования.
-9. Среднее. Ожидание ботов должно показываться одним честным таймером.
-10. Высокое. Показ результатов спорит с объяснением ИИ; автопереход обрывает чтение.
-11. Среднее. Плотность карты результатов (11 меток, дуги, 180-й меридиан), смешение «за раунд» и «всего».
-12. Высокое. Финал без вариантов: ничья, меньше трёх участников, досрочный конец, кто жмёт «Ещё раз».
-13. Среднее. Поздно вошедший выглядит в итогах просто слабым.
+1. High. No visual and layout contract: font, scales, surfaces, layer order.
+2. High. Keyboard, contrast, 200% zoom and narrow window are not defined as criteria.
+3. High. Recovery rules exist, but there is no common look for connection states.
+4. High. Join: no order of validation, no look for errors, no explanation of the spectator role, no return to one's seat.
+5. High. The lobby is a list of settings with no start hierarchy; it is not defined when starting is possible.
+6. Medium. The "Check" mark goes stale after settings change; the changed values themselves are not explained.
+7. High. The main round action has no confirmations: the player does not know whether the answer was accepted.
+8. High. The 5 s cutoff for panorama loading makes a network failure part of the competition.
+9. Medium. Waiting for bots should be shown by one honest timer.
+10. High. The results reveal conflicts with the AI explanation; auto-advance interrupts reading.
+11. Medium. Results map density (11 markers, arcs, the 180th meridian), mixing "this round" and "total".
+12. High. The final has no variants: tie, fewer than three participants, early end, who presses "Play again".
+13. Medium. A late joiner just looks weak in the standings.
 
-Итог Codex: «Revise the UI specification before M1 because submission feedback, loading fairness, screen hierarchy, and accessible layouts remain undefined».
+Codex summary: "Revise the UI specification before M1 because submission feedback, loading fairness, screen hierarchy, and accessible layouts remain undefined".
 
-**CLAUDE SUBAGENT (design completeness)**, 16 замечаний, 3 критических, оценка полноты 3 из 10.
+**CLAUDE SUBAGENT (design completeness)**, 16 findings, 3 critical, completeness rating 3 out of 10.
 
-1. Критическое. Визуальной системы нет, и задачи на неё нет.
-2. Критическое. Участники различаются только цветом, палитра не задана, люди и ИИ не различаются.
-3. Критическое. Раскладка экрана раунда не задана; текст поверх панорамы без правила контраста.
-4. Высокое. Пригласительная ссылка только в терминале.
-5. Высокое. Экран входа почти пуст: нет ошибок токена, связи, места для «ник занят».
-6. Высокое. Лобби перегружено, вид гостя не задан, причина неактивной «Начать» не показана.
-7. Высокое. Нет состояний связи при заявленном переподключении.
-8. Высокое. Показ результатов спорит с автопереходом 30 с.
-9. Высокое. Сюжет «ИИ обыграл людей» не оформлен; счёт сторон стоит в M2.
-10. Среднее. Экран отсчёта не задан; видят ли люди панораму до нуля.
-11. Высокое. Клавиатуры и доступности нет, кроме `prefers-reduced-motion`.
-12. Среднее. Таблица финала переполнится (11 участников на 20 раундов).
-13. Среднее. Нет длительностей и кривых движения.
-14. Среднее. Нет правил русских текстов: склонения, формат чисел, обрезка ника.
-15. Среднее. Выбор карты меняет вид мини-карты и карты результатов.
-16. Среднее. M4 откладывает вид состояний.
+1. Critical. There is no visual system, and no task for it.
+2. Critical. Participants differ only by color, the palette is not defined, humans and AIs are not distinguished.
+3. Critical. The round screen layout is not defined; text over the panorama without a contrast rule.
+4. High. The invitation link is only in the terminal.
+5. High. The join screen is nearly empty: no token errors, no connection errors, no place for "nickname taken".
+6. High. The lobby is overloaded, the guest view is not defined, the reason for an inactive "Start" is not shown.
+7. High. There are no connection states despite the declared reconnection.
+8. High. The results reveal conflicts with the 30 s auto-advance.
+9. High. The "AI beat the humans" storyline is not designed; the sides score is in M2.
+10. Medium. The countdown screen is not defined; whether people see the panorama until zero.
+11. High. No keyboard or accessibility support apart from `prefers-reduced-motion`.
+12. Medium. The final table will overflow (11 participants over 20 rounds).
+13. Medium. No motion durations and curves.
+14. Medium. No rules for Russian text: declensions, number format, nickname truncation.
+15. Medium. The map choice changes the look of the mini-map and the results map.
+16. Medium. M4 postpones the look of states.
 
 ```
 DESIGN OUTSIDE VOICES — LITMUS SCORECARD
-| Проверка                              | Claude     | Codex      | Итог                         |
+| Check                                 | Claude     | Codex      | Result                       |
 |---------------------------------------|------------|------------|------------------------------|
-| 1. Продукт узнаётся на первом экране  | NOT SPEC'D | NOT SPEC'D | пробел подтверждён, закрыт   |
-| 2. Один сильный визуальный якорь      | NOT SPEC'D | YES        | расхождение, закрыто схемами |
-| 3. Понятно по заголовкам              | NOT SPEC'D | NOT SPEC'D | пробел подтверждён, закрыт   |
-| 4. У каждого раздела одна задача      | YES*       | YES        | подтверждено (*кроме лобби)  |
-| 5. Карточки нужны                     | NOT SPEC'D | NO         | карточек нет, кроме ИИ       |
-| 6. Движение помогает иерархии         | YES        | YES        | подтверждено                 |
-| 7. Смотрится без декоративных теней   | NOT SPEC'D | NOT SPEC'D | пробел подтверждён, закрыт   |
-| Жёсткие отказы                        | риск 4     | риск 4     | текст только на панелях      |
+| 1. Product recognizable on 1st screen | NOT SPEC'D | NOT SPEC'D | gap confirmed, closed        |
+| 2. One strong visual anchor           | NOT SPEC'D | YES        | disagreement, closed by diagrams |
+| 3. Clear from the headings            | NOT SPEC'D | NOT SPEC'D | gap confirmed, closed        |
+| 4. Each section has one job           | YES*       | YES        | confirmed (*except lobby)    |
+| 5. Cards are needed                   | NOT SPEC'D | NO         | no cards, except for the AI  |
+| 6. Motion helps hierarchy             | YES        | YES        | confirmed                    |
+| 7. Looks fine without decorative shadows | NOT SPEC'D | NOT SPEC'D | gap confirmed, closed     |
+| Hard rejections                       | risk 4     | risk 4     | text only on panels          |
 ```
 
-Совпадения двух голосов (10): визуальная система; признак участника помимо цвета; раскладка раунда; вход; лобби и условия старта; состояния связи; показ результатов против автоперехода; финал; клавиатура и узкое окно; метка с клавиатуры. Расхождения: отсечка 5 с (только Codex) и перенос счёта сторон в M1 (только Claude); оба вынесены на финальное утверждение.
+Agreement of the two voices (10): visual system; participant marker besides color; round layout; join; lobby and start conditions; connection states; results reveal versus auto-advance; final; keyboard and narrow window; keyboard marker. Disagreements: the 5 s cutoff (Codex only) and moving the sides score into M1 (Claude only); both are put up for final approval.
 
-#### Проходы
+#### Passes
 
-**Проход 1. Информационная архитектура: 3 → 8.** Не было порядка «первое, второе, третье» ни у одного экрана, схем, места для кнопки «Угадать», вида гостя в лобби. Добавлен пункт «Иерархия экранов» со схемами лобби, раунда и результатов, условиями кнопки «Начать», правилом одного таймера. До 10 не хватает утверждённых макетов.
+**Pass 1. Information architecture: 3 → 8.** No screen had a "first, second, third" order, diagrams, a place for the "Угадать" ("Guess") button, or a guest view in the lobby. Added the item "Screen hierarchy" with diagrams of the lobby, round and results, conditions for the "Начать" ("Start") button, and the one-timer rule. To reach 10, approved mockups are missing.
 
-**Проход 2. Состояния: 5 → 9.** Правила сбоев в плане были, вида у них не было. Добавлены таблица «Состояния интерфейса» (13 элементов на 5 состояний), пункт «Ответ человека: подтверждения сервера», общие компоненты `StatusBanner` и `InlineState`.
+**Pass 2. States: 5 → 9.** The failure rules existed in the plan but had no appearance. Added the table "Interface states" (13 elements by 5 states), the item "Human answer: server confirmations", and the shared components `StatusBanner` and `InlineState`.
 
-**Проход 3. Путь игрока: 4 → 8.**
+**Pass 3. Player journey: 4 → 8.**
 
-| Шаг | Что делает человек | Что чувствует | Чем это держит план |
+| Step | What the person does | What they feel | How the plan supports it |
 |---|---|---|---|
-| 1 | Открывает ссылку из чата | «Туда ли я попал?» | Название игры, строка «В лобби: Миша, Оля и 2 ИИ», одно поле и одна кнопка |
-| 2 | Ждёт в лобби | Любопытство: кто из ИИ играет | Список людей и ИИ слева, настройки видны гостю значениями |
-| 3 | Отсчёт | Предвкушение | Заслонка и крупные цифры; панораму до нуля не видит никто |
-| 4 | Смотрит панораму | Сосредоточен | Панорама на весь экран, интерфейс по краям на панелях |
-| 5 | Ставит метку и жмёт «Угадать» | «Принят ли ответ?» | Состояния зоны ответа по подтверждению сервера |
-| 6 | Ждёт остальных | Нетерпение | Один таймер «Все ответили. ИИ думают», счётчик ходов ботов |
-| 7 | Показ результатов | Азарт, главный момент | Метки от дальней к ближней, своя строка итога, пропуск пробелом |
-| 8 | Читает, почему ИИ так решил | Смех или досада | Первая строка объяснения видна сразу, карточка под строкой, пауза автоперехода |
-| 9 | Финал | Победа или «реванш?» | Исход первой строкой, «Победил ИИ: Клод», «Лучший из людей: Оля» |
-| 10 | «Ещё раз» | Хочется ещё | Кнопка у хоста, у гостей «Ждём хоста», настройки сохранены |
+| 1 | Opens the link from the chat | "Am I in the right place?" | Game name, the line "В лобби: Миша, Оля и 2 ИИ" ("In the lobby: Misha, Olya and 2 AIs"), one field and one button |
+| 2 | Waits in the lobby | Curiosity: which AIs are playing | List of humans and AIs on the left, settings visible to the guest as values |
+| 3 | Countdown | Anticipation | Shutter and large digits; nobody sees the panorama until zero |
+| 4 | Looks at the panorama | Focused | Full-screen panorama, interface on panels at the edges |
+| 5 | Places a marker and presses "Угадать" | "Was the answer accepted?" | Answer-zone states driven by server confirmation |
+| 6 | Waits for the others | Impatience | One timer "Все ответили. ИИ думают" ("Everyone has answered. The AIs are thinking"), counter of bot turns |
+| 7 | Results reveal | Excitement, the main moment | Markers from farthest to nearest, own result row, skip with space |
+| 8 | Reads why the AI decided so | Laughter or annoyance | First line of the explanation visible at once, card under the row, auto-advance pause |
+| 9 | Final | Victory or "rematch?" | Outcome in the first line, "Победил ИИ: Клод" ("The AI won: Claude"), "Лучший из людей: Оля" ("Best of the humans: Olya") |
+| 10 | "Ещё раз" ("Play again") | Wants more | Button for the host, "Ждём хоста" ("Waiting for the host") for guests, settings preserved |
 
-Горизонты: первые 5 секунд (вход: одно действие); 5 минут (раунд и показ результатов); долгий (счёт людей и ИИ между партиями отложен в `TODOS.md`, «Экран истории партий и зал славы»).
+Horizons: first 5 seconds (join: one action); 5 minutes (round and results reveal); long (the humans-versus-AIs score between games is deferred to `TODOS.md`, "Game history screen and hall of fame").
 
-**Проход 4. Шаблонность: 3 → 8.** Тип: интерфейс приложения с содержимым на весь экран. Риски были скрытые: названия `BotCard` и `BotSlotEditor` подталкивали к набору карточек, шрифт и палитра по умолчанию. Теперь: две колонки строк вместо карточек, карточка ИИ раскрывается под строкой, один акцент, названы шрифты, запрещены стекло, свечение, градиенты, эмодзи и декоративные иконки. Жёстких отказов нет. До 10 не хватает макетов, по которым это можно увидеть.
+**Pass 4. Templateness: 3 → 8.** Type: an application interface with full-screen content. The risks were hidden: the names `BotCard` and `BotSlotEditor` pushed toward a set of cards, and the default font and palette. Now: two columns of rows instead of cards, the AI card expands under the row, one accent, fonts are named, glass, glow, gradients, emoji and decorative icons are forbidden. No hard rejections. To reach 10, mockups are missing to see this in practice.
 
-**Проход 5. Дизайн-система: 1 → 8.** `DESIGN.md` не было и задачи на него не было. Теперь переменные цвета, шрифты, шкалы отступов и движения записаны в плане, файл создаётся в M0, проверка `bun run check` не пускает цвета мимо `tokens.css`, контраст проверяет тест.
+**Pass 5. Design system: 1 → 8.** There was no `DESIGN.md` and no task for it. Now color variables, fonts, spacing and motion scales are written in the plan, the file is created in M0, the `bun run check` check does not let colors bypass `tokens.css`, and a test checks contrast.
 
-**Проход 6. Узкие окна и доступность: 2 → 8.** Было только `prefers-reduced-motion`. Добавлен пункт «Клавиатура, контраст и размеры окна»: расчётное окно, поведение от 900 до 1279 px, режим уже 900 px, размеры зон нажатия, клавиши, метка с клавиатуры, объявления для программ чтения с экрана, проверки axe. Отдельная мобильная раскладка осталась отложенной.
+**Pass 6. Narrow windows and accessibility: 2 → 8.** There was only `prefers-reduced-motion`. Added the item "Keyboard, contrast and window sizes": a design window, behavior from 900 to 1279 px, a mode narrower than 900 px, tap target sizes, keys, keyboard marker placement, screen reader announcements, axe checks. A separate mobile layout remains deferred.
 
-**Проход 7. Нерешённое:** 30 решений записаны в план, 6 вынесены на финальное утверждение как вопросы вкуса, 2 переданы инженерной фазе.
+**Pass 7. Unresolved:** 30 decisions are written into the plan, 6 are put up for final approval as questions of taste, 2 are passed to the engineering phase.
 
-#### Вне рамок
+#### Out of scope
 
-- Отдельная мобильная раскладка: уже в `TODOS.md`; в первой версии предупреждение и запасная раскладка в одну колонку.
-- Тёмная схема карты и светлая тема интерфейса: одна тема, вечерняя сцена использования.
-- Звуки: уже в `TODOS.md`.
-- Переигровка раунда без счёта, если у игрока не загрузилась панорама (предложение Codex): добавлено в `TODOS.md`.
-- Раскрытие наложившихся меток веером: заменено подъёмом выбранной метки.
-- Утверждённые макеты: нет ключа генерации картинок; владелец может сделать их до экранов M1.
+- Separate mobile layout: already in `TODOS.md`; the first version has a warning and a fallback single-column layout.
+- Dark map scheme and light interface theme: one theme, an evening usage scene.
+- Sounds: already in `TODOS.md`.
+- Replaying a round without scoring if a player's panorama failed to load (Codex suggestion): added to `TODOS.md`.
+- Fanning out overlapping markers: replaced by raising the selected marker.
+- Approved mockups: there is no image generation key; the owner can make them before the M1 screens.
 
-#### Что уже есть
+#### What already exists
 
-Кода и `DESIGN.md` нет. Готовое, на что опирается дизайн: штатные элементы форм HTML, переходы Svelte (`transition`, `animate:flip`, `Tween`), клавиатурное управление карты у MapLibre и Google Maps, `Intl.PluralRules` и `Intl.NumberFormat`, пакеты шрифтов fontsource, иконки Lucide, `canvas-confetti`, `@axe-core/playwright`.
+There is no code and no `DESIGN.md`. Ready-made things the design relies on: standard HTML form elements, Svelte transitions (`transition`, `animate:flip`, `Tween`), keyboard control of the map in MapLibre and Google Maps, `Intl.PluralRules` and `Intl.NumberFormat`, fontsource font packages, Lucide icons, `canvas-confetti`, `@axe-core/playwright`.
 
-#### Изменения в `TODOS.md`
+#### Changes to `TODOS.md`
 
-Одна запись: «Переигровка раунда при незагруженной панораме» (P3). Остальные принятые правки вошли в задачи плана.
+One entry: "Replay a round when the panorama is not loaded" (P3). The other accepted edits went into the plan tasks.
 
 #### Implementation Tasks
 
-Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship. Оценка: соотношение «человек к CC» около 30 для экранов и 50 для тестов.
+Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship. Estimate: the "human to CC" ratio is about 30 for screens and 50 for tests.
 
-- [ ] **T19 (P1, human: ~1d / CC: ~30min)** — design system — Написать `DESIGN.md`, `tokens.css`, подключить шрифты, проверку цветов и тест контраста
-  - Surfaced by: Проход 5 — нет `DESIGN.md` и визуального языка (оба голоса, замечание 1)
+- [ ] **T19 (P1, human: ~1d / CC: ~30min)** — design system — Write `DESIGN.md`, `tokens.css`, wire up fonts, the color check and the contrast test
+  - Surfaced by: Pass 5 — no `DESIGN.md` and no visual language (both voices, finding 1)
   - Files: `DESIGN.md`, `CLAUDE.md`, `web/src/styles/tokens.css`, `scripts/check-colors.ts`, `web/src/styles/tokens.test.ts`
   - Verify: `bun run check`
-- [ ] **T20 (P1, human: ~1d / CC: ~30min)** — identity — Аватар и метка участника: форма, буква, палитра из 12 цветов, занятые цвета
-  - Surfaced by: Проход 4 — участники различались только цветом (Claude 2, Codex 2)
+- [ ] **T20 (P1, human: ~1d / CC: ~30min)** — identity — Avatar and participant marker: shape, letter, a 12-color palette, taken colors
+  - Surfaced by: Pass 4 — participants differed only by color (Claude 2, Codex 2)
   - Files: `web/src/components/Avatar.svelte`, `shared/colors.ts`, `shared/colors.test.ts`
   - Verify: `bun test shared/colors.test.ts`
-- [ ] **T21 (P1, human: ~1w / CC: ~3h)** — screens — Собрать пять экранов по пункту «Иерархия экранов»
-  - Surfaced by: Проход 1 — у экранов не было порядка и схем (Claude 3, 5, 6, 10, 12; Codex 4, 5, 7, 12)
+- [ ] **T21 (P1, human: ~1w / CC: ~3h)** — screens — Build the five screens per the item "Screen hierarchy"
+  - Surfaced by: Pass 1 — the screens had no order or diagrams (Claude 3, 5, 6, 10, 12; Codex 4, 5, 7, 12)
   - Files: `web/src/screens/*.svelte`, `web/src/components/*.svelte`, `web/src/i18n/ru.ts`
-  - Verify: E2E Playwright, партия из двух раундов
-- [ ] **T22 (P1, human: ~3d / CC: ~1h)** — states — `StatusBanner`, `InlineState` и все строки таблицы «Состояния интерфейса»
-  - Surfaced by: Проход 2 — у правил сбоев не было вида (Claude 7, 16; Codex 3)
-  - Files: `web/src/components/StatusBanner.svelte`, `web/src/components/InlineState.svelte`, экраны
-  - Verify: E2E на состояния входа и баннер связи
-- [ ] **T23 (P1, human: ~2d / CC: ~45min)** — protocol — Подтверждения метки и ответа, состояния зоны ответа, таймер от серверного времени
-  - Surfaced by: Проход 2 — игрок не знал, принят ли ответ (Codex 7, 9; Claude 7)
+  - Verify: Playwright E2E, a game of two rounds
+- [ ] **T22 (P1, human: ~3d / CC: ~1h)** — states — `StatusBanner`, `InlineState` and all rows of the "Interface states" table
+  - Surfaced by: Pass 2 — the failure rules had no appearance (Claude 7, 16; Codex 3)
+  - Files: `web/src/components/StatusBanner.svelte`, `web/src/components/InlineState.svelte`, screens
+  - Verify: E2E for join states and the connection banner
+- [ ] **T23 (P1, human: ~2d / CC: ~45min)** — protocol — Marker and answer confirmations, answer-zone states, timer driven by server time
+  - Surfaced by: Pass 2 — the player did not know whether the answer was accepted (Codex 7, 9; Claude 7)
   - Files: `shared/protocol.ts`, `server/game-engine.ts`, `web/src/components/GuessMap.svelte`, `web/src/components/TimerRing.svelte`
-  - Verify: интеграционный тест подтверждений; E2E обрыва связи после постановки метки
-- [ ] **T24 (P1, human: ~2d / CC: ~45min)** — host — Приглашение в лобби с состоянием проверки, меню хоста, «Завершить партию»
-  - Surfaced by: WARNING 11.4 и Проход 1 (Claude 4, Codex 5)
+  - Verify: integration test of confirmations; E2E of a connection drop after placing a marker
+- [ ] **T24 (P1, human: ~2d / CC: ~45min)** — host — Lobby invitation with a check state, host menu, "Завершить партию" ("End the game")
+  - Surfaced by: WARNING 11.4 and Pass 1 (Claude 4, Codex 5)
   - Files: `shared/protocol.ts`, `server/game-engine.ts`, `web/src/components/HostMenu.svelte`, `web/src/screens/Lobby.svelte`
-  - Verify: модульный тест перехода в `FINAL` по команде хоста; E2E копирования
-- [ ] **T25 (P1, human: ~1d / CC: ~30min)** — results — Пауза автоперехода, пока открыта карточка ИИ (предел 90 с)
-  - Surfaced by: Проход 3 — автопереход обрывал чтение объяснений (Claude 8, Codex 10)
+  - Verify: unit test of the transition to `FINAL` on the host's command; E2E of copying
+- [ ] **T25 (P1, human: ~1d / CC: ~30min)** — results — Auto-advance pause while an AI card is open (limit 90 s)
+  - Surfaced by: Pass 3 — auto-advance interrupted reading the explanations (Claude 8, Codex 10)
   - Files: `shared/protocol.ts`, `server/game-engine.ts`, `web/src/screens/RoundResults.svelte`
-  - Verify: модульные тесты паузы конечного автомата
-- [ ] **T26 (P1, human: ~3d / CC: ~1h)** — a11y — Клавиши, метка с клавиатуры, объявления, режимы ширины, проверки axe
-  - Surfaced by: Проход 6 — клавиатура и узкие окна не заданы (Claude 11, Codex 2), WARNING 11.3
+  - Verify: unit tests of the state machine pause
+- [ ] **T26 (P1, human: ~3d / CC: ~1h)** — a11y — Keys, keyboard marker, announcements, width modes, axe checks
+  - Surfaced by: Pass 6 — keyboard and narrow windows are not defined (Claude 11, Codex 2), WARNING 11.3
   - Files: `web/src/lib/keys.ts`, `web/src/components/GuessMap.svelte`, `web/tests/a11y.spec.ts`
-  - Verify: E2E только клавиатурой; `@axe-core/playwright` на пяти экранах
-- [ ] **T27 (P2, human: ~1d / CC: ~20min)** — i18n — Склонения, формат чисел и расстояний, обрезка ника
-  - Surfaced by: Проход 4 — нет правил русских текстов (Claude 14)
+  - Verify: keyboard-only E2E; `@axe-core/playwright` on the five screens
+- [ ] **T27 (P2, human: ~1d / CC: ~20min)** — i18n — Declensions, number and distance format, nickname truncation
+  - Surfaced by: Pass 4 — no rules for Russian text (Claude 14)
   - Files: `web/src/i18n/ru.ts`, `web/src/i18n/format.ts`, `web/src/i18n/format.test.ts`
   - Verify: `bun test web/src/i18n/format.test.ts`
-- [ ] **T28 (P2, human: ~3d / CC: ~1h)** — motion — Полный показ результатов, финал (конфетти, «Лучший из людей»), карточка ИИ из таблицы финала (M4)
-  - Surfaced by: Проход 3 — главный момент партии не был описан (Claude 8, 9, 12; Codex 10, 11, 12, 13)
+- [ ] **T28 (P2, human: ~3d / CC: ~1h)** — motion — Full results reveal, final (confetti, "Лучший из людей"), AI card from the final table (M4)
+  - Surfaced by: Pass 3 — the main moment of the game was not described (Claude 8, 9, 12; Codex 10, 11, 12, 13)
   - Files: `web/src/components/ResultsMap.svelte`, `web/src/screens/RoundResults.svelte`, `web/src/screens/Final.svelte`
-  - Verify: E2E, после пробела итог на экране без ожидания
+  - Verify: E2E, after space the result is on screen without waiting
 
 #### Design Review Completion Summary
 
@@ -1777,8 +1777,8 @@ Synthesized from this review's findings. Each task derives from a specific findi
   +====================================================================+
   |         DESIGN PLAN REVIEW — COMPLETION SUMMARY                    |
   +====================================================================+
-  | System Audit         | DESIGN.md нет; 5 экранов, 8 компонентов     |
-  | Step 0               | 3/10; все 7 проходов                        |
+  | System Audit         | No DESIGN.md; 5 screens, 8 components       |
+  | Step 0               | 3/10; all 7 passes                          |
   | Pass 1  (Info Arch)  | 3/10 → 8/10 after fixes                     |
   | Pass 2  (States)     | 5/10 → 9/10 after fixes                     |
   | Pass 3  (Journey)    | 4/10 → 8/10 after fixes                     |
@@ -1797,227 +1797,227 @@ Synthesized from this review's findings. Each task derives from a specific findi
   +====================================================================+
 ```
 
-Все проходы не ниже 8. Решения приняты авторежимом `/autoplan` и ждут утверждения владельца на финальном шаге; до него план не считается утверждённым по дизайну. После реализации нужен `/design-review` для проверки вживую.
+All passes are at 8 or above. The decisions were made in `/autoplan` auto mode and await the owner's approval at the final step; until then the plan is not considered approved on design. After implementation, `/design-review` is needed for a live check.
 
-#### Нерешённое после фазы 2
+#### Unresolved after phase 2
 
-На финальное утверждение (вопросы вкуса, в плане действует рекомендованный вариант):
+For final approval (questions of taste; the recommended option is in effect in the plan):
 
-- **D-1. Визуальный язык.** Образ «асфальт и разметка», шрифты Unbounded и Onest, один жёлтый акцент. Макетов нет, владелец видит только описание. Иной путь: настроить ключ картинок и выбрать направление по макетам (`/design-shotgun` или `/design-consultation`).
-- **D-2. Пауза чтения.** Автопереход стоит, пока у кого-то открыта карточка ИИ, не дольше 90 с за раунд. Иной путь: оставить жёсткие 30 с.
-- **D-3. Отсечка 5 с на загрузку панорамы.** Оставлена: раунд начинается для всех, у опоздавшего общий таймер. Codex предлагает ждать дольше и дать хосту переиграть раунд без счёта; отложено в `TODOS.md`.
-- **D-4. Счёт «Люди против ИИ» в M2.** Оставлен в M2 по решению фазы 1. Голос Claude предлагает перенести в M1: функция чистая, а сюжет «люди против машин» главный.
-- **D-5. Телефон.** Предупреждение и запасная раскладка в одну колонку вместо запрета входа.
-- **D-6. «Завершить партию» в меню хоста на любом экране.** Небольшое расширение: раньше кнопка была только при сбое подготовки раунда.
+- **D-1. Visual language.** The "asphalt and road markings" image, Unbounded and Onest fonts, one yellow accent. There are no mockups, the owner sees only the description. Alternative: configure an image key and choose a direction from mockups (`/design-shotgun` or `/design-consultation`).
+- **D-2. Reading pause.** Auto-advance stands still while anyone has an AI card open, for no more than 90 s per round. Alternative: keep a hard 30 s.
+- **D-3. 5 s cutoff for panorama loading.** Kept: the round starts for everyone, a latecomer has the shared timer. Codex suggests waiting longer and letting the host replay the round without scoring; deferred to `TODOS.md`.
+- **D-4. "Люди против ИИ" ("Humans vs AI") score in M2.** Kept in M2 by the phase 1 decision. The Claude voice suggests moving it to M1: the function is pure, and the "humans against machines" storyline is the main one.
+- **D-5. Phone.** A warning and a fallback single-column layout instead of blocking entry.
+- **D-6. "Завершить партию" in the host menu on any screen.** A small extension: previously the button existed only on a round preparation failure.
 
-Передано инженерной фазе:
+Passed to the engineering phase:
 
-- Что происходит, когда хост отключён (кто жмёт «Дальше» и «Ещё раз»): вид для гостей зависит от этого правила.
-- Формат подтверждений метки и ответа и способ сверки часов клиента с сервером.
+- What happens when the host is disconnected (who presses "Дальше" ("Next") and "Ещё раз"): the guest view depends on this rule.
+- The format of marker and answer confirmations and the way to reconcile the client clock with the server.
 
-Закрыто из унаследованного: C-UI, WARNING 11.2, 11.3 и 11.4.
+Closed from the inherited items: C-UI, WARNING 11.2, 11.3 and 11.4.
 
-#### Журнал авторешений, фаза 2
+#### Auto-decision log, phase 2
 
-| № | Фаза | Решение | Класс | Принцип | Обоснование | Отвергнуто |
+| No. | Phase | Decision | Class | Principle | Rationale | Rejected |
 |---|---|---|---|---|---|---|
-| 61 | Дизайн | Фаза проведена отдельным навыком `/plan-design-review` | механическое | документация gstack | Охранный хук не видит закрытия фазы 1 после сжатия контекста; обходить его нельзя | чтение защищённых файлов другим инструментом |
-| 62 | Дизайн | Обзор без макетов | механическое | 6 | Нет ключа генерации картинок | рисовать макеты вручную вместо дизайнера |
-| 63 | Дизайн | Визуальный язык «асфальт и разметка», Unbounded и Onest, один акцент | вкус | 5 | Тёмные плотные панели не спорят с панорамой; оба шрифта с кириллицей и свободной лицензией | системные шрифты, светлая тема, стекло поверх панорамы |
-| 64 | Дизайн | `DESIGN.md` и `tokens.css` в M0, проверка цветов в `bun run check` | механическое | 1 | Оба голоса: без системы каждый экран получит свой вид | отложить до M4 |
-| 65 | Дизайн | Участник: цвет, форма и буква; палитра из 12 цветов | механическое | 1 | Оба голоса: цвет не может быть единственным признаком при 11 участниках | только цвет |
-| 66 | Дизайн | Квадратный аватар со значком чипа у ИИ | вкус | 5 | Квадрат и круг различимы в мелком размере | шестиугольник (Claude) |
-| 67 | Дизайн | Раскладки экранов схемами; лобби в две колонки строк | механическое | 5 | Оба голоса: раскладка не задана; карточки не нужны | набор карточек, нижняя панель |
-| 68 | Дизайн | Список участников в раунде с именами, сжимается до аватаров уже 1280 px | вкус | 5 | Имена нужны, чтобы видеть, кто ответил | всегда только аватары (Claude) |
-| 69 | Дизайн | Заслонка на панораме до конца отсчёта | механическое | 1 | Равные условия с ботами, которым `observe()` задержан | затемнённая, но видимая панорама |
-| 70 | Дизайн | Подтверждения сервера и состояния зоны ответа | механическое | 1 | Codex 7: игрок должен знать, что ответ принят | показывать «принято» сразу на клиенте |
-| 71 | Дизайн | Один таймер; подпись «Все ответили. ИИ думают» | механическое | 5 | Codex 9: два отсчёта спорят | отдельный отсчёт окна ожидания |
-| 72 | Дизайн | Пауза автоперехода при открытой карточке ИИ, предел 90 с | вкус | 1 | Оба голоса: 30 с не хватает на три объяснения до 600 символов | жёсткие 30 с; пауза без предела |
-| 73 | Дизайн | Первая строка объяснения ИИ видна в таблице без щелчка | механическое | 1 | Объяснения это отличительная черта игры, их нельзя прятать за значком | только значок ИИ |
-| 74 | Дизайн | Подписи расстояний на карте только у своей и выбранной метки | вкус | 5 | Codex 11: 11 подписей и дуг нечитаемы | подписи у всех |
-| 75 | Дизайн | Финал: ничья, меньше трёх участников, досрочный конец, победа ИИ без конфетти | механическое | 1 | Оба голоса: варианты исхода не заданы | один вид пьедестала |
-| 76 | Дизайн | Карточка ИИ из таблицы финала (M4) | вкус | 2 | Миниатюры и так хранятся до возврата в лобби; правка мала | не делать |
-| 77 | Дизайн | Приглашение в лобби с состоянием проверки; меню хоста | механическое | 1 | WARNING 11.4, оба голоса | ссылка только в терминале |
-| 78 | Дизайн | «Завершить партию» в меню хоста на любом экране | вкус | 2 | Иначе неудачную партию можно прервать только остановкой сервера | только при сбое подготовки |
-| 79 | Дизайн | Метка с клавиатуры: прицел и Enter | механическое | 1 | Оба голоса; карты уже двигаются стрелками, правка мала | только указатель |
-| 80 | Дизайн | Расчётное окно 1280 × 720; уже 900 px предупреждение и одна колонка | вкус | 3 | WARNING 11.3: друг может открыть ссылку с телефона | запретить вход с телефона; полная мобильная раскладка |
-| 81 | Дизайн | Проверки axe и отсутствия горизонтальной прокрутки в E2E | механическое | 1 | Доступность, не записанная в тесты, не появится | ручная проверка |
-| 82 | Дизайн | Отсечка 5 с на загрузку панорамы сохранена | вкус | 3 | Один медленный клиент не должен держать всех; друзья в голосовом чате | долгое ожидание и переигровка раунда (Codex 8) |
-| 83 | Дизайн | Счёт «Люди против ИИ» остаётся в M2 | вкус | решение фазы 1 | Состав после ворот «Первая игра» подтверждает владелец | перенос в M1 (Claude 9) |
-| 84 | Дизайн | Правила русских текстов через `Intl` | механическое | 4 | Штатные средства вместо своих таблиц склонений | своя функция склонения |
-| 85 | Дизайн | Светлая карта: `positron` или штатная схема Google | вкус | 5 | Светлая карта читается лучше, тёмные панели её обрамляют | тёмная схема карты |
-| 86 | Дизайн | Отметка «Проверить» привязана к настройкам, на которых получена | механическое | 1 | Codex 6: зелёная отметка не должна подтверждать непроверенное | отметка без срока |
-| 87 | Дизайн | Условия кнопки «Начать» и причины рядом с ней | механическое | 5 | Codex 5, Claude 6 | неактивная кнопка без объяснения |
-| 88 | Дизайн | Поведение при отключении хоста передано инженерной фазе | механическое | 6 | Это правило конечного автомата, вид следует из него | решать в дизайне |
+| 61 | Design | The phase was run by the separate `/plan-design-review` skill | mechanical | gstack documentation | The guard hook does not see the closure of phase 1 after context compaction; it must not be bypassed | reading protected files with another tool |
+| 62 | Design | Review without mockups | mechanical | 6 | No image generation key | drawing mockups by hand instead of a designer |
+| 63 | Design | Visual language "asphalt and road markings", Unbounded and Onest, one accent | taste | 5 | Dark dense panels do not compete with the panorama; both fonts have Cyrillic and a free license | system fonts, light theme, glass over the panorama |
+| 64 | Design | `DESIGN.md` and `tokens.css` in M0, color check in `bun run check` | mechanical | 1 | Both voices: without a system every screen gets its own look | postpone to M4 |
+| 65 | Design | Participant: color, shape and letter; a 12-color palette | mechanical | 1 | Both voices: color cannot be the only marker with 11 participants | color only |
+| 66 | Design | Square avatar with a chip icon for AI | taste | 5 | A square and a circle are distinguishable at a small size | hexagon (Claude) |
+| 67 | Design | Screen layouts as diagrams; lobby in two columns of rows | mechanical | 5 | Both voices: layout not defined; cards are not needed | set of cards, bottom panel |
+| 68 | Design | Participant list in a round with names, shrinks to avatars narrower than 1280 px | taste | 5 | Names are needed to see who has answered | always avatars only (Claude) |
+| 69 | Design | Shutter over the panorama until the end of the countdown | mechanical | 1 | Equal conditions with bots, whose `observe()` is delayed | dimmed but visible panorama |
+| 70 | Design | Server confirmations and answer-zone states | mechanical | 1 | Codex 7: the player must know the answer was accepted | show "accepted" right away on the client |
+| 71 | Design | One timer; caption "Все ответили. ИИ думают" | mechanical | 5 | Codex 9: two countdowns conflict | a separate countdown of the waiting window |
+| 72 | Design | Auto-advance pause while an AI card is open, limit 90 s | taste | 1 | Both voices: 30 s is not enough for three explanations of up to 600 characters | hard 30 s; pause without a limit |
+| 73 | Design | The first line of the AI explanation is visible in the table without a click | mechanical | 1 | Explanations are a distinguishing feature of the game, they must not be hidden behind an icon | AI icon only |
+| 74 | Design | Distance labels on the map only for one's own and the selected marker | taste | 5 | Codex 11: 11 labels and arcs are unreadable | labels for all |
+| 75 | Design | Final: tie, fewer than three participants, early end, AI victory without confetti | mechanical | 1 | Both voices: outcome variants not defined | one podium look |
+| 76 | Design | AI card from the final table (M4) | taste | 2 | Thumbnails are kept anyway until the return to the lobby; the change is small | do not do it |
+| 77 | Design | Lobby invitation with a check state; host menu | mechanical | 1 | WARNING 11.4, both voices | link only in the terminal |
+| 78 | Design | "Завершить партию" in the host menu on any screen | taste | 2 | Otherwise a failed game can only be interrupted by stopping the server | only on a preparation failure |
+| 79 | Design | Keyboard marker: crosshair and Enter | mechanical | 1 | Both voices; the maps already move with arrows, the change is small | pointer only |
+| 80 | Design | Design window 1280 × 720; narrower than 900 px a warning and one column | taste | 3 | WARNING 11.3: a friend may open the link from a phone | forbid joining from a phone; full mobile layout |
+| 81 | Design | axe checks and no-horizontal-scroll checks in E2E | mechanical | 1 | Accessibility not written into tests will not appear | manual check |
+| 82 | Design | The 5 s cutoff for panorama loading kept | taste | 3 | One slow client must not hold everyone; friends are in a voice chat | long wait and round replay (Codex 8) |
+| 83 | Design | The "Люди против ИИ" score stays in M2 | taste | phase 1 decision | The scope after the "First game" gate is confirmed by the owner | move to M1 (Claude 9) |
+| 84 | Design | Russian text rules via `Intl` | mechanical | 4 | Standard facilities instead of custom declension tables | custom declension function |
+| 85 | Design | Light map: `positron` or the standard Google scheme | taste | 5 | A light map reads better, the dark panels frame it | dark map scheme |
+| 86 | Design | The "Check" mark is tied to the settings it was obtained on | mechanical | 1 | Codex 6: a green mark must not confirm the unchecked | mark without expiry |
+| 87 | Design | Conditions of the "Начать" button and reasons next to it | mechanical | 5 | Codex 5, Claude 6 | inactive button without explanation |
+| 88 | Design | Behavior on host disconnect passed to the engineering phase | mechanical | 6 | This is a state machine rule, the appearance follows from it | decide in design |
 
-### Фаза 2.5. Обзор DX (режим DX POLISH)
+### Phase 2.5. DX review (DX POLISH mode)
 
-#### Как шла фаза
+#### How the phase went
 
-- Как и фаза 2, проведена отдельным навыком `/plan-devex-review` с правилами авторешений `/autoplan` (охранный хук конвейера не видит закрытия фазы 1 после сжатия контекста).
-- Вопросы навыка (тип продукта, персона, рассказ, цель по времени, магический момент, режим, точки трения) решены по 6 принципам и записаны в журнал ниже; на финальное утверждение вынесены только вопросы вкуса.
-- Записи gstack по ключу `tass` (выученные уроки, прежние задачи DX-обзора, прошлые оценки) относятся к другому проекту и не использованы. Прежних DX-обзоров этого плана нет.
+- Like phase 2, it was run by the separate `/plan-devex-review` skill with the `/autoplan` auto-decision rules (the pipeline's guard hook does not see the closure of phase 1 after context compaction).
+- The skill's questions (product type, persona, narrative, time goal, magical moment, mode, friction points) were resolved by the 6 principles and recorded in the log below; only questions of taste are put up for final approval.
+- The gstack records under the key `tass` (learned lessons, earlier DX-review tasks, past scores) belong to a different project and were not used. There are no earlier DX reviews of this plan.
 
-#### Тип продукта и персона
+#### Product type and persona
 
-Тип: инструмент командной строки (`bun run start`, `doctor`, `dev`) с настройкой внешних сервисов; второй слой: проект, который строят ИИ-агенты.
+Type: a command-line tool (`bun run start`, `doctor`, `dev`) with setup of external services; second layer: a project built by AI agents.
 
 ```
 TARGET DEVELOPER PERSONA
 ========================
-Who:       владелец, разработчик на TypeScript под Linux; Bun, cloudflared и харнессы с входом уже стоят
-Context:   один раз поднимает проект и ключи Google, потом в вечер игры запускает start и шлёт ссылку друзьям в чат
-Tolerance: первый запуск до 20-30 минут (настройку Google он понимает); в вечер игры не больше минуты, друзья уже в голосовом чате
-Expects:   одна команда запуска, понятная причина и команда исправления на каждую ошибку, ничего не собирать руками
+Who:       the owner, a TypeScript developer on Linux; Bun, cloudflared and logged-in harnesses are already installed
+Context:   sets up the project and the Google keys once, then on game night runs start and sends the link to friends in the chat
+Tolerance: first run up to 20-30 minutes (he understands Google setup); on game night no more than a minute, friends are already in the voice chat
+Expects:   one launch command, a clear cause and a fix command for every error, nothing to assemble by hand
 ```
 
-Вторая персона: ИИ-агент (Claude Code, Codex), который строит проект по плану. Читает вывод `bun run check`, тестов и `doctor` буквально, не может переспросить, повторяет команды вслепую.
+Second persona: an AI agent (Claude Code, Codex) that builds the project from the plan. It reads the output of `bun run check`, the tests and `doctor` literally, cannot ask follow-up questions, and repeats commands blindly.
 
-#### Рассказ владельца (по плану, без кода)
+#### The owner's story (per the plan, no code)
 
-«Клонирую репозиторий и делаю `bun install`. README говорит завести два ключа Google. Ухожу в Cloud Console: проект, биллинг, два API, два ключа с ограничениями. План этих шагов не расписывал, и я бы потратил минут двадцать, гадая, какое ограничение ставить какому ключу и какие квоты. Вписываю ключи в `.env`, запускаю `doctor`: он проверяет серверный ключ и входы харнессов и на каждую проблему печатает команду. Запускаю `start`. Тут план молчал: собирать ли клиент самому, какой порт, что будет, если ссылка не готова за 60 с, с каким кодом выхода всё падает. Браузерный ключ проверяется только в браузере. Если сервер упадёт посреди партии, я не узнаю почему. Агенту, который пишет код, нечем разрабатывать экраны без ключей и подписок.» Пробелы этого рассказа (сборка, ключи, коды ошибок, разработка без ключей) закрыты пунктами раздела 14.
+"I clone the repository and run `bun install`. The README tells me to get two Google keys. I go to Cloud Console: a project, billing, two APIs, two keys with restrictions. The plan did not spell out these steps, and I would spend about twenty minutes guessing which restriction goes on which key and what quotas to set. I put the keys into `.env` and run `doctor`: it checks the server key and the harness logins and prints a command for every problem. I run `start`. Here the plan was silent: whether to build the client myself, which port, what happens if the link is not ready within 60 s, with what exit code everything fails. The browser key is checked only in the browser. If the server crashes in the middle of a game, I will not know why. The agent that writes the code has nothing to develop the screens with without keys and subscriptions." The gaps of this story (build, keys, error codes, development without keys) are closed by the items of section 14.
 
-#### Сравнение с похожими проектами
+#### Comparison with similar projects
 
-| Проект | Старт → результат | Время, вид оценки | Решение по DX | Источник |
+| Project | Start → result | Time, kind of estimate | DX decision | Source |
 |---|---|---|---|---|
-| Azimuth | клон → `.env` с одним ключом Google → `npm install` → `npm run dev` | не замерено | ключ можно ввести и в настройках игры | github.com/mesmerica/azimuth |
-| WorldGuessr | клон → `pnpm install` → `pnpm run dev` | не замерено | обычный dev-сервер | github.com/codergautam/worldguessr |
-| Enigjewo | биллинг → Maps JS API → ключ в Credentials | не замерено | шаги Google перечислены в README | github.com/leny/Enigjewo |
-| Earthwalker | Docker → localhost:8080 | не замерено | без ключа Google, через публичное встраивание | github.com/daehli/earthwalker |
-| geoaissr (план) | клон → ключи → `doctor` → `start` → друг в лобби | оценка: 20 мин первый раз, до 1 мин повторно | два ключа, туннель, проверенная ссылка, браузер хоста открывается сам | раздел 14 |
+| Azimuth | clone → `.env` with one Google key → `npm install` → `npm run dev` | not measured | the key can also be entered in the game settings | github.com/mesmerica/azimuth |
+| WorldGuessr | clone → `pnpm install` → `pnpm run dev` | not measured | an ordinary dev server | github.com/codergautam/worldguessr |
+| Enigjewo | billing → Maps JS API → key in Credentials | not measured | the Google steps are listed in the README | github.com/leny/Enigjewo |
+| Earthwalker | Docker → localhost:8080 | not measured | no Google key, via public embedding | github.com/daehli/earthwalker |
+| geoaissr (plan) | clone → keys → `doctor` → `start` → friend in the lobby | estimate: 20 min the first time, up to 1 min afterwards | two keys, tunnel, verified link, the host's browser opens by itself | section 14 |
 
-Ограничение: ни одно время не замерено, у похожих проектов нет туннеля и ботов, поэтому сравниваются решения, а не минуты. Путь Earthwalker без ключа Google не подходит: план использует официальный API, а условия Google проверены в фазе 1.
+Limitation: no time is measured, similar projects have no tunnel and no bots, so decisions are compared, not minutes. The Earthwalker path without a Google key does not fit: the plan uses the official API, and Google's terms were checked in phase 1.
 
-Цель (авторешение, вариант «реалистично»): первый запуск до 20 минут, из них большая часть в Cloud Console; повторный запуск в вечер игры до 1 минуты от `bun run start` до скопированной ссылки. Первый запуск по шкале навыка остаётся в классе «Red Flag» (больше 10 минут) из-за Google; повторный в классе «Champion».
+Goal (auto-decision, the "realistic" option): first run up to 20 minutes, most of it in Cloud Console; a repeat run on game night up to 1 minute from `bun run start` to the copied link. By the skill's scale, the first run stays in the "Red Flag" class (over 10 minutes) because of Google; the repeat run is in the "Champion" class.
 
-#### Магический момент
+#### Magical moment
 
-`bun run start` собирает клиент, проверяет ссылку, печатает «Ссылка готова за 14 с» и сам открывает лобби хоста в браузере; в лобби кнопка «Скопировать приглашение»; друг открывает ссылку и появляется в лобби у всех вживую. Средства уже есть в плане (проверка ссылки, кнопка копирования из фазы 2); добавлено открытие браузера с флагом `--no-open`.
+`bun run start` builds the client, verifies the link, prints «Ссылка готова за 14 с» ("Link ready in 14 s") and itself opens the host's lobby in the browser; in the lobby there is a «Скопировать приглашение» ("Copy invitation") button; a friend opens the link and appears in everyone's lobby live. The means are already in the plan (link verification, the copy button from phase 2); browser opening with the `--no-open` flag is added.
 
-#### Путь владельца
+#### Owner's path
 
 ```
 STAGE           | DEVELOPER DOES                         | FRICTION POINTS                              | STATUS
 ----------------|----------------------------------------|----------------------------------------------|--------
-1. Discover     | читает README                          | нет                                          | ok
-2. Install      | bun install, ключи, .env               | шаги Google не расписаны                     | fixed
-3. Hello World  | doctor, start, друг входит             | сборка клиента, порт, браузерный ключ        | fixed
-4. Real Usage   | вечер игры: start, ссылка в чат        | нет                                          | ok
-5. Debug        | ошибка start, сбой сервера, бот без 0  | нет кодов, кодов выхода, файла сбоя          | fixed
-6. Upgrade      | git pull, bun install, start           | новый формат файлов, квота                   | fixed
+1. Discover     | reads the README                       | none                                         | ok
+2. Install      | bun install, keys, .env                | Google steps not spelled out                 | fixed
+3. Hello World  | doctor, start, friend joins            | client build, port, browser key              | fixed
+4. Real Usage   | game night: start, link to the chat    | none                                         | ok
+5. Debug        | start error, server crash, bot at 0    | no codes, exit codes, crash file             | fixed
+6. Upgrade      | git pull, bun install, start           | new file format, quota                       | fixed
 ```
 
-#### Отчёт новичка
+#### Newcomer report
 
 ```
 FIRST-TIME DEVELOPER REPORT
 ============================
-Persona: владелец (и ИИ-агент, который строит проект)
-Attempting: geoaissr, первый запуск
+Persona: the owner (and the AI agent that builds the project)
+Attempting: geoaissr, first run
 
 CONFUSION LOG:
-T+0:00  bun install. Без вопросов.                                              ok
-T+0:30  README: «ключи Google». Какие API, какие ограничения, какие квоты?       исправлено: «Как получить ключи»
-T+15:00 doctor: «REQUEST_DENIED». Ключ или API? Какой шаг повторить?            исправлено: error_message и шаги по порядку
-T+17:00 start: собирать ли клиент? Что значит «не готова за 60 с»?              исправлено: сборка при каждом запуске, вид ошибки
-T+18:00 друг открыл ссылку, карта не грузится: referrer браузерного ключа       исправлено: client_error с кодом и шагом инструкции
-T+40:00 агент пишет экран лобби, ключей и подписок у него нет                   исправлено: dev --fake, отдельные каталоги данных
+T+0:00  bun install. No questions.                                              ok
+T+0:30  README: "Google keys". Which APIs, which restrictions, which quotas?    fixed: "Как получить ключи" ("How to get the keys")
+T+15:00 doctor: "REQUEST_DENIED". The key or the API? Which step to repeat?     fixed: error_message and steps in order
+T+17:00 start: build the client or not? What does "not ready within 60 s" mean? fixed: build on every launch, error format
+T+18:00 a friend opened the link, the map does not load: browser key referrer   fixed: client_error with a code and an instruction step
+T+40:00 the agent writes the lobby screen, has no keys or subscriptions         fixed: dev --fake, separate data directories
 ```
 
-#### Проходы
+#### Passes
 
-**Проход 1. Первый запуск: 4 → 7.** Не было шагов Google, ответа про сборку клиента, порта, предварительных проверок. Теперь четыре шага README, сборка в `start`, проверки до запуска, открытие браузера. До 10 мешает Cloud Console: биллинг и два ключа занимают основное время, и обойти это без отказа от официального API нельзя.
+**Pass 1. First run: 4 → 7.** There were no Google steps, no answer about building the client, the port, or preliminary checks. Now: four README steps, a build in `start`, checks before launch, browser opening. Reaching 10 is blocked by Cloud Console: billing and two keys take most of the time, and this cannot be avoided without giving up the official API.
 
-**Проход 2. Команды: 6 → 8.** Команды названы просто (`start`, `doctor`, `dev`), значения по умолчанию есть. Добавлены `--port`, `--no-open`, `--fake`, `doctor --json`, `setup:dev`, уровни проверок `doctor`, общие переменные каталогов данных. Команды не задают вопросов в терминале, поэтому агенту ничего не мешает.
+**Pass 2. Commands: 6 → 8.** The commands are named simply (`start`, `doctor`, `dev`), defaults exist. Added `--port`, `--no-open`, `--fake`, `doctor --json`, `setup:dev`, `doctor` check levels, shared data-directory variables. The commands do not ask questions in the terminal, so nothing blocks the agent.
 
-**Проход 3. Ошибки: 3 → 8.**
+**Pass 3. Errors: 3 → 8.**
 
 ```
-ERROR PATH MATRIX (agent-ready-v1), до правок
+ERROR PATH MATRIX (agent-ready-v1), before the edits
 Path                         | Class       | what | fix  | recovery | code | context | trace | redaction | channel | Cap
-start: нет ключа в .env      | usage       | fail | fail | N/A      | fail | N/A     | N/A   | pass      | fail    | CAP6:fix
-start: ссылка не готова 60 с | dependency  | pass | pass | fail     | fail | fail    | N/A   | pass      | fail    | CAP6:recovery
-doctor: харнесс без входа    | environment | pass | pass | pass     | fail | fail    | N/A   | pass      | fail    | CAP6:context
-сервер упал посреди партии   | unexpected  | fail | fail | fail     | fail | fail    | fail  | pass      | fail    | CAP6:trace
-инструмент geo: неверный арг | validation  | pass | pass | N/A      | fail | N/A     | N/A   | pass      | fail    | -
+start: no key in .env        | usage       | fail | fail | N/A      | fail | N/A     | N/A   | pass      | fail    | CAP6:fix
+start: link not ready in 60 s| dependency  | pass | pass | fail     | fail | fail    | N/A   | pass      | fail    | CAP6:recovery
+doctor: harness not logged in| environment | pass | pass | pass     | fail | fail    | N/A   | pass      | fail    | CAP6:context
+server crashed mid-game      | unexpected  | fail | fail | fail     | fail | fail    | fail  | pass      | fail    | CAP6:trace
+geo tool: invalid argument   | validation  | pass | pass | N/A      | fail | N/A     | N/A   | pass      | fail    | -
 ```
 
-Секреты маскировались уже по решению фазы 1, вопросов в терминале нет, поэтому CAP4 нет. После правок все пять путей проходят: реестр кодов с `docs/errors.md`, вид ошибки с исправлением в последней строке, коды выхода 1, 2, 3 и 70, `doctor --json`, файл сбоя без токенов, `isError: true` у инструментов `geo`. Пример исправленной строки приведён в пункте «Ошибки командной строки и инструментов бота». Подробного режима вывода нет: полный журнал и файл сбоя его заменяют.
+Secrets were already masked by the phase 1 decision, there are no questions in the terminal, so there is no CAP4. After the edits all five paths pass: the code registry with `docs/errors.md`, an error format with the fix on the last line, exit codes 1, 2, 3 and 70, `doctor --json`, a crash file without tokens, `isError: true` on the `geo` tools. An example of a corrected line is given in the item "Command-line and bot tool errors". There is no verbose output mode: the full log and the crash file replace it.
 
-**Проход 4. Документация: 4 → 7.** README получил точный состав: «Быстрый старт», «Как получить ключи», «Обновление», `docs/errors.md`, `CLAUDE.md` с командами. Игровую песочницу заменяет `dev --fake`. До 10 не хватает проверки README на чистой машине: она входит в замер первого запуска.
+**Pass 4. Documentation: 4 → 7.** The README got an exact composition: «Быстрый старт» ("Quick start"), «Как получить ключи», «Обновление» ("Upgrade"), `docs/errors.md`, `CLAUDE.md` with the commands. `dev --fake` replaces a game sandbox. Reaching 10 lacks a README check on a clean machine: it is part of the first-run measurement.
 
-**Проход 5. Обновление: 5 → 7.** Было поле `version` и правило `.bad`. Добавлены миграции по версиям, отдельное поведение для файла новее программы (квота не обнуляется), пересборка клиента при каждом запуске. CHANGELOG и семантические версии для проекта одного владельца не нужны.
+**Pass 5. Upgrade: 5 → 7.** There was a `version` field and the `.bad` rule. Added migrations by version, separate behavior for a file newer than the program (the quota is not reset), client rebuild on every launch. A CHANGELOG and semantic versions are not needed for a single-owner project.
 
-**Проход 6. Среда разработки: 6 → 8.** Были `dev` с перезагрузкой, поддельный харнесс и провайдер панорам в тестах. Добавлены `dev --fake`, изоляция каталогов данных, `setup:dev`, требования `shellcheck` и браузеров Playwright. Ворота качества владельца (строгие линтеры, лимиты 500, 1000 и 80 строк с проверкой и списком исключений, задача CI и pre-push хук с установкой одной командой, `CLAUDE.md`) в плане есть в M0; замечаний нет.
+**Pass 6. Dev environment: 6 → 8.** There were `dev` with reload, a fake harness and a panorama provider in tests. Added `dev --fake`, data-directory isolation, `setup:dev`, requirements for `shellcheck` and Playwright browsers. The owner's quality gates (strict linters, limits of 500, 1000 and 80 lines with a checker and an exceptions list, a CI job and a pre-push hook installed with one command, `CLAUDE.md`) are in the plan in M0; no findings.
 
-**Проход 7. Сообщество: 5 → 5.** Проект для трёх друзей в приватном репозитории; сообщество не цель. Спайк S4 сверяет лицензии открытых клонов. Правок нет.
+**Pass 7. Community: 5 → 5.** A project for three friends in a private repository; community is not a goal. Spike S4 checks the licenses of open clones. No edits.
 
-**Проход 8. Замер: 4 → 7.** Был замер игры на воротах «Первая игра», замера настройки не было. Добавлены «Ссылка готова за N с» в `start` и запись первого запуска в `docs/playtest-1.md` до входа второго человека, с кодами встреченных ошибок.
+**Pass 8. Measurement: 4 → 7.** There was a measurement of the game at the "First game" gate, but no measurement of setup. Added "Ссылка готова за N с" ("Link ready in N s") in `start` and a record of the first run in `docs/playtest-1.md` before the second person joins, with the codes of the errors encountered.
 
-#### Внешний голос
+#### Outside voice
 
-CODEX SAYS (plan review — outside voice), 8 замечаний, 3 высоких, итог «Revise the DX contract before implementation because startup success, diagnostic requirements, and persistence isolation are still ambiguous enough for agents to build incompatible or unsafe behavior»:
+CODEX SAYS (plan review — outside voice), 8 findings, 3 high, summary "Revise the DX contract before implementation because startup success, diagnostic requirements, and persistence isolation are still ambiguous enough for agents to build incompatible or unsafe behavior":
 
-1. Высокое. `doctor` завершался бы ошибкой при одном невошедшем харнессе, хотя для игры хватает одного. Принято: уровни проверок.
-2. Высокое. Файл квоты новее программы обнулял бы счёт. Принято: `start` не запускается; повреждённый файл требует подтверждения хоста (уточняет решение фазы 1).
-3. Высокое. Подмены и тесты писали бы в настоящие каталоги владельца. Принято: переменные каталогов, `.geoaissr-dev/`, временные каталоги в тестах.
-4. Среднее. Сумма исходников для решения о сборке пропускала входы сборки. Принято: сборка при каждом запуске.
-5. Среднее. Харнесс новой версии без правила, что остаётся доступным. Принято: предупреждение, харнесс доступен.
-6. Среднее. Рабочая копия без `shellcheck` и браузеров Playwright. Принято: `setup:dev`.
-7. Среднее. Замер первого запуска заканчивался до проверки браузерного ключа. Принято: конец замера после входа второго человека.
-8. Среднее. `REQUEST_DENIED` не даёт точного шага. Принято: `error_message` Google и шаги по порядку.
+1. High. `doctor` would fail with one harness not logged in, although one is enough for the game. Accepted: check levels.
+2. High. A quota file newer than the program would reset the count. Accepted: `start` does not launch; a corrupted file requires host confirmation (refines the phase 1 decision).
+3. High. Fakes and tests would write to the owner's real directories. Accepted: directory variables, `.geoaissr-dev/`, temporary directories in tests.
+4. Medium. The sum of sources for the build decision missed the build inputs. Accepted: build on every launch.
+5. Medium. A new harness version without a rule for what stays available. Accepted: a warning, the harness is available.
+6. Medium. A working copy without `shellcheck` and Playwright browsers. Accepted: `setup:dev`.
+7. Medium. The first-run measurement ended before the browser key was checked. Accepted: the measurement ends after the second person joins.
+8. Medium. `REQUEST_DENIED` does not give an exact step. Accepted: Google's `error_message` and steps in order.
 
-Расхождений с собственным обзором нет: все 8 замечаний уточняют пункты этой фазы, ни одно не меняет замысел владельца.
+No disagreements with my own review: all 8 findings refine items of this phase, none changes the owner's intent.
 
-#### Вне рамок
+#### Out of scope
 
-- Игра без ключа Google через публичное встраивание (как Earthwalker): расходится с выбранным официальным API.
-- Мастер настройки ключей в браузере: README и `doctor` дешевле и не требуют интерфейса.
-- QR-код ссылки в терминале: телефон не цель первой версии.
-- CHANGELOG, семантические версии, канал сообщества: проект одного владельца.
-- Кэш сборки клиента: до замера, что сборка мешает.
+- Playing without a Google key via public embedding (like Earthwalker): diverges from the chosen official API.
+- A key setup wizard in the browser: the README and `doctor` are cheaper and need no interface.
+- A QR code of the link in the terminal: a phone is not a goal of the first version.
+- CHANGELOG, semantic versions, a community channel: a single-owner project.
+- A client build cache: until it is measured that the build gets in the way.
 
-#### Что уже есть
+#### What already exists
 
-Кода нет. В плане уже были: `doctor` с причиной и командой исправления, поле `version` и правило `.bad`, маскировка токенов, журнал сервера, поддельный харнесс и провайдер панорам для тестов, проверка готовности ссылки, ворота качества в M0. Новые пункты строятся на них.
+There is no code. The plan already had: `doctor` with a cause and a fix command, the `version` field and the `.bad` rule, token masking, the server log, a fake harness and panorama provider for tests, link readiness check, quality gates in M0. The new items build on them.
 
-#### Изменения в `TODOS.md`
+#### Changes to `TODOS.md`
 
-Нет: все принятые правки вошли в задачи плана.
+None: all accepted edits went into the plan tasks.
 
 #### Implementation Tasks
 
-Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship. Оценка: соотношение «человек к CC» около 30 для команд и 50 для тестов.
+Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship. Estimate: the "human to CC" ratio is about 30 for commands and 50 for tests.
 
-- [ ] **T29 (P1, human: ~1d / CC: ~30min)** — cli/start — Сборка клиента, проверки до запуска, `--port`, `--no-open`, блок готовой ссылки
-  - Surfaced by: Проход 1 — WARNING 9.2, путь «Hello World»
+- [ ] **T29 (P1, human: ~1d / CC: ~30min)** — cli/start — Client build, checks before launch, `--port`, `--no-open`, ready-link block
+  - Surfaced by: Pass 1 — WARNING 9.2, the "Hello World" path
   - Files: `server/cli/start.ts`, `server/cli/preflight.ts`, `server/cli/start.test.ts`
-  - Verify: интеграционный `start --no-tunnel --no-open` на чистом каталоге
-- [ ] **T30 (P1, human: ~1d / CC: ~30min)** — cli/errors — Реестр кодов, вид ошибки, коды выхода, файл сбоя, `docs/errors.md`
-  - Surfaced by: Проход 3 — матрица ошибок, CAP6 на четырёх путях
+  - Verify: integration `start --no-tunnel --no-open` on a clean directory
+- [ ] **T30 (P1, human: ~1d / CC: ~30min)** — cli/errors — Code registry, error format, exit codes, crash file, `docs/errors.md`
+  - Surfaced by: Pass 3 — error matrix, CAP6 on four paths
   - Files: `server/errors.ts`, `server/cli/report-error.ts`, `docs/errors.md`, `server/errors.test.ts`
-  - Verify: `bun test server/errors.test.ts`; интеграционный на код 70 и файл сбоя
-- [ ] **T31 (P1, human: ~1d / CC: ~30min)** — cli/doctor — Уровни проверок, `--json`, `error_message` Google, версии харнессов
-  - Surfaced by: Проход 2 и Codex 1, 5, 8
+  - Verify: `bun test server/errors.test.ts`; integration for code 70 and the crash file
+- [ ] **T31 (P1, human: ~1d / CC: ~30min)** — cli/doctor — Check levels, `--json`, Google `error_message`, harness versions
+  - Surfaced by: Pass 2 and Codex 1, 5, 8
   - Files: `server/cli/doctor.ts`, `server/cli/doctor.test.ts`
   - Verify: `bun test server/cli/doctor.test.ts`
 - [ ] **T32 (P1, human: ~4h / CC: ~15min)** — docs — README «Быстрый старт», «Как получить ключи», «Обновление»
-  - Surfaced by: Проход 4 — шаги Google не расписаны
+  - Surfaced by: Pass 4 — the Google steps are not spelled out
   - Files: `README.md`, `.env.example`
-  - Verify: замер первого запуска на чистом каталоге
-- [ ] **T33 (P1, human: ~1d / CC: ~30min)** — dev — `dev --fake`, переменные каталогов данных, `setup:dev`, изоляция в тестах
-  - Surfaced by: Проход 6 и Codex 3, 6
+  - Verify: first-run measurement on a clean directory
+- [ ] **T33 (P1, human: ~1d / CC: ~30min)** — dev — `dev --fake`, data-directory variables, `setup:dev`, isolation in tests
+  - Surfaced by: Pass 6 and Codex 3, 6
   - Files: `server/paths.ts`, `server/dev/fake.ts`, `scripts/setup-dev.ts`, `test/setup.ts`, `CLAUDE.md`
-  - Verify: `bun run setup:dev && bun run check && bun run test` без сети
-- [ ] **T34 (P1, human: ~4h / CC: ~20min)** — storage — Миграции версий, файл новее программы, подтверждение хоста после повреждённой квоты
-  - Surfaced by: Проход 5 и Codex 2
+  - Verify: `bun run setup:dev && bun run check && bun run test` without network
+- [ ] **T34 (P1, human: ~4h / CC: ~20min)** — storage — Version migrations, a file newer than the program, host confirmation after a corrupted quota
+  - Surfaced by: Pass 5 and Codex 2
   - Files: `server/storage/migrate.ts`, `server/storage/quota.ts`, `server/storage/migrate.test.ts`
   - Verify: `bun test server/storage`
-- [ ] **T35 (P2, human: ~2h / CC: ~10min)** — gate — Замер первого запуска в `docs/playtest-1.md`
-  - Surfaced by: Проход 8 и Codex 7
+- [ ] **T35 (P2, human: ~2h / CC: ~10min)** — gate — First-run measurement in `docs/playtest-1.md`
+  - Surfaced by: Pass 8 and Codex 7
   - Files: `docs/playtest-1.md`
-  - Verify: запись есть до начала M2
+  - Verify: the record exists before M2 starts
 
 #### DX Review Scorecard
 
@@ -2037,264 +2037,264 @@ Synthesized from this review's findings. Each task derives from a specific findi
 | DX Measurement       |  7/10  |  4/10  |  +3 ↑  |
 +--------------------------------------------------------------------+
 | TTHW                 | 20 min | 30 min | -10 ↓  |
-| Competitive Rank     | Red Flag (первый запуск), Champion (повторный) |
-| Magical Moment       | designed via start + проверенная ссылка + браузер |
+| Competitive Rank     | Red Flag (first run), Champion (repeat run) |
+| Magical Moment       | designed via start + verified link + browser |
 | Product Type         | CLI Tool                                    |
 | Mode                 | POLISH                                      |
 | Overall DX           |  7/10  |  4/10  |  +3 ↑  |
 +====================================================================+
 | DX PRINCIPLE COVERAGE                                               |
-| Zero Friction      | gap: Cloud Console неизбежен                   |
+| Zero Friction      | gap: Cloud Console is unavoidable              |
 | Learn by Doing     | covered: dev --fake                            |
-| Fight Uncertainty  | covered: коды, исправление, doctor --json      |
-| Opinionated + Escape Hatches | covered: порт, --no-open, --no-tunnel |
-| Code in Context    | covered: README на четыре шага                 |
+| Fight Uncertainty  | covered: codes, fix, doctor --json             |
+| Opinionated + Escape Hatches | covered: port, --no-open, --no-tunnel |
+| Code in Context    | covered: four-step README                      |
 | Magical Moments    | covered                                        |
-| Agents Are Users   | covered: --json, коды выхода, без вопросов     |
+| Agents Are Users   | covered: --json, exit codes, no questions      |
 +====================================================================+
 ```
 
-Оценки «Prior» это оценки плана до этой фазы (первый DX-обзор). TTHW оценочный, не замерен. Ниже 6 только «Сообщество», и это не цель проекта. Первый запуск больше 10 минут из-за Cloud Console; блокером не считается, потому что повторный запуск укладывается в минуту.
+The "Prior" scores are the plan's scores before this phase (the first DX review). TTHW is estimated, not measured. Only "Community" is below 6, and it is not a project goal. The first run takes more than 10 minutes because of Cloud Console; it is not considered a blocker because the repeat run fits in a minute.
 
 ```
 DX IMPLEMENTATION CHECKLIST
 ============================
-[ ] Первый запуск < 20 мин, повторный < 1 мин
-[ ] Установка: bun install и четыре шага README
-[ ] start печатает проверенную ссылку и время
-[ ] Магический момент: браузер хоста открывается сам, друг появляется в лобби
-[ ] Каждая ошибка по контракту agent-ready (Проход 3)
-[ ] Названия команд понятны без документации
-[ ] У каждого флага есть значение по умолчанию
-[ ] README проверен на чистом каталоге
-[ ] dev --fake работает без ключей и подписок
-[ ] Миграции форматов файлов с тестами
-[ ] Работает в CI без особой настройки (bun run check, bun run test)
+[ ] First run < 20 min, repeat run < 1 min
+[ ] Installation: bun install and four README steps
+[ ] start prints the verified link and the time
+[ ] Magical moment: the host's browser opens by itself, a friend appears in the lobby
+[ ] Every error follows the agent-ready contract (Pass 3)
+[ ] Command names are clear without documentation
+[ ] Every flag has a default value
+[ ] README checked on a clean directory
+[ ] dev --fake works without keys and subscriptions
+[ ] File format migrations with tests
+[ ] Works in CI without special setup (bun run check, bun run test)
 ```
 
-#### Нерешённое после фазы 2.5
+#### Unresolved after phase 2.5
 
-На финальное утверждение (вопросы вкуса, в плане действует рекомендованный вариант):
+For final approval (questions of taste; the recommended option is in effect in the plan):
 
-- **X-1. Режим DX POLISH**, а не DX EXPANSION. Для проекта одного владельца расширения DX (мастер ключей, QR-код) не окупаются.
-- **X-2. Повреждённый `quota.json` требует подтверждения хоста** перед первой партией с ботами. Фаза 1 решила начинать счёт с нуля с предупреждением; Codex показал, что так защита квоты исчезает молча.
+- **X-1. DX POLISH mode**, not DX EXPANSION. For a single-owner project, DX expansions (a key wizard, a QR code) do not pay off.
+- **X-2. A corrupted `quota.json` requires host confirmation** before the first game with bots. Phase 1 decided to start the count from zero with a warning; Codex showed that this makes the quota protection disappear silently.
 
-Передано инженерной фазе: формат файла сбоя и как он сочетается с журналом за 14 дней.
+Passed to the engineering phase: the format of the crash file and how it combines with the 14-day log.
 
-#### Журнал авторешений, фаза 2.5
+#### Auto-decision log, phase 2.5
 
-| № | Фаза | Решение | Класс | Принцип | Обоснование | Отвергнуто |
+| No. | Phase | Decision | Class | Principle | Rationale | Rejected |
 |---|---|---|---|---|---|---|
-| 89 | DX | Фаза проведена отдельным навыком `/plan-devex-review` | механическое | документация gstack | Та же причина, что в фазе 2 | обход хука |
-| 90 | DX | Тип продукта: инструмент командной строки | механическое | 5 | `start`, `doctor`, `dev` это вся поверхность владельца | платформа, SDK |
-| 91 | DX | Персона: владелец; вторая: ИИ-агент | механическое | 1 | Игру поднимает один человек; строят её агенты | только владелец |
-| 92 | DX | Цель: 20 мин первый раз, до 1 мин повторно | механическое | 3 | Cloud Console не сократить; вечер игры сократить можно | меньше 2 минут первый раз |
-| 93 | DX | Магический момент: проверенная ссылка, время, браузер хоста | механическое | 4 | Средства уже есть в плане | QR-код в терминале |
-| 94 | DX | Режим DX POLISH | вкус | 3 | Рекомендованный вариант; продукт для одного владельца | DX EXPANSION |
-| 95 | DX | `start` собирает клиент при каждом запуске | механическое | 5 | Закрывает WARNING 9.2; Codex 4: сумма исходников пропускала входы | сумма исходников; отдельная команда сборки |
-| 96 | DX | Проверки до запуска и порт 5174 с `--port` | механическое | 1 | Ошибка должна прийти до туннеля, а не после | проверки только в `doctor` |
-| 97 | DX | `start` открывает браузер хоста, `--no-open` | механическое | 4 | Магический момент; без графической сессии строка вместо браузера | только печать ссылки |
-| 98 | DX | Шаги Google в README с оценкой времени | механическое | 1 | Основное время первого запуска уходит туда | ссылка на документацию Google |
-| 99 | DX | Браузерный ключ проверяется через `client_error` в лобби | механическое | 5 | Сервер не может проверить referrer за браузер | проверка в `doctor` |
-| 100 | DX | Реестр кодов, вид ошибки, коды выхода, `docs/errors.md` | механическое | 1 | Матрица Прохода 3: CAP6 на четырёх путях | свободный текст ошибок |
-| 101 | DX | `doctor --json` | механическое | 1 | Вторая персона: агент читает вывод буквально | только текст |
-| 102 | DX | Файл сбоя с полным стеком, без токенов | механическое | 1 | Непредвиденный сбой иначе не разобрать | стек в терминал |
-| 103 | DX | `isError: true` у инструментов `geo` | механическое | 5 | Канал ошибки MCP | ошибка простым текстом |
-| 104 | DX | `dev --fake` | механическое | 2 | Подмены уже есть в тестах; разработка экранов без ключей и квоты | разработка только с ключами |
-| 105 | DX | Переменные каталогов данных, `.geoaissr-dev/`, временные каталоги в тестах | механическое | 1 | Codex 3: тесты могли бы писать в настоящие файлы владельца | пути в коде |
-| 106 | DX | `setup:dev` | механическое | 1 | Codex 6: `shellcheck` и браузеры Playwright | список команд в README |
-| 107 | DX | Уровни проверок `doctor` | механическое | 1 | Codex 1: один невошедший харнесс не должен ронять `doctor` | все проверки обязательны |
-| 108 | DX | Новая версия харнесса: предупреждение, харнесс доступен | механическое | 6 | Codex 5; вечер игры важнее строгой проверки | скрывать харнесс |
-| 109 | DX | `error_message` Google и шаги по порядку | механическое | 5 | Codex 8: статус не называет причину | один шаг на статус |
-| 110 | DX | Миграции по версиям; файл новее программы | механическое | 1 | Обновление без потери настроек | только `.bad` |
-| 111 | DX | Квота новее программы: `start` не запускается | механическое | 1 | Codex 2: неизвестный расход не ноль | значения по умолчанию |
-| 112 | DX | Повреждённая квота: подтверждение хоста | вкус | 1 | Codex 2; уточняет решение фазы 1 | молча с нуля |
-| 113 | DX | Замер первого запуска до входа второго человека | механическое | 1 | Codex 7: замер должен проверить браузерный ключ | до готовой ссылки |
+| 89 | DX | The phase was run by the separate `/plan-devex-review` skill | mechanical | gstack documentation | Same reason as in phase 2 | hook bypass |
+| 90 | DX | Product type: command-line tool | mechanical | 5 | `start`, `doctor`, `dev` are the owner's whole surface | platform, SDK |
+| 91 | DX | Persona: the owner; second: the AI agent | mechanical | 1 | One person sets up the game; agents build it | owner only |
+| 92 | DX | Goal: 20 min the first time, up to 1 min afterwards | mechanical | 3 | Cloud Console cannot be shortened; game night can | under 2 minutes the first time |
+| 93 | DX | Magical moment: verified link, time, host's browser | mechanical | 4 | The means are already in the plan | QR code in the terminal |
+| 94 | DX | DX POLISH mode | taste | 3 | The recommended option; a single-owner product | DX EXPANSION |
+| 95 | DX | `start` builds the client on every launch | mechanical | 5 | Closes WARNING 9.2; Codex 4: the sum of sources missed the inputs | sum of sources; a separate build command |
+| 96 | DX | Checks before launch and port 5174 with `--port` | mechanical | 1 | The error must come before the tunnel, not after | checks only in `doctor` |
+| 97 | DX | `start` opens the host's browser, `--no-open` | mechanical | 4 | Magical moment; without a graphical session a line instead of a browser | only print the link |
+| 98 | DX | Google steps in the README with a time estimate | mechanical | 1 | Most of the first run's time goes there | a link to Google's documentation |
+| 99 | DX | The browser key is checked via `client_error` in the lobby | mechanical | 5 | The server cannot check the referrer on behalf of the browser | check in `doctor` |
+| 100 | DX | Code registry, error format, exit codes, `docs/errors.md` | mechanical | 1 | The Pass 3 matrix: CAP6 on four paths | free-text errors |
+| 101 | DX | `doctor --json` | mechanical | 1 | Second persona: the agent reads the output literally | text only |
+| 102 | DX | Crash file with a full stack, without tokens | mechanical | 1 | An unexpected crash cannot be diagnosed otherwise | stack in the terminal |
+| 103 | DX | `isError: true` on the `geo` tools | mechanical | 5 | The MCP error channel | error as plain text |
+| 104 | DX | `dev --fake` | mechanical | 2 | Fakes already exist in tests; developing screens without keys and quota | development only with keys |
+| 105 | DX | Data-directory variables, `.geoaissr-dev/`, temporary directories in tests | mechanical | 1 | Codex 3: tests could write to the owner's real files | paths in code |
+| 106 | DX | `setup:dev` | mechanical | 1 | Codex 6: `shellcheck` and Playwright browsers | a command list in the README |
+| 107 | DX | `doctor` check levels | mechanical | 1 | Codex 1: one harness not logged in must not fail `doctor` | all checks mandatory |
+| 108 | DX | New harness version: a warning, the harness is available | mechanical | 6 | Codex 5; game night matters more than strict checking | hide the harness |
+| 109 | DX | Google `error_message` and steps in order | mechanical | 5 | Codex 8: the status does not name the cause | one step per status |
+| 110 | DX | Migrations by version; a file newer than the program | mechanical | 1 | Upgrading without losing settings | only `.bad` |
+| 111 | DX | Quota newer than the program: `start` does not launch | mechanical | 1 | Codex 2: unknown usage is not zero | default values |
+| 112 | DX | Corrupted quota: host confirmation | taste | 1 | Codex 2; refines the phase 1 decision | silently from zero |
+| 113 | DX | Measure the first run until the second person joins | mechanical | 1 | Codex 7: the measurement must verify the browser key | until the link is ready |
 
-### Фаза 3. Инженерный обзор
+### Phase 3. Engineering review
 
-#### Как шла фаза
+#### How the phase went
 
-Фаза проведена отдельным навыком `/plan-eng-review` с правилами авторешений `/autoplan` (тот же запасной путь, что в фазах 2 и 2.5). Вопросов по ходу не было; спорные решения вынесены на финальное утверждение. Кода в репозитории нет, поэтому обзор сверяет план с самим собой, со справкой установленных CLI и с короткими проверками на машине владельца.
+The phase was run by the separate `/plan-eng-review` skill with the `/autoplan` auto-decision rules (the same fallback path as in phases 2 and 2.5). There were no questions along the way; contested decisions are put up for final approval. There is no code in the repository, so the review checks the plan against itself, against the help output of the installed CLIs, and against short checks on the owner's machine.
 
-Прошлые знания: поиск по проекту вернул 10 записей другого проекта с тем же slug `tass`. Две из них применимы по сути.
+Prior knowledge: a search by project returned 10 entries from a different project with the same slug `tass`. Two of them apply in substance.
 
-- Prior learning applied: telegram-stop-controller-timeout-observability (confidence 10/10, from 2026-11-05). Отдельная группа процессов ограничивает остановку дочерних процессов; отсюда `spawnManaged` с группами.
-- Prior learning applied: codex-tool-call-shape-and-rendered-delivery-proof (confidence 10/10, from 2026-11-07). У `codex` вызов инструмента записывается в разных формах; отсюда пункт S1 о форме результата.
+- Prior learning applied: telegram-stop-controller-timeout-observability (confidence 10/10, from 2026-11-05). A separate process group bounds the stopping of child processes; hence `spawnManaged` with groups.
+- Prior learning applied: codex-tool-call-shape-and-rendered-delivery-proof (confidence 10/10, from 2026-11-07). In `codex` a tool call is recorded in different shapes; hence the S1 item about the result shape.
 
-История: коммитов нет, возвратов нет (`git log` пуст); все пути плана будущие.
+History: no commits, no reverts (`git log` is empty); all paths in the plan are future ones.
 
-#### Шаг 0. Проверка рамок
+#### Step 0. Scope check
 
-**A. Оценка.**
+**A. Assessment.**
 
-- Что уже решает подзадачи: встроенные `Bun.serve` с WebSocket, `bun test`, `node:child_process` с `detached` (проверено ниже), zod с переводом в JSON Schema, параметр `fontfile` у `sharp`, `StreetViewPanorama` с параметром `pano`. Своего кода для них не нужно.
-- Минимум изменений: план уже режет M1 до одного харнесса и одного региона. Отложить без вреда можно только `eval:bots` (сделано: M2).
-- Сложность: около 60 файлов исходников и тестов в M1 по разделам 7 и 14 [estimated], новых служб больше двух (`GameEngine`, `LocationService`, `BotImageService`, `BotRunner`, мост `bot-tools`, хранилище квоты). Порог вопроса о структуре пройден.
-- Поиск: короткая проверка вместо веб-поиска. Bun 1.4.2: `spawn(..., {detached: true})` создаёт группу, `process.kill(-pgid)` остановил 3 из 3 процессов группы, поле времени запуска в `/proc/<pid>/stat` читается [measured: scratchpad pg-probe.ts]. Функциональное ядро с исполнителем эффектов [Layer 1]; группа процессов [Layer 1]; мост MCP stdio в HTTP [Layer 2, проверяет S1].
-- `TODOS.md`: ничто в нём не блокирует план; «Переигровка раунда» и «Мобильная раскладка» остаются отложенными. Новая запись: HTTP-транспорт MCP вместо моста (ниже).
-- Распространение: игра запускается из рабочей копии (`git clone`, `bun install`); сборок и публикаций нет, CI ждёт приватного remote (решение владельца до кода).
+- What already solves subtasks: built-in `Bun.serve` with WebSocket, `bun test`, `node:child_process` with `detached` (verified below), zod with conversion to JSON Schema, the `fontfile` parameter of `sharp`, `StreetViewPanorama` with the `pano` parameter. No custom code is needed for them.
+- Minimal change set: the plan already cuts M1 down to one harness and one region. The only thing that can be deferred without harm is `eval:bots` (done: M2).
+- Complexity: about 60 source and test files in M1 per sections 7 and 14 [estimated], more than two new services (`GameEngine`, `LocationService`, `BotImageService`, `BotRunner`, the `bot-tools` bridge, the quota store). The threshold for a structure question is passed.
+- Search: a short check instead of web search. Bun 1.4.2: `spawn(..., {detached: true})` creates a group, `process.kill(-pgid)` stopped 3 of 3 processes of the group, the start-time field in `/proc/<pid>/stat` is readable [measured: scratchpad pg-probe.ts]. A functional core with an effect executor [Layer 1]; process group [Layer 1]; an MCP stdio-to-HTTP bridge [Layer 2, checked by S1].
+- `TODOS.md`: nothing in it blocks the plan; "Round replay" and "Mobile layout" remain deferred. A new entry: MCP HTTP transport instead of the bridge (below).
+- Distribution: the game runs from a working copy (`git clone`, `bun install`); there are no builds or publications, CI waits for a private remote (the owner's decision before code).
 
-Проверки реальности:
+Reality checks:
 
-| Предпосылка | Утверждение | Подтверждение | Вывод |
+| Premise | Claim | Confirmation | Conclusion |
 |---|---|---|---|
-| Версии CLI | `codex` 0.167, `claude` 2.1.322, `agy` 1.5.7, `bun` 1.4.2 | PLAN.md:30; `Bun.version` 1.4.2 сегодня | подтверждено |
-| Флаги адаптеров | `-i`, `-c`, `-s`, `--json`; `--mcp-config`, `--strict-mcp-config`, `--allowedTools`; `-p`, `--settings`, `--output-format` | `--help` всех трёх сегодня | подтверждено; найдены `--skip-git-repo-check`, `--bare` без OAuth |
-| `agy` без входа | `Please sign in` | PLAN.md:32 | подтверждено ранее |
-| Ключ без Street View | `REQUEST_DENIED` | PLAN.md:35 | подтверждено ранее |
-| Бесплатный объём Google | 5 000 / 10 000 в месяц | PLAN.md:36 | unverified (дата страницы не подтверждена; S3) |
-| Quick tunnel и WebSocket | `101 Switching Protocols` | PLAN.md:37 | подтверждено ранее |
-| Картинки из MCP видит модель | не проверено | PLAN.md:39 | unverified (S1) |
-| Время хода харнесса | не проверено | PLAN.md:39 | unverified (S1) |
-| Группы процессов в Bun | `detached` и `kill(-pgid)` | pg-probe.ts | подтверждено сегодня |
+| CLI versions | `codex` 0.167, `claude` 2.1.322, `agy` 1.5.7, `bun` 1.4.2 | PLAN.md:30; `Bun.version` 1.4.2 today | confirmed |
+| Adapter flags | `-i`, `-c`, `-s`, `--json`; `--mcp-config`, `--strict-mcp-config`, `--allowedTools`; `-p`, `--settings`, `--output-format` | `--help` of all three today | confirmed; found `--skip-git-repo-check`, `--bare` without OAuth |
+| `agy` not signed in | `Please sign in` | PLAN.md:32 | confirmed earlier |
+| Key without Street View | `REQUEST_DENIED` | PLAN.md:35 | confirmed earlier |
+| Google free tier | 5,000 / 10,000 per month | PLAN.md:36 | unverified (page date not confirmed; S3) |
+| Quick tunnel and WebSocket | `101 Switching Protocols` | PLAN.md:37 | confirmed earlier |
+| The model sees images from MCP | not checked | PLAN.md:39 | unverified (S1) |
+| Harness turn time | not checked | PLAN.md:39 | unverified (S1) |
+| Process groups in Bun | `detached` and `kill(-pgid)` | pg-probe.ts | confirmed today |
 
 unverified=3.
 
-Числа пересчитаны: худший случай Static 5 × (12 + 3 × (6 + 3) × 4) = 600 и 5 × (12 + 3 × 7 × 4) = 480 сходятся с PLAN.md:147; 8 000 / 600 = 13, 10 000 / 600 = 16, 8 000 / 480 = 16 сходятся. Граница миниатюр 5 760 (PLAN.md:364) завышена: по правилам хранения выходит 20 × (4 + 3 × 20 × 4) = 4 880; как верхняя оценка годится [estimated]. Диагональ мира 14 916.862 км [estimated: формула сообщества]. Бесплатный объём [re-measure before gate: S3].
+Numbers recomputed: the worst case Static 5 × (12 + 3 × (6 + 3) × 4) = 600 and 5 × (12 + 3 × 7 × 4) = 480 match PLAN.md:147; 8,000 / 600 = 13, 10,000 / 600 = 16, 8,000 / 480 = 16 match. The thumbnail bound 5,760 (PLAN.md:364) is overstated: by the storage rules it comes to 20 × (4 + 3 × 20 × 4) = 4,880; as an upper estimate it is fine [estimated]. The world diagonal 14,916.862 km [estimated: community formula]. Free tier [re-measure before gate: S3].
 
-REALITY: premise-table finding unverified=3: бесплатный объём Google, картинки из MCP, время хода; все три закрываются спайками S1 и S3 PLAN.md:36
-REALITY: already-done pass нет коммитов и remote, сделанной ранее работы нет PLAN.md:1
-REALITY: surface-check finding флаги проверены по `--help`: `codex` вне git требует `--skip-git-repo-check`, `claude --bare` выключает вход claude.ai PLAN.md:121
-REALITY: binding-decisions pass `gstack-decision-search` пуст; решения владельца (agy вместо gemini, правило ворот качества) соблюдены PLAN.md:9
-REALITY: numbers finding расчёты квоты сходятся, граница миниатюр завышена (4 880 против 5 760), бесплатный объём ждёт S3 PLAN.md:364
-REALITY: deferred-asks pass связанной задачи нет; из просьб владельца отложен только выбор любой модели всех харнессов (M2, по S1) PLAN.md:221
-REALITY: pr-count pass `.gstack/ship-policy.json` нет, по умолчанию один PR на волну; без remote PR нет вовсе PLAN.md:201
+REALITY: premise-table finding unverified=3: Google free tier, images from MCP, turn time; all three are closed by spikes S1 and S3 PLAN.md:36
+REALITY: already-done pass no commits and no remote, no previously completed work PLAN.md:1
+REALITY: surface-check finding flags checked against `--help`: `codex` outside git requires `--skip-git-repo-check`, `claude --bare` disables claude.ai login PLAN.md:121
+REALITY: binding-decisions pass `gstack-decision-search` is empty; the owner's decisions (agy instead of gemini, the quality-gate rule) are respected PLAN.md:9
+REALITY: numbers finding the quota calculations match, the thumbnail bound is overstated (4,880 versus 5,760), the free tier awaits S3 PLAN.md:364
+REALITY: deferred-asks pass no related task; of the owner's requests only the choice of any model for all harnesses is deferred (M2, per S1) PLAN.md:221
+REALITY: pr-count pass there is no `.gstack/ship-policy.json`, by default one PR per wave; without a remote there is no PR at all PLAN.md:201
 
-**B. Структура.** Порог пройден, вопрос `plan-eng-review-structure` решён авторешением по рекомендации.
+**B. Structure.** The threshold is passed, the `plan-eng-review-structure` question was resolved by auto-decision following the recommendation.
 
-- Original arrangement: пять каталогов верхнего уровня, способ упаковки не задан (возможны пять workspaces с пятью `package.json` и `tsconfig`).
-- Smaller arrangement (выбрано): один `package.json`, два `tsconfig`, границы каталогов проверяет ESLint. Те же функции, контракты и тесты; меньше настроек и нет рассинхрона версий зависимостей.
+- Original arrangement: five top-level directories, the packaging method is not defined (five workspaces with five `package.json` and `tsconfig` files are possible).
+- Smaller arrangement (chosen): one `package.json`, two `tsconfig` files, directory boundaries checked by ESLint. The same functions, contracts and tests; fewer settings and no drift of dependency versions.
 
 Pending remedies not decided here: none.
 
-Запись рамок: feature answers: сокращений не предлагалось; structure: Smaller arrangement (авторешение, принцип 5 и 3); accepted scope: план фаз 1–2.5 без изменений плюс пункты фазы 3; pending remedies: none. Scope Challenge: scope accepted as-is.
+Scope record: feature answers: no reductions were proposed; structure: Smaller arrangement (auto-decision, principles 5 and 3); accepted scope: the plan of phases 1–2.5 unchanged plus the phase 3 items; pending remedies: none. Scope Challenge: scope accepted as-is.
 
-**C. Замечания рамок.** No issues found: сокращать нечего, M1 уже сквозной срез.
+**C. Scope remarks.** No issues found: there is nothing to cut, M1 is already an end-to-end slice.
 
-#### Раздел 1. Архитектура
+#### Section 1. Architecture
 
 ```
-браузеры ──WSS──> /ws ──parse(zod)──> событие ──┐
-                                                 v
-таймеры, Google, харнессы ──событие {matchId,gen}──> reduce(state, event, now)
-                                                 │        │
-                                                 │        └─> effects[] ──> shell.ts ──> таймер | spawnManaged | fetch | запись файла
-                                                 v
-                                          RoomState (один владелец)
-                                                 │
-                                    view(state, viewerId) ──> вид целиком каждому клиенту
+browsers ──WSS──> /ws ──parse(zod)──> event ──┐
+                                               v
+timers, Google, harnesses ──event {matchId,gen}──> reduce(state, event, now)
+                                               │        │
+                                               │        └─> effects[] ──> shell.ts ──> timer | spawnManaged | fetch | file write
+                                               v
+                                        RoomState (single owner)
+                                               │
+                                  view(state, viewerId) ──> a whole view for each client
 
-харнесс ──stdio MCP──> bot-tools (мост) ──HTTP + токен──> 127.0.0.1:BOT_PORT ──> очередь бота ──> событие
+harness ──stdio MCP──> bot-tools (bridge) ──HTTP + token──> 127.0.0.1:BOT_PORT ──> bot queue ──> event
 ```
 
-Две формы:
+Two forms:
 
-- Форма A (план): службы держат свои куски состояния (`BotRunner` считает ходы, обработчики сами проверяют фазу после каждого ожидания).
-- Форма B (выбрана): `reduce(state, event, now) → {state, effects}`, исполнитель эффектов, одно `RoomState`.
+- Form A (plan): services hold their own pieces of state (`BotRunner` counts turns, handlers check the phase themselves after each wait).
+- Form B (chosen): `reduce(state, event, now) → {state, effects}`, an effect executor, a single `RoomState`.
 
-Довод глубины: B прячет все правила порядка событий за одной функцией с одним входом; правило «проверить фазу после ожидания» перестаёт быть соглашением, которое агент забудет в новом обработчике. Все гонки из пункта «Порядок событий» становятся строками одной таблицы тестов.
+Depth argument: B hides all event-ordering rules behind one function with one entry point; the rule "check the phase after a wait" stops being a convention an agent will forget in a new handler. All races from the item "Event ordering" become rows of one test table.
 
-Красные флаги:
+Red flags:
 
-1. Мелкий модуль: мост `bot-tools` (пересылка). Исправление: в мосте нет логики, схемы приходят с сервера; это транспорт, иначе stdio не подключить.
-2. Утечка сведений: кто что видит решала бы каждая рассылка. Исправление: одна `view(state, viewerId)`.
-3. Разбиение по времени: нет; службы названы по знанию (место, картинки, боты).
-4. Сквозной метод: мост (см. 1).
-5. Раздельное владение: счётчик ходов в `BotRunner` и фаза в `GameEngine`. Исправление: всё в `RoomState`.
-6. Два способа одного дела: запуск процессов (харнессы, `cloudflared`, Vite). Исправление: одна `spawnManaged`.
-7. Импортируемые внутренности: `web/` мог бы импортировать `server/`. Исправление: границы в ESLint.
-8. Список, сверяемый руками: харнессы в `doctor`, схеме настроек, лобби и тестах; схемы инструментов в мосте и сервере. Исправление: реестр адаптеров и `shared/bot-tools.ts`.
+1. Shallow module: the `bot-tools` bridge (forwarding). Fix: the bridge has no logic, schemas come from the server; it is transport, otherwise stdio cannot be connected.
+2. Information leakage: who sees what would be decided by each broadcast. Fix: a single `view(state, viewerId)`.
+3. Temporal decomposition: none; services are named by knowledge (location, images, bots).
+4. Pass-through method: the bridge (see 1).
+5. Split ownership: the turn counter in `BotRunner` and the phase in `GameEngine`. Fix: everything in `RoomState`.
+6. Two ways to do one thing: launching processes (harnesses, `cloudflared`, Vite). Fix: one `spawnManaged`.
+7. Imported internals: `web/` could import `server/`. Fix: boundaries in ESLint.
+8. A list reconciled by hand: harnesses in `doctor`, the settings schema, the lobby and tests; tool schemas in the bridge and the server. Fix: an adapter registry and `shared/bot-tools.ts`.
 
-Замечания:
+Findings:
 
-- [CRITICAL] (confidence: 7/10) PLAN.md:165 — «Сервер авторитетен: состояние игры, таймеры, очки» и PLAN.md:379 «Каждый обработчик проверяет номер и фазу раунда»: правило держится на дисциплине каждого обработчика. Исправление: форма B.
-- [CRITICAL] (confidence: 8/10) PLAN.md:165 — не сказано, что именно получает каждый клиент; рассылка общего состояния отдала бы чужие метки во время раунда. Исправление: `view`.
-- [CRITICAL] (confidence: 8/10) PLAN.md:137 — «сервер убивает процесс харнесса (SIGTERM, через 2 с SIGKILL)»: сигнал одному процессу оставляет его потомков, после аварии сервера харнессы живут дальше. Исправление: группы процессов, `children.json`, блокировка каталога.
-- [CRITICAL] (confidence: 9/10) PLAN.md:121 — `codex exec -m <model> -s read-only ...` в пустом временном каталоге: без `--skip-git-repo-check` `codex exec` вне git-репозитория не запускается. Проверено сегодня в пустом каталоге: «Not inside a trusted directory and --skip-git-repo-check was not specified.»
-- [INFORMATIONAL] (confidence: 9/10) PLAN.md:353 — «Пользовательские настройки харнесса ... адаптер отключает флагами»: самый короткий путь `claude --bare` выключает вход через claude.ai (справка 2.1.322). Записан запрет и кандидаты.
-- [INFORMATIONAL] (confidence: 7/10) PLAN.md:82 — «Хост жмёт «Дальше»»: не сказано, что будет без хоста (вопрос C-HOSTDROP), с двумя вкладками и с возвратом посреди раунда.
-- [INFORMATIONAL] (confidence: 7/10) PLAN.md:47 — «Клиент шлёт его первым сообщением по WebSocket»: соединение без токена держит место в потолке 32 сколько угодно.
-- [INFORMATIONAL] (confidence: 7/10) PLAN.md:494 — «Сервер подтверждает каждое положение метки»: формат подтверждения и расчёт часов не заданы (передано фазой дизайна).
-- [INFORMATIONAL] (confidence: 5/10) PLAN.md:121 — «read-only песочница без сети»: Medium confidence, verify this is actually an issue. Мост, запущенный харнессом, может не достать до `127.0.0.1` из-под песочницы. Добавлено в S1.
+- [CRITICAL] (confidence: 7/10) PLAN.md:165 — "The server is authoritative: game state, timers, scoring" and PLAN.md:379 "Every handler checks the round number and phase": the rule depends on the discipline of every handler. Fix: form B.
+- [CRITICAL] (confidence: 8/10) PLAN.md:165 — it is not said what exactly each client receives; broadcasting the shared state would give away other players' markers during a round. Fix: `view`.
+- [CRITICAL] (confidence: 8/10) PLAN.md:137 — "the server kills the harness process (SIGTERM, after 2 s SIGKILL)": a signal to a single process leaves its descendants alive, and after a server crash the harnesses live on. Fix: process groups, `children.json`, a directory lock.
+- [CRITICAL] (confidence: 9/10) PLAN.md:121 — `codex exec -m <model> -s read-only ...` in an empty temporary directory: without `--skip-git-repo-check`, `codex exec` does not run outside a git repository. Checked today in an empty directory: "Not inside a trusted directory and --skip-git-repo-check was not specified."
+- [INFORMATIONAL] (confidence: 9/10) PLAN.md:353 — "The harness's user settings ... the adapter disables with flags": the shortest path `claude --bare` disables login via claude.ai (help of 2.1.322). A prohibition and candidates are recorded.
+- [INFORMATIONAL] (confidence: 7/10) PLAN.md:82 — "The host presses «Дальше»" ("Next"): it is not said what happens without a host (question C-HOSTDROP), with two tabs, and with a return in the middle of a round.
+- [INFORMATIONAL] (confidence: 7/10) PLAN.md:47 — "The client sends it as the first WebSocket message": a connection without a token holds a slot in the ceiling of 32 for any length of time.
+- [INFORMATIONAL] (confidence: 7/10) PLAN.md:494 — "The server confirms every marker position": the confirmation format and the clock calculation are not defined (passed on by the design phase).
+- [INFORMATIONAL] (confidence: 5/10) PLAN.md:121 — "read-only sandbox without network": Medium confidence, verify this is actually an issue. A bridge launched by the harness may not reach `127.0.0.1` from inside the sandbox. Added to S1.
 
-Dispositions: все 9 приняты авторешением (журнал 116–118, 121–127); форма B вынесена на финальное утверждение как E-1.
+Dispositions: all 9 accepted by auto-decision (log 116–118, 121–127); form B is put up for final approval as E-1.
 
-#### Раздел 2. Качество кода
+#### Section 2. Code quality
 
-- [CRITICAL] (confidence: 7/10) PLAN.md:108 — «сервер впечатывает подпись ... через `sharp`»: системный шрифт без кириллицы даст квадратики, бот прочтёт мусор, ошибки не будет. Исправление: шрифт из репозитория, тест.
-- [INFORMATIONAL] (confidence: 8/10) PLAN.md:119 — список харнессов повторён в таблице адаптеров, `doctor`, лобби и `harnesses.json`. Исправление: реестр адаптеров.
-- [INFORMATIONAL] (confidence: 8/10) PLAN.md:117 — схемы инструментов жили бы и в мосте, и на сервере. Исправление: `shared/bot-tools.ts`, мост берёт их у сервера.
-- [INFORMATIONAL] (confidence: 7/10) PLAN.md:164 — границы каталогов не проверяются. Исправление: ESLint.
-- [INFORMATIONAL] (confidence: 7/10) PLAN.md:200 — `check-size.ts` не назван для `.svelte`; `max-lines-per-function: 80` в тестах упрётся в большие `describe`. Исправление: проверка `.svelte` и правило в `CLAUDE.md`. Лимиты не меняются.
-- [INFORMATIONAL] (confidence: 7/10) PLAN.md:137 — процессы запускаются в трёх местах тремя способами. Исправление: `spawnManaged`.
-- [INFORMATIONAL] (confidence: 8/10) PLAN.md:270 — «`GuessMap` и `ResultsMap` пишутся сразу под выбранную карту, без слоя подмены» против PLAN.md:571 «Ключи Google, туннель и подписки не нужны» для `dev --fake`: при выборе Google Maps E2E без сети невозможен. Исправление: одна подделка карты только для `--fake`.
-- [INFORMATIONAL] (confidence: 7/10) PLAN.md:344 — «счётчик ... увеличивается до отправки запроса»: не сказано, как он попадает на диск и что при ошибке записи. Исправление: атомарная запись, ошибка видна хосту.
+- [CRITICAL] (confidence: 7/10) PLAN.md:108 — "the server stamps the caption ... via `sharp`": a system font without Cyrillic will give squares, the bot will read garbage, and there will be no error. Fix: a font from the repository, a test.
+- [INFORMATIONAL] (confidence: 8/10) PLAN.md:119 — the list of harnesses is repeated in the adapter table, `doctor`, the lobby and `harnesses.json`. Fix: an adapter registry.
+- [INFORMATIONAL] (confidence: 8/10) PLAN.md:117 — tool schemas would live both in the bridge and on the server. Fix: `shared/bot-tools.ts`, the bridge takes them from the server.
+- [INFORMATIONAL] (confidence: 7/10) PLAN.md:164 — directory boundaries are not checked. Fix: ESLint.
+- [INFORMATIONAL] (confidence: 7/10) PLAN.md:200 — `check-size.ts` is not named for `.svelte`; `max-lines-per-function: 80` in tests will hit large `describe` blocks. Fix: a `.svelte` check and a rule in `CLAUDE.md`. The limits do not change.
+- [INFORMATIONAL] (confidence: 7/10) PLAN.md:137 — processes are launched in three places in three ways. Fix: `spawnManaged`.
+- [INFORMATIONAL] (confidence: 8/10) PLAN.md:270 — "`GuessMap` and `ResultsMap` are written straight for the chosen map, without a substitution layer" versus PLAN.md:571 "Google keys, tunnel and subscriptions are not needed" for `dev --fake`: when Google Maps is chosen, an E2E without network is impossible. Fix: a single map fake for `--fake` only.
+- [INFORMATIONAL] (confidence: 7/10) PLAN.md:344 — "the counter ... is incremented before the request is sent": it is not said how it reaches the disk and what happens on a write error. Fix: an atomic write, the error is visible to the host.
 
-Ворота качества по правилу владельца: в M0 есть строгие линтеры и форматтер (PLAN.md:199), лимиты размера с проверкой и списком исключений только на уменьшение (PLAN.md:200), CI и pre-push хук одной командой (PLAN.md:201), `CLAUDE.md` с лимитами и командами (PLAN.md:202). Замечаний нет.
+Quality gates per the owner's rule: M0 has strict linters and a formatter (PLAN.md:199), size limits with a checker and an exceptions list that may only shrink (PLAN.md:200), CI and a pre-push hook with one command (PLAN.md:201), `CLAUDE.md` with the limits and commands (PLAN.md:202). No findings.
 
-Общий код: кода нет, вызывающих мест в исходниках нет; предложенные места (реестр адаптеров, `spawnManaged`, `shared/bot-tools.ts`) записаны как предположения плана, их проверит M1.
+Shared code: there is no code, no call sites in sources; the proposed places (adapter registry, `spawnManaged`, `shared/bot-tools.ts`) are recorded as the plan's assumptions, M1 will verify them.
 
-Dispositions: все 8 приняты авторешением (журнал 126, 128, 129, 134, 138, 140–142); подделка карты вынесена на утверждение как E-3.
+Dispositions: all 8 accepted by auto-decision (log 126, 128, 129, 134, 138, 140–142); the map fake is put up for approval as E-3.
 
-#### Раздел 3. Тесты
+#### Section 3. Tests
 
-Фреймворк: в репозитории его ещё нет. План: `bun test` и Playwright (журнал 140).
+Framework: there is none in the repository yet. The plan: `bun test` and Playwright (log 140).
 
 ```
 CODE PATHS                                              USER FLOWS
-[+] server/engine/reduce.ts                             [+] Партия
-  ├── [PLANNED] переходы и гонки (§14 «Порядок»)          ├── [PLANNED] [→E2E] два браузера, два раунда
-  ├── [GAP]     событие с чужим {matchId,gen}             ├── [PLANNED] [→E2E] вход и лобби с клавиатуры
-  └── [GAP]     «Угадать» с координатами                  ├── [GAP]     [→E2E] хост закрыл вкладку посреди партии
-[+] server/engine/view.ts                                 └── [GAP]     вторая вкладка той же личности
-  └── [GAP]     нет чужих меток и ответа в раунде       [+] Ошибки, видные человеку
-[+] server/net/ws.ts                                      ├── [PLANNED] [→E2E] баннер связи
-  ├── [GAP]     соединение без токена 5 с                 ├── [PLANNED] [→E2E] состояния входа
-  └── [GAP]     возврат участника посреди раунда          └── [GAP]     второй start при живом сервере
+[+] server/engine/reduce.ts                             [+] Game
+  ├── [PLANNED] transitions and races (§14 "Order")       ├── [PLANNED] [→E2E] two browsers, two rounds
+  ├── [GAP]     event with a foreign {matchId,gen}        ├── [PLANNED] [→E2E] join and lobby by keyboard
+  └── [GAP]     "Угадать" with coordinates                ├── [GAP]     [→E2E] host closed the tab mid-game
+[+] server/engine/view.ts                                 └── [GAP]     second tab of the same identity
+  └── [GAP]     no foreign markers or answer in a round [+] Errors visible to a person
+[+] server/net/ws.ts                                      ├── [PLANNED] [→E2E] connection banner
+  ├── [GAP]     connection without a token for 5 s        ├── [PLANNED] [→E2E] join states
+  └── [GAP]     participant returns mid-round             └── [GAP]     second start with a live server
 [+] server/proc/spawn.ts
-  ├── [GAP]     группа останавливается целиком
-  └── [GAP]     зачистка по children.json и блокировка
+  ├── [GAP]     the group stops as a whole
+  └── [GAP]     cleanup by children.json and the lock
 [+] server/bots/adapters/*
-  └── [GAP]     снимок argv и окружения
+  └── [GAP]     argv and environment snapshot
 [+] server/bots/queue.ts
-  ├── [GAP]     два move по очереди
-  └── [GAP]     шаг с направлением 90° отклонён
+  ├── [GAP]     two moves in the queue
+  └── [GAP]     step with a 90° direction rejected
 [+] server/images/label.ts
-  └── [GAP]     подпись нарисована, метаданных нет
+  └── [GAP]     caption drawn, no metadata
 [+] server/storage/quota.ts
-  └── [GAP]     обрыв записи, ошибка записи, смена месяца
+  └── [GAP]     interrupted write, write error, month change
 [+] server/location.ts
-  └── [GAP]     очки от координат панорамы
+  └── [GAP]     score from panorama coordinates
 [+] web/src/lib/clock.ts
-  └── [GAP]     смещение по наименьшему пингу
+  └── [GAP]     offset by the smallest ping
 
-LLM integration: [GAP] [→EVAL] промпт и схемы инструментов: eval:bots (M2)
+LLM integration: [GAP] [→EVAL] prompt and tool schemas: eval:bots (M2)
 
-COVERAGE: 0/27 путей покрыто кодом (кода нет)  |  в плане тест есть: 9/27  |  после фазы 3: 27/27
-QUALITY: все новые тесты спланированы как ★★★ (поведение, край, ошибка)  |  GAPS до фазы 3: 18 (1 E2E, 1 eval)
-Legend: [PLANNED] тест уже назван в плане  |  [GAP] теста в плане не было  |  [→E2E] нужен сквозной тест  |  [→EVAL] нужна оценка модели
+COVERAGE: 0/27 paths covered by code (no code)  |  test named in plan: 9/27  |  after phase 3: 27/27
+QUALITY: all new tests planned as ★★★ (behavior, edge, error)  |  GAPS before phase 3: 18 (1 E2E, 1 eval)
+Legend: [PLANNED] test already named in the plan  |  [GAP] the plan had no test  |  [→E2E] end-to-end test needed  |  [→EVAL] model evaluation needed
 ```
 
-Каждый пробел закрыт тестом в пункте фазы 3 (раздел 14). Пробелы, которые сводятся к таблице `reduce`, добавляются строками в неё, а не отдельными файлами. Карточки ценности лежат в Test Plan Artifact. Устаревших тестов нет (тестов нет). Регрессионного риска для существующего поведения нет: кода нет.
+Every gap is closed by a test in a phase 3 item (section 14). Gaps that reduce to the `reduce` table are added as rows in it, not as separate files. The value cards are in the Test Plan Artifact. There are no stale tests (there are no tests). There is no regression risk for existing behavior: there is no code.
 
-Test Plan Artifact: `~/.gstack/projects/tass/tass-unknown-eng-review-test-plan-20261113-083416.md` (в имени `unknown`: у репозитория ещё нет коммитов, и `gstack-slug` не видит ветку).
+Test Plan Artifact: `~/.gstack/projects/tass/tass-unknown-eng-review-test-plan-20261113-083416.md` (the name has `unknown`: the repository has no commits yet, and `gstack-slug` does not see the branch).
 
-Dispositions: 12 новых требований к тестам приняты (они закрепляют принятые пункты); `eval:bots` принят в M2 (журнал 139).
+Dispositions: 12 new test requirements accepted (they pin down accepted items); `eval:bots` accepted into M2 (log 139).
 
-#### Раздел 4. Производительность
+#### Section 4. Performance
 
-- [INFORMATIONAL] (confidence: 7/10) PLAN.md:544 — «`start` собирает клиент при каждом запуске (`vite build`, несколько секунд)» и PLAN.md:318 «Ожидание до 60 с»: если идти по очереди, сборка складывается с ожиданием DNS, а цель повторного запуска 1 минута. Исправление: параллельно; DoH раз в 2 с.
+- [INFORMATIONAL] (confidence: 7/10) PLAN.md:544 — "`start` builds the client on every launch (`vite build`, a few seconds)" and PLAN.md:318 "Waiting up to 60 s": done sequentially, the build adds to the DNS wait, and the repeat-run goal is 1 minute. Fix: in parallel; DoH once every 2 s.
 
-Остальное в порядке: метки 5 раз в секунду от 8 игроков это до 40 сообщений в секунду без рассылки другим; вид состояния на 11 участников это единицы КБ [estimated]; миниатюры ограничены (до 86 МБ, PLAN.md:364); картинки бота запрашиваются параллельно, по 4 на `move`.
+The rest is fine: markers 5 times per second from 8 players are up to 40 messages per second without being broadcast to others; the state view for 11 participants is a few KB [estimated]; thumbnails are bounded (up to 86 MB, PLAN.md:364); bot images are requested in parallel, 4 per `move`.
 
-Dispositions: принято (журнал 135).
+Dispositions: accepted (log 135).
 
-#### Внешний голос
+#### Outside voice
 
 Running the outside voice automatically (standard step). Disable: `gstack-config set codex_reviews disabled`.
 
-Первая попытка не запустилась: обрезка плана до 30 КБ разрезала символ UTF-8, Codex отказался читать ввод. Ввод исправлен, вторая попытка завершилась (`OUTSIDE_STATUS: completed provider=codex host=claude`, модель gpt-6-astra).
+The first attempt did not start: trimming the plan to 30 KB cut a UTF-8 character in half, and Codex refused to read the input. The input was fixed, the second attempt completed (`OUTSIDE_STATUS: completed provider=codex host=claude`, model gpt-6-astra).
 
 ```
 CODEX SAYS (plan review — outside voice):
@@ -2319,172 +2319,172 @@ Recommendation: revise these contracts before M1 because the proposed tests can 
 ════════════════════════════════════════════════════════════
 ```
 
-Расхождения моделей:
+Model disagreements:
 
-| № | Замечание Codex | Решение | Класс |
+| No. | Codex finding | Decision | Class |
 |---|---|---|---|
-| 1 | Зачистка может убить чужую партию | Принято: блокировка каталога данных, три признака процесса | механическое |
-| 2 | Номера раунда мало для старых эффектов | Принято: `matchId` и поколение `gen` | механическое |
-| 3 | «Угадать» может закрепить старую метку | Принято: координаты в подтверждении | механическое |
-| 4 | `move` не идёт по дороге | Оставлен шаг с проверкой направления, честная оговорка и замер в S3; при совпадении ниже 80% владелец решает | вкус, E-2 |
-| 5 | Ходы одного бота не упорядочены | Принято: очередь на бота, одна текущая панорама | механическое |
-| 6 | Место раунда не закреплено | Принято: `pano_id` и координаты панорамы | механическое |
-| 7 | Платная подготовка до проверки квоты | Принято: в лобби только бесплатный поиск места | механическое |
-| 8 | `eval:bots` не проверяет ходы и пресеты | Принято: парные запуски, только стартовые снимки; пресеты по записанным партиям | механическое |
+| 1 | Cleanup may kill someone else's game | Accepted: data-directory lock, three process identity markers | mechanical |
+| 2 | The round number is not enough for stale effects | Accepted: `matchId` and the generation `gen` | mechanical |
+| 3 | "Угадать" may lock an old marker | Accepted: coordinates in the confirmation | mechanical |
+| 4 | `move` does not follow the road | The step with a direction check is kept, an honest caveat and a measurement in S3; if the match is below 80%, the owner decides | taste, E-2 |
+| 5 | A single bot's moves are not ordered | Accepted: a per-bot queue, one current panorama | mechanical |
+| 6 | The round location is not pinned down | Accepted: `pano_id` and the panorama coordinates | mechanical |
+| 7 | Paid preparation before the quota check | Accepted: only free location search in the lobby | mechanical |
+| 8 | `eval:bots` does not check moves and presets | Accepted: paired runs, starting snapshots only; presets from recorded games | mechanical |
 
-Пять замечаний Codex (1, 2, 3, 5, 8) нашли дыры в пунктах самой фазы 3 или в протоколе, переданном фазой дизайна; три (4, 6, 7) касаются исходного плана. Ни одно не меняет замысел владельца: вызовов замысла (User Challenge) нет.
+Five Codex findings (1, 2, 3, 5, 8) found holes in items of phase 3 itself or in the protocol handed over by the design phase; three (4, 6, 7) concern the original plan. None changes the owner's intent: there are no User Challenges.
 
-#### Вне рамок
+#### Out of scope
 
-- HTTP-транспорт MCP вместо моста `bot-tools`: зависит от поддержки у всех трёх харнессов; записан в `TODOS.md`.
-- Ход бота строго по связям панорам (через Maps JavaScript API в браузере): требует браузера на сервере и упирается в тот же вопрос условий Google, что UC-2.
-- Защита от остановки сервера сигналом SIGKILL без зачистки при следующем старте: зачистка при старте закрывает это достаточно.
-- Подписанные адреса миниатюр с токеном: 128 бит случайности в адресе достаточно для игры друзей.
+- MCP HTTP transport instead of the `bot-tools` bridge: depends on support in all three harnesses; recorded in `TODOS.md`.
+- A bot move strictly along panorama links (via the Maps JavaScript API in the browser): requires a browser on the server and runs into the same Google terms question as UC-2.
+- Protection against stopping the server with SIGKILL without cleanup at the next start: cleanup at start covers this sufficiently.
+- Signed thumbnail addresses with a token: 128 bits of randomness in the address are enough for a game among friends.
 
-#### Что уже есть
+#### What already exists
 
-Кода нет. Используются готовые средства: `Bun.serve` и его WebSocket, `bun test`, `node:child_process` с группами процессов (проверено), zod и его перевод в JSON Schema, `sharp` с `fontfile`, `StreetViewPanorama` с `pano`, `@fontsource` для шрифта подписей. Своих замен им план не пишет.
+There is no code. Ready-made means are used: `Bun.serve` and its WebSocket, `bun test`, `node:child_process` with process groups (verified), zod and its conversion to JSON Schema, `sharp` with `fontfile`, `StreetViewPanorama` with `pano`, `@fontsource` for the caption font. The plan writes no replacements of its own for them.
 
-#### Диаграммы
+#### Diagrams
 
-Схема потока событий в разделе 1. Встроенные схемы нужны в `server/engine/reduce.ts` (таблица фаз и событий) и `server/proc/spawn.ts` (жизнь группы процессов: запуск, запись, остановка, зачистка).
+The event flow diagram is in section 1. Inline diagrams are needed in `server/engine/reduce.ts` (the table of phases and events) and `server/proc/spawn.ts` (the life of a process group: launch, record, stop, cleanup).
 
 ```
-LOBBY ──Начать (квота ок)──> ROUND_LOADING ──все загрузились или 5 с──> ROUND_ACTIVE
-  ^                              │  gen+1 при «Повторить»                    │ таймер | все ответили и боты завершились | окно ожидания
+LOBBY ──Начать (quota ok)──> ROUND_LOADING ──all loaded or 5 s──> ROUND_ACTIVE
+  ^                              │  gen+1 on «Повторить»                    │ timer | all answered and bots finished | waiting window
   │                              v                                           v
-  │                         ошибка места ──Завершить──┐               ROUND_RESULTS ──Дальше | 30 с (пауза до 90 с)──> ROUND_LOADING
-  │                                                    v                     │ последний раунд
-  └──────────── Ещё раз ─────────────────────────── FINAL <──────────────────┘   (и «Завершить партию» из ROUND_ACTIVE и ROUND_RESULTS)
+  │                         location error ──Завершить──┐             ROUND_RESULTS ──Дальше | 30 s (pause up to 90 s)──> ROUND_LOADING
+  │                                                    v                     │ last round
+  └──────────── Ещё раз ─────────────────────────── FINAL <──────────────────┘   (and «Завершить партию» from ROUND_ACTIVE and ROUND_RESULTS)
 ```
 
-#### Режимы отказа
+#### Failure modes
 
-| Путь | Реалистичный отказ | Тест | Обработка | Видно человеку |
+| Path | Realistic failure | Test | Handling | Visible to a person |
 |---|---|---|---|---|
-| Харнесс | сервер упал, харнесс живёт и тратит подписку | зачистка по `children.json` | остановка при следующем старте | строка в терминале при зачистке |
-| Подпись картинки | нет кириллического шрифта | тест подписи | шрифт из репозитория | не нужно |
-| `move` | шаг на параллельную улицу | замер S3 | проверка направления, оговорка | подсказка в лобби |
-| «Угадать» | метка сдвинута перед нажатием | интеграционный | координаты в подтверждении | «Ответ принят» с верной меткой |
-| Подготовка | старый ответ Google после «Повторить» | строка таблицы `reduce` | отбрасывание по `gen` | нет: ничего не меняется |
-| `quota.json` | диск полон | модульный | предупреждение, старт как при повреждённом файле | баннер хоста |
-| Второй `start` | два сервера на одном каталоге | модульный | `GEO_ALREADY_RUNNING`, код 2 | текст ошибки |
-| Мост | сервер недоступен | интеграционный | ошибка «игра остановлена» | карточка ИИ: причина |
+| Harness | the server crashed, the harness lives on and spends the subscription | cleanup by `children.json` | stop at the next start | a line in the terminal during cleanup |
+| Image caption | no Cyrillic font | caption test | font from the repository | not needed |
+| `move` | a step onto a parallel street | S3 measurement | direction check, caveat | a hint in the lobby |
+| «Угадать» | the marker was shifted before pressing | integration | coordinates in the confirmation | «Ответ принят» ("Answer accepted") with the correct marker |
+| Preparation | an old Google response after «Повторить» | a `reduce` table row | discarded by `gen` | no: nothing changes |
+| `quota.json` | disk full | unit | warning, start as with a corrupted file | host banner |
+| Second `start` | two servers on one directory | unit | `GEO_ALREADY_RUNNING`, code 2 | error text |
+| Bridge | server unavailable | integration | error «игра остановлена» ("the game has stopped") | AI card: the cause |
 
-Критические пробелы: до фазы 3 их было два (харнессы после аварии сервера, подпись без шрифта): тихие, без теста и без обработки. Оба закрыты принятыми пунктами; в итоговом плане 0.
+Critical gaps: before phase 3 there were two (harnesses after a server crash, a caption without a font): silent, without a test and without handling. Both are closed by accepted items; in the final plan there are 0.
 
-#### Параллельная работа
+#### Parallel work
 
-| Шаг | Модули | Зависит от |
+| Step | Modules | Depends on |
 |---|---|---|
-| Ворота качества | корень, `scripts/` | — |
-| Протокол и схемы | `shared/` | Ворота качества |
-| Ядро и вид | `server/engine/`, `server/net/` | Протокол и схемы |
-| Процессы, хранилище, CLI | `server/proc/`, `server/storage/`, `server/cli/` | Ворота качества |
-| Боты | `server/bots/`, `bot-tools/`, `server/images/` | Протокол и схемы, S1 |
-| Экраны | `web/` | Протокол и схемы |
+| Quality gates | root, `scripts/` | — |
+| Protocol and schemas | `shared/` | Quality gates |
+| Core and view | `server/engine/`, `server/net/` | Protocol and schemas |
+| Processes, storage, CLI | `server/proc/`, `server/storage/`, `server/cli/` | Quality gates |
+| Bots | `server/bots/`, `bot-tools/`, `server/images/` | Protocol and schemas, S1 |
+| Screens | `web/` | Protocol and schemas |
 
-- Lane A: Протокол и схемы → Ядро и вид (`shared/` первым).
-- Lane B: Процессы, хранилище, CLI (независимо).
-- Lane C: Боты (после S1 и протокола).
-- Lane D: Экраны (после протокола).
-- Порядок: ворота качества; затем A (протокол) и B параллельно; после слияния протокола C и D параллельно с ядром.
-- Конфликты: `shared/` трогают A и C (схемы инструментов); `server/engine/` получает события от C. Схемы инструментов пишет A, C их только использует.
+- Lane A: Protocol and schemas → Core and view (`shared/` first).
+- Lane B: Processes, storage, CLI (independent).
+- Lane C: Bots (after S1 and the protocol).
+- Lane D: Screens (after the protocol).
+- Order: quality gates; then A (protocol) and B in parallel; after the protocol is merged, C and D in parallel with the core.
+- Conflicts: `shared/` is touched by A and C (tool schemas); `server/engine/` receives events from C. A writes the tool schemas, C only uses them.
 
-#### Изменения в `TODOS.md`
+#### Changes to `TODOS.md`
 
-Добавлено (авторешение A, P3): «HTTP-транспорт MCP вместо моста `bot-tools`».
+Added (auto-decision A, P3): "MCP HTTP transport instead of the `bot-tools` bridge".
 
 #### Implementation Tasks
 
-Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship. Оценка: соотношение «человек к CC» около 30 для функций, 50 для тестов, 5 для архитектуры.
+Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship. Estimate: the "human to CC" ratio is about 30 for functions, 50 for tests, 5 for architecture.
 
-- [ ] **T36 (P1, human: ~2d / CC: ~1h)** — engine — Ядро `reduce` и исполнитель эффектов, одно `RoomState`, метка операции `{matchId, gen}`, файлы по фазам
-  - Surfaced by: Раздел 1 — правило фазы держалось на обработчиках; Codex 2
+- [ ] **T36 (P1, human: ~2d / CC: ~1h)** — engine — The `reduce` core and effect executor, a single `RoomState`, the operation tag `{matchId, gen}`, files split by phase
+  - Surfaced by: Section 1 — the phase rule depended on handlers; Codex 2
   - Files: `server/engine/reduce.ts`, `server/engine/lobby.ts`, `server/engine/round.ts`, `server/engine/results.ts`, `server/engine/final.ts`, `server/engine/shell.ts`, `server/engine/reduce.test.ts`
   - Verify: `bun test server/engine`
-- [ ] **T37 (P1, human: ~1d / CC: ~30min)** — protocol — `view(state, viewerId)`, `seq` и `ack`, координаты в «Угадать», `serverNow` и смещение часов
-  - Surfaced by: Раздел 1 — нет проекции и формата подтверждения; Codex 3
+- [ ] **T37 (P1, human: ~1d / CC: ~30min)** — protocol — `view(state, viewerId)`, `seq` and `ack`, coordinates in «Угадать», `serverNow` and clock offset
+  - Surfaced by: Section 1 — no projection and no confirmation format; Codex 3
   - Files: `shared/protocol.ts`, `server/engine/view.ts`, `web/src/lib/clock.ts`, `server/engine/view.test.ts`, `web/src/lib/clock.test.ts`
   - Verify: `bun test server/engine/view.test.ts web/src/lib`
-- [ ] **T38 (P1, human: ~1d / CC: ~30min)** — proc — `spawnManaged` с группами, `children.json` с тремя признаками, блокировка каталога данных, остановка при выходе и сбое
-  - Surfaced by: Раздел 1 — SIGTERM одному процессу; Codex 1
+- [ ] **T38 (P1, human: ~1d / CC: ~30min)** — proc — `spawnManaged` with groups, `children.json` with three identity markers, data-directory lock, stop on exit and on crash
+  - Surfaced by: Section 1 — SIGTERM to a single process; Codex 1
   - Files: `server/proc/spawn.ts`, `server/proc/registry.ts`, `server/proc/lock.ts`, `server/proc/spawn.test.ts`
-  - Verify: `bun test server/proc`; интеграционный на код 70 без живых процессов
-- [ ] **T39 (P1, human: ~1d / CC: ~30min)** — bots — Реестр адаптеров, флаги по справке, снимок `argv` и окружения
-  - Surfaced by: Раздел 1 — `--skip-git-repo-check`, `--bare`; Раздел 2 — список харнессов сверяется руками
+  - Verify: `bun test server/proc`; integration for code 70 with no live processes
+- [ ] **T39 (P1, human: ~1d / CC: ~30min)** — bots — Adapter registry, flags from the help output, snapshot of `argv` and environment
+  - Surfaced by: Section 1 — `--skip-git-repo-check`, `--bare`; Section 2 — the list of harnesses is reconciled by hand
   - Files: `server/bots/adapters/index.ts`, `server/bots/adapters/codex.ts`, `server/bots/adapters/claude.ts`, `server/bots/adapters/agy.ts`, `server/bots/adapters/adapters.test.ts`
   - Verify: `bun test server/bots/adapters`
-- [ ] **T40 (P1, human: ~1d / CC: ~30min)** — bot-tools — Мост без логики, схемы в `shared/bot-tools.ts`, эфемерный `BOT_PORT`, поддельный харнесс через настоящий мост
-  - Surfaced by: Раздел 2 — схемы в двух местах
+- [ ] **T40 (P1, human: ~1d / CC: ~30min)** — bot-tools — A bridge without logic, schemas in `shared/bot-tools.ts`, ephemeral `BOT_PORT`, a fake harness through the real bridge
+  - Surfaced by: Section 2 — schemas in two places
   - Files: `bot-tools/main.ts`, `shared/bot-tools.ts`, `server/bots/api.ts`, `test/fake-harness.ts`
-  - Verify: интеграционный с поддельным харнессом; отказ токену прошлого раунда
-- [ ] **T41 (P1, human: ~1d / CC: ~30min)** — bots — Очередь ходов бота, одна текущая панорама, проверка направления шага
-  - Surfaced by: Codex 4 и 5
+  - Verify: integration with the fake harness; rejection of the previous round's token
+- [ ] **T41 (P1, human: ~1d / CC: ~30min)** — bots — Bot move queue, one current panorama, step direction check
+  - Surfaced by: Codex 4 and 5
   - Files: `server/bots/queue.ts`, `server/bots/move.ts`, `server/bots/queue.test.ts`
   - Verify: `bun test server/bots/queue.test.ts`
-- [ ] **T42 (P1, human: ~4h / CC: ~20min)** — location — Место раунда: `pano_id` и координаты панорамы для людей, ботов и очков
+- [ ] **T42 (P1, human: ~4h / CC: ~20min)** — location — Round location: `pano_id` and the panorama coordinates for humans, bots and scoring
   - Surfaced by: Codex 6
   - Files: `server/location.ts`, `web/src/components/PanoView.svelte`, `server/location.test.ts`
-  - Verify: `bun test server/location.test.ts`; интеграционный на общий `pano_id`
-- [ ] **T43 (P1, human: ~4h / CC: ~20min)** — images — Подпись шрифтом из репозитория, без метаданных
-  - Surfaced by: Раздел 2 — квадратики вместо кириллицы
+  - Verify: `bun test server/location.test.ts`; integration for a shared `pano_id`
+- [ ] **T43 (P1, human: ~4h / CC: ~20min)** — images — Caption with a font from the repository, without metadata
+  - Surfaced by: Section 2 — squares instead of Cyrillic
   - Files: `server/images/label.ts`, `server/images/label.test.ts`
   - Verify: `bun test server/images`
-- [ ] **T44 (P1, human: ~1d / CC: ~30min)** — net — Роль хоста по токену, последняя вкладка, возврат посреди раунда, соединения без токена
-  - Surfaced by: Раздел 1 — C-HOSTDROP и потолок соединений
+- [ ] **T44 (P1, human: ~1d / CC: ~30min)** — net — Host role by token, last tab, return mid-round, connections without a token
+  - Surfaced by: Section 1 — C-HOSTDROP and the connection ceiling
   - Files: `server/net/ws.ts`, `server/engine/lobby.ts`, `server/net/ws.test.ts`
   - Verify: `bun test server/net`
-- [ ] **T45 (P1, human: ~4h / CC: ~20min)** — storage — Атомарная запись `quota.json`, ошибка записи видна, месяц по UTC, платные картинки только после «Начать»
-  - Surfaced by: Раздел 2 — путь записи; Codex 7
+- [ ] **T45 (P1, human: ~4h / CC: ~20min)** — storage — Atomic write of `quota.json`, write error is visible, month by UTC, paid images only after «Начать»
+  - Surfaced by: Section 2 — the write path; Codex 7
   - Files: `server/storage/quota.ts`, `server/storage/quota.test.ts`, `server/engine/lobby.ts`
   - Verify: `bun test server/storage`
-- [ ] **T46 (P1, human: ~4h / CC: ~15min)** — tooling — Границы импортов, `check-size` для `.svelte`, правило о `describe` в `CLAUDE.md`, `bun test` и Playwright
-  - Surfaced by: Раздел 2 — границы и лимиты
+- [ ] **T46 (P1, human: ~4h / CC: ~15min)** — tooling — Import boundaries, `check-size` for `.svelte`, the `describe` rule in `CLAUDE.md`, `bun test` and Playwright
+  - Surfaced by: Section 2 — boundaries and limits
   - Files: `eslint.config.js`, `scripts/check-size.ts`, `CLAUDE.md`
-  - Verify: `bun run check` падает на запрещённом импорте
-- [ ] **T47 (P2, human: ~2h / CC: ~10min)** — cli/start — Сборка параллельно с туннелем, DoH раз в 2 с
-  - Surfaced by: Раздел 4
+  - Verify: `bun run check` fails on a forbidden import
+- [ ] **T47 (P2, human: ~2h / CC: ~10min)** — cli/start — Build in parallel with the tunnel, DoH once every 2 s
+  - Surfaced by: Section 4
   - Files: `server/cli/start.ts`
-  - Verify: замер повторного запуска в `docs/playtest-1.md`
-- [ ] **T48 (P2, human: ~4h / CC: ~15min)** — logs — Запись о запуске харнесса, файлы сбоя в правиле 14 дней, README о подписках
-  - Surfaced by: передано фазами 1 и 2.5 (журнал ботов, C-SUBTERMS, файл сбоя)
+  - Verify: repeat-run measurement in `docs/playtest-1.md`
+- [ ] **T48 (P2, human: ~4h / CC: ~15min)** — logs — A record of harness launch, crash files under the 14-day rule, README about subscriptions
+  - Surfaced by: passed on by phases 1 and 2.5 (bot log, C-SUBTERMS, crash file)
   - Files: `server/log.ts`, `README.md`, `server/log.test.ts`
-  - Verify: интеграционный журнал после партии без токенов
-- [ ] **T49 (P2, human: ~2h / CC: ~10min)** — http — Адреса миниатюр по 128 бит, 404 после лобби
-  - Surfaced by: Раздел 1 — картинка не может нести заголовок с токеном
+  - Verify: integration log after a game without tokens
+- [ ] **T49 (P2, human: ~2h / CC: ~10min)** — http — 128-bit thumbnail addresses, 404 after the lobby
+  - Surfaced by: Section 1 — an image cannot carry a header with a token
   - Files: `server/http/thumbs.ts`, `server/http/thumbs.test.ts`
   - Verify: `bun test server/http`
-- [ ] **T50 (P2, human: ~1d / CC: ~30min)** — spikes — Дополнения S1 и S3: кандидаты флагов, мост из-под песочницы, форма результата, `sharp` под Bun, замер шага бота
-  - Surfaced by: Раздел 1; Codex 4
+- [ ] **T50 (P2, human: ~1d / CC: ~30min)** — spikes — Additions to S1 and S3: flag candidates, a bridge from inside the sandbox, the result shape, `sharp` under Bun, measuring the bot step
+  - Surfaced by: Section 1; Codex 4
   - Files: `docs/spikes/s1.md`, `docs/spikes/s3.md`, `spikes/`
-  - Verify: отчёты спайков с ответом на каждый пункт
-- [ ] **T51 (P2, human: ~1d / CC: ~30min)** — web — Подделка карты для `--fake` (только при выборе Google Maps)
-  - Surfaced by: Раздел 2 — противоречие «без подмены» и «без сети»
+  - Verify: spike reports with an answer to each item
+- [ ] **T51 (P2, human: ~1d / CC: ~30min)** — web — A map fake for `--fake` (only when Google Maps is chosen)
+  - Surfaced by: Section 2 — the contradiction between "no substitution" and "no network"
   - Files: `web/src/components/FakeMap.svelte`
-  - Verify: `bun run test:e2e` без сети
-- [ ] **T52 (P2, human: ~1d / CC: ~30min)** — eval — `eval:bots`: парные запуски на своих фотографиях, медиана и разброс (M2)
-  - Surfaced by: Раздел 3 [→EVAL]; Codex 8
+  - Verify: `bun run test:e2e` without network
+- [ ] **T52 (P2, human: ~1d / CC: ~30min)** — eval — `eval:bots`: paired runs on own photographs, median and spread (M2)
+  - Surfaced by: Section 3 [→EVAL]; Codex 8
   - Files: `scripts/eval-bots.ts`, `docs/evals/README.md`
-  - Verify: два запуска одной версии дают близкие медианы
-- [ ] **T53 (P1, human: ~4h / CC: ~20min)** — maps — Переиспользование объектов карты, `map_loaded` в счётчике квоты, карты в худшем случае партии, дневная квота Maps JavaScript API в README и `doctor`
-  - Surfaced by: финальное утверждение — UC-1 (Google Maps JS) сделал загрузки карты платной услугой
+  - Verify: two runs of the same version give close medians
+- [ ] **T53 (P1, human: ~4h / CC: ~20min)** — maps — Reuse of map objects, `map_loaded` in the quota counter, maps in the worst case of a game, the daily Maps JavaScript API quota in the README and `doctor`
+  - Surfaced by: final approval — UC-1 (Google Maps JS) made map loads a paid service
   - Files: `web/src/components/GuessMap.svelte`, `web/src/components/ResultsMap.svelte`, `server/storage/quota.ts`, `server/cli/doctor.ts`, `README.md`, `web/tests/maps.spec.ts`
-  - Verify: E2E: два `map_loaded` на клиента за партию; `bun test server/storage`
+  - Verify: E2E: two `map_loaded` per client per game; `bun test server/storage`
 
-Регистрация списка: `gstack-tasks add --phase eng-review` не выполнялась. Прошлый список фазы под slug `tass` (запуск 20261031T120028Z-3551562, задачи с T39) принадлежит другому проекту; закрывать или переносить его значит испортить чужие записи. Строки записаны в `.gstack/tmp/tasks-eng-review-rows.jsonl`.
+List registration: `gstack-tasks add --phase eng-review` was not run. The earlier phase list under the slug `tass` (run 20261031T120028Z-3551562, tasks from T39) belongs to a different project; closing or carrying it over would corrupt someone else's records. The rows are written to `.gstack/tmp/tasks-eng-review-rows.jsonl`.
 
-#### Нерешённое после фазы 3
+#### Unresolved after phase 3
 
-На финальное утверждение (вопросы вкуса, в плане действует рекомендованный вариант):
+For final approval (questions of taste; the recommended option is in effect in the plan):
 
-- **E-1. Ядро игры как чистая функция переходов с исполнителем эффектов** (форма B), а не службы со своими кусками состояния. Дороже на старте, дешевле в каждой гонке.
-- **E-2. Ход бота `move`**: оставлен шаг к ближайшей панораме с проверкой направления и честной оговоркой; S3 меряет совпадение со связями Google, при совпадении ниже 80% владелец решает. Codex предлагал доказать общую модель движения в S1 или выключить движение в M1.
-- **E-3. Подделка карты для `--fake` при выборе Google Maps.** Уточняет решение фазы 1 «без слоя подмены»: переключателя между настоящими картами нет, но для тестов без сети нужна одна подделка.
+- **E-1. The game core as a pure transition function with an effect executor** (form B), rather than services with their own pieces of state. More expensive at the start, cheaper in every race.
+- **E-2. The bot `move`**: a step to the nearest panorama with a direction check and an honest caveat is kept; S3 measures the match with Google's links, and if the match is below 80% the owner decides. Codex suggested proving a shared movement model in S1 or disabling movement in M1.
+- **E-3. A map fake for `--fake` when Google Maps is chosen.** Refines the phase 1 decision "no substitution layer": there is no switch between real maps, but tests without network need one fake.
 
 #### Eng Review Completion Summary
 
-- Step 0: Scope Challenge — scope accepted as-is (структура: Smaller arrangement)
+- Step 0: Scope Challenge — scope accepted as-is (structure: Smaller arrangement)
 - Reality rows: 7/7 applicable rows emitted (`PLAN_REALITY: complete`), 3 unverified premises
 - Architecture Review: 9 issues found
 - Code Quality Review: 8 issues found
@@ -2493,61 +2493,61 @@ Synthesized from this review's findings. Each task derives from a specific findi
 - NOT in scope: written
 - What already exists: written
 - TODOS.md updates: 1 items proposed to user
-- Failure modes: 0 critical gaps flagged (2 закрыты в ходе фазы)
+- Failure modes: 0 critical gaps flagged (2 closed during the phase)
 - Unresolved decisions: 3 in this review
-- Outside voice: codex, completed (8 замечаний, все разобраны; первая попытка не запустилась из-за разрезанного символа UTF-8)
+- Outside voice: codex, completed (8 findings, all handled; the first attempt did not start because of a cut UTF-8 character)
 - Parallelization: 4 lanes, 2 parallel / 2 sequential
 - Lake Score: 14/15 = answers picking a 10/10 option / answers scored for Completeness
 
-#### Журнал авторешений, фаза 3
+#### Auto-decision log, phase 3
 
-| № | Фаза | Решение | Класс | Принцип | Обоснование | Отвергнуто |
+| No. | Phase | Decision | Class | Principle | Rationale | Rejected |
 |---|---|---|---|---|---|---|
-| 114 | Eng | Фаза проведена отдельным навыком `/plan-eng-review` | механическое | документация gstack | Та же причина, что в фазах 2 и 2.5 | обход хука |
-| 115 | Eng | Один `package.json`, два `tsconfig`, без workspaces | механическое | 5, 3 | Те же функции, меньше настроек | пять пакетов |
-| 116 | Eng | Ядро `reduce` и исполнитель эффектов | вкус | 5 | Гонки решаются в одном месте | службы со своим состоянием |
-| 117 | Eng | Одна `view(state, viewerId)`, вид целиком | механическое | 5 | Чужие метки не утекут из новой рассылки | дельты |
-| 118 | Eng | `seq` и `ack`, `serverNow`, смещение по наименьшему пингу | механическое | 1 | Передано фазой дизайна | время клиента |
-| 119 | Eng | Координаты в «Угадать» | механическое | 1 | Codex 3 | только `roundId` |
-| 120 | Eng | Метка операции `{matchId, gen}` | механическое | 1 | Codex 2 | номер раунда |
-| 121 | Eng | Роль хоста по токену, ожидание хоста | механическое | 1 | C-HOSTDROP | роль по соединению |
-| 122 | Eng | Последняя вкладка побеждает | механическое | 3 | Простое и предсказуемое правило | запрет второй вкладки |
-| 123 | Eng | Соединения без токена: 5 с, не больше 8 | механическое | 1 | Потолок 32 не занять молчанием | без предела |
-| 124 | Eng | `spawnManaged` с группами процессов | механическое | 1 | Проверено в Bun 1.4.2 | сигнал одному процессу |
-| 125 | Eng | Блокировка каталога данных, три признака процесса | механическое | 1 | Codex 1 | совпадение команды |
-| 126 | Eng | Реестр адаптеров как единственный список | механическое | 4 | Список сверялся бы руками | список в каждом модуле |
-| 127 | Eng | `--skip-git-repo-check` у `codex`, запрет `--bare` у `claude` | механическое | 1 | Справка CLI | флаги из таблицы плана |
-| 128 | Eng | Мост без логики, схемы с сервера | механическое | 4 | Одно место схем | схемы в мосте |
-| 129 | Eng | Подпись шрифтом из репозитория, без метаданных | механическое | 1 | Тихая порча картинок | системный шрифт |
-| 130 | Eng | Место раунда: `pano_id` и его координаты | механическое | 1 | Codex 6 | точка выборки |
-| 131 | Eng | Очередь ходов бота | механическое | 1 | Codex 5 | только резерв хода |
-| 132 | Eng | Шаг `move` с проверкой направления и замером S3 | вкус | 3 | Codex 4; ходьба по связям требует браузера на сервере | выключить движение в M1 |
-| 133 | Eng | Платные картинки только после «Начать» | механическое | 3 | Codex 7 | подготовка в лобби |
-| 134 | Eng | Атомарная запись `quota.json`, ошибка видна | механическое | 1 | Недосчёт квоты молча | запись без переименования |
-| 135 | Eng | Сборка параллельно с туннелем | механическое | 3 | Цель повторного запуска 1 минута | по очереди |
-| 136 | Eng | Журнал запуска бота, файлы сбоя в 14 днях, README о подписках | механическое | 1 | Передано фазами 1 и 2.5 | отдельная очистка |
-| 137 | Eng | Миниатюры по 128-битным адресам | механическое | 5 | `<img>` не несёт заголовков | токен в адресе |
-| 138 | Eng | Подделка карты при выборе Google Maps | вкус | 1 | Тесты без сети | E2E с сетью |
-| 139 | Eng | `eval:bots`: парные запуски, только стартовые снимки, M2 | механическое | 1 | Codex 8 | сравнение с прошлым запуском |
-| 140 | Eng | `bun test` и Playwright, без Vitest | механическое | 4 | Встроенное средство | Vitest |
-| 141 | Eng | Границы импортов в ESLint | механическое | 5 | Агент импортирует то, что компилируется | договорённость |
-| 142 | Eng | `check-size` для `.svelte`, правило о `describe` | механическое | 1 | Лимиты владельца без исключений | поднять лимит |
-| 143 | Eng | Список задач не регистрируется в `gstack-tasks` | механическое | безопасность | Чужой список под тем же slug | закрыть чужие задачи |
-| 144 | Eng | `TODOS.md`: HTTP-транспорт MCP | механическое | 6 | Зависит от S1 | строить сейчас |
+| 114 | Eng | The phase was run by the separate `/plan-eng-review` skill | mechanical | gstack documentation | Same reason as in phases 2 and 2.5 | hook bypass |
+| 115 | Eng | One `package.json`, two `tsconfig` files, no workspaces | mechanical | 5, 3 | The same functions, fewer settings | five packages |
+| 116 | Eng | The `reduce` core and effect executor | taste | 5 | Races are resolved in one place | services with their own state |
+| 117 | Eng | One `view(state, viewerId)`, a whole view | mechanical | 5 | Foreign markers cannot leak from a new broadcast | deltas |
+| 118 | Eng | `seq` and `ack`, `serverNow`, offset by the smallest ping | mechanical | 1 | Passed on by the design phase | client time |
+| 119 | Eng | Coordinates in «Угадать» | mechanical | 1 | Codex 3 | `roundId` only |
+| 120 | Eng | Operation tag `{matchId, gen}` | mechanical | 1 | Codex 2 | round number |
+| 121 | Eng | Host role by token, waiting for the host | mechanical | 1 | C-HOSTDROP | role by connection |
+| 122 | Eng | The last tab wins | mechanical | 3 | A simple and predictable rule | forbid a second tab |
+| 123 | Eng | Connections without a token: 5 s, no more than 8 | mechanical | 1 | The ceiling of 32 cannot be occupied by silence | no limit |
+| 124 | Eng | `spawnManaged` with process groups | mechanical | 1 | Verified in Bun 1.4.2 | a signal to a single process |
+| 125 | Eng | Data-directory lock, three process identity markers | mechanical | 1 | Codex 1 | command match |
+| 126 | Eng | The adapter registry as the only list | mechanical | 4 | The list would be reconciled by hand | a list in each module |
+| 127 | Eng | `--skip-git-repo-check` for `codex`, `--bare` forbidden for `claude` | mechanical | 1 | CLI help | flags from the plan's table |
+| 128 | Eng | A bridge without logic, schemas from the server | mechanical | 4 | A single place for schemas | schemas in the bridge |
+| 129 | Eng | Caption with a font from the repository, without metadata | mechanical | 1 | Silent image corruption | system font |
+| 130 | Eng | Round location: `pano_id` and its coordinates | mechanical | 1 | Codex 6 | the sampled point |
+| 131 | Eng | Bot move queue | mechanical | 1 | Codex 5 | turn reservation only |
+| 132 | Eng | The `move` step with a direction check and an S3 measurement | taste | 3 | Codex 4; walking along links requires a browser on the server | disable movement in M1 |
+| 133 | Eng | Paid images only after «Начать» | mechanical | 3 | Codex 7 | preparation in the lobby |
+| 134 | Eng | Atomic write of `quota.json`, the error is visible | mechanical | 1 | Silent quota undercounting | write without rename |
+| 135 | Eng | Build in parallel with the tunnel | mechanical | 3 | The repeat-run goal is 1 minute | sequentially |
+| 136 | Eng | Bot launch log, crash files within 14 days, README about subscriptions | mechanical | 1 | Passed on by phases 1 and 2.5 | separate cleanup |
+| 137 | Eng | Thumbnails at 128-bit addresses | mechanical | 5 | `<img>` carries no headers | token in the address |
+| 138 | Eng | A map fake when Google Maps is chosen | taste | 1 | Tests without network | E2E with network |
+| 139 | Eng | `eval:bots`: paired runs, starting snapshots only, M2 | mechanical | 1 | Codex 8 | comparison with the previous run |
+| 140 | Eng | `bun test` and Playwright, no Vitest | mechanical | 4 | A built-in tool | Vitest |
+| 141 | Eng | Import boundaries in ESLint | mechanical | 5 | An agent imports whatever compiles | an agreement |
+| 142 | Eng | `check-size` for `.svelte`, the `describe` rule | mechanical | 1 | The owner's limits without exceptions | raise the limit |
+| 143 | Eng | The task list is not registered in `gstack-tasks` | mechanical | safety | Someone else's list under the same slug | close the other tasks |
+| 144 | Eng | `TODOS.md`: MCP HTTP transport | mechanical | 6 | Depends on S1 | build now |
 
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | ISSUES OPEN | 14 proposals, 4 accepted, 5 deferred |
-| Outside Review | codex (`codex exec`, gpt-6-astra) в фазах CEO, дизайна, DX и инженерной | Independent 2nd opinion | 4 | completed (дизайн: текст получен, проверка вывода unverified) | дизайн 13, DX 8, инженерная 8 замечаний |
+| Outside Review | codex (`codex exec`, gpt-6-astra) in the CEO, design, DX and engineering phases | Independent 2nd opinion | 4 | completed (design: text received, output check unverified) | design 13, DX 8, engineering 8 findings |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | ISSUES OPEN | 30 issues, 0 critical gaps |
 | Design Review | `/plan-design-review` | UI/UX gaps | 1 | ISSUES OPEN | score: 1/10 → 8/10, 30 decisions |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 1 | ISSUES OPEN | score: 4/10 → 7/10, TTHW: 30 min → 20 min first, 1 min repeat |
 
-- **OUTSIDE COVERAGE:** codex, фаза CEO: два голоса (Фаза 1, 0.5); фаза дизайна: completed, вывод unverified (код 4, текст 13 замечаний использован); фаза DX: completed, 8 замечаний; инженерная фаза: completed со второй попытки (первая не запустилась из-за разрезанного символа UTF-8 во вводе), 8 замечаний. Записи журнала с 2026-10-22 по 2026-10-30 под тем же slug относятся к другому проекту и здесь не учтены.
-- **CROSS-MODEL:** хост Claude (Opus 5.5) и Codex (gpt-6-astra). В инженерной фазе совпадений нет: 5 замечаний Codex нашли дыры в собственных пунктах фазы 3 и в протоколе фазы дизайна, 3 касаются исходного плана (ход бота, место раунда, платная подготовка). Расхождение по ходу `move` (E-2) владелец решил в рекомендованном варианте.
-- **VERDICT:** обзоров со статусом CLEAR нет: все четыре закончились с ISSUES OPEN, найденное перенесено в раздел 14 и задачи T1–T53 (T53 добавлена после утверждения: загрузки карты Google). Владелец утвердил план 2026-11-13: UC-1 Google Maps JS, UC-2 ИИ на снимках Google с мерами, вопросы вкуса в рекомендованных вариантах. Журнал обзоров считает открытыми 11 решений (CEO 1, дизайн 8, DX 2) по записям до утверждения; из них открыт только C-REMOTE (приватный remote для CI, действие владельца), остальные 10 приняты на утверждении. eng review required
+- **OUTSIDE COVERAGE:** codex, CEO phase: two voices (Phase 1, 0.5); design phase: completed, output unverified (code 4, the text of 13 findings was used); DX phase: completed, 8 findings; engineering phase: completed on the second attempt (the first did not start because of a cut UTF-8 character in the input), 8 findings. Log entries from 2026-10-22 to 2026-10-30 under the same slug belong to a different project and are not counted here.
+- **CROSS-MODEL:** the Claude host (Opus 5.5) and Codex (gpt-6-astra). In the engineering phase there are no matches: 5 Codex findings found holes in the phase 3 items themselves and in the design phase's protocol, 3 concern the original plan (bot move, round location, paid preparation). The disagreement about the `move` step (E-2) was resolved by the owner in the recommended option.
+- **VERDICT:** there are no reviews with status CLEAR: all four ended with ISSUES OPEN, the findings were carried into section 14 and tasks T1–T53 (T53 was added after approval: Google map loads). The owner approved the plan on 2026-11-13: UC-1 Google Maps JS, UC-2 AI on Google snapshots with safeguards, questions of taste in the recommended options. The review log counts 11 decisions as open (CEO 1, design 8, DX 2) by the entries before approval; of them only C-REMOTE is open (a private remote for CI, an owner action), the other 10 were accepted at approval. eng review required
 
 **UNRESOLVED DECISIONS:**
 + 11 unresolved from prior reviews

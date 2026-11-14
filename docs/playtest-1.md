@@ -1,26 +1,26 @@
-# Плейтест №1 — Чеклист прогона
+# Playtest #1 — Run checklist
 
-Заполните этот шаблон во время первой живой игры с друзьями (3–4 участника + минимум 1 ИИ-бот) через `cloudflared` или `--public-url`.
+Fill in this template during the first live game with friends (3–4 participants + at least 1 AI bot) through `cloudflared` or `--public-url`.
 
-- **Дата и версия:** YYYY-MM-DD, версия `0.1.0`
-- **Режим запуска:** `bun run start` (туннель / `--public-url` / `--no-tunnel`)
-- **Участники:**
-  - Хост:
-  - Гости (устройства/браузеры):
-  - ИИ-слоты (харнесс / модель / пресет):
+- **Date and version:** YYYY-MM-DD, version `0.1.0`
+- **Launch mode:** `bun run start` (tunnel / `--public-url` / `--no-tunnel`)
+- **Participants:**
+  - Host:
+  - Guests (devices/browsers):
+  - AI slots (harness / model / preset):
 
-## Проверка потока
+## Flow check
 
-1. [ ] `bun run doctor` прошёл перед игрой (Maps JS, Street View, `cloudflared`, CLI-боты)
-2. [ ] Гости открыли ссылку `#t=...` без ручных правок и вошли с разных устройств
-3. [ ] ИИ-бот успел ответить в пределах раунда / окна ожидания; карточка «почему?» и миниатюры читаемы
-4. [ ] Таймер, постановка метки (`Enter`, `M`), пауза чтения карточки и «Ещё раз» отработали без сбоев
-5. [ ] Счётчик квоты в лобби соответствует ожидаемому (`Static`, `Pano`, `Карты`)
+1. [ ] `bun run doctor` passed before the game (Maps JS, Street View, `cloudflared`, CLI bots)
+2. [ ] Guests opened the `#t=...` link without manual edits and joined from different devices
+3. [ ] The AI bot managed to answer within the round / waiting window; the «почему?» ("why?") card and thumbnails are readable
+4. [ ] The timer, marker placement (`Enter`, `M`), the card reading pause and «Ещё раз» ("Once more") worked without failures
+5. [ ] The quota counter in the lobby matches expectations (`Static`, `Pano`, `Карты` — "Maps")
 
-## Наблюдения (где споткнулись игроки / лаги / UI)
+## Observations (where players stumbled / lag / UI)
 
 - ...
 
-## Правки по итогам плейтеста
+## Fixes after the playtest
 
 - ...

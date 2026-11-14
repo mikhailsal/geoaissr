@@ -1,90 +1,90 @@
 # geoaissr
 
-Мультиплеерная географическая угадайка на 1–8 человек и до 3 ИИ-соперников (`claude`, `codex`, `agy`). Сервер запускается на компьютере ведущего и раздаёт общую комнату друзьям по одноразовой ссылке через Cloudflare Quick Tunnel или собственный `--public-url`.
+A multiplayer geography guessing game for 1–8 people and up to 3 AI opponents (`claude`, `codex`, `agy`). The server runs on the host's computer and shares a common room with friends through a one-time link, using a Cloudflare Quick Tunnel or your own `--public-url`.
 
-## Быстрый старт (4 шага)
+## Quick start (4 steps)
 
-1. **Установите зависимости (Bun >= 1.4.2, cloudflared, shellcheck):**
+1. **Install dependencies (Bun >= 1.4.2, cloudflared, shellcheck):**
    ```bash
    bun install
    bun run setup:dev
    ```
-2. **Настройте ключи Google Maps в `.env`:**
-   Скопируйте `.env.example` в `.env` и заполните `GOOGLE_MAPS_BROWSER_KEY` и `GOOGLE_MAPS_SERVER_KEY` (подробно ниже).
-   _Чтобы попробовать игру офлайн без ключей и туннеля, используйте тестовый режим:_
+2. **Configure the Google Maps keys in `.env`:**
+   Copy `.env.example` to `.env` and fill in `GOOGLE_MAPS_BROWSER_KEY` and `GOOGLE_MAPS_SERVER_KEY` (details below).
+   _To try the game offline without keys or a tunnel, use the test mode:_
    ```bash
    bun run dev -- --fake
    ```
-3. **Проверьте окружение и квоты:**
+3. **Check the environment and quotas:**
    ```bash
    bun run doctor
    ```
-4. **Запустите игру:**
+4. **Start the game:**
    ```bash
    bun run start
    ```
-   В терминале появятся две ссылки `#t=...`: **Ссылка хоста** (для вас) и **Приглашение гостям** (отправьте друзьям).
+   The terminal prints two `#t=...` links: **Ссылка хоста** (Host link, for you) and **Приглашение гостям** (Invitation for guests, send it to your friends).
 
 ---
 
-## Как получить ключи Google Maps Platform
+## How to get Google Maps Platform keys
 
-1. Создайте проект в Google Cloud Console, привяжите платёжный аккаунт (предоставляется бесплатный ежемесячный порог: 10 000 вызовов Maps JS / 5 000 Dynamic Street View / 10 000 Street View Static API; приложение дополнительно ограничивает расход на 80% — `8000 / 4000 / 8000`).
-2. В разделе **APIs & Services → Library** включите:
+1. Create a project in Google Cloud Console and attach a billing account (a free monthly threshold applies: 10,000 Maps JS calls / 5,000 Dynamic Street View / 10,000 Street View Static API; the app additionally caps usage at 80%: `8000 / 4000 / 8000`).
+2. Under **APIs & Services → Library**, enable:
    - **Maps JavaScript API**
    - **Street View Static API**
-3. Создайте два отдельных API-ключа:
-   - `GOOGLE_MAPS_BROWSER_KEY` — передаётся в браузер игроков для показа карт и панорам. В настройках ключа задайте **Application restrictions → HTTP referrers** и добавьте:
+3. Create two separate API keys:
+   - `GOOGLE_MAPS_BROWSER_KEY` — sent to the players' browsers to show maps and panoramas. In the key settings, set **Application restrictions → HTTP referrers** and add:
      - `http://localhost:*/*`
      - `http://127.0.0.1:*/*`
-     - `https://*.trycloudflare.com/*` (или свой домен для `--public-url`)
-       И ограничьте **API restrictions** только на **Maps JavaScript API**.
-   - `GOOGLE_MAPS_SERVER_KEY` — используется **только сервером хоста** (вызов Street View Static API и Metadata API). Оставьте ограничение только по API (**Street View Static API**), никому его не передавайте.
-4. **Дневные лимиты в Cloud Console (рекомендуемые предохранители):**
-   Чтобы ошибка в клиенте не исчерпала месячный лимит за один вечер, задайте в квотах Cloud Console дневные ограничения:
-   - Maps JS API: **500 / день**
-   - Dynamic Street View Panorama Loads: **250 / день**
-   - Street View Static API: **500 / день**
+     - `https://*.trycloudflare.com/*` (or your own domain for `--public-url`)
+       And restrict **API restrictions** to **Maps JavaScript API** only.
+   - `GOOGLE_MAPS_SERVER_KEY` — used **only by the host's server** (Street View Static API and Metadata API calls). Restrict it by API only (**Street View Static API**) and never share it with anyone.
+4. **Daily limits in Cloud Console (recommended safeguards):**
+   So that a client bug cannot exhaust the monthly limit in a single evening, set daily limits in the Cloud Console quotas:
+   - Maps JS API: **500 / day**
+   - Dynamic Street View Panorama Loads: **250 / day**
+   - Street View Static API: **500 / day**
 
-Никогда не коммитьте `.env` в git (проверка `bun run check` и pre-commit хук блокируют случайный коммит).
-
----
-
-## Подготовка подписок ИИ и приватность
-
-ИИ-соперники используют уже установленные и авторизованные CLI-инструменты на машине ведущего (`claude`, `codex`, `agy`):
-
-- Перед игрой с друзьями рекомендуется отключить обучение моделей на ваших запросах в настройках аккаунтов Claude, OpenAI Codex / ChatGPT и Antigravity (`agy`).
-- **Важно про `agy`:** `agy` технически может читать файлы пользователя при запуске в системе (в отличие от `claude`/`codex`, где снимки передаются только в памяти MCP-процесса). Не храните открытые секреты или личные ключи в домашней директории; `.env` передаётся только процессу игры.
-- В лобби есть кнопка **«Проверить зрение»** для каждого слота ИИ — используйте её после выбора новой модели или размера снимка.
+Never commit `.env` to git (the `bun run check` check and the pre-commit hook block an accidental commit).
 
 ---
 
-## Команды
+## AI subscriptions and privacy
 
-| Команда                                                  | Назначение                                                                                                      |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `bun run doctor`                                         | Проверка `.env`, Google API, `cloudflared`, CLI ИИ-ботов и сборки (`--json` для JSON-отчёта)                    |
-| `bun run start`                                          | Прод-запуск: сборка клиента, запуск сервера и Quick Tunnel (`trycloudflare.com`)                                |
-| `bun run start -- --public-url https://game.example.com` | Запуск за собственным reverse-proxy / доменом (с проверкой DNS и `/healthz`)                                    |
-| `bun run start -- --no-tunnel`                           | Локальный запуск только на машине ведущего без туннеля                                                          |
-| `bun run start -- --fake --no-tunnel`                    | Локальный тестовый режим с имитацией карт, панорам и ИИ-ботов                                                   |
-| `bun run dev`                                            | Режим разработки (Vite HMR на `:5173` + backend API/WS; авто-`--fake` при отсутствии ключа)                     |
-| `bun run check`                                          | Полный набор проверок (`eslint`, `prettier`, `tsc`, `svelte-check`, размер файлов, токены цветов, `shellcheck`) |
-| `bun run test`                                           | Unit + интеграционные тесты                                                                                     |
-| `bun run test:e2e`                                       | Браузерные E2E и WCAG accessibility тесты в Playwright (`axe-core`)                                             |
-| `bun run test:harness -- --only claude`                  | Живой smoke-тест конкретного ИИ-харнесса через MCP                                                              |
-| `bun run test:tunnel -- --hold-sec 5`                    | Живая проверка `cloudflared` Quick Tunnel и DNS readiness                                                       |
-| `bun run eval:bots -- --dry --repeats 1`                 | Сухой прогон офлайн-оценки ботов ([подробнее](docs/evals/README.md))                                            |
+The AI opponents use CLI tools that are already installed and signed in on the host's machine (`claude`, `codex`, `agy`):
+
+- Before playing with friends, it is recommended to turn off model training on your prompts in the account settings of Claude, OpenAI Codex / ChatGPT and Antigravity (`agy`).
+- **Important about `agy`:** `agy` can technically read the user's files when it runs on the system (unlike `claude`/`codex`, where snapshots are passed only in the memory of the MCP process). Do not keep plaintext secrets or private keys in your home directory; `.env` is passed only to the game process.
+- The lobby has a **«Проверить зрение»** ("Check vision") button for each AI slot — use it after choosing a new model or snapshot size.
 
 ---
 
-## Управление с клавиатуры и доступность
+## Commands
 
-- **Enter** в активном раунде — отправить поставленную метку («Угадать»).
-- **M** — развернуть/свернуть мини-карту в раунде (или открыть лист карты на узком экране `< 900px`).
-- **Space** на экране результатов раунда — мгновенно показать все дуги и пины без ожидания анимации.
-- **Esc** — закрыть открытую карточку «почему?» ИИ-бота (с возвратом фокуса на кнопку) или выпадающее меню хоста.
-- Интерфейс поддерживает `prefers-reduced-motion: reduce`, навигацию `Tab`, озвучку смены таймера/статуса через `aria-live`, контраст текста >= 4.5:1 и уникальные формы аватаров (круг для людей, квадрат со значком процессора для ИИ).
+| Command                                                  | Purpose                                                                                                  |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `bun run doctor`                                         | Checks `.env`, the Google API, `cloudflared`, the AI bot CLIs and the build (`--json` for a JSON report) |
+| `bun run start`                                          | Production start: builds the client, starts the server and a Quick Tunnel (`trycloudflare.com`)          |
+| `bun run start -- --public-url https://game.example.com` | Start behind your own reverse proxy / domain (with DNS and `/healthz` checks)                            |
+| `bun run start -- --no-tunnel`                           | Local start on the host's machine only, without a tunnel                                                 |
+| `bun run start -- --fake --no-tunnel`                    | Local test mode with simulated maps, panoramas and AI bots                                               |
+| `bun run dev`                                            | Development mode (Vite HMR on `:5173` + backend API/WS; auto-`--fake` when there is no key)              |
+| `bun run check`                                          | Full set of checks (`eslint`, `prettier`, `tsc`, `svelte-check`, file size, color tokens, `shellcheck`)  |
+| `bun run test`                                           | Unit + integration tests                                                                                 |
+| `bun run test:e2e`                                       | Browser E2E and WCAG accessibility tests in Playwright (`axe-core`)                                      |
+| `bun run test:harness -- --only claude`                  | Live smoke test of a specific AI harness through MCP                                                     |
+| `bun run test:tunnel -- --hold-sec 5`                    | Live check of the `cloudflared` Quick Tunnel and DNS readiness                                           |
+| `bun run eval:bots -- --dry --repeats 1`                 | Offline dry run of the bot evaluation ([details](docs/evals/README.md))                                  |
 
-Подробные коды ошибок CLI описаны в [docs/errors.md](docs/errors.md).
+---
+
+## Keyboard controls and accessibility
+
+- **Enter** in an active round — submit the placed marker («Угадать», "Guess").
+- **M** — expand/collapse the minimap in a round (or open the map sheet on a narrow screen `< 900px`).
+- **Space** on the round results screen — instantly show all arcs and pins without waiting for the animation.
+- **Esc** — close an open AI bot «почему?» ("why?") card (returning focus to the button) or the host dropdown menu.
+- The interface supports `prefers-reduced-motion: reduce`, `Tab` navigation, `aria-live` announcements of timer/status changes, text contrast >= 4.5:1 and distinct avatar shapes (a circle for humans, a square with a processor icon for AI).
+
+Detailed CLI error codes are described in [docs/errors.md](docs/errors.md).

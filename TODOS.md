@@ -1,101 +1,101 @@
 # TODOS
 
-Отложено при обзоре плана `PLAN.md` (CEO-фаза /autoplan, 2026-11-13). В первую версию не входит.
+Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-11-13). Not part of the first version.
 
-## Игра
+## Game
 
-### Звуки
+### Sounds
 
-**What:** Короткие звуки: отсчёт 3-2-1, последние 10 секунд, появление меток, победа.
+**What:** Short sounds: the 3-2-1 countdown, the last 10 seconds, markers appearing, victory.
 
-**Why:** Звук усиливает ощущение партии, особенно когда все сидят в голосовом чате.
+**Why:** Sound strengthens the feeling of a match, especially when everyone is in a voice chat.
 
-**Context:** В плане первой версии только визуальная анимация (раздел 8 `PLAN.md`). Нужны: набор свободных звуков, переключатель громкости в интерфейсе, учёт автозапрета звука в браузерах до первого клика. Начинать с экрана результатов.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** веха M4
-
-### Экран истории партий и зал славы
-
-**What:** Экран со списком прошлых партий и сводной таблицей побед людей и ИИ.
-
-**Why:** Друзьям интересно, кто чаще выигрывает за месяц и какая модель сильнее.
-
-**Context:** Данные уже пишутся в `~/.local/share/geoaissr/matches.jsonl` (раздел 4.6 `PLAN.md`). Нужен только экран чтения и агрегирующая функция. Формат записи партии стоит зафиксировать схемой в `shared/` ещё в первой версии, чтобы старые партии читались.
-
-**Effort:** M
-**Priority:** P3
-**Depends on:** веха M1
-
-### Свои списки точек
-
-**What:** Партия по заранее заданному файлу точек (координаты или `pano_id`), а не по случайной выборке.
-
-**Why:** Тематические партии (один город, знакомые места) и повторяемые тесты ботов.
-
-**Context:** `LocationService` в плане выбирает точки случайно по полигонам стран (раздел 6 `PLAN.md`). Список точек можно сделать вторым источником за тем же интерфейсом. Проверять каждую точку бесплатным metadata-запросом при загрузке списка.
-
-**Effort:** M
-**Priority:** P3
-**Depends on:** веха M1
-
-### Восстановление партии после перезапуска сервера
-
-**What:** Сохранять состояние комнаты на диск и поднимать партию после падения или перезапуска.
-
-**Why:** Сейчас падение сервера обрывает партию (осознанное решение первой версии).
-
-**Context:** Состояние комнаты в памяти (раздел 7 `PLAN.md`). Понадобится снимок состояния конечного автомата на каждом переходе, правило для раунда, оборванного посередине (переиграть), и новая ссылка туннеля для игроков.
-
-**Effort:** M
-**Priority:** P3
-**Depends on:** веха M3
-
-### HTTP-транспорт MCP вместо моста `bot-tools`
-
-**What:** Игровой сервер сам отдаёт инструменты `geo` по MCP через HTTP на `127.0.0.1`, а харнесс подключается к нему по адресу из MCP-конфига; мост `bot-tools` и его процесс на каждого бота исчезают.
-
-**Why:** Меньше процессов и одним звеном меньше между ботом и сервером: мост сейчас только пересылает вызовы.
-
-**Pros:** Нет отдельного пакета и его процесса; отказ «мост упал» исчезает; схемы инструментов живут только на сервере.
-
-**Cons:** Поддержка HTTP-транспорта MCP у `codex`, `claude` и `agy` разная и меняется от версии к версии; stdio работает везде.
-
-**Context:** Предложено инженерным обзором (`PLAN.md`, «Фаза 3. Инженерный обзор», раздел 1). В первой версии действует мост без логики (пункт «Мост `bot-tools` без логики»). Начинать с отчёта спайка S1: если все допущенные харнессы подключаются к MCP по HTTP с токеном в заголовке, мост можно убрать.
+**Context:** The first-version plan has only visual animation (section 8 of `PLAN.md`). Needed: a set of free sounds, a volume toggle in the interface, handling of browsers blocking audio until the first click. Start with the results screen.
 
 **Effort:** S
 **Priority:** P3
-**Depends on:** спайк S1, ворота «Первая игра»
+**Depends on:** milestone M4
 
-## Интерфейс
+### Match history screen and hall of fame
 
-### Переигровка раунда при незагруженной панораме
+**What:** A screen with a list of past matches and a summary table of human and AI wins.
 
-**What:** Кнопка хоста «Переиграть раунд без счёта», если у кого-то из игроков панорама не загрузилась к началу раунда.
+**Why:** Friends are curious who wins more often in a month and which model is stronger.
 
-**Why:** Сейчас отсчёт начинается через 5 с ожидания для всех, и игрок с медленной сетью теряет время раунда не по своей вине.
-
-**Pros:** Счёт не зависит от качества связи.
-
-**Cons:** Новый переход конечного автомата, лишний расход квоты и подписок на переигранный раунд, соблазн переигрывать неудачные раунды.
-
-**Context:** Предложено голосом Codex в обзоре дизайна (`PLAN.md`, «Фаза 2. Обзор дизайна», решение D-3). В первой версии действует правило пункта «Сбои подготовки раунда»: общий таймер и кнопка «Повторить» у клиента. Вернуться, если первая партия покажет, что это случается.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** ворота «Первая игра»
-
-### Мобильная раскладка
-
-**What:** Раскладка для телефона: панорама на весь экран, карта выезжает снизу.
-
-**Why:** Кто-то из друзей может захотеть играть с телефона.
-
-**Context:** Первая версия рассчитана на настольный браузер (раздел 13 `PLAN.md`). Основная работа: мини-карта и список участников на узком экране, размеры зон касания, жесты панорамы против жестов карты.
+**Context:** The data is already written to `~/.local/share/geoaissr/matches.jsonl` (section 4.6 of `PLAN.md`). Only a reading screen and an aggregating function are needed. The match record format should be fixed by a schema in `shared/` already in the first version, so that old matches stay readable.
 
 **Effort:** M
 **Priority:** P3
-**Depends on:** веха M4
+**Depends on:** milestone M1
+
+### Custom location lists
+
+**What:** A match based on a predefined file of locations (coordinates or `pano_id`) instead of a random selection.
+
+**Why:** Themed matches (one city, familiar places) and repeatable bot tests.
+
+**Context:** In the plan, `LocationService` picks locations randomly by country polygons (section 6 of `PLAN.md`). A location list can be made a second source behind the same interface. Verify each location with a free metadata request when the list is loaded.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** milestone M1
+
+### Match recovery after a server restart
+
+**What:** Save the room state to disk and resume the match after a crash or restart.
+
+**Why:** Currently a server crash aborts the match (a deliberate decision for the first version).
+
+**Context:** The room state is in memory (section 7 of `PLAN.md`). This will need a snapshot of the state machine on every transition, a rule for a round interrupted midway (replay it), and a new tunnel link for the players.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** milestone M3
+
+### MCP HTTP transport instead of the `bot-tools` bridge
+
+**What:** The game server itself serves the `geo` tools over MCP via HTTP on `127.0.0.1`, and the harness connects to it at the address from the MCP config; the `bot-tools` bridge and its per-bot process go away.
+
+**Why:** Fewer processes and one less link between the bot and the server: the bridge currently only forwards calls.
+
+**Pros:** No separate package and process; the "bridge crashed" failure disappears; tool schemas live only on the server.
+
+**Cons:** Support for the MCP HTTP transport differs between `codex`, `claude` and `agy` and changes from version to version; stdio works everywhere.
+
+**Context:** Proposed by the engineering review (`PLAN.md`, "Phase 3. Engineering review", section 1). The first version uses a bridge without logic (the item "`bot-tools` bridge without logic"). Start from the S1 spike report: if all allowed harnesses connect to MCP over HTTP with a token in a header, the bridge can be removed.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** spike S1, the "First game" gate
+
+## Interface
+
+### Replaying a round when a panorama has not loaded
+
+**What:** A host button "Replay the round without scoring" if a player's panorama has not loaded by the start of the round.
+
+**Why:** Currently the countdown starts after a 5 s wait for everyone, and a player on a slow network loses round time through no fault of their own.
+
+**Pros:** The score does not depend on connection quality.
+
+**Cons:** A new state machine transition, extra quota and subscription usage for the replayed round, a temptation to replay unlucky rounds.
+
+**Context:** Proposed by the Codex voice in the design review (`PLAN.md`, "Phase 2. Design review", decision D-3). The first version applies the rule from the item "Round preparation failures": a shared timer and a «Повторить» ("Retry") button on the client. Come back to this if the first match shows that it happens.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** the "First game" gate
+
+### Mobile layout
+
+**What:** A phone layout: the panorama fills the screen and the map slides in from the bottom.
+
+**Why:** Some friends may want to play from a phone.
+
+**Context:** The first version targets a desktop browser (section 13 of `PLAN.md`). The main work: the minimap and the participant list on a narrow screen, touch target sizes, panorama gestures versus map gestures.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** milestone M4
 
 ## Completed

@@ -84,7 +84,7 @@ test('formatCliError snapshot for GEO_ENV_KEY_MISSING uses registry templates', 
       'start: не задан ключ Google в .env (GEO_ENV_KEY_MISSING)',
       '  причина: отсутствует GOOGLE_MAPS_SERVER_KEY в .env',
       `  контекст: geoaissr 0.1.0, bun ${Bun.version}`,
-      '  исправить: скопируйте .env.example в .env и заполните GOOGLE_MAPS_BROWSER_KEY и GOOGLE_MAPS_SERVER_KEY по разделу README «Как получить ключи» (docs/errors.md#GEO_ENV_KEY_MISSING)',
+      '  исправить: скопируйте .env.example в .env и заполните GOOGLE_MAPS_BROWSER_KEY и GOOGLE_MAPS_SERVER_KEY по разделу README «How to get Google Maps Platform keys» (docs/errors.md#GEO_ENV_KEY_MISSING)',
     ].join('\n'),
   );
 });

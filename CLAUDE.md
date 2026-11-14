@@ -1,47 +1,52 @@
-# CLAUDE.md — Правила работы с репозиторием geoaissr
+# CLAUDE.md — Working rules for the geoaissr repository
 
-## Устройство репозитория
+## Language
 
-Единый корневой `package.json` (без workspaces):
+- All documentation (`*.md`, including this file, `PLAN.md`, `docs/`), commit messages, pull request titles and descriptions, and code comments are written in **English**.
+- The game's user-facing UI strings and server messages shown to players stay in Russian; that is product content, not documentation.
 
-- `shared/` — протокол, zod-схемы, регионы, цвета, очки, схемы инструментов бота. Не импортирует ничего из других папок.
-- `server/` — игровой сервер на Bun (`engine/`, `net/`, `proc/`, `storage/`, `bots/`, `images/`, `tunnel/`, `cli/`, `dev/`, `http/`). Не импортирует `web/` и `bot-tools/`.
-- `web/` — фронтенд на Svelte 5 + Vite. Импортирует только из `shared/` и пакетов.
-- `bot-tools/` — stdio-мост MCP к `127.0.0.1:BOT_PORT`. Импортирует только из `shared/` и пакетов.
-- `scripts/` — служебные скрипты проверок, сборки регионов, хуков и eval.
-- `spikes/` — одноразовый код спайков M0 (подчиняется тем же лимитам и проверкам; удаляется после M1).
-- `test/` — интеграционные тесты и поддельный MCP-харнесс.
+## Repository layout
 
-## Ворота качества и лимиты
+A single root `package.json` (no workspaces):
 
-Перед коммитом и пушем запускаются `.githooks/pre-commit` и `.githooks/pre-push` (`bun run check`):
+- `shared/` — protocol, zod schemas, regions, colors, scoring, bot tool schemas. Imports nothing from other folders.
+- `server/` — game server on Bun (`engine/`, `net/`, `proc/`, `storage/`, `bots/`, `images/`, `tunnel/`, `cli/`, `dev/`, `http/`). Does not import `web/` or `bot-tools/`.
+- `web/` — frontend on Svelte 5 + Vite. Imports only from `shared/` and packages.
+- `bot-tools/` — MCP stdio bridge to `127.0.0.1:BOT_PORT`. Imports only from `shared/` and packages.
+- `scripts/` — check, region build, hook and eval scripts.
+- `spikes/` — throwaway M0 spike code (subject to the same limits and checks; deleted after M1).
+- `test/` — integration tests and the fake MCP harness.
 
-1. `.env` не отслеживается git.
-2. `shellcheck` для shell-скриптов (`.githooks/*`, `scripts/*.sh`).
-3. `eslint . --max-warnings 0` (`typescript-eslint` strictTypeChecked, `eslint-plugin-svelte`, границы импортов).
+## Quality gates and limits
+
+`.githooks/pre-commit` and `.githooks/pre-push` (`bun run check`) run before every commit and push:
+
+1. `.env` is not tracked by git.
+2. `shellcheck` for shell scripts (`.githooks/*`, `scripts/*.sh`).
+3. `eslint . --max-warnings 0` (`typescript-eslint` strictTypeChecked, `eslint-plugin-svelte`, import boundaries).
 4. `prettier --check .`.
-5. `tsc --noEmit -p tsconfig.server.json` и `tsconfig.web.json`, а также `svelte-check`.
-6. **Лимиты размера (`scripts/check-size.ts`):**
-   - исходный файл (`.ts`, `.js`, `.mjs`, `.svelte`) <= **500** строк;
-   - тестовый файл (`*.test.ts`, `*.spec.ts`) <= **1000** строк;
-   - функция <= **80** строк (`max-lines-per-function: 80`). **Важно для тестов:** правило действует и в тестах — не оборачивайте весь файл теста в один большой `describe(...)`, пишите `test(...)` на верхнем уровне или разбивайте на небольшие блоки.
-7. **Цвета (`scripts/check-colors.ts`):** в `web/src/**/*.svelte` запрещены литералы `#rrggbb`, `#rgb`, `rgb(...)`, `rgba(...)`. Все цвета живут только в `web/src/styles/tokens.css` (см. [DESIGN.md](./DESIGN.md)).
+5. `tsc --noEmit -p tsconfig.server.json` and `tsconfig.web.json`, plus `svelte-check`.
+6. **Size limits (`scripts/check-size.ts`):**
+   - source file (`.ts`, `.js`, `.mjs`, `.svelte`) <= **500** lines;
+   - test file (`*.test.ts`, `*.spec.ts`) <= **1000** lines;
+   - function <= **80** lines (`max-lines-per-function: 80`). **Note for tests:** the rule applies to tests too — don't wrap a whole test file in one big `describe(...)`; write top-level `test(...)` calls or split into small blocks.
+7. **Colors (`scripts/check-colors.ts`):** `#rrggbb`, `#rgb`, `rgb(...)` and `rgba(...)` literals are forbidden in `web/src/**/*.svelte`. All colors live only in `web/src/styles/tokens.css` (see [DESIGN.md](./DESIGN.md)).
 
-## Команды
+## Commands
 
-- `bun run setup:dev` — подготовка окружения разработчика (зависимости, хуки, Playwright Chromium, проверка `shellcheck`).
-- `bun run hooks:install` — установка `.githooks/pre-commit` и `.githooks/pre-push`.
-- `bun run check` — полный прогон ворот качества (при падении печатает шаг и точную команду повтора).
-- `bun run test` — модульные и интеграционные тесты (`bun test`, без сети и ключей).
-- `bun run test:e2e` — сквозные Playwright-тесты (в режиме `--fake`, без сети и ключей).
-- `bun run dev --fake` — локальная разработка без ключей Google, туннеля и подписок.
-- `bun run doctor` / `bun run doctor --json` — проверка ключей, `cloudflared`, харнессов.
-- `bun run start` — сборка клиента, запуск сервера и туннеля (`--no-tunnel`, `--public-url`, `--port`, `--no-open`).
-- `bun run test:harness` / `bun run test:tunnel` — живые проверки по требованию (с сетью/CLI).
-- `bun run eval:bots` — оценка промптов и схем ботов на локальных снимках.
+- `bun run setup:dev` — prepare the developer environment (dependencies, hooks, Playwright Chromium, `shellcheck` check).
+- `bun run hooks:install` — install `.githooks/pre-commit` and `.githooks/pre-push`.
+- `bun run check` — full quality-gate run (on failure prints the step and the exact command to repeat).
+- `bun run test` — unit and integration tests (`bun test`, no network or keys).
+- `bun run test:e2e` — end-to-end Playwright tests (in `--fake` mode, no network or keys).
+- `bun run dev --fake` — local development without Google keys, tunnel or subscriptions.
+- `bun run doctor` / `bun run doctor --json` — check keys, `cloudflared`, harnesses.
+- `bun run start` — build the client, start the server and tunnel (`--no-tunnel`, `--public-url`, `--port`, `--no-open`).
+- `bun run test:harness` / `bun run test:tunnel` — on-demand live checks (with network/CLI).
+- `bun run eval:bots` — evaluate bot prompts and schemas on local snapshots.
 
-## Хранение данных и ошибки
+## Data storage and errors
 
-- Пути к конфигам и данным задаются только через `server/paths.ts` (`GEOAISSR_CONFIG_DIR`, `GEOAISSR_DATA_DIR`). В тестовом режиме `--fake` используется `.geoaissr-dev/`.
-- Реестр кодов ошибок: `server/errors.ts` и [docs/errors.md](./docs/errors.md).
-- Визуальный язык: [DESIGN.md](./DESIGN.md).
+- Config and data paths are set only through `server/paths.ts` (`GEOAISSR_CONFIG_DIR`, `GEOAISSR_DATA_DIR`). In `--fake` test mode `.geoaissr-dev/` is used.
+- Error code registry: `server/errors.ts` and [docs/errors.md](./docs/errors.md).
+- Visual language: [DESIGN.md](./DESIGN.md).

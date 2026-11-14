@@ -1,75 +1,75 @@
-# DESIGN.md — Визуальный язык geoaissr
+# DESIGN.md — geoaissr visual language
 
-Образ: **асфальт и дорожная разметка**. Панорама и карта занимают весь экран; интерфейс лежит поверх них плотными непрозрачными тёмными панелями с чёткой границей `1px solid var(--line)`. Сценарий: вечер, друзья в голосовом чате, каждый за своим монитором.
+The image: **asphalt and road markings**. The panorama and the map fill the whole screen; the interface lies on top of them in dense, opaque dark panels with a crisp `1px solid var(--line)` border. The scenario: an evening, friends in a voice chat, each at their own monitor.
 
-## Принципы
+## Principles
 
-1. **Никакого стекла, свечения, градиентов и декоративных иконок.** Текст никогда не лежит прямо на панораме или карте — только на сплошной непрозрачной панели (`--asphalt-800` или `--asphalt-900`). Эмодзи в интерфейсе запрещены.
-2. **Цвета только из `web/src/styles/tokens.css`.** В `.svelte`-файлах запрещены литералы `#rrggbb`, `#rgb`, `rgb(...)`, `rgba(...)` (проверяется скриптом `scripts/check-colors.ts` в `bun run check`).
-3. **Светлая карта, тёмный интерфейс.** Карта ответов (Google Maps JS API) всегда в штатной светлой схеме со скрытыми значками заведений и русскими подписями (`language=ru`). Панели не спорят с дневными панорамами.
-4. **Один жёлтый акцент (`--paint`).** Используется только для главного действия экрана, кольца таймера и кольца фокуса (`2px solid var(--paint)` с отступом `2px`).
+1. **No glass, glow, gradients or decorative icons.** Text never sits directly on the panorama or the map — only on a solid opaque panel (`--asphalt-800` or `--asphalt-900`). Emoji in the interface are forbidden.
+2. **Colors only from `web/src/styles/tokens.css`.** In `.svelte` files the literals `#rrggbb`, `#rgb`, `rgb(...)`, `rgba(...)` are forbidden (checked by the `scripts/check-colors.ts` script in `bun run check`).
+3. **Light map, dark interface.** The answer map (Google Maps JS API) is always in the standard light scheme with point-of-interest icons hidden and Russian labels (`language=ru`). The panels do not clash with daytime panoramas.
+4. **One yellow accent (`--paint`).** Used only for the screen's primary action, the timer ring and the focus ring (`2px solid var(--paint)` with a `2px` offset).
 
-## Типографика
+## Typography
 
-Шрифты встроены в репозиторий (`@fontsource-variable/unbounded`, `@fontsource-variable/onest`, OFL, без запросов к внешним серверам):
+The fonts are bundled in the repository (`@fontsource-variable/unbounded`, `@fontsource-variable/onest`, OFL, no requests to external servers):
 
-- **Display (`--font-display`):** `'Unbounded Variable', sans-serif` — название `geoaissr`, таймер, очки, заголовки экранов.
-- **UI (`--font-ui`):** `'Onest Variable', sans-serif` — всё остальное.
-- **Цифры:** везде `font-variant-numeric: tabular-nums`.
-- **Шкала размеров:** `14px` (подписи и метки), `16px` (основной текст, минимум для тела), `20px`, `28px`, `40px`, `64px`.
+- **Display (`--font-display`):** `'Unbounded Variable', sans-serif` — the `geoaissr` name, timer, scores, screen headings.
+- **UI (`--font-ui`):** `'Onest Variable', sans-serif` — everything else.
+- **Numerals:** `font-variant-numeric: tabular-nums` everywhere.
+- **Size scale:** `14px` (captions and labels), `16px` (body text, the minimum for body), `20px`, `28px`, `40px`, `64px`.
 
-## Цветовая палитра (`web/src/styles/tokens.css`)
+## Color palette (`web/src/styles/tokens.css`)
 
-| Токен           | Значение  | Назначение                                           |
-| --------------- | --------- | ---------------------------------------------------- |
-| `--asphalt-900` | `#14171B` | Фон экрана, заслонка отсчёта, текст поверх `--paint` |
-| `--asphalt-800` | `#1B1E23` | Плотная панель интерфейса                            |
-| `--asphalt-700` | `#2A2E35` | Наведение, вторичная поверхность                     |
-| `--line`        | `#3A3F47` | Граница панелей и разделители (`1px solid`)          |
-| `--paper`       | `#F4F1EA` | Основной текст                                       |
-| `--paper-dim`   | `#B9B4A8` | Вторичный текст и подписи                            |
-| `--paint`       | `#FFD23F` | Главный акцент, фокус, основная кнопка, таймер       |
-| `--signal`      | `#FF6369` | Ошибки, отсчёт последних 10 с                        |
-| `--ok`          | `#3DBB7A` | Успех, подтверждённый ответ, связь в норме           |
+| Token           | Value     | Purpose                                                        |
+| --------------- | --------- | -------------------------------------------------------------- |
+| `--asphalt-900` | `#14171B` | Screen background, countdown shutter, text on top of `--paint` |
+| `--asphalt-800` | `#1B1E23` | Dense interface panel                                          |
+| `--asphalt-700` | `#2A2E35` | Hover, secondary surface                                       |
+| `--line`        | `#3A3F47` | Panel borders and dividers (`1px solid`)                       |
+| `--paper`       | `#F4F1EA` | Primary text                                                   |
+| `--paper-dim`   | `#B9B4A8` | Secondary text and captions                                    |
+| `--paint`       | `#FFD23F` | Primary accent, focus, main button, timer                      |
+| `--signal`      | `#FF6369` | Errors, the last-10-seconds countdown                          |
+| `--ok`          | `#3DBB7A` | Success, confirmed answer, connection healthy                  |
 
-### Палитра участников (`--p-1` … `--p-12`)
+### Participant palette (`--p-1` … `--p-12`)
 
-Жёлтый акцент не входит в палитру участников. Цвет букв поверх аватара (светлый `--paper` или тёмный `--asphalt-900`) выбирается автоматически по контрасту >= 4.5:1.
+The yellow accent is not part of the participant palette. The color of the letters on top of an avatar (light `--paper` or dark `--asphalt-900`) is chosen automatically for a contrast of >= 4.5:1.
 
-- `--p-1: #E8590C` (оранжевый)
-- `--p-2: #C2255C` (малиновый)
-- `--p-3: #9C36B5` (сиреневый)
-- `--p-4: #7048E8` (фиолетовый)
-- `--p-5: #339AF0` (синий)
-- `--p-6: #1098AD` (бирюзовый)
-- `--p-7: #0CA678` (изумрудный)
-- `--p-8: #74B816` (салатовый)
-- `--p-9: #8D5524` (коричневый)
-- `--p-10: #868E96` (серый)
-- `--p-11: #F06595` (розовый)
-- `--p-12: #22B8CF` (голубой)
+- `--p-1: #E8590C` (orange)
+- `--p-2: #C2255C` (crimson)
+- `--p-3: #9C36B5` (lilac)
+- `--p-4: #7048E8` (violet)
+- `--p-5: #339AF0` (blue)
+- `--p-6: #1098AD` (turquoise)
+- `--p-7: #0CA678` (emerald)
+- `--p-8: #74B816` (lime)
+- `--p-9: #8D5524` (brown)
+- `--p-10: #868E96` (gray)
+- `--p-11: #F06595` (pink)
+- `--p-12: #22B8CF` (light blue)
 
-## Геометрия, отступы, тени
+## Geometry, spacing, shadows
 
-- **Шкала отступов:** `4px`, `8px`, `12px`, `16px`, `24px`, `32px`, `48px`.
-- **Скругления:** `4px` у полей и кнопок (`--radius-sm`), `8px` у панелей (`--radius-md`), `6px` у квадратного аватара ИИ, `50%` у круглого аватара человека.
-- **Тень панелей:** `0 2px 0 rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35)`.
-- **Интерактивные элементы:** минимальная высота кнопок и полей ввода `44px`.
+- **Spacing scale:** `4px`, `8px`, `12px`, `16px`, `24px`, `32px`, `48px`.
+- **Corner radii:** `4px` for fields and buttons (`--radius-sm`), `8px` for panels (`--radius-md`), `6px` for the square AI avatar, `50%` for the round human avatar.
+- **Panel shadow:** `0 2px 0 rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35)`.
+- **Interactive elements:** minimum height of buttons and input fields is `44px`.
 
-## Движение
+## Motion
 
-Кривая: `cubic-bezier(0.16, 1, 0.3, 1)`, без отскоков.
+Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 
-- `120ms` — нажатие, наведение
-- `240ms` — раскрытие панели, смена состояния
-- `400ms` — перестановка строк таблицы
-- `800ms` — перелёт карты результатов (`flyTo`)
-- При `prefers-reduced-motion: reduce` движение и анимации отключаются, остаётся мгновенная смена состояний.
+- `120ms` — press, hover
+- `240ms` — panel expansion, state change
+- `400ms` — table row reordering
+- `800ms` — results map fly-over (`flyTo`)
+- With `prefers-reduced-motion: reduce`, motion and animations are turned off, leaving an instant change of states.
 
-## Аватары, метки и состояния
+## Avatars, markers and states
 
-- **Человек:** круглый аватар с первой буквой ника.
-- **ИИ:** квадратный аватар со скруглением `6px` и значком чипа рядом с буквой.
-- **На карте / панораме:** светлый контур `2px` и тёмная тень со смещением.
-- **Иконки:** только `@lucide/svelte` и только смысловые.
-- **Общие компоненты состояний:** `StatusBanner.svelte` (связь и предупреждения хосту) и `InlineState.svelte` (загрузка, пусто, ошибка с кнопкой действия).
+- **Human:** a round avatar with the first letter of the nickname.
+- **AI:** a square avatar with a `6px` corner radius and a chip icon next to the letter.
+- **On the map / panorama:** a light `2px` outline and a dark offset shadow.
+- **Icons:** only `@lucide/svelte`, and only meaningful ones.
+- **Shared state components:** `StatusBanner.svelte` (connection and warnings for the host) and `InlineState.svelte` (loading, empty, error with an action button).

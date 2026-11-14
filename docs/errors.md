@@ -1,67 +1,67 @@
-# Коды ошибок geoaissr
+# geoaissr error codes
 
-Каждая ошибка командной строки выводится в `stderr` с кодом из `server/errors.ts`, причиной, контекстом без секретов и точной командой исправления. Коды выхода: `1` (неверный вызов), `2` (окружение/настройка), `3` (внешняя зависимость), `70` (непредвиденный сбой).
+Every command-line error is printed to `stderr` with a code from `server/errors.ts`, a cause, context without secrets and the exact command to fix it. Exit codes: `1` (invalid invocation), `2` (environment/configuration), `3` (external dependency), `70` (unexpected failure).
 
 ## GEO_INVALID_ARGS
 
-Неверные аргументы или несовместимые флаги (например, `--public-url` вместе с `--no-tunnel` или некорректный `--port`). Исправьте флаги и повторите запуск.
+Invalid arguments or incompatible flags (for example, `--public-url` together with `--no-tunnel`, or an invalid `--port`). Fix the flags and run again.
 
 ## GEO_ENV_KEY_MISSING
 
-В `.env` или переменных окружения отсутствует `GOOGLE_MAPS_BROWSER_KEY` или `GOOGLE_MAPS_SERVER_KEY`. Скопируйте `.env.example` в `.env` и заполните ключи по разделу README «Как получить ключи».
+`GOOGLE_MAPS_BROWSER_KEY` or `GOOGLE_MAPS_SERVER_KEY` is missing from `.env` or the environment variables. Copy `.env.example` to `.env` and fill in the keys following the README section "How to get Google Maps Platform keys".
 
 ## GEO_PORT_BUSY
 
-Выбранный HTTP-порт (по умолчанию `5174`) уже занят. Освободите порт или передайте `--port <номер>`.
+The chosen HTTP port (`5174` by default) is already in use. Free the port or pass `--port <number>`.
 
 ## GEO_CLOUDFLARED_MISSING
 
-Исполняемый файл `cloudflared` не найден в `PATH`. Установите `cloudflared` или запустите сервер локально через `bun run start --no-tunnel`.
+The `cloudflared` executable was not found in `PATH`. Install `cloudflared` or run the server locally with `bun run start --no-tunnel`.
 
 ## GEO_ALREADY_RUNNING
 
-В каталоге `<GEOAISSR_DATA_DIR>/run/server.lock` уже активен другой экземпляр сервера. Остановите его или укажите другой каталог данных `GEOAISSR_DATA_DIR`.
+Another server instance is already active in `<GEOAISSR_DATA_DIR>/run/server.lock`. Stop it or specify a different data directory via `GEOAISSR_DATA_DIR`.
 
 ## GEO_SETTINGS_UNREADABLE
 
-Файл `settings.json` не прошёл разбор JSON или схему. Старый файл сохранён с расширением `.bad`, сервер стартовал со значениями по умолчанию.
+The `settings.json` file failed JSON parsing or schema validation. The old file was saved with a `.bad` extension, and the server started with default values.
 
 ## GEO_SETTINGS_NEWER
 
-Файл `settings.json` имеет версию формата новее поддерживаемой. Файл не перезаписывается; обновите приложение.
+The `settings.json` file has a format version newer than the supported one. The file is not overwritten; update the application.
 
 ## GEO_QUOTA_UNREADABLE
 
-Файл `quota.json` повреждён и переименован в `.bad` (или не удалось записать обновление счётчика). Хост должен подтвердить сброс счётчика в лобби перед стартом партии с ботами.
+The `quota.json` file is corrupted and was renamed to `.bad` (or the counter update could not be written). The host must confirm the counter reset in the lobby before starting a match with bots.
 
 ## GEO_QUOTA_NEWER
 
-Файл `quota.json` имеет более новую версию формата. Чтобы случайно не обнулить счётчик расхода, `start` отказывается запускаться до обновления приложения.
+The `quota.json` file has a newer format version. To avoid accidentally zeroing the usage counter, `start` refuses to run until the application is updated.
 
 ## GEO_TUNNEL_NOT_READY
 
-Публичное имя `cloudflared` (или адрес из `--public-url`) не разрешилось через публичный DoH и не ответило HTTP 200 на `/healthz` за 60 с. Перезапустите `bun run start`.
+The public `cloudflared` name (or the address from `--public-url`) did not resolve through public DoH and did not answer HTTP 200 on `/healthz` within 60 s. Restart `bun run start`.
 
 ## GEO_GOOGLE_KEY_DENIED
 
-Google вернул `REQUEST_DENIED` при проверке серверного ключа. Проверьте включение Street View Static API, подключение биллинга и ограничения ключа в Cloud Console.
+Google returned `REQUEST_DENIED` when checking the server key. Check that Street View Static API is enabled, that billing is connected, and the key restrictions in Cloud Console.
 
 ## GEO_GOOGLE_QUOTA
 
-Google вернул `OVER_QUERY_LIMIT`, 403 или 429. Проверьте дневные квоты и биллинг в Cloud Console.
+Google returned `OVER_QUERY_LIMIT`, 403 or 429. Check the daily quotas and billing in Cloud Console.
 
 ## GEO_HARNESS_NOT_LOGGED_IN
 
-Ни один допущенный ИИ-харнесс (`codex`, `claude`, `agy`) не установлен или не авторизован. Выполните вход в нужный CLI и запустите `bun run doctor`.
+No allowed AI harness (`codex`, `claude`, `agy`) is installed or signed in. Sign in to the CLI you need and run `bun run doctor`.
 
 ## GEO_HARNESS_HIDDEN
 
-Выбранный в слоте харнесс не прошёл проверку спайка S1 или не найден на машине. Выберите доступный харнесс в лобби.
+The harness selected in the slot failed the S1 spike check or was not found on the machine. Choose an available harness in the lobby.
 
 ## GEO_QUOTA_CEILING
 
-Текущий расход плюс худший случай новой партии превышают 80% бесплатного месячного объёма. Уменьшите раунды, число ботов или лимит ходов в лобби.
+Current usage plus the worst case of the new match exceeds 80% of the free monthly volume. Reduce the rounds, the number of bots or the move limit in the lobby.
 
 ## GEO_CRASH
 
-Непредвиденное исключение на сервере. Полный стек (без ключей и токенов) записан в `<GEOAISSR_DATA_DIR>/logs/crash-<timestamp>.log`. Перезапустите `bun run start`.
+Unexpected exception on the server. The full stack trace (without keys and tokens) is written to `<GEOAISSR_DATA_DIR>/logs/crash-<timestamp>.log`. Restart `bun run start`.

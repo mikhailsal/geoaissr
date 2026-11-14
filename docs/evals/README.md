@@ -1,10 +1,10 @@
-# Оценка качества ботов (`bun run eval:bots`)
+# Bot quality evaluation (`bun run eval:bots`)
 
-Этот каталог хранит парные сравнения промптов и моделей ИИ без использования сохранённых снимков Google (требование лицензии Google Maps Platform 3.2.3(a)).
+This directory stores paired comparisons of prompts and AI models without using saved Google snapshots (a requirement of Google Maps Platform license 3.2.3(a)).
 
-## Подготовка набора (10+ собственных точек)
+## Preparing the dataset (10+ own locations)
 
-Создайте каталог с собственными фотографиями улиц (по 4 кадра N/E/S/W с известными координатами) и файлом `manifest.json`:
+Create a directory with your own street photos (4 frames N/E/S/W each, with known coordinates) and a `manifest.json` file:
 
 ```json
 [
@@ -18,15 +18,15 @@
 ]
 ```
 
-## Запуск
+## Running
 
-- Сухой прогон (без вызовов CLI, для проверки расчёта медианы и IQR):
+- Dry run (no CLI calls, to check the median and IQR calculation):
   ```bash
   bun run eval:bots --dry
   ```
-- Парный живой прогон (3 повтора каждого места на 0 ходах):
+- Paired live run (3 repeats of each location with 0 moves):
   ```bash
   bun run eval:bots --harness claude --dataset ./my-spots --repeats 3
   ```
 
-Результат сохраняется в `docs/evals/latest-<harness>.json` с медианой ошибки в км и межквартильным размахом (IQR) для базовой и кандидатной версий подсказки.
+The result is saved to `docs/evals/latest-<harness>.json` with the median error in km and the interquartile range (IQR) for the baseline and candidate prompt versions.

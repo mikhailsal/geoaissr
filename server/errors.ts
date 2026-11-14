@@ -46,7 +46,7 @@ export const ERROR_REGISTRY: Record<ErrorCode, ErrorRegistryEntry> = {
     exitCode: 2,
     whatTemplate: 'не задан ключ Google в .env',
     fixTemplate:
-      'скопируйте .env.example в .env и заполните GOOGLE_MAPS_BROWSER_KEY и GOOGLE_MAPS_SERVER_KEY по разделу README «Как получить ключи»',
+      'скопируйте .env.example в .env и заполните GOOGLE_MAPS_BROWSER_KEY и GOOGLE_MAPS_SERVER_KEY по разделу README «How to get Google Maps Platform keys»',
     docAnchor: 'docs/errors.md#GEO_ENV_KEY_MISSING',
   },
   GEO_PORT_BUSY: {
