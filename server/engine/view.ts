@@ -123,10 +123,10 @@ function projectResults(state: RoomState, now: number): ClientViewState['results
     pausedByReaderName !== null
       ? Math.max(0, RESULTS_PAUSE_CAP_MS - res.pauseUsedMs - elapsedSinceResume)
       : Math.max(0, RESULTS_PAUSE_CAP_MS - res.pauseUsedMs);
-  const autoNextEndsAt =
-    pausedByReaderName !== null || res.waitingForHuman
-      ? now + res.autoNextBaseRemainingMs
-      : res.lastResumeAt + res.autoNextBaseRemainingMs;
+  const autoNextPaused = pausedByReaderName !== null || res.waitingForHuman;
+  const autoNextEndsAt = autoNextPaused
+    ? now + res.autoNextBaseRemainingMs
+    : res.lastResumeAt + res.autoNextBaseRemainingMs;
 
   return {
     targetLat: res.target.lat,
@@ -135,6 +135,7 @@ function projectResults(state: RoomState, now: number): ClientViewState['results
     entries: res.entries,
     humanVsAi: res.humanVsAi,
     autoNextEndsAt,
+    autoNextFrozenMs: autoNextPaused ? res.autoNextBaseRemainingMs : null,
     pausedByReaderName,
     pauseRemainingMs,
   };

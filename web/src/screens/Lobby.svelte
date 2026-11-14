@@ -88,6 +88,11 @@
     />
   </header>
 
+  {#if view.tunnel.mode === 'local'}
+    <!-- Inline, not in the fixed banner: a permanent notice must not cover header controls. -->
+    <p class="muted" role="note">{RU.connection.localOnly}</p>
+  {/if}
+
   <div class="columns">
     <section class="panel card" aria-label="Участники и ИИ">
       <h2 class="sec-head">{RU.lobby.playersHeading(view.players.length)}</h2>

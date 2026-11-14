@@ -58,12 +58,14 @@ export const RU = {
     submitSpectate: 'Смотреть раунд',
     submitting: 'Входим…',
     nickTaken: 'Ник занят',
+    nickTakenDisconnected:
+      'Ник занят отключившимся игроком. Вернуться на его место можно только из того же браузера',
     colorTaken: 'Цвет уже занят',
     roomFull: 'Комната полна: 8 из 8',
     spectatorNotice: (round: number, total: number) =>
       `Идёт раунд ${round} из ${total}. Вы посмотрите его как зритель и сыграете со следующего`,
     reconnectHint: (names: readonly string[]) =>
-      `Отключились: ${names.join(', ')}. Введите тот же ник, чтобы вернуться на своё место`,
+      `Отключились: ${names.join(', ')}. Чтобы вернуться на своё место, откройте ссылку в том же браузере, где играли`,
     narrowWarning: 'Игра рассчитана на компьютер. На телефоне играть неудобно',
     enterAnyway: 'Всё равно войти',
   },
@@ -143,6 +145,7 @@ export const RU = {
     noBotGuess: 'нет догадки',
     nextBtn: 'Дальше',
     hostWaitNext: 'Следующий раунд через',
+    hostWaitFinal: 'Итоги через',
     whyBtn: 'почему?',
     hideWhyBtn: 'свернуть',
     pausedBy: (name: string) => `Пауза: ${name} читает объяснение`,

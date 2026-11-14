@@ -7,7 +7,6 @@
     backOnline: boolean;
     hostConnected: boolean;
     tunnelChanged: boolean;
-    tunnelLocal: boolean;
     onRetryConnect?: () => void;
   }
 
@@ -17,7 +16,6 @@
     backOnline,
     hostConnected,
     tunnelChanged,
-    tunnelLocal,
     onRetryConnect,
   }: Props = $props();
 
@@ -54,13 +52,6 @@
       return {
         tone: 'warn' as const,
         text: RU.connection.tunnelChanged,
-        retry: false,
-      };
-    }
-    if (tunnelLocal) {
-      return {
-        tone: 'muted' as const,
-        text: RU.connection.localOnly,
         retry: false,
       };
     }
@@ -106,10 +97,6 @@
 
   .tone-warn {
     border-color: var(--paint);
-  }
-
-  .tone-muted {
-    color: var(--paper-dim);
   }
 
   .text {

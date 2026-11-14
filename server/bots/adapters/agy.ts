@@ -33,6 +33,17 @@ function parseAgyModelsOutput(stdout: string, fallback: readonly string[]): stri
   return discovered;
 }
 
+/**
+ * agy models named like `gemini-4-argon-medium` already fix the reasoning effort, and agy rejects a
+ * different `--effort` for them ("conflicts with --effort=low"). Pass `--effort` only to models
+ * without such a suffix.
+ */
+const AGY_EFFORT_SUFFIX = /-(?:low|medium|high|xhigh|max)$/;
+
+export function agyEffortArgs(model: string, effort: string): string[] {
+  return AGY_EFFORT_SUFFIX.test(model) ? [] : ['--effort', effort];
+}
+
 /** Only the game's own MCP tools pass the guard; other servers loaded from the owner's config do not. */
 const GEO_TOOL_NAMES = getBotToolDefinitions().map((t) => t.name);
 
@@ -162,8 +173,7 @@ export const agyAdapter: HarnessAdapter = {
         `--print=${opts.prompt}`,
         '--model',
         opts.model,
-        '--effort',
-        opts.effort,
+        ...agyEffortArgs(opts.model, opts.effort),
         '--sandbox',
         '--disable-slash-commands',
         '--settings',

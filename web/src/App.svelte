@@ -32,7 +32,9 @@
       : Math.max(1, Math.ceil(store.remainingMs(countdownStartsAt + COUNTDOWN_MS) / 1000)),
   );
   const autoNextRemainingMs = $derived(
-    view?.results ? store.remainingMs(view.results.autoNextEndsAt) : 0,
+    view?.results
+      ? (view.results.autoNextFrozenMs ?? store.remainingMs(view.results.autoNextEndsAt))
+      : 0,
   );
 
   const handleRetryConnect = (): void => {
@@ -125,7 +127,6 @@
         backOnline={store.backOnline}
         hostConnected={view.hostConnected}
         tunnelChanged={view.tunnel.changedSinceStart}
-        tunnelLocal={view.tunnel.mode === 'local'}
         onRetryConnect={handleRetryConnect}
       />
     </div>

@@ -6,6 +6,7 @@ import {
 } from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
 import { reduce } from './reduce.ts';
+import { projectView } from './view.ts';
 import { createInitialRoomState, type RoomState, type RoundTarget } from './types.ts';
 
 function makeSettings(overrides: Partial<SettingsFile> = {}): SettingsFile {
@@ -279,10 +280,15 @@ test('open_bot_card pauses autonext and enforces 60s cap', () => {
   const opened = reduce(s, { type: 'open_bot_card', playerId: 'h' }, 5000 + 3000);
   expect(opened.state.results?.autoNextBaseRemainingMs).toBe(RESULTS_AUTONEXT_MS - 3000);
   expect(opened.effects.some((e) => e.type === 'schedule_results_pause_cap')).toBe(true);
+  // While paused the client gets a frozen remainder, so its countdown does not tick down.
+  expect(projectView(opened.state, 'h', 5000 + 7000).results?.autoNextFrozenMs).toBe(
+    RESULTS_AUTONEXT_MS - 3000,
+  );
 
   const closed = reduce(opened.state, { type: 'close_bot_card', playerId: 'h' }, 5000 + 13_000);
   expect(closed.state.results?.pauseUsedMs).toBe(10_000);
   expect(closed.effects.some((e) => e.type === 'schedule_results_autonext')).toBe(true);
+  expect(projectView(closed.state, 'h', 5000 + 13_000).results?.autoNextFrozenMs).toBeNull();
 
   const capped = reduce(
     opened.state,

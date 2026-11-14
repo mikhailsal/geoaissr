@@ -185,6 +185,9 @@
                     <span class="muted"
                       >{entry.isAi ? RU.results.noBotGuess : RU.results.noHumanAnswer}</span
                     >
+                    {#if entry.isAi && entry.terminationReason && entry.terminationReason !== 'normal'}
+                      <span class="muted">· {entry.terminationReason}</span>
+                    {/if}
                   {/if}
                 </td>
                 <td class="num-col"><strong>{formatNumberRu(entry.roundScore)}</strong></td>
@@ -225,7 +228,7 @@
 
       <footer class="next-footer">
         <span class="muted" role="status">
-          {RU.results.hostWaitNext}
+          {isFinalRound ? RU.results.hostWaitFinal : RU.results.hostWaitNext}
           {formatSecondsOnly(remainingAutoNextMs / 1000)}
         </span>
         {#if view.viewerIsHost}

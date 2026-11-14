@@ -41,6 +41,7 @@ export class GameStore {
 
   joinPending = $state(false);
   joinError = $state<{ code: string; message: string } | null>(null);
+  private lastJoinNick = '';
   startMatchPending = $state(false);
   submittingGuess = $state(false);
   localPin = $state<{ roundNumber: number; lat: number; lng: number } | null>(null);
@@ -192,7 +193,15 @@ export class GameStore {
       room_full: RU.join.roomFull,
       bad_nick: RU.join.nameHint,
     };
-    this.joinError = { code: msg.code, message: msgByCode[msg.code] };
+    // A disconnected player's nick can be taken back only from their own browser; say so.
+    const nick = this.lastJoinNick.toLowerCase();
+    const ownSeatGone =
+      msg.code === 'nick_taken' &&
+      msg.lobbySummary.disconnected.some((n) => n.toLowerCase() === nick);
+    this.joinError = {
+      code: msg.code,
+      message: ownSeatGone ? RU.join.nickTakenDisconnected : msgByCode[msg.code],
+    };
   }
 
   private triggerBackOnline(): void {
@@ -306,6 +315,7 @@ export class GameStore {
   }
 
   join(nick: string, color: ParticipantColorId): void {
+    this.lastJoinNick = nick.trim();
     this.joinError = null;
     this.joinPending = true;
     if (!this.wsClient.sendJoin(nick, color)) {

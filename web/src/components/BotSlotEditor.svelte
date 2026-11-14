@@ -353,7 +353,7 @@
       </button>
     {/if}
 
-    <span class="vision-status">
+    <span class="vision-status" style:visibility={isCheckingVision ? 'hidden' : null}>
       {#if visionToast}
         {visionToast.passed
           ? `ОК за ${formatSecondsOnly(visionToast.elapsedMs / 1000)}`

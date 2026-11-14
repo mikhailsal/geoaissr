@@ -5,6 +5,7 @@ import path from 'node:path';
 import { detectAllHarnesses, getHarnessAdapter } from './index.ts';
 import { buildBotRoundPrompt } from '../prompt.ts';
 import { buildSanitizedChildEnv } from './shared.ts';
+import { agyEffortArgs } from './agy.ts';
 import type { CommandProbe } from './types.ts';
 
 test('detectAllHarnesses reports missing/unauthed CLIs accurately and discovers agy models', () => {
@@ -67,6 +68,14 @@ test('agy buildLaunchSpec creates PreToolUse guard blocking outside files and .a
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('agy passes --effort only to models whose name does not already fix the effort', () => {
+  expect(agyEffortArgs('gemini-4-argon-medium', 'low')).toEqual([]);
+  expect(agyEffortArgs('gemini-3.8-flash-low', 'low')).toEqual([]);
+  expect(agyEffortArgs('gemini-4-hydrogen-xhigh', 'medium')).toEqual([]);
+  expect(agyEffortArgs('gemini-3.8-flash', 'low')).toEqual(['--effort', 'low']);
+  expect(agyEffortArgs('gemini-3-pro', 'medium')).toEqual(['--effort', 'medium']);
 });
 
 test('claude and codex launch specs isolate tools and disable web search', () => {

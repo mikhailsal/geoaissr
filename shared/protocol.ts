@@ -354,6 +354,8 @@ export interface ClientViewState {
       aiTotal: number;
     };
     autoNextEndsAt: number;
+    /** Set while the countdown is paused (a reader has «почему?» open, or no human is online). */
+    autoNextFrozenMs: number | null;
     pausedByReaderName: string | null;
     pauseRemainingMs: number;
   };

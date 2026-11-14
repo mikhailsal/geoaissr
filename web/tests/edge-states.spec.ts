@@ -86,3 +86,34 @@ test('mobile viewport, reconnect banner, and early end match work cleanly', asyn
     await ctx.close();
   }
 });
+
+test('a disconnected guest nick points to the same browser, matching the server rule', async ({
+  browser,
+}) => {
+  const srv = getServer();
+  const host = await (await browser.newContext()).newPage();
+  const guestCtx = await browser.newContext();
+  const otherCtx = await browser.newContext();
+
+  try {
+    await host.goto(srv.hostUrl);
+    await host.getByLabel('Ваше имя').fill('Ведущий');
+    await host.getByRole('button', { name: 'Войти' }).click();
+    const guest = await guestCtx.newPage();
+    await guest.goto(srv.guestUrl);
+    await guest.getByLabel('Ваше имя').fill('Гость');
+    await guest.getByRole('button', { name: 'Войти' }).click();
+    await expect(host.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await guestCtx.close();
+
+    const other = await otherCtx.newPage();
+    await other.goto(srv.guestUrl);
+    await expect(other.getByText(/откройте ссылку в том же браузере/)).toBeVisible();
+    await other.getByLabel('Ваше имя').fill('Гость');
+    await other.getByRole('button', { name: 'Войти' }).click();
+    await expect(other.getByText(/только из того же браузера/)).toBeVisible();
+  } finally {
+    await host.context().close();
+    await otherCtx.close();
+  }
+});

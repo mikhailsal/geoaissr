@@ -4,6 +4,8 @@ import path from 'node:path';
 import sharp from 'sharp';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
 import { joinUnder } from '../paths.ts';
+import { redactSecrets } from '../errors.ts';
+import { formatStderrTail } from '../log.ts';
 import { spawnManaged } from '../proc/spawn.ts';
 import { getHarnessAdapter } from './adapters/index.ts';
 import { buildSanitizedChildEnv } from './adapters/shared.ts';
@@ -56,6 +58,19 @@ function buildVisionQueue(digits: string, visionState: { sawDigits: boolean }) {
       getRemainingTimeSec: () => 45,
     },
   });
+}
+
+/** Shows the host why a vision check failed: the CLI's last stderr line, with keys redacted. */
+export function withCliError(message: string, stderr: string, botToken = ''): string {
+  const last = formatStderrTail(stderr, 1)[0]?.trim();
+  if (!last) return message;
+  const clipped = last.length > 160 ? `${last.slice(0, 157)}...` : last;
+  const keys = [
+    process.env.GOOGLE_MAPS_BROWSER_KEY ?? '',
+    process.env.GOOGLE_MAPS_SERVER_KEY ?? '',
+    process.env.GOOGLE_API_KEY ?? '',
+  ].filter(Boolean);
+  return `${message}: ${redactSecrets(clipped, keys, botToken ? [botToken] : [])}`;
 }
 
 async function waitForVisionExitOrAbort(
@@ -136,7 +151,7 @@ export async function runVisionCheck(opts: {
         ? `Зрение подтверждено (${digits})`
         : opts.signal?.aborted
           ? 'Проверка зрения отменена'
-          : `Харнесс не считал код ${digits}`,
+          : withCliError(`Харнесс не считал код ${digits}`, proc.getStderr(), token),
     };
   } finally {
     q.abort('vision_check_done');
