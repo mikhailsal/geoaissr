@@ -37,6 +37,7 @@
   let panoErr = $state<string | null>(null);
   let resetForRound = -1;
   let hadPanoError = false;
+  let shownPanoKey = '';
 
   const loadedRounds = new SvelteSet<string>();
   let dragging = false;
@@ -125,8 +126,13 @@
           panControl: true,
           zoomControl: true,
         });
-        pano.setPano(panoId);
-        pano.setPov({ heading: 0, pitch: 0 });
+        // This effect re-runs on every server view update; resetting here would undo the
+        // player's camera turns and moves, so the start pano and heading are set once per round.
+        if (shownPanoKey !== loadKey) {
+          shownPanoKey = loadKey;
+          pano.setPano(panoId);
+          pano.setPov({ heading: 0, pitch: 0 });
+        }
         if (alreadyLoaded) {
           notifyStatus();
         }
