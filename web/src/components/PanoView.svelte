@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Compass, Navigation } from '@lucide/svelte';
+  import { Navigation } from '@lucide/svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { renderFakePanoCanvas } from '../lib/fake-canvas';
   import { mountReusableStreetView } from '../lib/maps-loader';
@@ -14,6 +14,8 @@
     moveEnabled: boolean;
     onPanoLoaded: (roundNumber: number, countedLoad: boolean) => void;
     onClientError: (source: 'maps_js' | 'pano', code: string, message: string) => void;
+    /** Camera heading in degrees, for the compass tape. */
+    heading?: number;
   }
 
   let {
@@ -25,6 +27,7 @@
     moveEnabled,
     onPanoLoaded,
     onClientError,
+    heading = $bindable(0),
   }: Props = $props();
 
   let googleHost = $state<HTMLDivElement | null>(null);
@@ -95,6 +98,7 @@
     }
     let cancelled = false;
     let statusListener: { remove: () => void } | null = null;
+    let povListener: { remove: () => void } | null = null;
     const loadKey = `${roundNumber}:${panoId}`;
     void mountReusableStreetView(browserMapsKey, googleHost)
       .then((pano) => {
@@ -120,6 +124,9 @@
         };
         const alreadyLoaded = pano.getPano() === panoId && pano.getStatus() === 'OK';
         statusListener = pano.addListener('status_changed', notifyStatus);
+        povListener = pano.addListener('pov_changed', () => {
+          heading = pano.getPov().heading;
+        });
         pano.setOptions({
           linksControl: moveEnabled,
           clickToGo: moveEnabled,
@@ -133,6 +140,7 @@
           pano.setPano(panoId);
           pano.setPov({ heading: 0, pitch: 0 });
         }
+        heading = pano.getPov().heading;
         if (alreadyLoaded) {
           notifyStatus();
         }
@@ -148,12 +156,18 @@
       cancelled = true;
       statusListener?.remove();
       statusListener = null;
+      povListener?.remove();
+      povListener = null;
     };
   });
 
   function rotateBy(delta: number): void {
     fakeHeading = (fakeHeading + delta + 360) % 360;
   }
+
+  $effect(() => {
+    if (fakeMode) heading = fakeHeading;
+  });
 
   function handlePointerDown(event: PointerEvent): void {
     dragging = true;
@@ -204,11 +218,6 @@
         ></canvas>
       </div>
 
-      <div class="compass-chip panel">
-        <Compass size={16} />
-        <span>{Math.round(fakeHeading)}°</span>
-      </div>
-
       {#if moveEnabled}
         <div class="fake-move-controls">
           <button type="button" class="btn" onclick={() => (fakeStep += 1)}>
@@ -257,20 +266,6 @@
 
   .fake-pano-canvas:active {
     cursor: grabbing;
-  }
-
-  .compass-chip {
-    position: absolute;
-    left: 1rem;
-    bottom: 1rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.4rem 0.75rem;
-    border-radius: 999px;
-    background-color: var(--asphalt-900);
-    font-size: 0.85rem;
-    font-weight: 600;
   }
 
   .fake-move-controls {

@@ -4,6 +4,7 @@
   import type { ClientViewState } from '$shared/protocol';
   import GuessMap from '../components/GuessMap.svelte';
   import HostMenu from '../components/HostMenu.svelte';
+  import CompassTape from '../components/CompassTape.svelte';
   import PanoView from '../components/PanoView.svelte';
   import PlayerList from '../components/PlayerList.svelte';
   import TimerRing from '../components/TimerRing.svelte';
@@ -48,6 +49,7 @@
 
   // Keyboard (M) pins the dock open; hover only peeks. Keeping them apart stops the two
   // from toggling each other while the dock is resizing under the cursor.
+  let heading = $state(0);
   let mapPinned = $state(false);
   let mapHovered = $state(false);
   const desktopExpanded = $derived(mapPinned || mapHovered);
@@ -116,6 +118,7 @@
       roundNumber={view.roundNumber}
       moveEnabled={view.moveEnabled}
       {onPanoLoaded}
+      bind:heading
       onClientError={(src: 'maps_js' | 'pano', code: string, msg: string) => {
         onClientError(src, code, msg);
       }}
@@ -127,14 +130,17 @@
       <span>{RU.round.roundTitle(view.roundNumber, view.totalRounds)}</span>
     </div>
 
-    {#if view.phase === 'ROUND_ACTIVE' && view.active}
-      <TimerRing
-        {remainingMs}
-        totalMs={view.roundDurationSec * 1000}
-        subLabel={timerSubLabel}
-        danger={remainingMs <= 10_000}
-      />
-    {/if}
+    <div class="hud-center">
+      {#if panoId}<CompassTape {heading} />{/if}
+      {#if view.phase === 'ROUND_ACTIVE' && view.active}
+        <TimerRing
+          {remainingMs}
+          totalMs={view.roundDurationSec * 1000}
+          subLabel={timerSubLabel}
+          danger={remainingMs <= 10_000}
+        />
+      {/if}
+    </div>
 
     <HostMenu
       fakeMode={view.fakeMode}
@@ -296,6 +302,13 @@
 
   .hud-top > :global(*) {
     pointer-events: auto;
+  }
+
+  .hud-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-2);
   }
 
   .round-chip {
