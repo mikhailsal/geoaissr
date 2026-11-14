@@ -6,7 +6,7 @@ import { HARNESS_IDS, type HarnessId } from '../shared/storage-schemas.ts';
 import { haversineDistanceKm } from '../shared/score.ts';
 import { getHarnessAdapter } from '../server/bots/adapters/index.ts';
 import { createBotRunner } from '../server/bots/runner.ts';
-import type { EngineEvent, RoundTarget } from '../server/engine/types.ts';
+import type { BotGuessData, EngineEvent, RoundTarget } from '../server/engine/types.ts';
 import { createThumbStore } from '../server/http/thumbs.ts';
 import {
   createBotImageService,
@@ -62,6 +62,20 @@ export function computeMedianAndIqr(values: readonly number[]): {
   const q2 = quantile(0.5);
   const q3 = quantile(0.75);
   return { median: Math.round(q2 * 10) / 10, iqr: Math.round((q3 - q1) * 10) / 10 };
+}
+
+/**
+ * The guess the game would score for the bot. A repeated submit_guess overwrites the earlier one
+ * and the reducer ignores a bot's events once it has finished, so this is the last guess recorded
+ * before the first bot_finished.
+ */
+export function pickFinalGuess(events: readonly EngineEvent[]): BotGuessData | null {
+  let final: BotGuessData | null = null;
+  for (const event of events) {
+    if (event.type === 'bot_finished') break;
+    if (event.type === 'bot_guess_recorded') final = event.guess;
+  }
+  return final;
 }
 
 export function loadDataset(datasetDir: string | null): EvalSampleItem[] {
@@ -247,14 +261,11 @@ async function runSingleEvalSample(opts: {
     while (Date.now() < deadline && !events.some((e) => e.type === 'bot_finished')) {
       await Bun.sleep(25);
     }
-    const guessEv = events.find(
-      (e): e is Extract<EngineEvent, { type: 'bot_guess_recorded' }> =>
-        e.type === 'bot_guess_recorded',
-    );
-    if (!guessEv) return null;
+    const guess = pickFinalGuess(events);
+    if (!guess) return null;
     return haversineDistanceKm(
       { lat: opts.sample.lat, lng: opts.sample.lng },
-      { lat: guessEv.guess.lat, lng: guessEv.guess.lng },
+      { lat: guess.lat, lng: guess.lng },
     );
   } finally {
     await runner.close();

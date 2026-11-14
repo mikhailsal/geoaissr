@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { createBotRunner } from '../server/bots/runner.ts';
 import type { EngineEvent } from '../server/engine/types.ts';
 import { createFakeLocationService } from '../server/location.ts';
-import { type EvalArmMetrics, loadDataset, parseEvalArgs } from './eval-bots.ts';
+import { type EvalArmMetrics, loadDataset, parseEvalArgs, pickFinalGuess } from './eval-bots.ts';
 
 test('parseEvalArgs validates flags and supports --out cleanly', () => {
   expect(
@@ -209,4 +209,31 @@ test('fake bot runner dispatches aborted bot_finished when fake sequence rejects
     await runner.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+const GUESS_IDS = { matchId: 'm', gen: 1, roundNumber: 1, botId: 'b' } as const;
+
+function guessEvent(lat: number, lng: number): EngineEvent {
+  return { type: 'bot_guess_recorded', ...GUESS_IDS, guess: { lat, lng, explanation: 'test' } };
+}
+
+const FINISHED_EVENT: EngineEvent = {
+  type: 'bot_finished',
+  ...GUESS_IDS,
+  aborted: false,
+  reason: 'done',
+};
+
+test('pickFinalGuess scores the last guess when a bot revises its answer', () => {
+  const picked = pickFinalGuess([guessEvent(10, 20), guessEvent(11, 21), FINISHED_EVENT]);
+  expect(picked).toMatchObject({ lat: 11, lng: 21 });
+});
+
+test('pickFinalGuess ignores guesses recorded after the bot finished, like the reducer', () => {
+  const picked = pickFinalGuess([guessEvent(10, 20), FINISHED_EVENT, guessEvent(11, 21)]);
+  expect(picked).toMatchObject({ lat: 10, lng: 20 });
+});
+
+test('pickFinalGuess returns null when the bot never guessed', () => {
+  expect(pickFinalGuess([FINISHED_EVENT])).toBeNull();
 });
