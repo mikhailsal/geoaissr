@@ -332,11 +332,15 @@ export class GeoWsClient {
 
     ws.addEventListener('message', (event) => {
       if (this.ws !== ws || typeof event.data !== 'string') return;
+      let msg: ServerMessage;
       try {
-        this.handleMessage(JSON.parse(event.data) as ServerMessage);
+        msg = JSON.parse(event.data) as ServerMessage;
       } catch {
         // Ignore malformed server payload.
+        return;
       }
+      // Kept outside the try block: an exception in a message handler is a bug and must stay visible.
+      this.handleMessage(msg);
     });
 
     ws.addEventListener('close', () => {
