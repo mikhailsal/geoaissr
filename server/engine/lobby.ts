@@ -1,5 +1,6 @@
 import {
   botNameFromModel,
+  isAutoBotName,
   PRESET_CONFIGS,
   personalityTextSchema,
   type BotImageSize,
@@ -12,20 +13,6 @@ import { MAX_BOTS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { BotSlotConfig, HarnessId, SettingsFile } from '../../shared/storage-schemas.ts';
 import type { PlayerState, ReduceOutput, RoomState } from './types.ts';
 
-/** Default names before bots were named after their model; still treated as untouched. */
-const LEGACY_DEFAULT_BOT_NAMES = new Set([
-  'ИИ Клод',
-  'ИИ Кодекс',
-  'ИИ Агент',
-  'ИИ 1',
-  'ИИ 2',
-  'ИИ 3',
-]);
-
-/** True while the host has not renamed the bot, so its name may follow the model. */
-function hasAutoName(slot: Pick<BotSlotConfig, 'name' | 'model'>): boolean {
-  return slot.name === botNameFromModel(slot.model) || LEGACY_DEFAULT_BOT_NAMES.has(slot.name);
-}
 let botSeqCounter = 0;
 
 function pickHarnessDefaults(availableHarnesses: readonly HarnessCatalogEntry[]): {
@@ -175,7 +162,9 @@ function mergeBotSlotPatch(
   const next: BotSlotConfig = { ...slot };
   // An empty name hands naming back to the model (see the end of this function).
   const nameFollowsModel =
-    typeof patch.name === 'string' ? patch.name.trim() === '' : hasAutoName(slot);
+    typeof patch.name === 'string'
+      ? patch.name.trim() === ''
+      : isAutoBotName(slot.name, slot.model);
   if (typeof patch.name === 'string' && !nameFollowsModel) next.name = patch.name;
   if (typeof patch.color === 'string') next.color = patch.color as BotSlotConfig['color'];
   if (typeof patch.enabled === 'boolean') next.enabled = patch.enabled;

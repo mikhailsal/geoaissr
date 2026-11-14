@@ -85,6 +85,48 @@ test('buildInitialSettings disables saved enabled slot when harness is unavailab
   }
 });
 
+test('buildInitialSettings renames bots that still carry an old default name', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'geo-init-names-'));
+  try {
+    const file = path.join(root, 'settings.json');
+    const saved = createDefaultSettings();
+    const slot = (id: string, name: string, model: string): (typeof saved.bots)[number] => ({
+      id,
+      name,
+      color: 'p-4',
+      harness: 'codex',
+      model,
+      effort: 'low',
+      moveLimit: 4,
+      imageSize: 400,
+      budgetSec: 120,
+      personalityPreset: 'neutral',
+      personalityText: '',
+      difficultyPreset: 'amateur',
+      enabled: true,
+    });
+    saved.bots = [
+      slot('bot-1', 'ИИ Кодекс', 'gpt-6-luna'),
+      slot('bot-2', 'Gemini-3.8-flash', 'gemini-3.8-flash-low'),
+      slot('bot-3', 'Гена', 'gpt-6-luna'),
+    ];
+    saveSettings(file, saved);
+    const res = buildInitialSettings({
+      settingsFile: file,
+      cli: parseStartArgs([]),
+      availableHarnesses: [],
+      fakeMode: true,
+    });
+    expect(res.settings.bots.map((b) => b.name)).toEqual([
+      'GPT 6 Luna',
+      'Gemini 3.8 Flash',
+      'Гена',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('startGeoServer rejects concurrent second server on same dataDir and writes redacted crash logs', async () => {
   await withTempAppEnv(async () => {
     const srv = await startGeoServer(

@@ -308,11 +308,16 @@ test('bot turns, thumbs, and guesses recorded during ROUND_LOADING are preserved
   expect(activeBot?.guess?.lat).toBe(48.8);
 });
 
-test('botNameFromModel drops the effort suffix and capitalizes', () => {
-  expect(botNameFromModel('gemini-4-argon-medium')).toBe('Gemini-4-argon');
+test('botNameFromModel makes words: no dashes or effort suffix, acronyms in capitals', () => {
+  expect(botNameFromModel('gpt-6-luna-medium')).toBe('GPT 6 Luna');
+  expect(botNameFromModel('gemini-4-argon-medium')).toBe('Gemini 4 Argon');
+  expect(botNameFromModel('claude-sonnet-5-5-low')).toBe('Claude Sonnet 5.5');
+  expect(botNameFromModel('gemini-3.8-flash')).toBe('Gemini 3.8 Flash');
+  expect(botNameFromModel('glm-5')).toBe('GLM 5');
+  expect(botNameFromModel('gpt-oss-120b-medium')).toBe('GPT OSS 120b');
+  expect(botNameFromModel('gemini-3-pro')).toBe('Gemini 3 Pro');
   expect(botNameFromModel('haiku')).toBe('Haiku');
-  expect(botNameFromModel('gpt-6-luna')).toBe('Gpt-6-luna');
-  expect(botNameFromModel('gemini-pro-orchestrator-g1-pro').length).toBe(24);
+  expect(botNameFromModel('gemini-pro-orchestrator-g1-pro')).toBe('Gemini Pro Orchestrator');
 });
 
 function makeLobbyWithModels(): RoomState {
@@ -385,7 +390,7 @@ test('an untouched bot name follows the model; a renamed one stays; an empty one
   s = handleUpdateBot(s, 'h', id, { model: 'sonnet' }).state;
   expect(nameOf(s)).toBe('Sonnet');
   s = handleUpdateBot(s, 'h', id, { harness: 'agy' }).state;
-  expect(nameOf(s)).toBe('Gemini-4-argon');
+  expect(nameOf(s)).toBe('Gemini 4 Argon');
 
   s = handleUpdateBot(s, 'h', id, { name: 'Гена' }).state;
   s = handleUpdateBot(s, 'h', id, { harness: 'claude', model: 'haiku' }).state;

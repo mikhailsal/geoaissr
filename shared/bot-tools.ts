@@ -19,11 +19,57 @@ export const MODEL_EFFORT_SUFFIX = /-(?:low|medium|high|xhigh|max)$/i;
 
 export const BOT_NAME_MAX_LEN = 24;
 
-/** Default bot name: the model without its effort suffix, capitalized ("gemini-4-argon-medium" -> "Gemini-4-argon"). */
+/** Short words that are ordinary words, not acronyms, keep title case ("Gemini 3 Pro"). */
+const SHORT_TITLE_WORDS = new Set(['pro']);
+
+function formatModelWord(word: string): string {
+  if (/^[a-z]{2,3}$/i.test(word) && !SHORT_TITLE_WORDS.has(word.toLowerCase())) {
+    return word.toUpperCase(); // gpt -> GPT, glm -> GLM, oss -> OSS
+  }
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/**
+ * Default bot name: the model as words, without its effort suffix.
+ * "gpt-6-luna-medium" -> "GPT 6 Luna", "claude-sonnet-5-5" -> "Claude Sonnet 5.5".
+ */
 export function botNameFromModel(model: string): string {
   const base = model.trim().replace(MODEL_EFFORT_SUFFIX, '') || model.trim();
-  const name = base.charAt(0).toUpperCase() + base.slice(1);
-  return name.slice(0, BOT_NAME_MAX_LEN) || 'ИИ';
+  const words: string[] = [];
+  for (const part of base.split(/[-_\s]+/).filter(Boolean)) {
+    const prev = words.at(-1);
+    // Version numbers split by dashes ("5-5") read as "5.5".
+    if (prev && /^\d{1,2}$/.test(prev) && /^\d{1,2}$/.test(part)) {
+      words[words.length - 1] = `${prev}.${part}`;
+      continue;
+    }
+    words.push(formatModelWord(part));
+  }
+  return words.join(' ').slice(0, BOT_NAME_MAX_LEN).trim() || 'ИИ';
+}
+
+/** Default names from earlier versions; a bot still carrying one counts as not renamed. */
+const LEGACY_DEFAULT_BOT_NAMES = new Set([
+  'ИИ Клод',
+  'ИИ Кодекс',
+  'ИИ Агент',
+  'ИИ 1',
+  'ИИ 2',
+  'ИИ 3',
+]);
+
+function legacyHyphenNameFromModel(model: string): string {
+  const base = model.trim().replace(MODEL_EFFORT_SUFFIX, '') || model.trim();
+  return (base.charAt(0).toUpperCase() + base.slice(1)).slice(0, BOT_NAME_MAX_LEN);
+}
+
+/** True while the host has not renamed the bot, so its name may follow the model. */
+export function isAutoBotName(name: string, model: string): boolean {
+  return (
+    name === botNameFromModel(model) ||
+    name === legacyHyphenNameFromModel(model) ||
+    LEGACY_DEFAULT_BOT_NAMES.has(name)
+  );
 }
 
 export const IMAGE_SIZES = [256, 400, 640] as const;
