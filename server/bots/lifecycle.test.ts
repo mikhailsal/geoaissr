@@ -1,7 +1,8 @@
 import { expect, test } from 'bun:test';
+import { botNameFromModel } from '../../shared/bot-tools.ts';
 import { handleAddBot, handleUpdateBot } from '../engine/lobby.ts';
 import { reduce } from '../engine/reduce.ts';
-import { createInitialRoomState } from '../engine/types.ts';
+import { createInitialRoomState, type RoomState } from '../engine/types.ts';
 import { createFakeLocationService } from '../location.ts';
 import { createMoveTracker } from './move.ts';
 import { createBotToolQueue } from './queue.ts';
@@ -305,4 +306,93 @@ test('bot turns, thumbs, and guesses recorded during ROUND_LOADING are preserved
   expect(activeBot?.turnsUsed).toBe(1);
   expect(activeBot?.thumbs.length).toBe(1);
   expect(activeBot?.guess?.lat).toBe(48.8);
+});
+
+test('botNameFromModel drops the effort suffix and capitalizes', () => {
+  expect(botNameFromModel('gemini-4-argon-medium')).toBe('Gemini-4-argon');
+  expect(botNameFromModel('haiku')).toBe('Haiku');
+  expect(botNameFromModel('gpt-6-luna')).toBe('Gpt-6-luna');
+  expect(botNameFromModel('gemini-pro-orchestrator-g1-pro').length).toBe(24);
+});
+
+function makeLobbyWithModels(): RoomState {
+  const base = createInitialRoomState({
+    matchId: 'm-names',
+    fakeMode: true,
+    settings: {
+      version: 1,
+      region: 'world',
+      rounds: 2,
+      roundDurationSec: 90,
+      moveEnabled: true,
+      aiWaitWindowSec: 30,
+      bots: [],
+    },
+    quotaSummary: {
+      staticUsed: 0,
+      staticCeiling: 8000,
+      staticWorstCase: 1,
+      panoUsed: 0,
+      panoCeiling: 4000,
+      panoWorstCase: 2,
+      mapUsed: 0,
+      mapCeiling: 8000,
+      mapWorstCase: 2,
+      needsResetConfirm: false,
+      sufficient: true,
+    },
+    tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },
+    availableHarnesses: [
+      { id: 'claude', available: true, readsOwnerFiles: false, models: ['haiku', 'sonnet'] },
+      {
+        id: 'agy',
+        available: true,
+        readsOwnerFiles: true,
+        models: ['gemini-4-argon-medium'],
+      },
+    ],
+  });
+  return handleAddBot(
+    {
+      ...base,
+      players: {
+        h: {
+          id: 'h',
+          secret: 's',
+          name: 'H',
+          color: 'p-1' as const,
+          isHost: true,
+          connected: true,
+          isSpectator: false,
+          panoLoaded: false,
+          totalScore: 0,
+          answeredRounds: 0,
+          totalDistanceKm: 0,
+        },
+      },
+      playerOrder: ['h'],
+    },
+    'h',
+  ).state;
+}
+
+test('an untouched bot name follows the model; a renamed one stays; an empty one resets', () => {
+  let s = makeLobbyWithModels();
+  const id = s.settings.bots[0]?.id ?? '';
+  const nameOf = (st: RoomState): string | undefined => st.settings.bots[0]?.name;
+  expect(nameOf(s)).toBe('Haiku');
+
+  s = handleUpdateBot(s, 'h', id, { model: 'sonnet' }).state;
+  expect(nameOf(s)).toBe('Sonnet');
+  s = handleUpdateBot(s, 'h', id, { harness: 'agy' }).state;
+  expect(nameOf(s)).toBe('Gemini-4-argon');
+
+  s = handleUpdateBot(s, 'h', id, { name: 'Гена' }).state;
+  s = handleUpdateBot(s, 'h', id, { harness: 'claude', model: 'haiku' }).state;
+  expect(nameOf(s)).toBe('Гена');
+
+  s = handleUpdateBot(s, 'h', id, { name: '' }).state;
+  expect(nameOf(s)).toBe('Haiku');
+  s = handleUpdateBot(s, 'h', id, { model: 'sonnet' }).state;
+  expect(nameOf(s)).toBe('Sonnet');
 });

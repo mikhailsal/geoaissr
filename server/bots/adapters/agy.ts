@@ -1,6 +1,6 @@
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { getBotToolDefinitions } from '../../../shared/bot-tools.ts';
+import { getBotToolDefinitions, MODEL_EFFORT_SUFFIX } from '../../../shared/bot-tools.ts';
 import type { HarnessCatalogEntry } from '../../../shared/protocol.ts';
 import {
   buildSharedMcpEnv,
@@ -38,10 +38,8 @@ function parseAgyModelsOutput(stdout: string, fallback: readonly string[]): stri
  * different `--effort` for them ("conflicts with --effort=low"). Pass `--effort` only to models
  * without such a suffix.
  */
-const AGY_EFFORT_SUFFIX = /-(?:low|medium|high|xhigh|max)$/;
-
 export function agyEffortArgs(model: string, effort: string): string[] {
-  return AGY_EFFORT_SUFFIX.test(model) ? [] : ['--effort', effort];
+  return MODEL_EFFORT_SUFFIX.test(model) ? [] : ['--effort', effort];
 }
 
 /** Only the game's own MCP tools pass the guard; other servers loaded from the owner's config do not. */

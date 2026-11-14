@@ -60,8 +60,8 @@
   });
 
   function commitName(): void {
-    const clean = draftName.trim().slice(0, 24);
-    if (clean && clean !== slot.name) {
+    const clean = draftName.trim().slice(0, 24); // empty: the server names the bot after its model
+    if (clean !== slot.name) {
       onUpdate({ name: clean });
     }
   }

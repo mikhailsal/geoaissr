@@ -1,4 +1,5 @@
 import {
+  botNameFromModel,
   PRESET_CONFIGS,
   personalityTextSchema,
   type BotImageSize,
@@ -11,7 +12,20 @@ import { MAX_BOTS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { BotSlotConfig, HarnessId, SettingsFile } from '../../shared/storage-schemas.ts';
 import type { PlayerState, ReduceOutput, RoomState } from './types.ts';
 
-const DEFAULT_BOT_NAMES = ['ИИ Клод', 'ИИ Кодекс', 'ИИ Агент'];
+/** Default names before bots were named after their model; still treated as untouched. */
+const LEGACY_DEFAULT_BOT_NAMES = new Set([
+  'ИИ Клод',
+  'ИИ Кодекс',
+  'ИИ Агент',
+  'ИИ 1',
+  'ИИ 2',
+  'ИИ 3',
+]);
+
+/** True while the host has not renamed the bot, so its name may follow the model. */
+function hasAutoName(slot: Pick<BotSlotConfig, 'name' | 'model'>): boolean {
+  return slot.name === botNameFromModel(slot.model) || LEGACY_DEFAULT_BOT_NAMES.has(slot.name);
+}
 let botSeqCounter = 0;
 
 function pickHarnessDefaults(availableHarnesses: readonly HarnessCatalogEntry[]): {
@@ -107,11 +121,10 @@ export function handleAddBot(state: RoomState, playerId: string): ReduceOutput {
   const used = getAllUsedColors(state);
   const color = pickFirstFreeColor(used) ?? 'p-12';
   const def = pickHarnessDefaults(state.availableHarnesses);
-  const idx = state.settings.bots.length;
   const preset = PRESET_CONFIGS.amateur;
   const newBot: BotSlotConfig = {
     id: `bot-${Date.now().toString(36)}-${++botSeqCounter}`,
-    name: DEFAULT_BOT_NAMES[idx] ?? `ИИ ${idx + 1}`,
+    name: botNameFromModel(def.model),
     color,
     enabled: def.enabled,
     harness: def.harness,
@@ -160,7 +173,10 @@ function mergeBotSlotPatch(
   availableHarnesses: readonly HarnessCatalogEntry[],
 ): BotSlotConfig {
   const next: BotSlotConfig = { ...slot };
-  if (typeof patch.name === 'string') next.name = patch.name;
+  // An empty name hands naming back to the model (see the end of this function).
+  const nameFollowsModel =
+    typeof patch.name === 'string' ? patch.name.trim() === '' : hasAutoName(slot);
+  if (typeof patch.name === 'string' && !nameFollowsModel) next.name = patch.name;
   if (typeof patch.color === 'string') next.color = patch.color as BotSlotConfig['color'];
   if (typeof patch.enabled === 'boolean') next.enabled = patch.enabled;
   if (typeof patch.harness === 'string') {
@@ -208,6 +224,9 @@ function mergeBotSlotPatch(
   }
   if (changedTuning) {
     next.difficultyPreset = 'custom';
+  }
+  if (nameFollowsModel && (next.model !== slot.model || typeof patch.name === 'string')) {
+    next.name = botNameFromModel(next.model);
   }
   if (
     next.lastVisionCheck &&

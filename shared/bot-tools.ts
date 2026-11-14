@@ -14,6 +14,18 @@ export type DifficultyPreset = (typeof DIFFICULTY_PRESETS)[number];
 export const EFFORT_LEVELS = ['low', 'medium', 'high'] as const;
 export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
+/** Model names like `gemini-4-argon-medium` carry a reasoning-effort suffix. */
+export const MODEL_EFFORT_SUFFIX = /-(?:low|medium|high|xhigh|max)$/i;
+
+export const BOT_NAME_MAX_LEN = 24;
+
+/** Default bot name: the model without its effort suffix, capitalized ("gemini-4-argon-medium" -> "Gemini-4-argon"). */
+export function botNameFromModel(model: string): string {
+  const base = model.trim().replace(MODEL_EFFORT_SUFFIX, '') || model.trim();
+  const name = base.charAt(0).toUpperCase() + base.slice(1);
+  return name.slice(0, BOT_NAME_MAX_LEN) || 'ИИ';
+}
+
 export const IMAGE_SIZES = [256, 400, 640] as const;
 export type BotImageSize = (typeof IMAGE_SIZES)[number];
 

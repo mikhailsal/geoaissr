@@ -67,10 +67,10 @@ export const updateLobbyMessageSchema = z.object({
 });
 
 export const botSlotPatchSchema = z.object({
+  // Empty means "name the bot after its model".
   name: z
     .string()
     .trim()
-    .min(1)
     .max(24)
     .refine((v) => !/[\r\n]/.test(v), 'Имя должно быть в одну строку')
     .optional(),
