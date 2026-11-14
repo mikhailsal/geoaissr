@@ -1,5 +1,6 @@
 import type { ParticipantColorId } from '$shared/colors';
 import type { LobbySummary, ClientViewState, ServerMessage } from '$shared/protocol';
+import { MapLoadReporter, type MapLoadKind } from './map-load-reports';
 
 const TOKEN_PARAM_RE = /(?:^|&)t=([^&]+)/;
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 10_000] as const;
@@ -129,7 +130,9 @@ export class GeoWsClient {
   private fatalStop = false;
   private browserOffline = false;
   private listenersAttached = false;
-  private readonly sentMapKinds = new Set<'guess' | 'results'>();
+  private readonly mapLoads = new MapLoadReporter((kind) =>
+    this.sendSequenced('map_loaded', { kind }),
+  );
 
   constructor(callbacks: WsClientCallbacks) {
     this.callbacks = callbacks;
@@ -163,7 +166,7 @@ export class GeoWsClient {
     this.attempt = 0;
     this.disconnectedSince = null;
     this.wasAuthenticatedOnce = false;
-    this.sentMapKinds.clear();
+    this.mapLoads.reset();
     this.clearTimers();
     this.detachSocket();
     this.callbacks.onHashToken?.();
@@ -198,10 +201,13 @@ export class GeoWsClient {
     if (prev) prev.close();
   }
 
-  sendMapLoadedOnce(kind: 'guess' | 'results'): void {
-    if (this.sentMapKinds.has(kind)) return;
-    this.sentMapKinds.add(kind);
-    this.sendSequenced('map_loaded', { kind });
+  sendMapLoadedOnce(kind: MapLoadKind): void {
+    this.mapLoads.report(kind);
+  }
+
+  /** Re-sends map loads reported while the socket was down; call once the room is past the lobby. */
+  flushPendingMapLoads(): void {
+    this.mapLoads.flushPending();
   }
 
   start(): void {

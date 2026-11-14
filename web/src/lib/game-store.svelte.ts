@@ -260,6 +260,9 @@ export class GameStore {
       this.resendDirtyPin(view);
       this.resendUnsentPanoLoaded(view);
     }
+    // A map that finished loading while the socket was down is reported once the room is past the
+    // lobby: the server ignores map loads there. Kept outside the one-shot block above on purpose.
+    if (this.joined && view.phase !== 'LOBBY') this.wsClient.flushPendingMapLoads();
   }
 
   private resendUnsentPanoLoaded(view: ClientViewState): void {
