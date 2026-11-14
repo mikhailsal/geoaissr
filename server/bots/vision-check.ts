@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
+import type { BotImageSize } from '../../shared/bot-tools.ts';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
 import { joinUnder } from '../paths.ts';
 import { redactSecrets } from '../errors.ts';
@@ -13,7 +14,12 @@ import type { BotToolApiServer } from './api.ts';
 import { buildVisionCheckPrompt } from './prompt.ts';
 import { createBotToolQueue } from './queue.ts';
 
-async function renderVisionDigitsImage(digits: string): Promise<Buffer> {
+// The digits layout is tuned on a 400 px canvas. Other slot sizes scale it linearly, so the check
+// sends the same image size (and the same relative text size) a real round would send.
+const VISION_REFERENCE_SIZE = 400;
+
+export async function renderVisionDigitsImage(digits: string, size: BotImageSize): Promise<Buffer> {
+  const scale = size / VISION_REFERENCE_SIZE;
   const fontLat = path.resolve(
     import.meta.dir,
     '../../node_modules/@fontsource-variable/onest/files/onest-latin-wght-normal.woff2',
@@ -23,27 +29,32 @@ async function renderVisionDigitsImage(digits: string): Promise<Buffer> {
       text: `<span foreground="#FFD23F" size="56000">${digits}</span>`,
       fontfile: fontLat,
       rgba: true,
-      dpi: 150,
+      dpi: Math.round(150 * scale),
     },
   })
     .png()
     .toBuffer();
   return sharp({
-    create: { width: 400, height: 400, channels: 4, background: { r: 27, g: 30, b: 35, alpha: 1 } },
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: { r: 27, g: 30, b: 35, alpha: 1 },
+    },
   })
-    .composite([{ input: txt, left: 80, top: 140 }])
+    .composite([{ input: txt, left: Math.round(80 * scale), top: Math.round(140 * scale) }])
     .jpeg({ quality: 85 })
     .toBuffer();
 }
 
-function buildVisionQueue(digits: string, visionState: { sawDigits: boolean }) {
+function buildVisionQueue(digits: string, visionState: { sawDigits: boolean }, size: BotImageSize) {
   return createBotToolQueue({
     moveLimit: 0,
     moveEnabled: false,
     handlers: {
       waitObserveRelease: () => Promise.resolve(),
       executeObserve: async () => {
-        const buf = await renderVisionDigitsImage(digits);
+        const buf = await renderVisionDigitsImage(digits, size);
         return {
           text: 'Тестовое изображение с 4-значным кодом.',
           images: [{ name: 'vision.jpg', base64: buf.toString('base64'), mimeType: 'image/jpeg' }],
@@ -120,7 +131,7 @@ export async function runVisionCheck(opts: {
   const workDir = joinUnder(opts.runDir, `vision-${opts.slot.id}-${t0}`);
   const visionState = { sawDigits: false };
   const adapter = getHarnessAdapter(opts.slot.harness);
-  const q = buildVisionQueue(digits, visionState);
+  const q = buildVisionQueue(digits, visionState, opts.slot.imageSize);
   const token = opts.api.registerBot(q);
   // Everything after registerBot sits in the try so a failed spawn still releases token and dir.
   try {
