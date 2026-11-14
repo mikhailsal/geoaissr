@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { HarnessId } from '../../shared/storage-schemas.ts';
+import { redactSecrets } from '../errors.ts';
 import { formatStderrTail, type ServerLogger } from '../log.ts';
 import { spawnManaged, type ManagedProcess } from '../proc/spawn.ts';
 import { getHarnessAdapter } from './adapters/index.ts';
@@ -130,6 +131,43 @@ function attachBotProcessMonitor(opts: {
     });
 }
 
+/**
+ * Masks secrets in text that is about to enter the room state, and so reach the host's screen.
+ * The logger knows the keys and invite tokens. The bot's own token is passed explicitly because
+ * a launch that failed early never got as far as registering it.
+ */
+export function maskDiagnostics(text: string, botToken: string, logger?: ServerLogger): string {
+  const known = logger ? logger.redact(text) : text;
+  return redactSecrets(known, [], botToken ? [botToken] : []);
+}
+
+/** Reports a bot whose launch itself failed (no process ran), with the cause masked and clipped. */
+export function dispatchBotLaunchFailure(opts: {
+  dispatch: (event: EngineEvent) => void;
+  matchId: string;
+  gen: number;
+  roundNumber: number;
+  botId: string;
+  /** The bot's own token, when one had already been issued at the point of failure. */
+  token?: string;
+  err: unknown;
+  logger?: ServerLogger;
+}): void {
+  const detail = opts.err instanceof Error ? opts.err.message : String(opts.err);
+  // Mask first, then clip: clipping first could cut a secret in half and leave a readable part.
+  const masked = maskDiagnostics(detail, opts.token ?? '', opts.logger);
+  opts.dispatch({
+    type: 'bot_finished',
+    matchId: opts.matchId,
+    gen: opts.gen,
+    roundNumber: opts.roundNumber,
+    botId: opts.botId,
+    aborted: true,
+    reason: 'сбой запуска',
+    diagnosticsTail: masked.slice(-300),
+  });
+}
+
 function reportBotExit(
   opts: Parameters<typeof attachBotProcessMonitor>[0],
   exitInfo: { code: number | null; signal: NodeJS.Signals | null },
@@ -162,7 +200,10 @@ function reportBotExit(
     botId: opts.handle.slotId,
     aborted,
     reason,
-    diagnosticsTail: aborted && tail.length > 0 ? tail.join('\n') : undefined,
+    diagnosticsTail:
+      aborted && tail.length > 0
+        ? maskDiagnostics(tail.join('\n'), opts.handle.token, opts.logger)
+        : undefined,
   });
 }
 
@@ -232,17 +273,16 @@ export function spawnAndMonitorBotProcess(opts: {
       logger: opts.logger,
     });
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
     cleanupBotHandle(opts.api, opts.activeHandles, opts.handle);
-    opts.dispatch({
-      type: 'bot_finished',
+    dispatchBotLaunchFailure({
+      dispatch: opts.dispatch,
       matchId: opts.handle.matchId,
       gen: opts.handle.gen,
       roundNumber: opts.roundNumber,
       botId: opts.handle.slotId,
-      aborted: true,
-      reason: 'сбой запуска',
-      diagnosticsTail: detail.slice(-300),
+      token: opts.handle.token,
+      err,
+      logger: opts.logger,
     });
   }
 }

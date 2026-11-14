@@ -40,6 +40,8 @@ export interface ServerLogger {
   writeCrash: (err: unknown) => string;
   pruneOld: () => number;
   registerSecrets: (secrets: readonly string[], tokens?: readonly string[]) => void;
+  /** Masks every secret and token registered so far, exactly as the log file does. */
+  redact: (text: string) => string;
   getLogsDir: () => string;
 }
 
@@ -124,7 +126,14 @@ export function createServerLogger(
   };
 
   pruneOld();
-  return { log, writeCrash, pruneOld, registerSecrets, getLogsDir: () => logsDir };
+  return {
+    log,
+    writeCrash,
+    pruneOld,
+    registerSecrets,
+    redact: redactString,
+    getLogsDir: () => logsDir,
+  };
 }
 
 export function formatRoundTerminalSummary(opts: {

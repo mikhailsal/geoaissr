@@ -35,6 +35,25 @@ test('logger writes daily JSONL with redacted keys and masked tokens', () => {
   }
 });
 
+test('logger.redact masks registered keys and tokens the way the log file does', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-redact-test-'));
+  try {
+    const logger = createServerLogger(dir);
+    const secret = 'AIzaSyRedactKey000111222333';
+    const token = 'InviteTokenAbcdef123456';
+    logger.registerSecrets([secret], [token]);
+
+    const out = logger.redact(`boom: ${secret} then ${token} and a plain line`);
+    expect(out).not.toContain(secret);
+    expect(out).not.toContain(token);
+    expect(out).toContain('[REDACTED]');
+    expect(out).toContain('Invi…');
+    expect(out).toContain('a plain line');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('writeCrash strips tokens and secrets from stack trace', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-crash-test-'));
   try {

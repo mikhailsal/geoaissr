@@ -201,3 +201,92 @@ test('round results and final screen reveal scores and perRound botCards', () =>
   expect(finalView.final?.standings[0]?.isAi).toBe(true);
   expect(finalView.final?.standings[0]?.perRound[0]?.botCard?.explanation).toBe('Эйфелева башня');
 });
+
+const BOT_ABORT_REASON = 'ошибка процесса (код 1)';
+const BOT_STDERR = 'claude: authentication failed, run `claude login` (cwd /home/user/run/bot-1)';
+
+/** A one-round match where the only AI aborted with raw CLI output and both humans confirmed. */
+function makeResultsRoomWithFailedBot(): RoomState {
+  let s = makeBaseRoom();
+  s = reduce(
+    s,
+    { type: 'player_join', playerId: 'h', secret: 's1', name: 'Хост', color: 'p-1', isHost: true },
+    100,
+  ).state;
+  s = reduce(
+    s,
+    {
+      type: 'player_join',
+      playerId: 'g',
+      secret: 's2',
+      name: 'Гость',
+      color: 'p-2',
+      isHost: false,
+    },
+    101,
+  ).state;
+  s = reduce(s, { type: 'add_bot', playerId: 'h' }, 102).state;
+  s = reduce(s, { type: 'start_match', playerId: 'h' }, 1000).state;
+  s = reduce(
+    s,
+    { type: 'round_prepared', matchId: 'm-view', gen: s.gen, roundNumber: 1, target: TARGET },
+    1100,
+  ).state;
+  s = reduce(s, { type: 'pano_loaded', playerId: 'h', roundNumber: 1 }, 1200).state;
+  s = reduce(s, { type: 'pano_loaded', playerId: 'g', roundNumber: 1 }, 1201).state;
+  s = reduce(s, { type: 'countdown_done', matchId: 'm-view', gen: s.gen }, 4201).state;
+  const botId = s.settings.bots[0]?.id ?? '';
+  s = reduce(
+    s,
+    {
+      type: 'bot_finished',
+      matchId: 'm-view',
+      gen: s.gen,
+      roundNumber: 1,
+      botId,
+      aborted: true,
+      reason: BOT_ABORT_REASON,
+      diagnosticsTail: BOT_STDERR,
+    },
+    4600,
+  ).state;
+  s = reduce(
+    s,
+    { type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 48, lng: 2 },
+    5000,
+  ).state;
+  s = reduce(
+    s,
+    { type: 'submit_guess', playerId: 'g', roundNumber: 1, lat: 47, lng: 3 },
+    5001,
+  ).state;
+  return s;
+}
+
+test('round results show raw bot diagnostics to the host only; guests keep the abort reason', () => {
+  const s = makeResultsRoomWithFailedBot();
+  expect(s.phase).toBe('ROUND_RESULTS');
+
+  const hostEntry = projectView(s, 'h').results?.entries.find((e) => e.isAi);
+  expect(hostEntry?.terminationReason).toBe(BOT_ABORT_REASON);
+  expect(hostEntry?.diagnosticsTail).toBe(BOT_STDERR);
+
+  const guestView = projectView(s, 'g');
+  const guestEntry = guestView.results?.entries.find((e) => e.isAi);
+  expect(guestEntry?.terminationReason).toBe(BOT_ABORT_REASON);
+  expect(guestEntry?.diagnosticsTail).toBeUndefined();
+  expect(JSON.stringify(guestView)).not.toContain('claude login');
+});
+
+test('final screen bot cards show raw bot diagnostics to the host only', () => {
+  const resultsRoom = makeResultsRoomWithFailedBot();
+  const s = reduce(resultsRoom, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 6000).state;
+  expect(s.phase).toBe('FINAL');
+
+  const cardFor = (viewerId: string) =>
+    projectView(s, viewerId).final?.standings.find((row) => row.isAi)?.perRound[0]?.botCard;
+  expect(cardFor('h')?.diagnosticsTail).toBe(BOT_STDERR);
+  expect(cardFor('g')?.terminationReason).toBe(BOT_ABORT_REASON);
+  expect(cardFor('g')?.diagnosticsTail).toBeUndefined();
+  expect(JSON.stringify(projectView(s, 'g'))).not.toContain('claude login');
+});

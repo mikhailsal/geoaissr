@@ -13,6 +13,7 @@ import { createMoveTracker, type MoveTracker } from './move.ts';
 import {
   cleanupBotHandle,
   createGatePair,
+  dispatchBotLaunchFailure,
   spawnAndMonitorBotProcess,
   type ActiveBotHandle,
   type CustomBotLaunchBuilder,
@@ -371,21 +372,25 @@ function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
     startBotExecution(ctx, params, handle, gate.waitOnce, () => roundRef.submittedGuess);
   } catch (err) {
     cleanupBotHandle(ctx.api, ctx.activeHandles, handle);
-    dispatchLaunchFailure(ctx, params, err);
+    dispatchLaunchFailure(ctx, params, err, handle.token);
   }
 }
 
-function dispatchLaunchFailure(ctx: RunnerCtx, params: RoundBotParams, err: unknown): void {
-  const detail = err instanceof Error ? err.message : String(err);
-  ctx.dispatch({
-    type: 'bot_finished',
+function dispatchLaunchFailure(
+  ctx: RunnerCtx,
+  params: RoundBotParams,
+  err: unknown,
+  token?: string,
+): void {
+  dispatchBotLaunchFailure({
+    dispatch: ctx.dispatch,
     matchId: params.matchId,
     gen: params.gen,
     roundNumber: params.roundNumber,
     botId: params.slot.id,
-    aborted: true,
-    reason: 'сбой запуска',
-    diagnosticsTail: detail.slice(-300),
+    token,
+    err,
+    logger: ctx.logger,
   });
 }
 

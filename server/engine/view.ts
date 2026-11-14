@@ -103,19 +103,28 @@ function projectActive(state: RoomState, viewerId: string): ClientViewState['act
   };
 }
 
-function projectResults(state: RoomState): ClientViewState['results'] {
+/**
+ * Raw CLI output (paths, tool errors, anything the masking missed) is for the host who runs the
+ * bots. Other viewers still get the abort reason, just not the dump.
+ */
+function forViewer<T extends { diagnosticsTail?: string }>(entry: T, viewerIsHost: boolean): T {
+  if (viewerIsHost || entry.diagnosticsTail === undefined) return entry;
+  return { ...entry, diagnosticsTail: undefined };
+}
+
+function projectResults(state: RoomState, viewerIsHost: boolean): ClientViewState['results'] {
   const res = state.results;
   if (state.phase !== 'ROUND_RESULTS' || !res) return undefined;
   return {
     targetLat: res.target.lat,
     targetLng: res.target.lng,
     countryNameRu: res.target.countryNameRu,
-    entries: res.entries,
+    entries: res.entries.map((entry) => forViewer(entry, viewerIsHost)),
     humanVsAi: res.humanVsAi,
   };
 }
 
-function projectFinal(state: RoomState): ClientViewState['final'] {
+function projectFinal(state: RoomState, viewerIsHost: boolean): ClientViewState['final'] {
   if (state.phase !== 'FINAL') return undefined;
   const ranked = computeFinalRankings(state);
   const standings = ranked.map(({ rank, item }) => ({
@@ -133,7 +142,7 @@ function projectFinal(state: RoomState): ClientViewState['final'] {
         played: Boolean(entry && entry.distanceKm !== null),
         score: entry ? entry.roundScore : null,
         distanceKm: entry ? entry.distanceKm : null,
-        botCard: item.isAi ? entry : undefined,
+        botCard: item.isAi && entry ? forViewer(entry, viewerIsHost) : undefined,
       };
     }),
   }));
@@ -153,6 +162,7 @@ function projectFinal(state: RoomState): ClientViewState['final'] {
 
 export function projectView(state: RoomState, viewerId: string): ClientViewState {
   const viewer = state.players[viewerId];
+  const viewerIsHost = Boolean(viewer?.isHost);
   const hostConnected = state.playerOrder.some((id) => {
     const p = state.players[id];
     return Boolean(p?.isHost && p.connected);
@@ -163,7 +173,7 @@ export function projectView(state: RoomState, viewerId: string): ClientViewState
     gen: state.gen,
     phase: state.phase,
     viewerId,
-    viewerIsHost: Boolean(viewer?.isHost),
+    viewerIsHost,
     viewerIsSpectator: Boolean(viewer?.isSpectator),
     hostConnected,
     fakeMode: state.fakeMode,
@@ -184,7 +194,7 @@ export function projectView(state: RoomState, viewerId: string): ClientViewState
     availableHarnesses: state.availableHarnesses,
     loading: projectLoading(state),
     active: projectActive(state, viewerId),
-    results: projectResults(state),
-    final: projectFinal(state),
+    results: projectResults(state, viewerIsHost),
+    final: projectFinal(state, viewerIsHost),
   };
 }
