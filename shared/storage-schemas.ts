@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  BOT_NAME_MAX_LEN,
   DIFFICULTY_PRESETS,
   EFFORT_LEVELS,
   IMAGE_SIZES,
@@ -39,7 +40,7 @@ export const botSlotIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
 export const botSlotConfigSchema = z.object({
   id: botSlotIdSchema,
-  name: z.string().trim().min(1).max(24),
+  name: z.string().trim().min(1).max(BOT_NAME_MAX_LEN),
   color: z.enum(PARTICIPANT_COLOR_IDS),
   enabled: z.boolean(),
   harness: z.enum(HARNESS_IDS),

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  BOT_NAME_MAX_LEN,
   DIFFICULTY_PRESETS,
   EFFORT_LEVELS,
   PERSONALITY_PRESETS,
@@ -69,7 +70,7 @@ export const botSlotPatchSchema = z.object({
   name: z
     .string()
     .trim()
-    .max(24)
+    .max(BOT_NAME_MAX_LEN)
     .refine((v) => !/[\r\n]/.test(v), 'Имя должно быть в одну строку')
     .optional(),
   color: z.enum(PARTICIPANT_COLOR_IDS).optional(),
