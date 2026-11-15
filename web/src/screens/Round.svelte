@@ -47,8 +47,7 @@
     onEndMatch,
   }: Props = $props();
 
-  // Keyboard (M) pins the dock open; hover only peeks. Keeping them apart stops the two
-  // from toggling each other while the dock is resizing under the cursor.
+  // Keep keyboard pinning separate from hover while the dock resizes.
   let heading = $state(0);
   let mapPinned = $state(false);
   let mapHovered = $state(false);
@@ -347,11 +346,19 @@
     overflow: hidden;
     z-index: 25;
     background-color: var(--asphalt-900);
+    opacity: 0.8;
     transition:
+      opacity var(--dur-fast) var(--ease),
       width var(--dur-fast) var(--ease),
       height var(--dur-fast) var(--ease);
   }
 
+  .map-dock:hover,
+  .map-dock:focus-within,
+  .map-dock.expanded,
+  .map-dock.mobile-open {
+    opacity: 1;
+  }
   .map-dock.expanded {
     width: min(560px, 52vw);
     height: min(440px, 65vh);

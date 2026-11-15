@@ -4,6 +4,7 @@
   import type { FakeMapArc, FakeMapMarker } from '../lib/fake-canvas';
   import { prefersReducedMotion } from '../lib/keys';
   import {
+    buildStreetViewUrl,
     mountReusableResultsMap,
     type GoogleResultsMapController,
     type PinOverlaySpec,
@@ -168,6 +169,10 @@
       testId="fake-results-map"
       ariaLabel="Карта результатов раунда"
       onMarkerClick={(id: string) => {
+        if (id === '__target__') {
+          window.open(buildStreetViewUrl(targetLat, targetLng), '_blank', 'noopener,noreferrer');
+          return;
+        }
         const hit = entries.find((e) => e.id === id);
         if (hit) onSelectEntry(hit);
       }}
