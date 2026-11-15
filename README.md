@@ -29,7 +29,7 @@ A multiplayer geography guessing game for 1–8 people and up to 3 AI opponents 
 
 ## How to get Google Maps Platform keys
 
-1. Create a project in Google Cloud Console and attach a billing account (a free monthly threshold applies: 10,000 Maps JS calls / 5,000 Dynamic Street View / 10,000 Street View Static API; the app additionally caps usage at 80%: `8000 / 4000 / 8000`).
+1. Create a project in Google Cloud Console and attach a billing account (a free monthly threshold applies: 10,000 Maps JS calls / 5,000 Dynamic Street View / 10,000 Street View Static API; the app caps usage at 80% by default: `8000 / 4000 / 8000`).
 2. Under **APIs & Services → Library**, enable:
    - **Maps JavaScript API**
    - **Street View Static API**
@@ -40,6 +40,8 @@ A multiplayer geography guessing game for 1–8 people and up to 3 AI opponents 
      - `https://*.trycloudflare.com/*` (or your own domain for `--public-url`)
        And restrict **API restrictions** to **Maps JavaScript API** only.
    - `GOOGLE_MAPS_SERVER_KEY` — used **only by the host's server** (Street View Static API and Metadata API calls). Restrict it by API only (**Street View Static API**) and never share it with anyone.
+     The app tracks quota use by UTC day. You can override its monthly ceilings in `settings.json` using the optional `quotaCeilings` object, with positive integer values for `staticRequests`, `panoLoads`, and `mapLoads`; omitted values keep the defaults above. Changes take effect after restarting the server. API usage events are also appended on a best-effort basis to `api-usage.jsonl` in the data directory. The lobby quota widget shows usage percentages and forecasts against the configured ceilings.
+
 4. **Daily limits in Cloud Console (recommended safeguards):**
    So that a client bug cannot exhaust the monthly limit in a single evening, set daily limits in the Cloud Console quotas:
    - Maps JS API: **500 / day**

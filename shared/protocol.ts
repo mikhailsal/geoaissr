@@ -266,7 +266,21 @@ export interface RoundResultEntryView {
   thumbs: BotTurnThumbView[];
 }
 
+export interface QuotaMetricView {
+  used: number;
+  ceiling: number;
+  percent: number;
+  dailyAvg: number | null;
+  projectedMonth: number | null;
+  status: 'ok' | 'warn' | 'danger';
+}
+
 export interface QuotaSummaryView {
+  metrics: {
+    static: QuotaMetricView;
+    pano: QuotaMetricView;
+    map: QuotaMetricView;
+  };
   staticUsed: number;
   staticCeiling: number;
   staticWorstCase: number;

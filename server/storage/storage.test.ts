@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { z } from 'zod';
 import {
   createDefaultSettings,
   quotaFileSchema,
@@ -10,7 +11,13 @@ import {
 import { GeoError } from '../errors.ts';
 import { appendMatchRecord, readMatchRecords } from './matches.ts';
 import { migrateObject } from './migrate.ts';
-import { QUOTA_CEILINGS, calculateWorstCaseMatchCost, createQuotaManager } from './quota.ts';
+import {
+  QUOTA_CEILINGS,
+  buildQuotaMetric,
+  buildQuotaSummaryForRoom,
+  calculateWorstCaseMatchCost,
+  createQuotaManager,
+} from './quota.ts';
 import { loadSettings, saveSettings } from './settings.ts';
 
 test('migrateObject upgrades older version step-by-step and preserves newer_version without overwrite', () => {
@@ -264,6 +271,202 @@ test('matches.jsonl appends v1 records and skips newer-version rows cleanly', ()
         mapLoads: 0,
       }),
     ).toBeDefined();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('legacy quota gains UTC daily counts and usage log, then resets on rollover', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-quota-daily-'));
+  try {
+    const file = path.join(dir, 'quota.json');
+    const log = path.join(dir, 'api-usage.jsonl');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        month: '2026-02',
+        staticRequests: 10,
+        panoLoads: 4,
+        mapLoads: 3,
+      }),
+    );
+    let now = Date.UTC(2026, 1, 28, 23, 59);
+    const manager = createQuotaManager(file, () => now, {
+      apiUsageFile: log,
+      ceilings: { staticRequests: 12 },
+    });
+    expect(manager.getState().staticRequests).toBe(10);
+    expect(manager.tryReserveStatic(2)).toBe(true);
+    expect(manager.tryReserveStatic(1)).toBe(false);
+    manager.recordPanoLoad(3);
+    manager.recordMapLoad();
+    expect(
+      quotaFileSchema.parse(JSON.parse(readFileSync(file, 'utf8'))).daily?.['2026-02-28'],
+    ).toEqual({
+      staticRequests: 2,
+      panoLoads: 3,
+      mapLoads: 1,
+    });
+    expect(
+      readFileSync(log, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) =>
+          z
+            .object({ ts: z.string(), api: z.enum(['static', 'pano', 'map']), count: z.number() })
+            .parse(JSON.parse(line)),
+        ),
+    ).toEqual([
+      { ts: '2026-02-28T23:59:00.000Z', api: 'static', count: 2 },
+      { ts: '2026-02-28T23:59:00.000Z', api: 'pano', count: 3 },
+      { ts: '2026-02-28T23:59:00.000Z', api: 'map', count: 1 },
+    ]);
+    now = Date.UTC(2026, 2, 1);
+    expect(manager.getState().staticRequests).toBe(0);
+    manager.recordMapLoad();
+    expect(manager.getState().daily).toEqual({
+      '2026-03-01': { staticRequests: 0, panoLoads: 0, mapLoads: 1 },
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('usage log errors are best effort and configured limits enforce checks', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-quota-log-'));
+  try {
+    const manager = createQuotaManager(path.join(dir, 'quota.json'), () => Date.UTC(2026, 0, 15), {
+      ceilings: { staticRequests: 2, panoLoads: 1 },
+      apiUsageFile: dir,
+    });
+    expect(manager.getCeilings()).toEqual({ ...QUOTA_CEILINGS, staticRequests: 2, panoLoads: 1 });
+    expect(manager.tryReserveStatic(2)).toBe(true);
+    expect(manager.tryReserveStatic(1)).toBe(false);
+    manager.recordPanoLoad();
+    expect(manager.hasWriteError()).toBeNull();
+    expect(manager.canStartMatch({ rounds: 1, humanCount: 1, botMoveLimits: [] }).allowed).toBe(
+      false,
+    );
+    const summary = buildQuotaSummaryForRoom(manager);
+    expect(summary.staticCeiling).toBe(2);
+    expect(summary.metrics.static.status).toBe('danger');
+    expect(summary.metrics.pano.dailyAvg).toBe(0.1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('settings validate optional quota ceilings', () => {
+  const defaults = createDefaultSettings();
+  expect(settingsFileSchema.parse(defaults).quotaCeilings).toBeUndefined();
+  expect(
+    settingsFileSchema.parse({ ...defaults, quotaCeilings: { mapLoads: 42 } }).quotaCeilings,
+  ).toEqual({ mapLoads: 42 });
+  for (const invalid of [0, -1, 1.5]) {
+    expect(
+      settingsFileSchema.safeParse({ ...defaults, quotaCeilings: { staticRequests: invalid } })
+        .success,
+    ).toBe(false);
+  }
+});
+
+test('quota metrics use UTC month length and forecast status precedence', () => {
+  const now = Date.UTC(2024, 1, 10);
+  expect(buildQuotaMetric(0, 100, now)).toEqual({
+    used: 0,
+    ceiling: 100,
+    percent: 0,
+    dailyAvg: null,
+    projectedMonth: null,
+    status: 'ok',
+  });
+  expect(buildQuotaMetric(17, 200, now)).toEqual({
+    used: 17,
+    ceiling: 200,
+    percent: 9,
+    dailyAvg: 1.7,
+    projectedMonth: 49,
+    status: 'ok',
+  });
+  expect(buildQuotaMetric(30, 100, now).status).toBe('warn');
+  expect(buildQuotaMetric(35, 100, now).status).toBe('danger');
+  expect(buildQuotaMetric(100, 100, Date.UTC(2024, 1, 29)).status).toBe('danger');
+  expect(buildQuotaMetric(85, 100, Date.UTC(2024, 1, 29)).status).toBe('warn');
+});
+
+test('failed static persistence does not append a usage event', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-quota-failed-log-'));
+  try {
+    const blocker = path.join(dir, 'not-a-directory');
+    const log = path.join(dir, 'api-usage.jsonl');
+    writeFileSync(blocker, 'block parent directory');
+    const manager = createQuotaManager(
+      path.join(blocker, 'quota.json'),
+      () => Date.UTC(2026, 0, 1),
+      {
+        apiUsageFile: log,
+      },
+    );
+    expect(manager.tryReserveStatic(1)).toBe(false);
+    expect(manager.hasWriteError()).not.toBeNull();
+    expect(existsSync(log)).toBe(false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('daily history and legacy totals survive a reload across UTC days', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-quota-reload-'));
+  try {
+    const file = path.join(dir, 'quota.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        month: '2026-02',
+        staticRequests: 10,
+        panoLoads: 4,
+        mapLoads: 3,
+      }),
+    );
+    let now = Date.UTC(2026, 1, 10, 23, 59);
+    const manager = createQuotaManager(file, () => now);
+    expect(manager.tryReserveStatic(2)).toBe(true);
+    manager.recordPanoLoad();
+    now = Date.UTC(2026, 1, 11);
+    manager.recordMapLoad(2);
+    const reloaded = createQuotaManager(file, () => now).getState();
+    expect(reloaded.staticRequests).toBe(12);
+    expect(reloaded.panoLoads).toBe(5);
+    expect(reloaded.mapLoads).toBe(5);
+    expect(reloaded.daily).toEqual({
+      '2026-02-10': { staticRequests: 2, panoLoads: 1, mapLoads: 0 },
+      '2026-02-11': { staticRequests: 0, panoLoads: 0, mapLoads: 2 },
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('configured worst case ceilings independently enforce all three API limits', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-quota-check-'));
+  try {
+    const opts = { rounds: 1, humanCount: 1, botMoveLimits: [0] };
+    const cost = calculateWorstCaseMatchCost(opts);
+    const exact = { ...cost };
+    const allowed = createQuotaManager(path.join(dir, 'allowed.json'), Date.now, {
+      ceilings: exact,
+    });
+    expect(allowed.canStartMatch(opts).allowed).toBe(true);
+    for (const field of ['staticRequests', 'panoLoads', 'mapLoads'] as const) {
+      const ceilings = { ...exact, [field]: exact[field] - 1 };
+      const manager = createQuotaManager(path.join(dir, `${field}.json`), Date.now, { ceilings });
+      const check = manager.canStartMatch(opts);
+      expect(check.allowed).toBe(false);
+      expect(check.reasons).toHaveLength(1);
+      expect(check.reasons[0]).toContain(`> ${ceilings[field]}`);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

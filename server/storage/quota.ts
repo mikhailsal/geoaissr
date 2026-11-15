@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs';
-import type { QuotaSummaryView } from '../../shared/protocol.ts';
+import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import type { QuotaMetricView, QuotaSummaryView } from '../../shared/protocol.ts';
 import { quotaFileSchema, type QuotaFile } from '../../shared/storage-schemas.ts';
 import { GeoError } from '../errors.ts';
 import { migrateObject, type LoadOutcome, type MigrationFn } from './migrate.ts';
@@ -20,6 +20,8 @@ export const QUOTA_CEILINGS = {
   panoLoads: 4_000,
   mapLoads: 8_000,
 } as const;
+
+export type QuotaCeilings = { staticRequests: number; panoLoads: number; mapLoads: number };
 
 export const QUOTA_MIGRATIONS: Record<number, MigrationFn> = {};
 
@@ -65,6 +67,8 @@ export interface QuotaCheckResult {
 
 export interface QuotaManager {
   getState: () => QuotaFile;
+  getCeilings: () => QuotaCeilings;
+  getNowMs: () => number;
   needsResetConfirm: () => boolean;
   hasWriteError: () => string | null;
   confirmReset: () => void;
@@ -135,6 +139,7 @@ function loadInitialQuota(
 function checkWorstCaseReasons(
   state: QuotaFile,
   resetConfirmNeeded: boolean,
+  ceilings: QuotaCeilings,
   opts: { rounds: number; humanCount: number; botMoveLimits: readonly number[] },
 ): QuotaCheckResult {
   const worstCase = calculateWorstCaseMatchCost(opts);
@@ -144,21 +149,39 @@ function checkWorstCaseReasons(
   }
   if (
     opts.botMoveLimits.length > 0 &&
-    state.staticRequests + worstCase.staticRequests > QUOTA_CEILINGS.staticRequests
+    state.staticRequests + worstCase.staticRequests > ceilings.staticRequests
   ) {
     reasons.push(
-      `Static API: ${state.staticRequests} + ${worstCase.staticRequests} > ${QUOTA_CEILINGS.staticRequests}`,
+      `Static API: ${state.staticRequests} + ${worstCase.staticRequests} > ${ceilings.staticRequests}`,
     );
   }
-  if (state.panoLoads + worstCase.panoLoads > QUOTA_CEILINGS.panoLoads) {
-    reasons.push(
-      `Панорамы: ${state.panoLoads} + ${worstCase.panoLoads} > ${QUOTA_CEILINGS.panoLoads}`,
-    );
+  if (state.panoLoads + worstCase.panoLoads > ceilings.panoLoads) {
+    reasons.push(`Панорамы: ${state.panoLoads} + ${worstCase.panoLoads} > ${ceilings.panoLoads}`);
   }
-  if (state.mapLoads + worstCase.mapLoads > QUOTA_CEILINGS.mapLoads) {
-    reasons.push(`Карты: ${state.mapLoads} + ${worstCase.mapLoads} > ${QUOTA_CEILINGS.mapLoads}`);
+  if (state.mapLoads + worstCase.mapLoads > ceilings.mapLoads) {
+    reasons.push(`Карты: ${state.mapLoads} + ${worstCase.mapLoads} > ${ceilings.mapLoads}`);
   }
   return { allowed: reasons.length === 0, worstCase, reasons };
+}
+
+export function buildQuotaMetric(
+  used: number,
+  ceiling: number,
+  nowMs = Date.now(),
+): QuotaMetricView {
+  const date = new Date(nowMs);
+  const day = date.getUTCDate();
+  const days = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  const percent = Math.round((used / ceiling) * 100);
+  const dailyAvg = used === 0 ? null : Math.round((used / day) * 10) / 10;
+  const projectedMonth = used === 0 ? null : Math.round((used / day) * days);
+  const status =
+    used >= ceiling || (projectedMonth !== null && projectedMonth > ceiling)
+      ? 'danger'
+      : percent >= 85 || (projectedMonth !== null && projectedMonth >= Math.round(ceiling * 0.85))
+        ? 'warn'
+        : 'ok';
+  return { used, ceiling, percent, dailyAvg, projectedMonth, status };
 }
 
 /** Build a summary view from a QuotaManager and current room match configuration. */
@@ -167,20 +190,27 @@ export function buildQuotaSummaryForRoom(
   opts?: { rounds?: number; humanCount?: number; botMoveLimits?: readonly number[] },
 ): QuotaSummaryView {
   const q = quotaManager.getState();
+  const ceilings = quotaManager.getCeilings();
+  const nowMs = quotaManager.getNowMs();
   const check = quotaManager.canStartMatch({
     rounds: opts?.rounds ?? 5,
     humanCount: Math.max(1, opts?.humanCount ?? 1),
     botMoveLimits: opts?.botMoveLimits ?? [],
   });
   return {
+    metrics: {
+      static: buildQuotaMetric(q.staticRequests, ceilings.staticRequests, nowMs),
+      pano: buildQuotaMetric(q.panoLoads, ceilings.panoLoads, nowMs),
+      map: buildQuotaMetric(q.mapLoads, ceilings.mapLoads, nowMs),
+    },
     staticUsed: q.staticRequests,
-    staticCeiling: QUOTA_CEILINGS.staticRequests,
+    staticCeiling: ceilings.staticRequests,
     staticWorstCase: check.worstCase.staticRequests,
     panoUsed: q.panoLoads,
-    panoCeiling: QUOTA_CEILINGS.panoLoads,
+    panoCeiling: ceilings.panoLoads,
     panoWorstCase: check.worstCase.panoLoads,
     mapUsed: q.mapLoads,
-    mapCeiling: QUOTA_CEILINGS.mapLoads,
+    mapCeiling: ceilings.mapLoads,
     mapWorstCase: check.worstCase.mapLoads,
     needsResetConfirm: quotaManager.needsResetConfirm(),
     resetReason: quotaManager.hasWriteError() ?? undefined,
@@ -198,16 +228,50 @@ function writeSentinelBestEffort(sentinelFile: string, nowMs: number): string | 
   }
 }
 
-function clearSentinelChecked(sentinelFile: string): void {
-  if (existsSync(sentinelFile)) {
-    rmSync(sentinelFile, { force: true });
+function clearSentinelChecked(sentinelFile: string): string | null {
+  try {
+    if (existsSync(sentinelFile)) rmSync(sentinelFile, { force: true });
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+function applyDebit(
+  state: QuotaFile,
+  field: keyof QuotaCeilings,
+  count: number,
+  nowMs: number,
+): QuotaFile {
+  const day = new Date(nowMs).toISOString().slice(0, 10);
+  const daily = state.daily ?? {};
+  const today = daily[day] ?? { staticRequests: 0, panoLoads: 0, mapLoads: 0 };
+  return {
+    ...state,
+    [field]: state[field] + count,
+    daily: { ...daily, [day]: { ...today, [field]: today[field] + count } },
+  };
+}
+
+function appendUsageBestEffort(
+  file: string,
+  api: 'static' | 'pano' | 'map',
+  count: number,
+  nowMs: number,
+): void {
+  try {
+    appendFileSync(file, `${JSON.stringify({ ts: new Date(nowMs).toISOString(), api, count })}\n`);
+  } catch {
+    /* Usage logging is best effort. */
   }
 }
 
 export function createQuotaManager(
   quotaFile: string,
   nowFn: () => number = () => Date.now(),
+  options: { ceilings?: Partial<QuotaCeilings>; apiUsageFile?: string } = {},
 ): QuotaManager {
+  const ceilings = { ...QUOTA_CEILINGS, ...options.ceilings };
   const sentinelFile = `${quotaFile}.reset-pending`;
   const initial = loadInitialQuota(quotaFile, sentinelFile, nowFn());
   let state = initial.state;
@@ -233,44 +297,52 @@ export function createQuotaManager(
     }
   };
 
+  const debit = (
+    field: keyof QuotaCeilings,
+    api: 'static' | 'pano' | 'map',
+    count: number,
+  ): boolean => {
+    const nowMs = nowFn();
+    state = applyDebit(state, field, count, nowMs);
+    const saved = persist();
+    if ((saved || api !== 'static') && options.apiUsageFile) {
+      appendUsageBestEffort(options.apiUsageFile, api, count, nowMs);
+    }
+    return saved;
+  };
+
   return {
+    getCeilings: () => ({ ...ceilings }),
+    getNowMs: nowFn,
     getState: () => {
       rolloverIfNeeded();
-      return { ...state };
+      return structuredClone(state);
     },
     needsResetConfirm: () => resetConfirmNeeded,
     hasWriteError: () => writeErrorMsg,
     confirmReset: () => {
       rolloverIfNeeded();
       if (!persist()) return;
-      try {
-        clearSentinelChecked(sentinelFile);
-        resetConfirmNeeded = false;
-      } catch (err) {
-        writeErrorMsg = err instanceof Error ? err.message : String(err);
-        resetConfirmNeeded = true;
-      }
+      writeErrorMsg = clearSentinelChecked(sentinelFile);
+      resetConfirmNeeded = writeErrorMsg !== null;
     },
     canStartMatch: (opts) => {
       rolloverIfNeeded();
-      return checkWorstCaseReasons(state, resetConfirmNeeded, opts);
+      return checkWorstCaseReasons(state, resetConfirmNeeded, ceilings, opts);
     },
     tryReserveStatic: (count) => {
       rolloverIfNeeded();
-      if (state.staticRequests + count > QUOTA_CEILINGS.staticRequests) return false;
-      state = { ...state, staticRequests: state.staticRequests + count };
+      if (state.staticRequests + count > ceilings.staticRequests) return false;
       // Fail closed: a request that cannot be recorded on disk is not allowed.
-      return persist();
+      return debit('staticRequests', 'static', count);
     },
     recordPanoLoad: (count = 1) => {
       rolloverIfNeeded();
-      state = { ...state, panoLoads: state.panoLoads + count };
-      persist();
+      debit('panoLoads', 'pano', count);
     },
     recordMapLoad: (count = 1) => {
       rolloverIfNeeded();
-      state = { ...state, mapLoads: state.mapLoads + count };
-      persist();
+      debit('mapLoads', 'map', count);
     },
   };
 }

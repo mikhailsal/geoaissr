@@ -60,7 +60,7 @@ The harness selected in the slot failed the S1 spike check or was not found on t
 
 ## GEO_QUOTA_CEILING
 
-Current usage plus the worst case of the new match exceeds 80% of the free monthly volume. Reduce the rounds, the number of bots or the move limit in the lobby.
+Current usage plus the worst case of the new match exceeds the configured monthly quota ceiling. Reduce the rounds, the number of bots or the move limit in the lobby.
 
 ## GEO_CRASH
 

@@ -13,7 +13,14 @@ export interface StartedFakeApp {
   stop: () => Promise<void>;
 }
 
-function writeTestSettings(configDir: string, rounds: number, seedBot: boolean): void {
+type QuotaCounts = { staticRequests: number; panoLoads: number; mapLoads: number };
+
+function writeTestSettings(
+  configDir: string,
+  rounds: number,
+  seedBot: boolean,
+  quotaCeilings?: Partial<QuotaCounts>,
+): void {
   const settings = {
     version: 1,
     rounds,
@@ -21,6 +28,7 @@ function writeTestSettings(configDir: string, rounds: number, seedBot: boolean):
     moveEnabled: true,
     region: 'world',
     aiWaitWindowSec: 5,
+    ...(quotaCeilings ? { quotaCeilings } : {}),
     bots: seedBot
       ? [
           {
@@ -92,13 +100,27 @@ function findFreePort(): Promise<number> {
 export async function startIsolatedFakeServer(opts?: {
   seedBot?: boolean;
   rounds?: number;
+  quotaCeilings?: Partial<QuotaCounts>;
+  initialQuota?: QuotaCounts;
 }): Promise<StartedFakeApp> {
   const root = mkdtempSync(path.join(tmpdir(), 'geo-pw-e2e-'));
   const configDir = path.join(root, 'config');
   const dataDir = path.join(root, 'data');
-  if (opts?.seedBot || opts?.rounds !== undefined) {
+  if (opts?.seedBot || opts?.rounds !== undefined || opts?.quotaCeilings) {
     mkdirSync(configDir, { recursive: true });
-    writeTestSettings(configDir, opts.rounds ?? 2, Boolean(opts.seedBot));
+    writeTestSettings(configDir, opts.rounds ?? 2, Boolean(opts.seedBot), opts.quotaCeilings);
+  }
+  if (opts?.initialQuota) {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(
+      path.join(dataDir, 'quota.json'),
+      JSON.stringify({
+        version: 1,
+        month: new Date().toISOString().slice(0, 7),
+        ...opts.initialQuota,
+      }),
+      'utf8',
+    );
   }
   const freePort = await findFreePort();
   const proc = spawn(

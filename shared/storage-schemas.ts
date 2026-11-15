@@ -66,6 +66,13 @@ export const settingsFileSchema = z.object({
   region: z.enum(REGION_IDS),
   aiWaitWindowSec: z.number().int().min(0).max(120),
   bots: z.array(botSlotConfigSchema).max(3),
+  quotaCeilings: z
+    .object({
+      staticRequests: z.number().int().positive().optional(),
+      panoLoads: z.number().int().positive().optional(),
+      mapLoads: z.number().int().positive().optional(),
+    })
+    .optional(),
 });
 
 export type SettingsFile = z.infer<typeof settingsFileSchema>;
@@ -88,6 +95,16 @@ export const quotaFileSchema = z.object({
   staticRequests: z.number().int().nonnegative(),
   panoLoads: z.number().int().nonnegative(),
   mapLoads: z.number().int().nonnegative(),
+  daily: z
+    .record(
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      z.object({
+        staticRequests: z.number().int().nonnegative(),
+        panoLoads: z.number().int().nonnegative(),
+        mapLoads: z.number().int().nonnegative(),
+      }),
+    )
+    .optional(),
 });
 
 export type QuotaFile = z.infer<typeof quotaFileSchema>;

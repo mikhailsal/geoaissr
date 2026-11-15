@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 import { GeoError } from '../errors.ts';
 import { saveSettings } from '../storage/settings.ts';
 import { createDefaultSettings } from '../../shared/storage-schemas.ts';
@@ -139,6 +139,35 @@ test('buildInitialSettings renames old default names and expands saved model ali
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// protects=configured limits reach startup, summaries, and the live start gate; fails_when=defaults override saved ceilings or settings reload without a restart; no_claim=does not exercise paid Google requests.
+test('startGeoServer reads quota ceilings once at startup and reports percentages', async () => {
+  await withTempAppEnv(async ({ configDir }) => {
+    const settingsFile = path.join(configDir, 'settings.json');
+    const settings = { ...createDefaultSettings(), quotaCeilings: { panoLoads: 1 } };
+    saveSettings(settingsFile, settings);
+    const logs = spyOn(console, 'log');
+    const cli = { ...parseStartArgs(['--fake', '--no-tunnel', '--no-open']), port: 0 };
+    let srv: Awaited<ReturnType<typeof startGeoServer>> | undefined;
+    try {
+      srv = await startGeoServer(cli, { skipClientBuild: true });
+      expect(srv.shell.getState().quotaSummary.panoCeiling).toBe(1);
+      expect(srv.shell.getState().quotaSummary.sufficient).toBe(false);
+      expect(logs.mock.calls.flat().join('\n')).toContain(
+        'Static 0/8000 (0%), Pano 0/1 (0%), Карты 0/8000 (0%)',
+      );
+      saveSettings(settingsFile, { ...settings, quotaCeilings: { panoLoads: 40 } });
+      expect(srv.shell.getState().quotaSummary.panoCeiling).toBe(1);
+      await srv.stop();
+      srv = await startGeoServer(cli, { skipClientBuild: true });
+      expect(srv.shell.getState().quotaSummary.panoCeiling).toBe(40);
+      expect(srv.shell.getState().quotaSummary.sufficient).toBe(true);
+    } finally {
+      await srv?.stop();
+      logs.mockRestore();
+    }
+  });
 });
 
 test('startGeoServer rejects concurrent second server on same dataDir and writes redacted crash logs', async () => {
