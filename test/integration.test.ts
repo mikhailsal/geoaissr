@@ -1,3 +1,4 @@
+// Value: protects=bot results thumbs include fullUrl and HTTP serves full image; fails_when=makeThumb drops fullUrl or thumbStore lacks fullId; why_new=thumbUrl was verified but fullUrl remained unasserted; seam=none; no_claim=none beyond protects
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
@@ -279,15 +280,23 @@ async function driveMatchRound(
     (m) => m.type === 'state' && m.view.phase === 'ROUND_RESULTS' && m.view.roundNumber === round,
   );
   let thumbUrl = '';
+  let fullUrl = '';
   if (resMsg.type === 'state') {
     const aiEntry = resMsg.view.results?.entries.find((e) => e.isAi);
     expect(aiEntry?.explanation).toBeTruthy();
     expect(aiEntry?.quip).toBeTruthy();
     thumbUrl = aiEntry?.thumbs[0]?.thumbUrl ?? '';
+    fullUrl = aiEntry?.thumbs[0]?.fullUrl ?? '';
+    expect(fullUrl).toBeTruthy();
+    expect(fullUrl).toMatch(/^\/thumb\/[0-9a-f]{32}$/);
   }
   if (thumbUrl) {
     const thumbRes = await fetch(`${baseUrl}${thumbUrl}`);
     expect(thumbRes.status).toBe(200);
+  }
+  if (fullUrl) {
+    const fullRes = await fetch(`${baseUrl}${fullUrl}`);
+    expect(fullRes.status).toBe(200);
   }
   host.ws.send(JSON.stringify({ type: 'next_round', seq: baseSeq + 50, roundNumber: round }));
   return thumbUrl;

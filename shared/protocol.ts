@@ -243,6 +243,7 @@ export interface BotTurnThumbView {
   action: 'observe' | 'look' | 'move';
   label: string;
   thumbUrl: string;
+  fullUrl?: string;
 }
 
 export interface RoundResultEntryView {
