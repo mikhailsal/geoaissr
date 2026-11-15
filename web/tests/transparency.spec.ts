@@ -117,7 +117,7 @@ test('renders transparent bot snapshot and supports accounting interactions', as
     const details = card.getByRole('region', { name: 'Расход токенов и оценка стоимости' });
     await expect(details).toContainText('Input: 1');
     await expect(details).toContainText('provider/model (приблизительное совпадение)');
-    await expect(details).toContainText('не фактическая стоимость подписки');
+    await expect(details).toContainText('API-цена для справки');
     await page.keyboard.press('Escape');
     await expect(details).toHaveCount(0);
     await expect(card).toBeVisible();
@@ -188,7 +188,7 @@ test('hover details dismiss and a same-card update preserves open state', async 
     await expect(badge).toBeFocused();
     expect(replacement.send).toBeDefined();
     replacement.send?.();
-    await expect(badge).toContainText('~$0.1234');
+    await expect(badge).toContainText('~$0.123');
     await expect(card.locator('.zoomed-preview')).toBeVisible();
     await expect(details).toBeVisible();
     await expect(badge).toBeFocused();
