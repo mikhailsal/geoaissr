@@ -112,6 +112,8 @@ test('renders transparent bot snapshot and supports accounting interactions', as
     await expect(card).toContainText('шаг 2');
     await card.locator('.thumb-btn').first().click();
     await expect(card.locator('.zoomed-preview img')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(card.locator('.zoomed-preview')).toHaveCount(0);
     const badge = card.getByRole('button', { name: 'Расход токенов и оценка стоимости' });
     await badge.click();
     const details = card.getByRole('region', { name: 'Расход токенов и оценка стоимости' });
@@ -179,6 +181,14 @@ test('hover details dismiss and a same-card update preserves open state', async 
     await expect(details).toHaveCount(0);
     await card.locator('.thumb-btn').first().click();
     await expect(card.locator('.zoomed-preview')).toBeVisible();
+    const closeImage = page.getByRole('button', { name: 'Закрыть снимок' });
+    await expect(closeImage).toBeFocused();
+    expect(replacement.send).toBeDefined();
+    replacement.send?.();
+    await expect(badge).toContainText('~$0.123');
+    await expect(card.locator('.zoomed-preview')).toBeVisible();
+    await expect(closeImage).toBeFocused();
+    await closeImage.click();
     await badge.click();
     await expect(details).toBeVisible();
     // Keep the pointer away so this checks pinned state without a fresh hover.
@@ -189,7 +199,6 @@ test('hover details dismiss and a same-card update preserves open state', async 
     expect(replacement.send).toBeDefined();
     replacement.send?.();
     await expect(badge).toContainText('~$0.123');
-    await expect(card.locator('.zoomed-preview')).toBeVisible();
     await expect(details).toBeVisible();
     await expect(badge).toBeFocused();
   } finally {
