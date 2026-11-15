@@ -77,7 +77,7 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 
 ## AI result cards
 
-Reasoning appears in a fixed reading order: facts, rejected alternatives, conclusion and coordinates. A draft badge identifies checkpoint fallback. Legacy explanations remain readable; absent reasoning does not imply that coordinates were missing.
+Reasoning appears in a fixed reading order: facts, rejected alternatives, conclusion and coordinates. A draft badge identifies checkpoint fallback. A legacy explanation fills the conclusion slot when no valid conclusion exists, including alongside partial structured reasoning. Absent reasoning does not imply that coordinates were missing.
 
 The inspection timeline groups initial observations above numbered paid steps. Each row pairs a clickable image with its action, camera or move parameters and hypothesis. Zoom is always derived from field of view, including a `1.0×` normal view. Long text wraps within the card on narrow screens.
 

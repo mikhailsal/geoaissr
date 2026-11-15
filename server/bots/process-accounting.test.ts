@@ -5,7 +5,25 @@ import path from 'node:path';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
 import type { EngineEvent, RoundTarget } from '../engine/types.ts';
 import type { BotToolApiServer } from './api.ts';
+import type { ServerLogger } from '../log.ts';
 import { spawnAndMonitorBotProcess, type ActiveBotHandle } from './process.ts';
+
+const failingAccountingLogger: ServerLogger = {
+  registerSecrets: () => {},
+  redact: (text: string) => text,
+  log: (_event, data) => {
+    if (data.phase === 'accounting') throw new Error('log write failed');
+  },
+  writeCrash: () => '',
+  pruneOld: () => 0,
+  getLogsDir: () => '',
+};
+const accountingFailureCases = [
+  [false, false, false],
+  [true, false, false],
+  [false, true, false],
+  [false, true, true],
+] as const;
 
 test('dispatches usage before finish and enriches it asynchronously', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-accounting-'));
@@ -73,11 +91,7 @@ test('dispatches usage before finish and enriches it asynchronously', async () =
 
 // Value: protects=known usage survives stop and optional accounting errors cannot block completion; fails_when=stop guard discards usage or accounting errors suppress finish and cleanup; why_new=existing test covers only successful pricing and normal exit; seam=none; no_claim=local child does not prove provider CLI behavior.
 test('retains stopped usage and finishes despite optional accounting errors', async () => {
-  for (const [stopped, dispatchThrows] of [
-    [false, false],
-    [true, false],
-    [false, true],
-  ] as const) {
+  for (const [stopped, dispatchThrows, loggerThrows] of accountingFailureCases) {
     const dir = mkdtempSync(path.join(tmpdir(), 'geo-accounting-error-'));
     const events: EngineEvent[] = [];
     let unregistered = false;
@@ -116,6 +130,7 @@ test('retains stopped usage and finishes despite optional accounting errors', as
           if (dispatchThrows && event.type === 'bot_accounting') throw new Error('dispatch failed');
         },
         estimateCost: () => Promise.reject(new Error('pricing unavailable')),
+        logger: loggerThrows ? failingAccountingLogger : undefined,
         buildCustomLaunchSpec: ({ workDir }) => ({
           cmd: [
             process.execPath,

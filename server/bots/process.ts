@@ -153,11 +153,15 @@ function attachBotProcessMonitor(opts: {
           }
         }
       } catch (err) {
-        opts.logger?.log('harness_monitor_error', {
-          phase: 'accounting',
-          slotId: opts.handle.slotId,
-          message: err instanceof Error ? err.message : String(err),
-        });
+        try {
+          opts.logger?.log('harness_monitor_error', {
+            phase: 'accounting',
+            slotId: opts.handle.slotId,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        } catch {
+          // Optional accounting diagnostics must not prevent completion or cleanup.
+        }
       }
       if (opts.handle.stopped) return;
       try {

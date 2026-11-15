@@ -19,15 +19,12 @@
       </ul>
     </section>
   {/if}
-  {#if entry.explanation && !entry.facts && !entry.rejectedGuesses?.length && !entry.conclusion}
-    <p>{entry.explanation}</p>
-  {/if}
-  {#if entry.conclusion || (entry.lat !== null && entry.lng !== null)}
+  {#if entry.conclusion || entry.explanation || (entry.lat !== null && entry.lng !== null)}
     <section>
       <h4>
         Итоговый вывод {#if entry.usedDraft}<span class="draft">Черновик</span>{/if}
       </h4>
-      {#if entry.conclusion}<p>{entry.conclusion}</p>{/if}
+      {#if entry.conclusion || entry.explanation}<p>{entry.conclusion || entry.explanation}</p>{/if}
       {#if entry.lat !== null && entry.lng !== null}<p class="coordinates">
           {entry.lat.toFixed(5)}, {entry.lng.toFixed(5)}
         </p>{/if}

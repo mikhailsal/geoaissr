@@ -5,7 +5,7 @@ import { assertNoHorizontalOverflow, startIsolatedFakeServer } from './helpers';
 async function injectSnapshot(
   page: Page,
   legacy = false,
-  replacement?: { send?: () => void },
+  replacement?: { send?: () => void; partial?: boolean },
 ): Promise<void> {
   await page.routeWebSocket('**/*', (socket) => {
     const server = socket.connectToServer();
@@ -25,6 +25,7 @@ async function injectSnapshot(
             delete entry.tokenUsage;
             delete entry.costUsd;
             entry.explanation = 'Старая версия объяснения';
+            if (replacement?.partial) entry.facts = 'Частичные факты';
             continue;
           }
           Object.assign(entry, {
@@ -66,7 +67,10 @@ async function injectSnapshot(
       if (replacement && parsed.type === 'state' && parsed.view.results) {
         replacement.send = () => {
           const entry = parsed.view.results?.entries.find((item) => item.isAi);
-          if (entry) entry.costUsd = 0.1234;
+          if (entry) {
+            entry.costUsd = 0.1234;
+            if (replacement.partial) entry.facts = 'Частичные факты';
+          }
           socket.send(JSON.stringify(parsed));
         };
       }
@@ -133,11 +137,12 @@ test('renders transparent bot snapshot and supports accounting interactions', as
   }
 });
 
-// protects=legacy explanation and missing usage display when coordinates exist; fails_when=missing structured reasoning is treated as no guess or unavailable accounting is invented; no_claim=synthetic snapshot does not test storage migration.
+// protects=legacy and partial structured reasoning with missing usage when coordinates exist; fails_when=valid fallback explanation disappears, missing reasoning is treated as no guess or unavailable accounting is invented; no_claim=synthetic snapshot does not test storage migration.
 test('renders legacy reasoning and unavailable accounting', async ({ page }) => {
   const server = await startIsolatedFakeServer({ seedBot: true, rounds: 1 });
+  const replacement: { send?: () => void; partial?: boolean } = {};
   try {
-    await injectSnapshot(page, true);
+    await injectSnapshot(page, true, replacement);
     await openResults(page, server.hostUrl);
     const card = page.locator('.bot-card');
     await expect(card).toContainText('Старая версия объяснения');
@@ -148,6 +153,11 @@ test('renders legacy reasoning and unavailable accounting', async ({ page }) => 
     await expect(
       card.getByRole('region', { name: 'Расход токенов и оценка стоимости' }),
     ).toContainText('Input: н/д');
+    replacement.partial = true;
+    expect(replacement.send).toBeDefined();
+    replacement.send?.();
+    await expect(card).toContainText('Частичные факты');
+    await expect(card).toContainText('Старая версия объяснения');
   } finally {
     await server.stop();
   }

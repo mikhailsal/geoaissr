@@ -23,7 +23,7 @@ Advertised draft and final schemas are strict. Their field order is `facts`, `re
 - `lat`: finite number in `[-90, 90]`; `lng`: finite number, normalized to `[-180, 180]`.
 - `quip`: optional text, at most 120 characters.
 
-Ingress is deliberately tolerant: valid coordinates remain usable if reasoning is missing or malformed. Valid reasoning blocks are retained independently, and legacy `explanation` text remains supported. The prompt recommends 2–3 rejected alternatives and continued exploration while uncertain with time and turns available; this is an instruction to the model, not a guarantee of its behavior.
+Ingress is deliberately tolerant: valid coordinates remain usable if reasoning is missing or malformed. Valid reasoning blocks are retained independently, and legacy `explanation` fills the conclusion slot when no valid conclusion exists, including with partial structured blocks. The prompt recommends 2–3 rejected alternatives and continued exploration while uncertain with time and turns available; this is an instruction to the model, not a guarantee of its behavior.
 
 `look` accepts heading, optional pitch, optional `fov` and optional `zoom` in `1..9`. Explicit finite `fov` takes precedence and is clamped to `10..120`; otherwise `fov = clamp(round(90 / zoom), 10, 120)`, defaulting to 90. A field of view of 20–45 zooms in, while 120 is wide. Fake images use the same field-of-view projection. `look` and `move` advertise a nonempty hypothesis of at most 300 characters; older or incomplete calls can omit it. Successful step records preserve the effective parameters and valid hypothesis.
 
