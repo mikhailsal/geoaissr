@@ -30,11 +30,25 @@ test('parses split terminal turns while skipping oversized and intermediate even
     totalTokens: 177,
   });
 });
+// Value: protects=invalid terminal turns cannot publish partial or unsafe totals; fails_when=invalid turns or overflow are ignored; why_new=prior cases covered only isolated invalid counters; seam=none; no_claim=fixtures do not establish live provider format.
 test('rejects missing, invalid, and truncated usage', () => {
   for (const [harness, body] of [
     ['claude', '{"usage":{"input_tokens":1}}'],
     ['codex', '{"type":"turn.completed","usage":{"input_tokens":-1,"output_tokens":1}}'],
     ['claude', 'x'.repeat(300000)],
+    ['claude', '{"usage":{"input_tokens":1,"output_tokens":2}'],
+    [
+      'codex',
+      '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}\n{"type":"turn.completed","usage":{"input_tokens":-1,"output_tokens":2}}',
+    ],
+    [
+      'codex',
+      '{"type":"turn.completed","usage":{"input_tokens":3,"cached_input_tokens":4,"output_tokens":1}}',
+    ],
+    [
+      'codex',
+      '{"type":"turn.completed","usage":{"input_tokens":9007199254740990,"output_tokens":1}}\n{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":0}}',
+    ],
   ] as const) {
     const parser = createUsageParser(harness);
     parser.push(body);

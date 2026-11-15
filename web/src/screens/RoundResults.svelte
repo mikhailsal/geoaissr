@@ -217,7 +217,7 @@
               {#if cardOpen && activeBotCard}
                 <tr class="bot-card-row">
                   <td colspan={5}>
-                    <BotCard entry={activeBotCard.entry} onClose={closeAndRestoreFocus} />
+                    <BotCard {entry} onClose={closeAndRestoreFocus} />
                   </td>
                 </tr>
               {/if}

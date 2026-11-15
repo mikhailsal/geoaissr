@@ -2,7 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 import type { ServerMessage } from '../../shared/protocol';
 import { assertNoHorizontalOverflow, startIsolatedFakeServer } from './helpers';
 
-async function injectSnapshot(page: Page, legacy = false): Promise<void> {
+async function injectSnapshot(
+  page: Page,
+  legacy = false,
+  replacement?: { send?: () => void },
+): Promise<void> {
   await page.routeWebSocket('**/*', (socket) => {
     const server = socket.connectToServer();
     server.onMessage((message) => {
@@ -57,6 +61,13 @@ async function injectSnapshot(page: Page, legacy = false): Promise<void> {
             },
           ];
         }
+      }
+      if (replacement && parsed.type === 'state' && parsed.view.results) {
+        replacement.send = () => {
+          const entry = parsed.view.results?.entries.find((item) => item.isAi);
+          if (entry) entry.costUsd = 0.1234;
+          socket.send(JSON.stringify(parsed));
+        };
       }
       socket.send(JSON.stringify(parsed));
     });
@@ -135,6 +146,37 @@ test('renders legacy reasoning and unavailable accounting', async ({ page }) => 
     await expect(
       card.getByRole('region', { name: 'Расход токенов и оценка стоимости' }),
     ).toContainText('Input: н/д');
+  } finally {
+    await server.stop();
+  }
+});
+
+// protects=mouse hover dismissal and replacement snapshot reset; fails_when=hover sticks or an old preview/details survives a replacement; why_new=existing interactions only use click/focus and one snapshot; seam=none; no_claim=synthetic snapshot timing does not prove server delivery timing.
+test('hover details dismiss and a replacement snapshot resets open state', async ({ page }) => {
+  const server = await startIsolatedFakeServer({ seedBot: true, rounds: 1 });
+  const replacement: { send?: () => void } = {};
+  try {
+    await injectSnapshot(page, false, replacement);
+    await openResults(page, server.hostUrl);
+    const card = page.locator('.bot-card');
+    const badge = card.getByRole('button', { name: 'Расход токенов и оценка стоимости' });
+    const details = card.getByRole('region', { name: 'Расход токенов и оценка стоимости' });
+    await badge.hover();
+    await expect(details).toBeVisible();
+    await card.locator('h3').hover();
+    await expect(details).toHaveCount(0);
+    await card.locator('.thumb-btn').first().click();
+    await expect(card.locator('.zoomed-preview')).toBeVisible();
+    await badge.click();
+    await expect(details).toBeVisible();
+    // Keep the pinned panel open while moving off its future replacement geometry.
+    await card.locator('h3').hover();
+    await expect(details).toBeVisible();
+    expect(replacement.send).toBeDefined();
+    replacement.send?.();
+    await expect(badge).toContainText('~$0.1234');
+    await expect(card.locator('.zoomed-preview')).toHaveCount(0);
+    await expect(details).toHaveCount(0);
   } finally {
     await server.stop();
   }

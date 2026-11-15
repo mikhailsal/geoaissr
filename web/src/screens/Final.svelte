@@ -1,6 +1,6 @@
 <script lang="ts">
   import confetti from 'canvas-confetti';
-  import type { ClientViewState, RoundResultEntryView } from '$shared/protocol';
+  import type { ClientViewState } from '$shared/protocol';
   import Avatar from '../components/Avatar.svelte';
   import BotCard from '../components/BotCard.svelte';
   import HostMenu from '../components/HostMenu.svelte';
@@ -19,11 +19,16 @@
 
   let { view, onPlayAgain, onEndMatch, onEditProfile, onResetBotWins }: Props = $props();
 
-  let inspectedCard = $state<{ roundNumber: number; entry: RoundResultEntryView } | null>(null);
+  let inspectedCard = $state<{ roundNumber: number; botId: string } | null>(null);
   let lastTriggerBtn = $state<HTMLButtonElement | null>(null);
   let confettiPlayed = false;
 
   const fin = $derived(view.final);
+  const inspectedEntry = $derived(
+    fin?.standings
+      .find((row) => row.id === inspectedCard?.botId)
+      ?.perRound.find((cell) => cell.roundNumber === inspectedCard?.roundNumber)?.botCard,
+  );
   const me = $derived(view.players.find((p) => p.id === view.viewerId));
   const topWinners = $derived(fin ? fin.standings.filter((s) => s.rank === 1) : []);
   const bestHuman = $derived(fin?.standings.find((s) => !s.isAi) ?? null);
@@ -156,7 +161,7 @@
                             onclick={(e) => {
                               lastTriggerBtn = e.currentTarget;
                               inspectedCard = cell.botCard
-                                ? { roundNumber: rn, entry: cell.botCard }
+                                ? { roundNumber: rn, botId: row.id }
                                 : null;
                             }}
                           >
@@ -205,9 +210,9 @@
           >{/each}{/if}
     </section>
 
-    {#if inspectedCard}
+    {#if inspectedCard && inspectedEntry}
       <section aria-label={`Мысли бота в раунде ${inspectedCard.roundNumber}`}>
-        <BotCard entry={inspectedCard.entry} onClose={closeInspect} />
+        <BotCard entry={inspectedEntry} onClose={closeInspect} />
       </section>
     {/if}
 

@@ -311,7 +311,8 @@ test('stale, unknown and human accounting updates are rejected', () => {
   const results = finish(active);
   expect(reduce(results, { ...event, gen: active.gen - 1 }).state).toBe(results);
   expect(reduce(results, { ...event, botId: 'host' }).state).toBe(results);
-  expect(reduce({ ...results, matchId: 'new-match' }, event).state.matchId).toBe('new-match');
+  const newMatch = { ...results, matchId: 'new-match' };
+  expect(reduce(newMatch, event).state).toBe(newMatch);
 });
 
 // protects=older direct engine guess events retain final semantics; fails_when=missing optional finalized accidentally becomes a draft; no_claim=does not validate legacy MCP input

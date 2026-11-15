@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createPricingService } from './pricing.ts';
@@ -66,6 +66,57 @@ test('fails soft on invalid pricing and invalid usage', async () => {
     expect(
       (await service.estimateCost('x', { ...usage, cachedInputTokens: 101 })).costUsd,
     ).toBeNull();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// Value: protects=failed cache and pending network operations resolve without losing valid prices; fails_when=timeout, corruption, future cache, or write failure escapes; why_new=existing network failure rejects immediately and persistence succeeds; seam=none; no_claim=local fixtures do not establish OpenRouter availability.
+test('timeouts and invalid or unwritable cache fail soft', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'pricing-errors-'));
+  const cacheFile = path.join(dir, 'openrouter-models-cache.json');
+  const valid = {
+    data: [{ id: 'anthropic/claude-4.5-haiku', pricing: { prompt: '0.01', completion: '0.1' } }],
+  };
+  try {
+    await writeFile(cacheFile, '{broken');
+    const pendingFetch = createPricingService({
+      dataDir: dir,
+      timeoutMs: 5,
+      fetch: () => new Promise<Response>(() => {}),
+    });
+    expect((await pendingFetch.estimateCost('claude-haiku-4-5', usage)).costUsd).toBeNull();
+    const pendingBody = createPricingService({
+      dataDir: dir,
+      timeoutMs: 5,
+      fetch: () => Promise.resolve(new Response(new ReadableStream({ start() {} }))),
+    });
+    expect((await pendingBody.estimateCost('claude-haiku-4-5', usage)).costUsd).toBeNull();
+    await writeFile(
+      cacheFile,
+      JSON.stringify({
+        fetchedAt: 200,
+        models: [{ id: 'anthropic/claude-4.5-haiku', prompt: 99, completion: 99 }],
+      }),
+    );
+    let calls = 0;
+    const future = createPricingService({
+      dataDir: dir,
+      now: () => 100,
+      fetch: () => {
+        calls++;
+        return Promise.resolve(Response.json(valid));
+      },
+    });
+    expect((await future.estimateCost('claude-haiku-4-5', usage)).costUsd).toBeCloseTo(3);
+    expect(calls).toBe(1);
+    const blocker = path.join(dir, 'not-a-directory');
+    await writeFile(blocker, 'file');
+    const unwritable = createPricingService({
+      dataDir: blocker,
+      fetch: () => Promise.resolve(Response.json(valid)),
+    });
+    expect((await unwritable.estimateCost('claude-haiku-4-5', usage)).costUsd).toBeCloseTo(3);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
