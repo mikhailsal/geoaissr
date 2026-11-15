@@ -11,8 +11,8 @@ import { spawnAndMonitorBotProcess, type ActiveBotHandle } from './process.ts';
 const failingAccountingLogger: ServerLogger = {
   registerSecrets: () => {},
   redact: (text: string) => text,
-  log: (_event, data) => {
-    if (data.phase === 'accounting') throw new Error('log write failed');
+  log: (event) => {
+    if (event !== 'harness_start') throw new Error('log write failed');
   },
   writeCrash: () => '',
   pruneOld: () => 0,

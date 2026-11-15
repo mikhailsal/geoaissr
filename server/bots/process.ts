@@ -105,6 +105,18 @@ export function resolveInstalledCliVersions(
   return out;
 }
 
+function logBotMonitorEvent(
+  logger: ServerLogger | undefined,
+  event: 'harness_end' | 'harness_monitor_error',
+  data: Record<string, unknown>,
+): void {
+  try {
+    logger?.log(event, data);
+  } catch {
+    // Diagnostic I/O must not interrupt bot completion or cleanup.
+  }
+}
+
 function attachBotProcessMonitor(opts: {
   proc: ManagedProcess;
   api: BotToolApiServer;
@@ -153,15 +165,11 @@ function attachBotProcessMonitor(opts: {
           }
         }
       } catch (err) {
-        try {
-          opts.logger?.log('harness_monitor_error', {
-            phase: 'accounting',
-            slotId: opts.handle.slotId,
-            message: err instanceof Error ? err.message : String(err),
-          });
-        } catch {
-          // Optional accounting diagnostics must not prevent completion or cleanup.
-        }
+        logBotMonitorEvent(opts.logger, 'harness_monitor_error', {
+          phase: 'accounting',
+          slotId: opts.handle.slotId,
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
       if (opts.handle.stopped) return;
       try {
@@ -171,7 +179,7 @@ function attachBotProcessMonitor(opts: {
       }
     })
     .catch((err: unknown) => {
-      opts.logger?.log('harness_monitor_error', {
+      logBotMonitorEvent(opts.logger, 'harness_monitor_error', {
         slotId: opts.handle.slotId,
         message: err instanceof Error ? err.message : String(err),
       });
@@ -228,7 +236,7 @@ function reportBotExit(
     : exitInfo.code !== 0
       ? `ошибка процесса (код ${codeNum})`
       : 'вышел без ответа';
-  opts.logger?.log('harness_end', {
+  logBotMonitorEvent(opts.logger, 'harness_end', {
     slotId: opts.handle.slotId,
     harness: opts.harnessName,
     roundNumber: opts.handle.roundNumber,
