@@ -17,6 +17,11 @@ function finishFakeBot(
     lat: Math.max(-85, Math.min(85, target.lat + offset)),
     lng: target.lng + offset,
     explanation: `Вижу дорожную разметку и ландшафт, характерный для ${target.countryNameRu}.`,
+    facts: 'Вижу дорожную разметку и местный ландшафт.',
+    rejectedGuesses: [
+      { guess: 'Другая климатическая зона', reason: 'Растительность не совпадает.' },
+    ],
+    conclusion: `Улики указывают на ${target.countryNameRu}.`,
     quip: slot.personalityPreset === 'braggart' ? 'Легчайшая точка!' : 'Проверяю ориентиры.',
   };
   dispatch({
@@ -59,6 +64,18 @@ export async function runFakeBotSequence(opts: {
     0,
     views,
   );
+  dispatch({
+    type: 'bot_guess_recorded',
+    ...ids,
+    botId: slot.id,
+    finalized: false,
+    guess: {
+      lat: Math.max(-85, Math.min(85, target.lat + 1.5)),
+      lng: target.lng + 1.5,
+      explanation: 'Предварительная оценка.',
+      facts: 'Оцениваю ландшафт.',
+    },
+  });
   await new Promise((r) => setTimeout(r, stepDelayMs));
   if (isStopped()) return;
 
@@ -86,7 +103,10 @@ export async function runFakeBotSequence(opts: {
     gen: ids.gen,
     roundNumber: ids.roundNumber,
     botId: slot.id,
-    thumb: makeThumb(1, 'look', lookView),
+    thumb: makeThumb(1, 'look', lookView, {
+      params: { heading: 90, pitch: 0, fov: 60 },
+      hypothesis: 'Приближаю дорожные детали, чтобы проверить регион.',
+    }),
   });
   await new Promise((r) => setTimeout(r, stepDelayMs));
   if (!isStopped()) finishFakeBot(ids, slot, target, dispatch);

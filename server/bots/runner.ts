@@ -1,8 +1,10 @@
+import type { BotCostEstimate, BotTokenUsage } from '../../shared/bot-results.ts';
 import { mkdirSync } from 'node:fs';
 import { getRegionDiagonalKm } from '../../shared/regions.ts';
 import type { BotSlotConfig, RegionId } from '../../shared/storage-schemas.ts';
 import type { EngineEvent, RoundTarget } from '../engine/types.ts';
 import type { BotImageService, RenderedBotImage } from '../images/bot-image-service.ts';
+import { normalizeHeadingDeg } from '../images/label.ts';
 import type { LocationService } from '../location.ts';
 import type { ServerLogger } from '../log.ts';
 import { joinUnder } from '../paths.ts';
@@ -67,6 +69,7 @@ interface RunnerCtx {
   dispatch: (event: EngineEvent) => void;
   logger?: ServerLogger;
   buildCustomLaunchSpec?: CustomBotLaunchBuilder;
+  estimateCost?: (model: string, usage: BotTokenUsage) => Promise<BotCostEstimate>;
   api: BotToolApiServer;
   activeHandles: Map<string, ActiveBotHandle>;
   activeVisionChecks: Map<AbortController, Promise<unknown>>;
@@ -96,7 +99,7 @@ async function runLookTool(
   params: RoundBotParams,
   tracker: MoveTracker,
   turnNum: number,
-  args: { heading: number; pitch: number; fov: number },
+  args: { heading: number; pitch: number; fov: number; hypothesis?: string },
 ): Promise<ToolResponsePayload> {
   const pos = tracker.getPosition();
   try {
@@ -116,7 +119,14 @@ async function runLookTool(
       gen: params.gen,
       roundNumber: params.roundNumber,
       botId: params.slot.id,
-      thumb: makeThumb(turnNum, 'look', view),
+      thumb: makeThumb(turnNum, 'look', view, {
+        params: {
+          heading: normalizeHeadingDeg(args.heading),
+          pitch: Math.round(args.pitch),
+          fov: Math.round(args.fov),
+        },
+        ...(args.hypothesis ? { hypothesis: args.hypothesis } : {}),
+      }),
     });
     return { text: view.label, images: toImageBlocks([view]) };
   } catch (err) {
@@ -129,7 +139,7 @@ async function runMoveTool(
   params: RoundBotParams,
   tracker: MoveTracker,
   turnNum: number,
-  args: { heading: number },
+  args: { heading: number; hypothesis?: string },
 ): Promise<ToolResponsePayload> {
   const prevPos = tracker.getPosition();
   try {
@@ -151,7 +161,10 @@ async function runMoveTool(
         gen: params.gen,
         roundNumber: params.roundNumber,
         botId: params.slot.id,
-        thumb: makeThumb(turnNum, 'move', view),
+        thumb: makeThumb(turnNum, 'move', view, {
+          params: { heading: normalizeHeadingDeg(args.heading), step: res.position.steps },
+          ...(args.hypothesis ? { hypothesis: args.hypothesis } : {}),
+        }),
       });
       return { text: `Перемещение выполнено (${view.label}).`, images: toImageBlocks([view]) };
     } catch (err) {
@@ -230,12 +243,12 @@ function buildRoundHandlers(
     executeMove: createLoggedToolExecutor(ctx, slot.id, roundNumber, 'move', (args) =>
       runMoveTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args),
     ),
-    onGuess(guess) {
+    onGuess(guess, finalized) {
       deps.onSubmittedGuess();
       ctx.logger?.log('bot_tool_call', {
         slotId: slot.id,
         roundNumber,
-        tool: 'submit_guess',
+        tool: finalized ? 'final_guess' : 'draft_guess',
         args: { lat: guess.lat, lng: guess.lng },
         ok: true,
       });
@@ -246,6 +259,7 @@ function buildRoundHandlers(
         roundNumber,
         botId: slot.id,
         guess,
+        finalized,
       });
     },
     onTurnsChanged: (turnsUsed) => {
@@ -262,7 +276,6 @@ function buildRoundHandlers(
       Math.max(0, slot.budgetSec - (Date.now() - deps.getStartedAt()) / 1000),
   };
 }
-
 function startBotExecution(
   ctx: RunnerCtx,
   params: RoundBotParams,
@@ -314,6 +327,7 @@ function startBotExecution(
     dispatch: ctx.dispatch,
     logger: ctx.logger,
     buildCustomLaunchSpec: ctx.buildCustomLaunchSpec,
+    estimateCost: ctx.estimateCost,
   });
 }
 
@@ -375,7 +389,6 @@ function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
     dispatchLaunchFailure(ctx, params, err, handle.token);
   }
 }
-
 function dispatchLaunchFailure(
   ctx: RunnerCtx,
   params: RoundBotParams,
@@ -412,6 +425,7 @@ export function createBotRunner(opts: {
   dispatch: (event: EngineEvent) => void;
   logger?: ServerLogger;
   buildCustomLaunchSpec?: CustomBotLaunchBuilder;
+  estimateCost?: (model: string, usage: BotTokenUsage) => Promise<BotCostEstimate>;
 }): BotRunner {
   const ctx: RunnerCtx = {
     ...opts,

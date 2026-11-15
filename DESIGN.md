@@ -74,3 +74,11 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 - **On the map / panorama:** a light `2px` outline and a dark offset shadow.
 - **Icons:** only `@lucide/svelte`, and only meaningful ones.
 - **Shared state components:** `StatusBanner.svelte` (connection and warnings for the host) and `InlineState.svelte` (loading, empty, error with an action button).
+
+## AI result cards
+
+Reasoning appears in a fixed reading order: facts, rejected alternatives, conclusion and coordinates. A draft badge identifies checkpoint fallback. Legacy explanations remain readable; absent reasoning does not imply that coordinates were missing.
+
+The inspection timeline groups initial observations above numbered paid steps. Each row pairs a clickable image with its action, camera or move parameters and hypothesis. Zoom is always derived from field of view, including a `1.0×` normal view. Long text wraps within the card on narrow screens.
+
+Token and estimated-cost details use one compact metric button. Its tooltip works with hover, keyboard focus and tap; Escape closes the tooltip before the surrounding card, and clicking outside dismisses it. The cost is labelled as an OpenRouter estimate and approximate model matches are explicit.

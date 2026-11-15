@@ -61,24 +61,26 @@ const FAKE_PALETTES = [
   { r: 66, g: 78, b: 92 },
 ] as const;
 
-async function createFakeRawFrame(
+export async function createFakeRawFrame(
   sceneIndex: number,
   heading: number,
   pitch: number,
+  fov: number,
 ): Promise<Buffer> {
   const pal = FAKE_PALETTES[Math.abs(sceneIndex) % FAKE_PALETTES.length] ?? FAKE_PALETTES[0];
+  const scale = 90 / fov;
   const shift = Math.round((normalizeHeadingDeg(heading) / 360) * 40);
-  const sky = {
-    r: Math.min(255, pal.r + shift),
-    g: Math.min(255, pal.g + Math.round(pitch * 0.2) + 20),
-    b: Math.min(255, pal.b + 25),
-    alpha: 1,
-  };
-  return sharp({
-    create: { width: 640, height: 640, channels: 4, background: sky },
-  })
-    .jpeg({ quality: 80 })
-    .toBuffer();
+  const sky = `rgb(${Math.min(255, pal.r + shift)},${Math.min(255, pal.g + Math.round(pitch * 0.2) + 20)},${Math.min(255, pal.b + 25)})`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640">
+    <rect width="640" height="640" fill="${sky}"/>
+    <g transform="translate(320 320) scale(${scale})">
+      <rect x="-320" y="40" width="640" height="300" fill="rgb(72,92,60)"/>
+      <path d="M -180 320 L -35 40 L 35 40 L 180 320 Z" fill="rgb(90,90,90)"/>
+      <rect x="65" y="-60" width="45" height="70" fill="rgb(230,210,130)"/>
+      <rect x="83" y="10" width="8" height="70" fill="rgb(55,45,35)"/>
+    </g>
+  </svg>`;
+  return sharp(Buffer.from(svg)).jpeg({ quality: 80 }).toBuffer();
 }
 
 async function fetchStaticWithRetry(
@@ -178,7 +180,7 @@ async function fetchRawCached(
 
   const promise = (async () => {
     if (deps.fakeMode) {
-      return createFakeRawFrame(params.fakeSceneIndex, h, p);
+      return createFakeRawFrame(params.fakeSceneIndex, h, p, f);
     }
     if (!deps.serverKey) {
       throw new GeoError({

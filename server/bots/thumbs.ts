@@ -6,6 +6,7 @@ export function makeThumb(
   turn: number,
   action: 'observe' | 'look' | 'move',
   rendered: RenderedBotImage,
+  details?: Pick<BotTurnThumbView, 'params' | 'hypothesis'>,
 ): BotTurnThumbView {
   return {
     turn,
@@ -13,6 +14,7 @@ export function makeThumb(
     label: rendered.label,
     thumbUrl: rendered.thumbUrl,
     fullUrl: rendered.fullUrl,
+    ...details,
   };
 }
 

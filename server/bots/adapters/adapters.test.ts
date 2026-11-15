@@ -165,6 +165,8 @@ test('agy guard allows only the exact geo tools, not other MCP servers with a ge
     const guardPath = path.join(spec.cwd, '.agents', 'plugins', 'geo', 'guard.ts');
     expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_observe', args: {} })).toBe('allow');
     expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_submit_guess', args: {} })).toBe('allow');
+    expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_draft_guess', args: {} })).toBe('allow');
+    expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_final_guess', args: {} })).toBe('allow');
     expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_extra_shell', args: {} })).toBe('deny');
     expect(runAgyGuard(guardPath, { name: 'run_command', args: { command: 'ls' } })).toBe('deny');
     expect(

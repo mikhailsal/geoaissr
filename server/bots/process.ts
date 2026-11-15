@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
+import type { BotCostEstimate, BotTokenUsage } from '../../shared/bot-results.ts';
+import { createUsageParser } from './usage.ts';
 import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { HarnessId } from '../../shared/storage-schemas.ts';
 import { redactSecrets } from '../errors.ts';
@@ -113,9 +115,42 @@ function attachBotProcessMonitor(opts: {
   didSubmitGuess: () => boolean;
   dispatch: (event: EngineEvent) => void;
   logger?: ServerLogger;
+  parser: ReturnType<typeof createUsageParser>;
+  model: string;
+  estimateCost?: (model: string, usage: BotTokenUsage) => Promise<BotCostEstimate>;
 }): void {
   void opts.proc.exited
-    .then((exitInfo) => {
+    .then(async (exitInfo) => {
+      await opts.proc.drained;
+      const tokenUsage = opts.parser.finish();
+      if (tokenUsage) {
+        const identity = {
+          matchId: opts.handle.matchId,
+          gen: opts.handle.gen,
+          roundNumber: opts.handle.roundNumber,
+          botId: opts.handle.slotId,
+        };
+        opts.dispatch({
+          type: 'bot_accounting',
+          ...identity,
+          accounting: { tokenUsage, costUsd: null },
+        });
+        if (opts.estimateCost) {
+          void Promise.resolve()
+            .then(() => opts.estimateCost?.(opts.model, tokenUsage))
+            .then((estimate) => {
+              if (estimate)
+                opts.dispatch({
+                  type: 'bot_accounting',
+                  ...identity,
+                  accounting: { tokenUsage, ...estimate },
+                });
+            })
+            .catch(() => {
+              /* Estimates are optional. */
+            });
+        }
+      }
       if (opts.handle.stopped) return;
       try {
         reportBotExit(opts, exitInfo);
@@ -207,6 +242,26 @@ function reportBotExit(
   });
 }
 
+function logBotStart(
+  opts: {
+    logger?: ServerLogger;
+    handle: ActiveBotHandle;
+    slot: BotSlotConfig;
+    roundNumber: number;
+  },
+  argv?: string[],
+): number {
+  opts.logger?.registerSecrets([], [opts.handle.token]);
+  const startedAtMs = Date.now();
+  opts.logger?.log('harness_start', {
+    slotId: opts.slot.id,
+    harness: opts.slot.harness,
+    roundNumber: opts.roundNumber,
+    argv,
+  });
+  return startedAtMs;
+}
+
 export function spawnAndMonitorBotProcess(opts: {
   childrenFile: string;
   api: BotToolApiServer;
@@ -221,6 +276,7 @@ export function spawnAndMonitorBotProcess(opts: {
   dispatch: (event: EngineEvent) => void;
   logger?: ServerLogger;
   buildCustomLaunchSpec?: CustomBotLaunchBuilder;
+  estimateCost?: (model: string, usage: BotTokenUsage) => Promise<BotCostEstimate>;
 }): void {
   try {
     mkdirSync(opts.handle.workDir, { recursive: true });
@@ -243,15 +299,8 @@ export function spawnAndMonitorBotProcess(opts: {
           moveEnabled: opts.moveEnabled,
         });
 
-    opts.logger?.registerSecrets([], [opts.handle.token]);
-    const startedAtMs = Date.now();
-    opts.logger?.log('harness_start', {
-      slotId: opts.slot.id,
-      harness: opts.slot.harness,
-      roundNumber: opts.roundNumber,
-      argv: spec.cmd,
-    });
-
+    const startedAtMs = logBotStart(opts, spec.cmd);
+    const parser = createUsageParser(opts.slot.harness);
     const proc = spawnManaged({
       cmd: spec.cmd,
       cwd: path.resolve(spec.cwd),
@@ -259,10 +308,14 @@ export function spawnAndMonitorBotProcess(opts: {
       stdinText: spec.stdinText,
       kind: 'bot',
       childrenFile: opts.childrenFile,
+      onStdoutChunk: parser.push,
     });
     opts.handle.proc = proc;
     attachBotProcessMonitor({
       proc,
+      parser,
+      model: opts.slot.model,
+      estimateCost: opts.estimateCost,
       api: opts.api,
       activeHandles: opts.activeHandles,
       handle: opts.handle,

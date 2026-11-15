@@ -17,6 +17,7 @@ export interface ManagedProcess {
   readonly pid: number;
   readonly command: string;
   readonly exited: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
+  readonly drained?: Promise<void>;
   getStdout: () => string;
   getStderr: () => string;
   stop: (graceMs?: number) => Promise<void>;
@@ -87,6 +88,25 @@ function attachStreamReaders(
   };
 }
 
+// Reap on exit, then allow buffered output to drain without waiting indefinitely on inherited pipes.
+function waitForDrain(child: ChildProcess, exited: ManagedProcess['exited']): Promise<void> {
+  const closed = new Promise<void>((resolve) =>
+    child.once('close', () => {
+      resolve();
+    }),
+  );
+  return exited.then(async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      closed,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, 1000);
+      }),
+    ]);
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export function spawnManaged(opts: SpawnManagedOptions): ManagedProcess {
   installProcessExitHooks();
   const [command, ...args] = opts.cmd;
@@ -137,11 +157,14 @@ export function spawnManaged(opts: SpawnManagedOptions): ManagedProcess {
     });
   });
 
+  const drained = waitForDrain(child, exited);
+
   let stopping: Promise<void> | null = null;
   handle = {
     pid,
     command,
     exited,
+    drained,
     getStdout: streams.getStdout,
     getStderr: streams.getStderr,
     stop: async (graceMs = 2000) => {

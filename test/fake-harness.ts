@@ -67,8 +67,19 @@ async function runNormalScenario(
   callTool: (n: string, a: Record<string, unknown>) => Promise<McpToolCallResult>,
 ): Promise<void> {
   await callTool('observe', {});
-  await callTool('look', { heading: 90, pitch: 0, fov: 60 });
-  await callTool('submit_guess', {
+  await callTool('draft_guess', {
+    lat: 55.7,
+    lng: 37.6,
+    facts: 'Архитектура',
+    conclusion: 'Предварительная версия',
+  });
+  await callTool('look', {
+    heading: 90,
+    pitch: 0,
+    fov: 60,
+    hypothesis: 'Проверяю дорожные знаки.',
+  });
+  await callTool('final_guess', {
     lat: 55.75,
     lng: 37.61,
     explanation: 'Дорожные знаки и архитектура соответствуют центральной части страны.',

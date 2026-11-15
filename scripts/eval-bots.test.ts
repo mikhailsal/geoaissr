@@ -213,8 +213,13 @@ test('fake bot runner dispatches aborted bot_finished when fake sequence rejects
 
 const GUESS_IDS = { matchId: 'm', gen: 1, roundNumber: 1, botId: 'b' } as const;
 
-function guessEvent(lat: number, lng: number): EngineEvent {
-  return { type: 'bot_guess_recorded', ...GUESS_IDS, guess: { lat, lng, explanation: 'test' } };
+function guessEvent(lat: number, lng: number, finalized?: boolean): EngineEvent {
+  return {
+    type: 'bot_guess_recorded',
+    ...GUESS_IDS,
+    guess: { lat, lng, explanation: 'test' },
+    finalized,
+  };
 }
 
 const FINISHED_EVENT: EngineEvent = {
@@ -224,9 +229,28 @@ const FINISHED_EVENT: EngineEvent = {
   reason: 'done',
 };
 
-test('pickFinalGuess scores the last guess when a bot revises its answer', () => {
-  const picked = pickFinalGuess([guessEvent(10, 20), guessEvent(11, 21), FINISHED_EVENT]);
+// protects=latest draft fallback; fails_when=an earlier checkpoint is scored; no_claim=live model quality.
+test('pickFinalGuess scores the latest draft when no final arrives', () => {
+  const picked = pickFinalGuess([
+    guessEvent(10, 20, false),
+    guessEvent(11, 21, false),
+    FINISHED_EVENT,
+  ]);
   expect(picked).toMatchObject({ lat: 11, lng: 21 });
+});
+
+// protects=final immutability and legacy final events; fails_when=later draft or final overwrites a final; no_claim=queue behavior.
+test('pickFinalGuess preserves the first final against later guesses', () => {
+  for (const finalized of [true, undefined]) {
+    const picked = pickFinalGuess([
+      guessEvent(1, 2, false),
+      guessEvent(10, 20, finalized),
+      guessEvent(11, 21, false),
+      guessEvent(12, 22, true),
+      FINISHED_EVENT,
+    ]);
+    expect(picked).toMatchObject({ lat: 10, lng: 20 });
+  }
 });
 
 test('pickFinalGuess ignores guesses recorded after the bot finished, like the reducer', () => {

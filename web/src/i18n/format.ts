@@ -46,3 +46,7 @@ export function formatSecondsOnly(sec: number): string {
 export function participantDisplayAria(name: string, isAi: boolean): string {
   return isAi ? `${name}, ИИ` : name;
 }
+
+export function formatZoom(fov: number): string {
+  return (90 / fov).toFixed(1);
+}

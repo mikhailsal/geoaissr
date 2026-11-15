@@ -136,7 +136,7 @@ export const codexAdapter: HarnessAdapter = {
     for (const [k, v] of Object.entries(env)) {
       args.push('-c', `mcp_servers.geo.env.${k}=${JSON.stringify(v)}`);
     }
-    for (const tool of ['observe', 'look', 'move', 'submit_guess']) {
+    for (const tool of ['observe', 'look', 'move', 'draft_guess', 'final_guess', 'submit_guess']) {
       args.push('-c', `mcp_servers.geo.tools.${tool}.approval_mode="approve"`);
     }
     args.push(

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { BotReasoning } from './bot-results.ts';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 export const EXPLANATION_MAX_LEN = 600;
@@ -94,54 +95,61 @@ export const personalityTextSchema = z
 
 export const observeInputSchema = z.object({}).strict();
 
+const hypothesisSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(300)
+  .describe('Гипотеза и что поможет её проверить');
+
 export const lookInputSchema = z
   .object({
     heading: z.number().finite().min(0).max(360).describe('Азимут взгляда в градусах (0–360)'),
-    pitch: z
-      .number()
-      .finite()
-      .min(-90)
-      .max(90)
-      .default(0)
-      .describe('Угол наклона камеры (-90 вниз .. 90 вверх, по умолчанию 0)'),
+    pitch: z.number().finite().min(-90).max(90).default(0),
     fov: z
       .number()
       .finite()
-      .min(10)
-      .max(120)
-      .default(90)
-      .describe('Угол обзора (10 приближение .. 120 широкий, по умолчанию 90)'),
+      .optional()
+      .describe('Угол обзора: 90 обычный, 20–45 приближение, 120 широкий'),
+    zoom: z.number().finite().min(1).max(9).optional().describe('Приближение; fov имеет приоритет'),
+    hypothesis: hypothesisSchema,
   })
   .strict();
 
 export const moveInputSchema = z
   .object({
     heading: z.number().finite().min(0).max(360).describe('Азимут движения по дороге (0–360)'),
+    hypothesis: hypothesisSchema,
   })
   .strict();
 
-export const submitGuessInputSchema = z
-  .object({
-    lat: z.number().finite().min(-90).max(90).describe('Широта от -90 до 90'),
-    lng: z.number().finite().describe('Долгота (приводится к -180..180)'),
-    explanation: z
-      .string()
-      .trim()
-      .min(1, 'Поле explanation не может быть пустым')
-      .describe('Краткое объяснение догадки до 600 символов на языке интерфейса'),
-    quip: z
-      .string()
-      .trim()
-      .optional()
-      .describe('Необязательная короткая реплика для соперников до 120 символов'),
-  })
-  .strict();
-
+const guessShape = {
+  facts: z.string().trim().min(1).max(1000),
+  rejected_guesses: z
+    .array(
+      z
+        .object({
+          guess: z.string().trim().min(1).max(120),
+          reason: z.string().trim().min(1).max(300),
+        })
+        .strict(),
+    )
+    .min(1)
+    .max(3),
+  conclusion: z.string().trim().min(1).max(600),
+  lat: z.number().finite().min(-90).max(90),
+  lng: z.number().finite(),
+  quip: z.string().trim().max(120).optional(),
+};
+export const draftGuessInputSchema = z.object(guessShape).strict();
+export const finalGuessInputSchema = z.object(guessShape).strict();
+// Kept for legacy clients that discover the deprecated tool.
+export const submitGuessInputSchema = finalGuessInputSchema;
 export type LookInput = z.infer<typeof lookInputSchema>;
 export type MoveInput = z.infer<typeof moveInputSchema>;
 export type SubmitGuessInput = z.infer<typeof submitGuessInputSchema>;
 
-export interface NormalizedGuessInput {
+export interface NormalizedGuessInput extends BotReasoning {
   lat: number;
   lng: number;
   explanation: string;
@@ -153,19 +161,47 @@ export function normalizeLongitude(lng: number): number {
   return shifted === -180 && lng > 0 ? 180 : shifted;
 }
 
-export function normalizeSubmitGuessInput(raw: SubmitGuessInput): NormalizedGuessInput {
-  const explanation = raw.explanation.slice(0, EXPLANATION_MAX_LEN);
-  const quip = raw.quip && raw.quip.length > 0 ? raw.quip.slice(0, QUIP_MAX_LEN) : undefined;
+const guessIngressSchema = z
+  .object({
+    lat: z.number().finite().min(-90).max(90),
+    lng: z.number().finite(),
+  })
+  .passthrough();
+
+export function parseGuessInput(raw: unknown): NormalizedGuessInput | undefined {
+  const parsed = guessIngressSchema.safeParse(raw);
+  if (!parsed.success) return undefined;
+  const data = parsed.data;
+  const facts = guessShape.facts.safeParse(data.facts);
+  const rejected = guessShape.rejected_guesses.safeParse(data.rejected_guesses);
+  const conclusion = guessShape.conclusion.safeParse(data.conclusion);
+  const reasoning = {
+    ...(facts.success ? { facts: facts.data } : {}),
+    ...(rejected.success ? { rejectedGuesses: rejected.data } : {}),
+    ...(conclusion.success ? { conclusion: conclusion.data } : {}),
+  };
+  const explanation =
+    typeof data.explanation === 'string'
+      ? data.explanation.trim().slice(0, EXPLANATION_MAX_LEN)
+      : '';
+  const quip = typeof data.quip === 'string' ? data.quip.trim().slice(0, QUIP_MAX_LEN) : '';
   return {
-    lat: raw.lat,
-    lng: normalizeLongitude(raw.lng),
+    lat: data.lat,
+    lng: normalizeLongitude(data.lng),
     explanation,
-    ...(quip !== undefined ? { quip } : {}),
+    ...(quip ? { quip } : {}),
+    ...reasoning,
   };
 }
 
+export function normalizeSubmitGuessInput(raw: SubmitGuessInput): NormalizedGuessInput {
+  const result = parseGuessInput(raw);
+  if (!result) throw new Error('Invalid guess');
+  return result;
+}
+
 export interface BotToolDefinition {
-  name: 'observe' | 'look' | 'move' | 'submit_guess';
+  name: 'observe' | 'look' | 'move' | 'draft_guess' | 'final_guess' | 'submit_guess';
   description: string;
   inputSchema: Record<string, unknown>;
 }
@@ -194,15 +230,24 @@ export function getBotToolDefinitions(moveEnabled = true): BotToolDefinition[] {
     {
       name: 'move',
       description: moveEnabled
-        ? 'Сделать шаг по дороге в сторону heading и получить 4 новых снимка. Стоит 1 ход.'
+        ? 'Сделать шаг по дороге в сторону heading и получить новый снимок. Стоит 1 ход.'
         : 'Движение по панораме выключено в этой партии (вызов вернёт ошибку без списания хода).',
       inputSchema: toToolJsonSchema(moveInputSchema),
     },
     {
+      name: 'draft_guess',
+      description: 'Сохранить промежуточную догадку и продолжить исследование. Бесплатно.',
+      inputSchema: toToolJsonSchema(draftGuessInputSchema),
+    },
+    {
+      name: 'final_guess',
+      description: 'Записать окончательную догадку. Бесплатно.',
+      inputSchema: toToolJsonSchema(finalGuessInputSchema),
+    },
+    {
       name: 'submit_guess',
-      description:
-        'Записать догадку (lat, lng, explanation, опционально quip). Бесплатно, можно обновлять; засчитывается последняя.',
-      inputSchema: toToolJsonSchema(submitGuessInputSchema),
+      description: 'Устаревший синоним final_guess.',
+      inputSchema: toToolJsonSchema(finalGuessInputSchema),
     },
   ];
 }

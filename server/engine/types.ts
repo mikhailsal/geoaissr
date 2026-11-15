@@ -8,6 +8,7 @@ import type {
   TunnelStatusView,
 } from '../../shared/protocol.ts';
 import type { LatLng } from '../../shared/score.ts';
+import type { BotAccounting, BotReasoning } from '../../shared/bot-results.ts';
 import type {
   BotRoundTelemetry,
   BotSlotConfig,
@@ -48,14 +49,15 @@ export interface HumanGuessState {
   confirmedAt: number | null;
 }
 
-export interface BotGuessData {
+export interface BotGuessData extends BotReasoning {
   lat: number;
   lng: number;
   explanation: string;
   quip?: string;
 }
 
-export interface BotRoundState {
+export interface BotRoundState extends BotAccounting {
+  guessFinalized?: boolean;
   slotId: string;
   name: string;
   color: BotSlotConfig['color'];
@@ -105,6 +107,7 @@ export interface RoundResultsState {
 }
 
 export interface RoundArchiveRecord {
+  gen?: number;
   roundNumber: number;
   target: RoundTarget;
   humanWaitMs: number | null;
@@ -233,6 +236,15 @@ export type EngineEvent =
       roundNumber: number;
       botId: string;
       guess: BotGuessData;
+      finalized?: boolean;
+    }
+  | {
+      type: 'bot_accounting';
+      matchId: string;
+      gen: number;
+      roundNumber: number;
+      botId: string;
+      accounting: BotAccounting;
     }
   | {
       type: 'bot_finished';
