@@ -64,18 +64,16 @@ export function computeMedianAndIqr(values: readonly number[]): {
   return { median: Math.round(q2 * 10) / 10, iqr: Math.round((q3 - q1) * 10) / 10 };
 }
 
-/**
- * The guess the game would score for the bot. A repeated submit_guess overwrites the earlier one
- * and the reducer ignores a bot's events once it has finished, so this is the last guess recorded
- * before the first bot_finished.
- */
+/** Select the first final guess, or the latest draft before the bot finishes. */
 export function pickFinalGuess(events: readonly EngineEvent[]): BotGuessData | null {
-  let final: BotGuessData | null = null;
+  let draft: BotGuessData | null = null;
   for (const event of events) {
     if (event.type === 'bot_finished') break;
-    if (event.type === 'bot_guess_recorded') final = event.guess;
+    if (event.type !== 'bot_guess_recorded') continue;
+    if (event.finalized ?? true) return event.guess;
+    draft = event.guess;
   }
-  return final;
+  return draft;
 }
 
 export function loadDataset(datasetDir: string | null): EvalSampleItem[] {

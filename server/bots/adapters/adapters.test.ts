@@ -80,6 +80,7 @@ test('agy passes --effort only to models whose name does not already fix the eff
   expect(agyEffortArgs('gemini-3-pro', 'medium')).toEqual(['--effort', 'medium']);
 });
 
+// protects=Codex tool approvals and JSON output; fails_when=draft or final requires approval or output is not JSON; why_new=isolation checks did not assert tool config; seam=none; no_claim=argv does not prove CLI compatibility.
 test('claude and codex launch specs isolate tools and disable web search', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-cc-spec-'));
   try {
@@ -108,6 +109,9 @@ test('claude and codex launch specs isolate tools and disable web search', () =>
     expect(codexSpec.stdinText).toBe('go-codex');
     expect(codexSpec.cmd).toContain('web_search="disabled"');
     expect(codexSpec.cmd).toContain('features.shell_tool=false');
+    expect(codexSpec.cmd).toContain('--json');
+    expect(codexSpec.cmd).toContain('mcp_servers.geo.tools.draft_guess.approval_mode="approve"');
+    expect(codexSpec.cmd).toContain('mcp_servers.geo.tools.final_guess.approval_mode="approve"');
     expect(codexSpec.cmd.some((a) => a.includes('t2'))).toBe(false);
     expect(readFileSync(path.join(codexSpec.cwd, 'geo-bot-token'), 'utf8')).toBe('t2');
   } finally {
@@ -165,6 +169,8 @@ test('agy guard allows only the exact geo tools, not other MCP servers with a ge
     const guardPath = path.join(spec.cwd, '.agents', 'plugins', 'geo', 'guard.ts');
     expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_observe', args: {} })).toBe('allow');
     expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_submit_guess', args: {} })).toBe('allow');
+    expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_draft_guess', args: {} })).toBe('allow');
+    expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_final_guess', args: {} })).toBe('allow');
     expect(runAgyGuard(guardPath, { name: 'mcp_geo_geo_extra_shell', args: {} })).toBe('deny');
     expect(runAgyGuard(guardPath, { name: 'run_command', args: { command: 'ls' } })).toBe('deny');
     expect(
@@ -212,4 +218,35 @@ test('claude adds the models Claude Code caches for this account, without contex
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// protects=prompt tool, evidence, zoom and delivery guidance; fails_when=exploration or image instructions disappear; why_new=sanitization tests do not check behavior instructions; seam=none; no_claim=presence does not prove model compliance.
+test('round prompt describes checkpoints, exploration and image delivery', () => {
+  const options = {
+    botName: 'Bot',
+    regionLabelRu: 'Мир',
+    moveEnabled: true,
+    moveLimit: 3,
+    budgetSec: 60,
+    personalityPreset: 'neutral' as const,
+    personalityText: '',
+  };
+  const mcp = buildBotRoundPrompt({ ...options, deliveryMode: 'mcp' });
+  const file = buildBotRoundPrompt({ ...options, deliveryMode: 'file' });
+  for (const prompt of [mcp, file]) {
+    expect(prompt.indexOf('draft_guess')).toBeLessThan(prompt.indexOf('final_guess'));
+    for (const field of [
+      'facts',
+      'rejected_guesses',
+      'conclusion',
+      'hypothesis',
+      'fov=90',
+      '20–45',
+      'zoom',
+    ])
+      expect(prompt).toContain(field);
+    expect(prompt).toContain('не вызывай final_guess');
+  }
+  expect(mcp).toContain('прямо в ответе MCP');
+  expect(file).toContain('прочитай их через read_file');
 });

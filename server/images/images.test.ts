@@ -142,3 +142,25 @@ test('bot image service reserves static quota per retry attempt on 500 -> 200', 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// protects=fake zoom changes projected feature scale; fails_when=fov is ignored or scene is uniform; no_claim=photorealistic perspective.
+test('fake frame enlarges the same sign when fov narrows', async () => {
+  const { createFakeRawFrame } = await import('./bot-image-service.ts');
+  const sharp = (await import('sharp')).default;
+  const measure = async (fov: number) => {
+    const frame = await createFakeRawFrame(0, 0, 0, fov);
+    const { data, info } = await sharp(frame).raw().toBuffer({ resolveWithObject: true });
+    let count = 0;
+    for (let y = 200; y < 320; y += 1) {
+      for (let x = 320; x < 560; x += 1) {
+        const i = (y * info.width + x) * info.channels;
+        if ((data[i] ?? 0) > 180 && (data[i + 1] ?? 0) > 160 && (data[i + 2] ?? 0) > 90) count += 1;
+      }
+    }
+    return count;
+  };
+  const normal = await measure(90);
+  const zoomed = await measure(45);
+  expect(normal).toBeGreaterThan(1000);
+  expect(zoomed).toBeGreaterThan(normal * 3);
+});

@@ -1,4 +1,5 @@
 import { handleProfileAction } from './profile.ts';
+import { handleBotAccounting } from './bot-accounting.ts';
 import { handleEndMatch, handlePlayAgain } from './final.ts';
 import {
   handleAddBot,
@@ -83,11 +84,13 @@ function handleBotEvent(state: RoomState, event: EngineEvent, now: number): Redu
   } else if (event.type === 'bot_thumb_added') {
     updatedBot = { ...bot, thumbs: [...bot.thumbs, event.thumb] };
   } else if (event.type === 'bot_guess_recorded') {
+    if (bot.guessFinalized) return { state, effects: [] };
     updatedBot = {
       ...bot,
       firstGuessAt: bot.firstGuessAt ?? now,
       lastGuessAt: now,
       guess: event.guess,
+      guessFinalized: event.finalized ?? true,
     };
   } else {
     updatedBot = {
@@ -353,6 +356,8 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
     case 'bot_guess_recorded':
     case 'bot_finished':
       return handleBotEvent(state, event, now);
+    case 'bot_accounting':
+      return handleBotAccounting(state, event);
     case 'deadline_tick':
       return handleDeadlineTick(state, event, now);
     case 'next_round':

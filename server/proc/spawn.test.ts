@@ -115,3 +115,20 @@ test('spawnManaged reaps grandchildren when the group leader exits on its own', 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('drained waits for trailing stdout from a real child', async () => {
+  const output = 'a'.repeat(180000) + 'terminal';
+  let observed = '';
+  const handle = spawnManaged({
+    cmd: [process.execPath, '-e', "process.stdout.write('a'.repeat(180000) + 'terminal')"],
+    cwd: process.cwd(),
+    kind: 'test-output',
+    onStdoutChunk: (chunk) => {
+      observed += chunk;
+    },
+  });
+  await handle.exited;
+  await handle.drained;
+  expect(observed).toBe(output);
+  expect(handle.getStdout()).toBe(output);
+});

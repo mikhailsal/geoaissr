@@ -2,9 +2,8 @@ import {
   formatToolZodError,
   lookInputSchema,
   moveInputSchema,
-  normalizeSubmitGuessInput,
+  parseGuessInput,
   observeInputSchema,
-  submitGuessInputSchema,
   type NormalizedGuessInput,
 } from '../../shared/bot-tools.ts';
 
@@ -21,9 +20,10 @@ export interface BotSessionHandlers {
     heading: number;
     pitch: number;
     fov: number;
+    hypothesis?: string;
   }) => Promise<ToolResponsePayload>;
-  executeMove: (args: { heading: number }) => Promise<ToolResponsePayload>;
-  onGuess: (guess: NormalizedGuessInput) => void;
+  executeMove: (args: { heading: number; hypothesis?: string }) => Promise<ToolResponsePayload>;
+  onGuess: (guess: NormalizedGuessInput, finalized: boolean) => void;
   onTurnsChanged: (turnsUsed: number) => void;
   getRemainingTimeSec: () => number;
 }
@@ -43,26 +43,21 @@ interface QueueState {
   turnsUsed: number;
   failedCalls: number;
   roundStartedPromise: Promise<void> | null;
+  finalized: boolean;
 }
 
-function recordQueueFailure(
-  st: QueueState,
-  baseMsg: string,
-  spendTurnNote?: string,
-): ToolResponsePayload {
+function recordQueueFailure(st: QueueState, baseMsg: string): ToolResponsePayload {
   st.failedCalls += 1;
-  if (st.failedCalls > 3 && st.turnsUsed < st.moveLimit) {
-    st.turnsUsed += 1;
-    st.handlers.onTurnsChanged(st.turnsUsed);
-    const rem = Math.max(0, st.moveLimit - st.turnsUsed);
-    return {
-      text: `${baseMsg}\nПревышен порог бесплатных ошибок (>3): списан 1 ход (осталось ${rem}).`,
-      isError: true,
-    };
-  }
-  const note =
-    spendTurnNote ?? `Ход не списан (ошибок без штрафа: ${Math.min(st.failedCalls, 3)}/3).`;
-  return { text: `${baseMsg}\n${note}`, isError: true };
+  return { text: `${baseMsg}\nХод не списан.`, isError: true };
+}
+
+function optionalHypothesis(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return raw;
+  const data = { ...raw } as Record<string, unknown>;
+  const parsed = lookInputSchema.shape.hypothesis.safeParse(data.hypothesis);
+  if (parsed.success) data.hypothesis = parsed.data;
+  else delete data.hypothesis;
+  return data;
 }
 
 function isSignalAborted(signal: AbortSignal): boolean {
@@ -89,6 +84,8 @@ async function executeQueuedTool(
     return { text: 'Раунд уже завершён.', isError: true };
   }
 
+  if (st.finalized) return { text: 'Окончательная догадка уже отправлена.', isError: true };
+
   if (toolName === 'observe') {
     const parsed = observeInputSchema.safeParse(rawArgs ?? {});
     if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
@@ -96,30 +93,37 @@ async function executeQueuedTool(
     return st.handlers.executeObserve();
   }
 
-  if (toolName === 'submit_guess') {
-    const parsed = submitGuessInputSchema.safeParse(rawArgs ?? {});
-    if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
+  if (toolName === 'submit_guess' || toolName === 'final_guess' || toolName === 'draft_guess') {
+    const guess = parseGuessInput(rawArgs);
+    if (!guess) return recordQueueFailure(st, 'Неверные координаты догадки.');
     if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
-    const norm = normalizeSubmitGuessInput(parsed.data);
-    st.handlers.onGuess(norm);
+    const finalized = toolName !== 'draft_guess';
+    st.handlers.onGuess(guess, finalized);
+    st.finalized = finalized;
     const remMoves = Math.max(0, st.moveLimit - st.turnsUsed);
     const remSec = Math.max(0, Math.round(st.handlers.getRemainingTimeSec()));
     return {
-      text: `Догадка принята (${norm.lat.toFixed(3)}, ${norm.lng.toFixed(3)}). Осталось ходов: ${remMoves}, до конца бюджета: ${remSec} с.`,
+      text: finalized
+        ? 'Окончательная догадка принята.'
+        : `Черновик сохранён. Осталось ходов: ${remMoves}, времени: ${remSec} с — продолжай исследование, если не уверен окончательно.`,
     };
   }
 
   if (toolName === 'look') {
-    const parsed = lookInputSchema.safeParse(rawArgs ?? {});
+    const parsed = lookInputSchema
+      .extend({ hypothesis: lookInputSchema.shape.hypothesis.optional() })
+      .safeParse(optionalHypothesis(rawArgs ?? {}));
     if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
     if (st.turnsUsed >= st.moveLimit) {
       return {
-        text: `Лимит ходов (${st.moveLimit}) исчерпан. Отправьте догадку через submit_guess.`,
+        text: `Лимит ходов (${st.moveLimit}) исчерпан. Отправьте догадку через final_guess.`,
         isError: true,
       };
     }
     if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
-    const res = await st.handlers.executeLook(parsed.data);
+    const { fov, zoom, ...rest } = parsed.data;
+    const effectiveFov = Math.max(10, Math.min(120, fov ?? (zoom ? Math.round(90 / zoom) : 90)));
+    const res = await st.handlers.executeLook({ ...rest, fov: effectiveFov });
     if (res.isError) return recordQueueFailure(st, res.text);
     st.turnsUsed += 1;
     st.handlers.onTurnsChanged(st.turnsUsed);
@@ -130,11 +134,13 @@ async function executeQueuedTool(
     if (!st.moveEnabled) {
       return recordQueueFailure(st, 'Движение (move) отключено в этой партии.');
     }
-    const parsed = moveInputSchema.safeParse(rawArgs ?? {});
+    const parsed = moveInputSchema
+      .extend({ hypothesis: moveInputSchema.shape.hypothesis.optional() })
+      .safeParse(optionalHypothesis(rawArgs ?? {}));
     if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
     if (st.turnsUsed >= st.moveLimit) {
       return {
-        text: `Лимит ходов (${st.moveLimit}) исчерпан. Отправьте догадку через submit_guess.`,
+        text: `Лимит ходов (${st.moveLimit}) исчерпан. Отправьте догадку через final_guess.`,
         isError: true,
       };
     }
@@ -163,6 +169,7 @@ export function createBotToolQueue(opts: {
     turnsUsed: 0,
     failedCalls: 0,
     roundStartedPromise: null,
+    finalized: false,
   };
   let tail: Promise<unknown> = Promise.resolve();
 

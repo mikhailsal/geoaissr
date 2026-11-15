@@ -14,7 +14,7 @@ function makeHandlers(overrides: Partial<BotSessionHandlers> = {}): BotSessionHa
   };
 }
 
-test('queue enforces moveLimit, gives first 3 failed calls free, and charges turns on 4th failure', async () => {
+test('only successful look and move consume turns', async () => {
   let turns = 0;
   const q = createBotToolQueue({
     moveLimit: 2,
@@ -33,14 +33,16 @@ test('queue enforces moveLimit, gives first 3 failed calls free, and charges tur
     expect(turns).toBe(0);
   }
 
-  // 4th failed call -> charges 1 turn
+  // Additional failures remain free.
   const fourth = await q.dispatch('look', { heading: 999 });
   expect(fourth.isError).toBe(true);
-  expect(turns).toBe(1);
+  expect(turns).toBe(0);
 
-  // 1 valid move -> hits moveLimit 2
+  // Successful moves and looks consume the budget.
   const mv = await q.dispatch('move', { heading: 90 });
   expect(mv.isError).toBeUndefined();
+  expect(turns).toBe(1);
+  expect((await q.dispatch('look', { heading: 180 })).isError).toBeUndefined();
   expect(turns).toBe(2);
 
   // Next look blocked
@@ -122,4 +124,50 @@ test('look and submit_guess wait for round start release before executing', asyn
   const res = await pendingGuess;
   expect(res.isError).toBeUndefined();
   expect(guessCalls).toBe(1);
+});
+
+// protects=draft fallback and final immutability; fails_when=checkpoint terminates or final is overwritten; no_claim=engine scoring.
+test('drafts remain free, final is accepted at the limit and closes the queue', async () => {
+  const guesses: Array<{ lat: number; finalized: boolean }> = [];
+  const q = createBotToolQueue({
+    moveLimit: 1,
+    moveEnabled: true,
+    handlers: makeHandlers({
+      onGuess: (g, finalized) => guesses.push({ lat: g.lat, finalized }),
+    }),
+  });
+  expect((await q.dispatch('draft_guess', { lat: 1, lng: 190 })).text).toContain(
+    'Осталось ходов: 1',
+  );
+  expect((await q.dispatch('look', { heading: 0 })).isError).toBeUndefined();
+  expect((await q.dispatch('draft_guess', { lat: 2, lng: 0 })).isError).toBeUndefined();
+  expect((await q.dispatch('final_guess', { lat: 3, lng: 0 })).isError).toBeUndefined();
+  expect((await q.dispatch('draft_guess', { lat: 4, lng: 0 })).isError).toBe(true);
+  expect(guesses).toEqual([
+    { lat: 1, finalized: false },
+    { lat: 2, finalized: false },
+    { lat: 3, finalized: true },
+  ]);
+  expect(q.getTurnsUsed()).toBe(1);
+});
+
+// protects=zoom precedence and tolerant hypothesis; fails_when=fov is defaulted before zoom or malformed optional text rejects a call; no_claim=image rendering.
+test('look resolves zoom and explicit fov and tolerates absent hypothesis', async () => {
+  const views: Array<{ fov: number; hypothesis?: string }> = [];
+  const q = createBotToolQueue({
+    moveLimit: 4,
+    moveEnabled: true,
+    handlers: makeHandlers({
+      executeLook: (args) => {
+        views.push(args);
+        return Promise.resolve({ text: 'ok' });
+      },
+    }),
+  });
+  await q.dispatch('look', { heading: 10, zoom: 3, hypothesis: '  sign  ' });
+  await q.dispatch('look', { heading: 10, zoom: 3, fov: 200, hypothesis: '' });
+  await q.dispatch('look', { heading: 10, fov: 5 });
+  expect(views.map((v) => v.fov)).toEqual([30, 120, 10]);
+  expect(views[0]?.hypothesis).toBe('sign');
+  expect(views[1]?.hypothesis).toBeUndefined();
 });

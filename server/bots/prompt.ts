@@ -1,9 +1,4 @@
-import {
-  EXPLANATION_MAX_LEN,
-  QUIP_MAX_LEN,
-  type BotImageSize,
-  type PersonalityPreset,
-} from '../../shared/bot-tools.ts';
+import { QUIP_MAX_LEN, type BotImageSize, type PersonalityPreset } from '../../shared/bot-tools.ts';
 
 const PRESET_TONE_RU: Record<PersonalityPreset, string> = {
   neutral: 'Спокойный, точный и деловой тон.',
@@ -52,13 +47,14 @@ export function buildBotRoundPrompt(opts: {
 
   return [
     `Ты — «${safeBotName}», участник игры угадывания геолокации по уличным панорамам (регион партии: ${opts.regionLabelRu}).`,
-    `У тебя строго изолированное окружение: используй ТОЛЬКО инструменты observe, look, move, submit_guess.`,
+    `У тебя строго изолированное окружение: используй ТОЛЬКО инструменты observe, look, move, draft_guess, final_guess.`,
     `ПРАВИЛА И ТАКТИКА:`,
     `1. Первым действием ВСЕГДА вызови observe() — это бесплатно и даст 4 панорамных кадра (С, В, Ю, З).`,
     `2. ${fileNote}`,
-    `3. После анализа стартовых кадров СРАЗУ вызови submit_guess с первой лучшей гипотезой (explanation до ${EXPLANATION_MAX_LEN} символов на русском, опционально quip до ${QUIP_MAX_LEN} символов). Повторный submit_guess перезаписывает догадку на более точную.`,
+    `3. Сохрани лучшую текущую версию через draft_guess. В полях facts, rejected_guesses (2–3 версии) и conclusion сначала объясни улики и вывод, затем укажи lat, lng и необязательный quip до ${QUIP_MAX_LEN} символов.`,
     `4. ${moveRule} Бюджет времени на раунд: ${opts.budgetSec} с. Не трать весь бюджет перед первой догадкой!`,
-    `5. Стиль: ${toneLine} В поле explanation обязательно перечисли конкретные визуальные улики с кадров.`,
+    `5. Для look и move укажи hypothesis: что проверяешь и почему. Для look fov=90 — обычный обзор, 20–45 — приближение знаков, 120 — широкий обзор; можно указать zoom от 1 до 9.`,
+    `6. Пока не уверен и остаются ходы и время, продолжай исследование, не вызывай final_guess и не завершай работу. Когда уверен или бюджет исчерпан, вызови final_guess. Стиль: ${toneLine}`,
   ].join('\n');
 }
 
@@ -74,6 +70,6 @@ export function buildVisionCheckPrompt(
     `Служебная самопроверка зрения (${imageSize}px).`,
     `1. Вызови observe().`,
     `2. ${readInstruction}`,
-    `3. На изображении крупно написан 4-значный цифровой код. Вызови submit_guess с lat=0, lng=0 и запиши точный 4-значный код в начало поля explanation.`,
+    `3. На изображении крупно написан 4-значный цифровой код. Вызови final_guess с lat=0, lng=0 и запиши точный 4-значный код в начало поля conclusion; заполни facts и rejected_guesses.`,
   ].join('\n');
 }

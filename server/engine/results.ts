@@ -1,4 +1,5 @@
 import type { RoundResultEntryView } from '../../shared/protocol.ts';
+import { accountingFields } from './bot-accounting.ts';
 import {
   calculateRoundScore,
   computeHumanVsAiRound,
@@ -138,6 +139,11 @@ function scoreBotsForRound(
       roundScore,
       totalScore,
       explanation: guess?.explanation,
+      facts: guess?.facts,
+      rejectedGuesses: guess?.rejectedGuesses,
+      conclusion: guess?.conclusion,
+      usedDraft: guess !== null && bot.guessFinalized === false,
+      ...accountingFields(bot),
       quip: guess?.quip,
       turnsUsed: bot.turnsUsed,
       elapsedMs,
@@ -232,6 +238,7 @@ export function finishActiveRoundToResults(
       : null;
 
   const archive: RoundArchiveRecord = {
+    gen: state.gen,
     roundNumber: active.roundNumber,
     target,
     humanWaitMs,

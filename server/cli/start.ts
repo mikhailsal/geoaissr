@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
+import type { BotCostEstimate, BotTokenUsage } from '../../shared/bot-results.ts';
+import { createPricingService } from '../bots/pricing.ts';
 import type { TunnelStatusView } from '../../shared/protocol.ts';
 import type { CommandProbe } from '../bots/adapters/types.ts';
 import { detectAllHarnesses } from '../bots/adapters/index.ts';
@@ -53,6 +55,7 @@ export interface StartGeoServerDeps {
   openBrowserFn?: (url: string) => void;
   buildClientFn?: () => Promise<number>;
   buildCustomLaunchSpec?: CustomBotLaunchBuilder;
+  estimateBotCost?: (model: string, usage: BotTokenUsage) => Promise<BotCostEstimate>;
   installProcessHandlers?: boolean;
   onUnexpectedCrash?: (crashFile: string, err: unknown) => void;
 }
@@ -111,6 +114,10 @@ function createNetTransport(opts: {
     rateLimiter,
   });
   return { wsCoordinator, httpServer };
+}
+
+function resolveEstimateBotCost(deps: StartGeoServerDeps, paths: AppPaths) {
+  return deps.estimateBotCost ?? createPricingService({ dataDir: paths.dataDir }).estimateCost;
 }
 
 function createServerPipeline(opts: PipelineBuildOpts) {
@@ -174,6 +181,7 @@ function createServerPipeline(opts: PipelineBuildOpts) {
     dispatch: (ev) => shell.dispatch(ev),
     logger,
     buildCustomLaunchSpec: deps.buildCustomLaunchSpec,
+    estimateCost: resolveEstimateBotCost(deps, paths),
   });
   const net = createNetTransport({
     cli,

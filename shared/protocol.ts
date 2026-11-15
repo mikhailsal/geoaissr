@@ -7,6 +7,8 @@ import {
   personalityTextSchema,
 } from './bot-tools.ts';
 import { PARTICIPANT_COLOR_IDS } from './colors.ts';
+import type { BotAccounting, BotReasoning, BotTurnThumbView } from './bot-results.ts';
+export type { BotTurnThumbView } from './bot-results.ts';
 import {
   HARNESS_IDS,
   REGION_IDS,
@@ -253,15 +255,8 @@ export interface BotRoundProgressView {
   abortReason?: string;
 }
 
-export interface BotTurnThumbView {
-  turn: number;
-  action: 'observe' | 'look' | 'move';
-  label: string;
-  thumbUrl: string;
-  fullUrl?: string;
-}
-
-export interface RoundResultEntryView {
+export interface RoundResultEntryView extends BotReasoning, BotAccounting {
+  usedDraft?: boolean;
   wins6h: number;
   id: string;
   name: string;

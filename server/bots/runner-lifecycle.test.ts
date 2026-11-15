@@ -95,3 +95,78 @@ test('a closed runner launches no bots and no vision checks', async () => {
     },
   );
 });
+
+// protects=runner look/move metadata and real image request fov; fails_when=effective fov, normalized parameters or hypotheses are dropped; why_new=queue mocks do not exercise runner and image boundaries; seam=none; no_claim=mock fetch does not prove Google rendering.
+test('runner records paid tool parameters and requests effective fov', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-runner-views-'));
+  const events: EngineEvent[] = [];
+  const urls: string[] = [];
+  const sharp = (await import('sharp')).default;
+  const image = await sharp({
+    create: { width: 640, height: 640, channels: 3, background: 'grey' },
+  })
+    .jpeg()
+    .toBuffer();
+  const imageService = createBotImageService({
+    serverKey: 'test',
+    fakeMode: false,
+    quotaManager: createQuotaManager(path.join(dir, 'quota.json')),
+    thumbStore: createThumbStore(),
+    fetchImpl: (url) => {
+      urls.push(url);
+      return Promise.resolve(new Response(new Uint8Array(image)));
+    },
+  });
+  const runner = createBotRunner({
+    runDir: path.join(dir, 'run'),
+    childrenFile: path.join(dir, 'children.json'),
+    fakeMode: true,
+    imageService,
+    locationService: createFakeLocationService(),
+    dispatch: (event) => events.push(event),
+    buildCustomLaunchSpec: ({ workDir, apiUrl, botToken }) => ({
+      cwd: workDir,
+      cmd: [
+        process.execPath,
+        '-e',
+        `
+        const base = ${JSON.stringify(apiUrl)}, token = ${JSON.stringify(botToken)};
+        async function call(name, body) {
+          const response = await fetch(base + '/tool/' + name, {method:'POST', headers:{authorization:'Bearer '+token,'content-type':'application/json'}, body:JSON.stringify(body)});
+          if ((await response.json()).isError) process.exit(1);
+        }
+        await call('look', {heading:359.6,pitch:4.6,zoom:3,hypothesis:'Проверяю знак'});
+        await call('move', {heading:90.4,hypothesis:'Проверяю дорогу'});
+        await call('final_guess', {lat:1,lng:2});
+      `,
+      ],
+    }),
+  });
+  try {
+    runner.startRoundBots({ ...(await roundParams()), bots: [makeSlot('b1')] });
+    runner.releaseObserve('m1', 1, 1);
+    const deadline = Date.now() + 5000;
+    while (!events.some((event) => event.type === 'bot_finished') && Date.now() < deadline)
+      await Bun.sleep(10);
+    expect(events.find((event) => event.type === 'bot_finished')).toMatchObject({ aborted: false });
+    const thumbs = events
+      .filter((event) => event.type === 'bot_thumb_added')
+      .map((event) => event.thumb);
+    expect(thumbs).toMatchObject([
+      {
+        action: 'look',
+        turn: 1,
+        params: { heading: 0, pitch: 5, fov: 30 },
+        hypothesis: 'Проверяю знак',
+      },
+      { action: 'move', turn: 2, params: { heading: 90, step: 1 }, hypothesis: 'Проверяю дорогу' },
+    ]);
+    const lookUrl = new URL(urls[0] ?? 'http://invalid');
+    expect(lookUrl.searchParams.get('heading')).toBe('0');
+    expect(lookUrl.searchParams.get('pitch')).toBe('5');
+    expect(lookUrl.searchParams.get('fov')).toBe('30');
+  } finally {
+    await runner.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

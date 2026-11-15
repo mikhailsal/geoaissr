@@ -63,7 +63,9 @@ function buildVisionQueue(digits: string, visionState: { sawDigits: boolean }, s
       executeLook: () => Promise.resolve({ text: 'Недоступно в проверке зрения', isError: true }),
       executeMove: () => Promise.resolve({ text: 'Недоступно в проверке зрения', isError: true }),
       onGuess: (g) => {
-        if (g.explanation.includes(digits)) visionState.sawDigits = true;
+        if ([g.explanation, g.conclusion].some((text) => text?.includes(digits))) {
+          visionState.sawDigits = true;
+        }
       },
       onTurnsChanged: () => undefined,
       getRemainingTimeSec: () => 45,
