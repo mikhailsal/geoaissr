@@ -14,3 +14,20 @@ test('thumb store issues 128-bit hex ids and clears to null (404) on return to l
   expect(store.size()).toBe(0);
   expect(store.get(id)).toBeNull();
 });
+
+test('thumb store evicts least-recently-used entries when maxBytes is exceeded', () => {
+  const store = createThumbStore(10);
+  const a = store.put(Buffer.alloc(4, 1));
+  const b = store.put(Buffer.alloc(4, 2));
+  expect(store.size()).toBe(2);
+
+  // Touch `a` so `b` becomes least-recently-used.
+  expect(store.get(a)).not.toBeNull();
+
+  // Adding 4 bytes (4 + 4 + 4 = 12 > 10) should evict `b`, keeping `a` and `c`.
+  const c = store.put(Buffer.alloc(4, 3));
+  expect(store.get(b)).toBeNull();
+  expect(store.get(a)).not.toBeNull();
+  expect(store.get(c)).not.toBeNull();
+  expect(store.size()).toBe(2);
+});
