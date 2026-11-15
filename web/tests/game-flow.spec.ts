@@ -130,7 +130,12 @@ async function assertBotCardInteractions(hostPage: Page): Promise<void> {
   const zoomedImg = hostPage.locator('.zoomed-preview img');
   await expect(zoomedImg).toBeVisible();
   expect(await zoomedImg.getAttribute('src')).toMatch(/^\/thumb\//);
-  await expect(zoomedImg).toHaveCSS('max-height', '640px');
+  const preview = hostPage.getByRole('dialog', { name: 'Снимок бота' });
+  await expect(preview).toBeVisible();
+  const bounds = await preview.boundingBox();
+  if (!bounds) throw new Error('Snapshot dialog has no bounds');
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(hostPage.viewportSize()?.height ?? 720);
   await expect(zoomedImg).toHaveCSS('max-width', '100%');
   await expect(zoomedImg).toHaveCSS('object-fit', 'contain');
   await expect(async () => {
@@ -144,7 +149,7 @@ async function assertBotCardInteractions(hostPage: Page): Promise<void> {
   await zoomedImg.dispatchEvent('error');
   await expect(zoomedImg).toBeVisible();
   expect(await zoomedImg.getAttribute('src')).toBe(thumbSrc);
-  await firstThumb.click();
+  await hostPage.getByRole('button', { name: 'Закрыть снимок' }).click();
   await expect(zoomedImg).toHaveCount(0);
 
   const secondThumb = hostPage.locator('.bot-card .thumb-item').nth(1);

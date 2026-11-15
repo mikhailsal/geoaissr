@@ -87,6 +87,7 @@ test('bot snapshots open within the viewport and close back to the thumbnail', a
       expect(bounds.y).toBeGreaterThanOrEqual(0);
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
       expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
+      await page.screenshot({ path: test.info().outputPath(`snapshot-${width}.png`) });
       await page.keyboard.press('Escape');
       await expect(modal).toHaveCount(0);
       await expect(thumbnail).toBeFocused();
