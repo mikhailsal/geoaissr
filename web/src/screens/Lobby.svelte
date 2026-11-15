@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check, ChevronDown, ChevronUp, Copy } from '@lucide/svelte';
+  import { ChevronDown, ChevronUp } from '@lucide/svelte';
   import type { DifficultyPreset } from '$shared/bot-tools';
   import type { ParticipantColorId } from '$shared/colors';
   import type { ClientViewState } from '$shared/protocol';
@@ -50,7 +50,6 @@
   }: Props = $props();
 
   let expandedBotId = $state<string | null>(null);
-  let copiedInvite = $state(false);
 
   const usedColors = $derived<ParticipantColorId[]>([
     ...view.players.map((p) => p.color),
@@ -59,19 +58,6 @@
   const enabledBotsCount = $derived(view.bots.filter((b) => b.enabled).length);
   const hostName = $derived(view.players.find((p) => p.isHost)?.name ?? 'хоста');
   const minDurationSec = $derived(enabledBotsCount > 0 ? 60 : 30);
-
-  async function copyInviteInline(): Promise<void> {
-    if (!view.tunnel.inviteUrl) return;
-    try {
-      await navigator.clipboard.writeText(view.tunnel.inviteUrl);
-      copiedInvite = true;
-      window.setTimeout(() => {
-        copiedInvite = false;
-      }, 2_000);
-    } catch {
-      copiedInvite = false;
-    }
-  }
 </script>
 
 <main class="lobby-page">
@@ -126,13 +112,6 @@
       {#if view.players.length === 1}
         <div class="alone-box">
           <span>{RU.lobby.aloneHint}</span>
-          {#if view.tunnel.inviteUrl}
-            <button type="button" class="btn" onclick={() => void copyInviteInline()}>
-              {#if copiedInvite}<Check size={16} />{RU.lobby.copiedInvite}{:else}<Copy
-                  size={16}
-                />{RU.lobby.copyInvite}{/if}
-            </button>
-          {/if}
         </div>
       {/if}
 

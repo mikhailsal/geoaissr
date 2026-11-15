@@ -66,7 +66,7 @@
     </button>
   {/if}
 
-  {#if viewerIsHost && (canEndEarly || inviteUrl)}
+  {#if viewerIsHost && canEndEarly}
     <div class="dropdown-wrap">
       <button
         type="button"
@@ -83,17 +83,6 @@
 
       {#if menuOpen}
         <div class="menu-popover panel" role="menu">
-          {#if inviteUrl}
-            <button
-              type="button"
-              class="menu-item"
-              role="menuitem"
-              onclick={() => void copyInvite()}
-            >
-              {copied ? RU.lobby.copiedInvite : RU.lobby.copyInvite}
-            </button>
-          {/if}
-
           {#if canEndEarly}
             {#if !confirmEnd}
               <button

@@ -389,6 +389,10 @@
   }
 
   @media (max-width: 899px) {
+    .map-top-bar {
+      flex-wrap: wrap;
+    }
+
     .results-layout {
       grid-template-columns: 1fr;
       grid-template-rows: 42dvh 1fr;
