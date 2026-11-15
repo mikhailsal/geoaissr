@@ -1,3 +1,4 @@
+// Value: protects=bot card zoom preview loads fullUrl with responsive CSS limits and broken thumb suppresses zoom; fails_when=zoomed preview ignores fullUrl or CSS sizing regresses or broken thumb still renders button; why_new=game-flow verified thumb presence but omitted CSS constraints, full-res naturalWidth, and broken thumb fallback; seam=none; no_claim=does not assert visual image canvas pixels or network disconnection timing
 import { expect, test, type Page } from '@playwright/test';
 import {
   assertAxeClean,
@@ -73,11 +74,46 @@ async function playRoundOne(hostPage: Page, guestPage: Page): Promise<void> {
   await assertAxeClean(hostPage, 'RoundResults');
   await assertNoHorizontalOverflow(hostPage);
 
+  await assertBotCardInteractions(hostPage);
+}
+
+async function assertBotCardInteractions(hostPage: Page): Promise<void> {
   const whyBtn = hostPage.getByRole('button', { name: 'почему?' }).first();
   await whyBtn.click();
   await expect(hostPage.locator('.bot-card')).toBeVisible();
   // All four start frames (N, E, S, W) are shown, not only the first one.
   expect(await hostPage.locator('.bot-card .thumb-item').count()).toBeGreaterThanOrEqual(4);
+  const firstThumb = hostPage.locator('.bot-card .thumb-btn').first();
+  await firstThumb.click();
+  const zoomedImg = hostPage.locator('.zoomed-preview img');
+  await expect(zoomedImg).toBeVisible();
+  expect(await zoomedImg.getAttribute('src')).toMatch(/^\/thumb\//);
+  await expect(zoomedImg).toHaveCSS('max-height', '640px');
+  await expect(zoomedImg).toHaveCSS('max-width', '100%');
+  await expect(zoomedImg).toHaveCSS('object-fit', 'contain');
+  await expect(async () => {
+    const nw = await zoomedImg.evaluate((img: HTMLImageElement) => img.naturalWidth);
+    expect(nw).toBeGreaterThan(160);
+  }).toPass();
+  // When the full-res zoomed image errors, it falls back to the 160px thumbUrl.
+  const fullSrc = await zoomedImg.getAttribute('src');
+  const thumbSrc = await firstThumb.locator('img').getAttribute('src');
+  expect(fullSrc).not.toBe(thumbSrc);
+  await zoomedImg.dispatchEvent('error');
+  await expect(zoomedImg).toBeVisible();
+  expect(await zoomedImg.getAttribute('src')).toBe(thumbSrc);
+  await firstThumb.click();
+  await expect(zoomedImg).toHaveCount(0);
+
+  const secondThumb = hostPage.locator('.bot-card .thumb-item').nth(1);
+  await secondThumb.locator('img').dispatchEvent('error');
+  await expect(secondThumb.locator('.thumb-fallback')).toBeVisible();
+  await expect(secondThumb.locator('.thumb-fallback')).toHaveText(
+    'Снимки этого раунда уже удалены',
+  );
+  await expect(secondThumb.locator('.thumb-btn')).toHaveCount(0);
+  await expect(hostPage.locator('.zoomed-preview')).toHaveCount(0);
+
   await hostPage.keyboard.press('Escape');
   await expect(hostPage.locator('.bot-card')).toHaveCount(0);
   await expect(whyBtn).toBeFocused();

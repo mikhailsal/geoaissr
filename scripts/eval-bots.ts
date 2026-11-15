@@ -172,7 +172,14 @@ async function renderDatasetFrame(
   const jpeg = await annotateStreetViewImage(raw, size, parts);
   const thumb = await createThumb(jpeg);
   const thumbId = thumbStore.put(thumb);
-  return { jpeg, thumbId, thumbUrl: `/thumb/${thumbId}`, label: parts.fullText };
+  return {
+    jpeg,
+    thumbId,
+    thumbUrl: `/thumb/${thumbId}`,
+    fullId: thumbId,
+    fullUrl: `/thumb/${thumbId}`,
+    label: parts.fullText,
+  };
 }
 
 function createEvalDatasetImageService(

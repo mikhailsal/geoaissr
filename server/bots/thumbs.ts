@@ -7,7 +7,13 @@ export function makeThumb(
   action: 'observe' | 'look' | 'move',
   rendered: RenderedBotImage,
 ): BotTurnThumbView {
-  return { turn, action, label: rendered.label, thumbUrl: rendered.thumbUrl };
+  return {
+    turn,
+    action,
+    label: rendered.label,
+    thumbUrl: rendered.thumbUrl,
+    fullUrl: rendered.fullUrl,
+  };
 }
 
 /** The bot sees all four start frames, so the "why?" card shows all four too. */

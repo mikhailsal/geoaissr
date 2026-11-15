@@ -50,7 +50,21 @@ test('bot image service uses in-round cache and reserves static quota before fet
     expect(views.length).toBe(4);
     expect(requestedUrls.length).toBe(4);
     expect(quota.getState().staticRequests).toBe(4);
-    expect(thumbs.get(views[0]?.thumbId ?? '')).not.toBeNull();
+    const first = views[0];
+    expect(first).toBeDefined();
+    if (first) {
+      const thumbBuf = thumbs.get(first.thumbId);
+      const fullBuf = thumbs.get(first.fullId);
+      expect(thumbBuf).not.toBeNull();
+      expect(fullBuf).not.toBeNull();
+      expect(first.fullUrl).toBe(`/thumb/${first.fullId}`);
+      if (thumbBuf && fullBuf) {
+        const thumbMeta = await sharp(thumbBuf).metadata();
+        const fullMeta = await sharp(fullBuf).metadata();
+        expect(thumbMeta.width).toBe(160);
+        expect(fullMeta.width).toBe(256);
+      }
+    }
 
     svc.clearRound();
   } finally {

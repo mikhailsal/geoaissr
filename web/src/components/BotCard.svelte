@@ -20,11 +20,11 @@
   let brokenThumbs = $state<Record<string, boolean>>({});
   let zoomedUrl = $state<string | null>(null);
   let closeBtn = $state<HTMLButtonElement | null>(null);
-  let lastEntryId = '';
+  let lastEntry: RoundResultEntryView | null = null;
 
   $effect(() => {
-    if (lastEntryId !== entry.id) {
-      lastEntryId = entry.id;
+    if (lastEntry !== entry) {
+      lastEntry = entry;
       brokenThumbs = {};
       zoomedUrl = null;
       closeBtn?.focus();
@@ -88,11 +88,13 @@
           {#if brokenThumbs[thumb.thumbUrl]}
             <div class="thumb-fallback">Снимки этого раунда уже удалены</div>
           {:else}
+            {@const previewUrl =
+              thumb.fullUrl && !brokenThumbs[thumb.fullUrl] ? thumb.fullUrl : thumb.thumbUrl}
             <button
               type="button"
               class="thumb-btn"
               onclick={() => {
-                zoomedUrl = zoomedUrl === thumb.thumbUrl ? null : thumb.thumbUrl;
+                zoomedUrl = zoomedUrl === previewUrl ? null : previewUrl;
               }}
             >
               <img
@@ -100,6 +102,7 @@
                 alt={`Ход ${thumb.turn}: ${thumb.label}`}
                 onerror={() => {
                   markBroken(thumb.thumbUrl);
+                  if (thumb.fullUrl) markBroken(thumb.fullUrl);
                 }}
               />
             </button>
@@ -111,8 +114,28 @@
   {/if}
 
   {#if zoomedUrl && !brokenThumbs[zoomedUrl]}
+    {@const zoomedThumb = entry.thumbs.find(
+      (t) => t.fullUrl === zoomedUrl || t.thumbUrl === zoomedUrl,
+    )}
     <div class="zoomed-preview">
-      <img src={zoomedUrl} alt="Увеличенный снимок бота" />
+      <img
+        src={zoomedUrl}
+        alt="Увеличенный снимок бота"
+        onerror={() => {
+          if (!zoomedUrl) return;
+          const failedUrl = zoomedUrl;
+          markBroken(failedUrl);
+          if (
+            zoomedThumb &&
+            failedUrl === zoomedThumb.fullUrl &&
+            !brokenThumbs[zoomedThumb.thumbUrl]
+          ) {
+            zoomedUrl = zoomedThumb.thumbUrl;
+          } else {
+            zoomedUrl = null;
+          }
+        }}
+      />
     </div>
   {/if}
 
@@ -226,8 +249,12 @@
   }
 
   .zoomed-preview img {
-    width: 100%;
-    max-height: 280px;
+    width: auto;
+    max-width: 100%;
+    max-height: 640px;
+    height: auto;
+    display: block;
+    margin: 0 auto;
     object-fit: contain;
     border-radius: var(--radius-sm);
     border: 1px solid var(--line);
