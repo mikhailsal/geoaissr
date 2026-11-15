@@ -74,10 +74,18 @@
       }
     }}
   >
-    {#if kind === 'static'}<Image size={17} aria-hidden="true" />
-    {:else if kind === 'pano'}<Navigation size={17} aria-hidden="true" />
-    {:else}<Map size={17} aria-hidden="true" />{/if}
-    <span>{metric.percent}%</span>
+    <span class="reading">
+      {#if kind === 'static'}<Image size={17} aria-hidden="true" />
+      {:else if kind === 'pano'}<Navigation size={17} aria-hidden="true" />
+      {:else}<Map size={17} aria-hidden="true" />{/if}
+      <span>{metric.percent}%</span>
+    </span>
+    <meter
+      aria-label={names[kind]}
+      min="0"
+      max={metric.ceiling}
+      value={Math.min(metric.used, metric.ceiling)}
+    ></meter>
   </button>
   {#if open}
     <div
@@ -100,18 +108,46 @@
 <style>
   .metric {
     position: relative;
+    min-width: 72px;
   }
   button {
-    display: inline-flex;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     gap: var(--sp-1);
+    width: 100%;
     min-height: var(--control-h);
-    padding: 0 var(--sp-2);
-    background: var(--asphalt-700);
-    border: 1px solid currentColor;
-    border-radius: var(--radius-sm);
+    padding: var(--sp-1) 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     font: inherit;
-    cursor: pointer;
+    cursor: help;
+  }
+  .reading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+  }
+  meter {
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--line);
+    border: 0;
+    border-radius: var(--radius-sm);
+  }
+  meter::-webkit-meter-bar {
+    background: var(--line);
+    border: 0;
+    box-shadow: none;
+  }
+  meter::-webkit-meter-optimum-value {
+    background: currentColor;
+  }
+  meter::-moz-meter-bar {
+    background: currentColor;
   }
   .ok {
     color: var(--ok);

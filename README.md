@@ -62,7 +62,7 @@ The AI opponents use CLI tools that are already installed and signed in on the h
 
 After a round, open an AI's **«почему?»** card to inspect its visual clues, rejected alternatives and final deduction. The step timeline groups initial views and shows each camera view or move, its zoom and the hypothesis being checked. A **«Черновик»** badge means the latest saved checkpoint was scored because the bot ended without a final submission.
 
-The token badge shows CLI-reported usage when available. Its tooltip separates input, output and cached input and identifies the matched OpenRouter model. The dollar value is an estimate using OpenRouter reference prices, not the host's subscription bill; approximate model matches are labelled. Missing usage, prices or a suitable match appear as **«н/д»**. The model-price list is cached for 24 hours in `openrouter-models-cache.json` in the data directory; failed refreshes use the last readable cache.
+The token badge shows CLI-reported usage when available. Its tooltip separates input, output and cached input and identifies the matched OpenRouter model. The dollar value shows three decimal places with **«API-цена для справки»**, using OpenRouter reference prices rather than the host's subscription bill; approximate model matches are labelled. Missing usage, prices or a suitable match appear as **«н/д»**. The model-price list is cached for 24 hours in `openrouter-models-cache.json` in the data directory; failed refreshes use the last readable cache.
 
 The [bot tool and accounting reference](docs/bot-tools.md) describes draft/final submissions, camera parameters and token normalization. The offline evaluation exercises the runtime and scoring pipeline; it does not measure how well a live model follows the prompt.
 
