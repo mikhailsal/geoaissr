@@ -70,6 +70,7 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 
 - **Human:** a round avatar with the first letter of the nickname.
 - **AI:** a square avatar with a `6px` corner radius and a chip icon next to the letter.
+- **Recent wins:** a meaningful trophy icon and a 14px count beside participant avatars, with an accessible name describing the six-hour window. Profile editing sits beside the viewer's identity; final-result administration stays below the standings.
 - **On the map / panorama:** a light `2px` outline and a dark offset shadow.
 - **Icons:** only `@lucide/svelte`, and only meaningful ones.
 - **Shared state components:** `StatusBanner.svelte` (connection and warnings for the host) and `InlineState.svelte` (loading, empty, error with an action button).

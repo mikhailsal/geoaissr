@@ -7,6 +7,7 @@
 
   export interface StandingRow {
     id: string;
+    wins6h: number;
     name: string;
     color: ParticipantColorId;
     isAi: boolean;
@@ -33,7 +34,7 @@
       animate:flip={{ duration: flipDuration }}
     >
       <span class="place">#{row.rank}</span>
-      <Avatar name={row.name} colorId={row.color} isAi={row.isAi} size="lg" />
+      <Avatar wins6h={row.wins6h} name={row.name} colorId={row.color} isAi={row.isAi} size="lg" />
       <span class="name">{row.name}</span>
       <strong class="score">{formatPointsRu(row.totalScore)}</strong>
       <span class="sub">{formatRoundsRu(row.answeredRounds)} с ответом</span>

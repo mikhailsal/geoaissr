@@ -201,6 +201,13 @@ export function dispatchEngineClientMessage(
   msg: ClientMessage,
 ): AckResult {
   switch (msg.type) {
+    case 'update_profile':
+      return (
+        shell.dispatch({ type: 'update_profile', playerId, nick: msg.nick, color: msg.color }) ??
+        'ok'
+      );
+    case 'reset_bot_wins':
+      return shell.dispatch({ type: 'reset_bot_wins', playerId, botId: msg.botId }) ?? 'ok';
     case 'update_lobby':
       return shell.dispatch({ type: 'update_lobby', playerId, patch: msg.patch }) ?? 'ok';
     case 'add_bot':

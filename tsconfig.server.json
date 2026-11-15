@@ -27,6 +27,7 @@
     "web/src/**/*.test.ts",
     "web/src/i18n/format.ts",
     "web/src/lib/clock.ts",
+    "web/src/lib/profile.ts",
     "web/src/lib/map-load-reports.ts"
   ]
 }

@@ -1,0 +1,46 @@
+import type { EngineEvent, ReduceOutput, RoomState } from './types.ts';
+
+export function handleProfileAction(
+  state: RoomState,
+  event: Extract<EngineEvent, { type: 'update_profile' | 'reset_bot_wins' }>,
+  now: number,
+): ReduceOutput {
+  const player = state.players[event.playerId];
+  if (!player || (event.type === 'reset_bot_wins' && !player.isHost))
+    return { state, effects: [], ack: 'forbidden' };
+  if (state.phase !== 'LOBBY' && state.phase !== 'FINAL')
+    return { state, effects: [], ack: 'invalid' };
+  if (event.type === 'update_profile') {
+    const name = event.nick.trim();
+    const occupied = [
+      ...Object.values(state.players).filter((p) => p.id !== player.id),
+      ...state.settings.bots,
+    ];
+    if (
+      !name ||
+      name.length > 20 ||
+      occupied.some(
+        (p) => p.name.trim().toLowerCase() === name.toLowerCase() || p.color === event.color,
+      )
+    ) {
+      return { state, effects: [], ack: 'invalid' };
+    }
+    return {
+      state: {
+        ...state,
+        players: { ...state.players, [player.id]: { ...player, name, color: event.color } },
+      },
+      effects: [],
+      ack: 'ok',
+    };
+  }
+  if (!state.settings.bots.some((b) => b.id === event.botId))
+    return { state, effects: [], ack: 'invalid' };
+  return {
+    state,
+    effects: [
+      { type: 'persist_bot_wins_reset', botId: event.botId, at: new Date(now).toISOString() },
+    ],
+    ack: 'ok',
+  };
+}

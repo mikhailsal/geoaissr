@@ -288,7 +288,13 @@ export function handleApplyBotPreset(
 
 function reclaimExistingPlayer(
   state: RoomState,
-  opts: { playerId: string; oldPlayerId: string; newSecret: string; isHost?: boolean },
+  opts: {
+    playerId: string;
+    oldPlayerId: string;
+    newSecret: string;
+    isHost?: boolean;
+    profileId?: string;
+  },
 ): ReduceOutput {
   const old = state.players[opts.oldPlayerId];
   if (!old) return { state, effects: [] };
@@ -298,6 +304,7 @@ function reclaimExistingPlayer(
   );
   const migrated: PlayerState = {
     ...old,
+    profileId: opts.profileId ?? old.profileId,
     id: opts.playerId,
     secret: opts.newSecret,
     connected: true,
@@ -328,15 +335,17 @@ export function handlePlayerJoinOrReclaim(
   opts:
     | {
         kind: 'join';
+        profileId?: string;
         playerId: string;
         secret: string;
         name: string;
         color: BotSlotConfig['color'];
         isHost: boolean;
       }
-    | { kind: 'reconnect'; playerId: string; isHost: boolean }
+    | { kind: 'reconnect'; playerId: string; isHost: boolean; profileId?: string }
     | {
         kind: 'reclaim';
+        profileId?: string;
         playerId: string;
         oldPlayerId: string;
         newSecret: string;
@@ -348,6 +357,7 @@ export function handlePlayerJoinOrReclaim(
     if (!existing) return { state, effects: [] };
     const updated: PlayerState = {
       ...existing,
+      profileId: existing.profileId ?? opts.profileId,
       connected: true,
       isHost: existing.isHost || opts.isHost,
     };
@@ -363,6 +373,7 @@ export function handlePlayerJoinOrReclaim(
   const isSpectator = state.phase !== 'LOBBY' && state.phase !== 'FINAL';
   const joined: PlayerState = {
     id: opts.playerId,
+    profileId: opts.profileId,
     secret: opts.secret,
     name: opts.name,
     color: opts.color,

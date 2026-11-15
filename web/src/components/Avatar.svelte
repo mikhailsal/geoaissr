@@ -1,17 +1,18 @@
 <script lang="ts">
-  import { Cpu } from '@lucide/svelte';
+  import { Cpu, Trophy } from '@lucide/svelte';
   import { getParticipantColor, type ParticipantColorId } from '$shared/colors';
   import { participantDisplayAria } from '../i18n/format';
 
   interface Props {
     name: string;
+    wins6h?: number;
     colorId: ParticipantColorId;
     isAi?: boolean;
     size?: 'sm' | 'md' | 'lg';
     dimmed?: boolean;
   }
 
-  let { name, colorId, isAi = false, size = 'md', dimmed = false }: Props = $props();
+  let { name, wins6h, colorId, isAi = false, size = 'md', dimmed = false }: Props = $props();
 
   const colorMeta = $derived(getParticipantColor(colorId));
   const initial = $derived(name.trim().slice(0, 1).toUpperCase() || '?');
@@ -32,8 +33,21 @@
     </span>
   {/if}
 </span>
+{#if wins6h !== undefined}
+  <span class="wins" role="img" aria-label={`Побед за 6 часов: ${wins6h} — ${name}`}>
+    <Trophy size={14} aria-hidden="true" /> <span aria-hidden="true">{wins6h}</span>
+  </span>
+{/if}
 
 <style>
+  .wins {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 14px;
+    color: var(--paper-dim);
+  }
   .avatar {
     position: relative;
     display: inline-flex;

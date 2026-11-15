@@ -703,3 +703,148 @@ test('authenticated sockets that never join are evicted oldest-first', async () 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('profile ID does not reclaim a disconnected guest and profile updates broadcast', async () => {
+  // protects: profile IDs are public statistics keys and updates reach room state; fails_when: ID grants seat ownership; no_claim: browser persistence.
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-sec-profile-'));
+  const { shell, srv } = createSecServer(dir, 'local');
+  const url = `ws://127.0.0.1:${srv.port}/ws`;
+  const guest = await connectWs(url);
+  const attacker = await connectWs(url);
+  try {
+    guest.ws.send(JSON.stringify({ type: 'hello', token: 'guest-tok' }));
+    await guest.nextMsg();
+    guest.ws.send(
+      JSON.stringify({ type: 'join', seq: 1, nick: 'Guest', color: 'p-2', profileId: 'public-id' }),
+    );
+    let joined = await guest.nextMsg();
+    if (joined?.type === 'state') joined = await guest.nextMsg();
+    expect(joined?.type).toBe('join_ok');
+    if (joined?.type !== 'join_ok') throw new Error('join failed');
+    guest.ws.send(
+      JSON.stringify({ type: 'update_profile', seq: 2, nick: 'Renamed', color: 'p-3' }),
+    );
+    let ack = await guest.nextMsg();
+    while (ack && !(ack.type === 'ack' && ack.seq === 2)) ack = await guest.nextMsg();
+    expect(ack?.type === 'ack' && ack.result).toBe('ok');
+    expect(shell.getState().players[joined.playerId]?.name).toBe('Renamed');
+    expect(shell.getState().players[joined.playerId]?.profileId).toBe('public-id');
+    guest.ws.close();
+    await guest.waitClose();
+    attacker.ws.send(JSON.stringify({ type: 'hello', token: 'guest-tok' }));
+    await attacker.nextMsg();
+    attacker.ws.send(
+      JSON.stringify({
+        type: 'join',
+        seq: 1,
+        nick: 'Renamed',
+        color: 'p-3',
+        profileId: 'public-id',
+      }),
+    );
+    let rejected = await attacker.nextMsg();
+    if (rejected?.type === 'state') rejected = await attacker.nextMsg();
+    expect(rejected?.type === 'join_error' && rejected.code).toBe('nick_taken');
+  } finally {
+    guest.ws.close();
+    attacker.ws.close();
+    shell.dispose();
+    srv.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+async function messageOfType<T extends ServerMessage['type']>(
+  client: WsHandle,
+  type: T,
+): Promise<Extract<ServerMessage, { type: T }>> {
+  for (;;) {
+    const msg = await client.nextMsg();
+    if (!msg) throw new Error(`missing ${type}`);
+    if (msg.type === type) return msg as Extract<ServerMessage, { type: T }>;
+  }
+}
+
+test('host nickname reclaim adopts the submitted profile while preserving omitted identity', async () => {
+  // protects: authorized host reclaim uses the new browser profile and preserves it when omitted; fails_when: stale profile survives replacement; no_claim: public ID authenticates anyone.
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-host-profile-'));
+  const { shell, srv } = createSecServer(dir, 'local');
+  const url = `ws://127.0.0.1:${srv.port}/ws`;
+  const clients: WsHandle[] = [];
+  try {
+    for (const profileId of ['first', 'second', undefined]) {
+      const client = await connectWs(url);
+      clients.push(client);
+      client.ws.send(JSON.stringify({ type: 'hello', token: 'host-tok' }));
+      await messageOfType(client, 'hello_ok');
+      client.ws.send(
+        JSON.stringify({ type: 'join', seq: 1, nick: 'Host', color: 'p-1', profileId }),
+      );
+      const joined = await messageOfType(client, 'join_ok');
+      expect(shell.getState().players[joined.playerId]?.profileId).toBe(profileId ?? 'second');
+      client.ws.close();
+      await client.waitClose();
+    }
+  } finally {
+    for (const client of clients) client.ws.close();
+    shell.dispose();
+    srv.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('secret restore attaches legacy profile once and reports authoritative identity', async () => {
+  // protects: legacy secret-authenticated seat migration and authoritative identity; fails_when: a later hello overwrites it or public ID grants a seat; no_claim: browser persistence.
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-legacy-profile-'));
+  const { shell, srv } = createSecServer(dir, 'local');
+  const url = `ws://127.0.0.1:${srv.port}/ws`;
+  const clients: WsHandle[] = [];
+  try {
+    const first = await connectWs(url);
+    clients.push(first);
+    first.ws.send(JSON.stringify({ type: 'hello', token: 'guest-tok' }));
+    await messageOfType(first, 'hello_ok');
+    first.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: 'Legacy', color: 'p-2' }));
+    const joined = await messageOfType(first, 'join_ok');
+    first.ws.close();
+    await first.waitClose();
+    for (const [submitted, expected] of [
+      ['adopted', 'adopted'],
+      ['other', 'adopted'],
+    ]) {
+      const client = await connectWs(url);
+      clients.push(client);
+      client.ws.send(
+        JSON.stringify({
+          type: 'hello',
+          token: 'guest-tok',
+          playerId: joined.playerId,
+          playerSecret: joined.playerSecret,
+          profileId: submitted,
+        }),
+      );
+      const hello = await messageOfType(client, 'hello_ok');
+      expect(hello.restoredPlayerId).toBe(joined.playerId);
+      expect(hello.restoredProfileId).toBe(expected);
+      expect(shell.getState().players[joined.playerId]?.profileId).toBe(expected);
+      client.ws.close();
+      await client.waitClose();
+    }
+    const attacker = await connectWs(url);
+    clients.push(attacker);
+    attacker.ws.send(
+      JSON.stringify({
+        type: 'hello',
+        token: 'guest-tok',
+        playerId: joined.playerId,
+        profileId: 'adopted',
+      }),
+    );
+    expect((await messageOfType(attacker, 'hello_ok')).restoredPlayerId).toBeUndefined();
+  } finally {
+    for (const client of clients) client.ws.close();
+    shell.dispose();
+    srv.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

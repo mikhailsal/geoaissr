@@ -13,6 +13,8 @@
 
   interface Props {
     view: ClientViewState;
+    onEditProfile: (e: MouseEvent) => void;
+    onResetBotWins: (id: string) => void;
     starting: boolean;
     checkingVisionBotId: string | null;
     visionToastByBot: Record<string, VisionToast | undefined>;
@@ -35,6 +37,8 @@
 
   let {
     view,
+    onEditProfile,
+    onResetBotWins,
     starting,
     checkingVisionBotId,
     visionToastByBot,
@@ -86,6 +90,7 @@
         {#each view.players as player (player.id)}
           <li class="player-row">
             <Avatar
+              wins6h={player.wins6h}
               name={player.name}
               colorId={player.color}
               size="md"
@@ -105,6 +110,11 @@
                 {/if}
               </span>
             </div>
+            {#if player.id === view.viewerId}<button
+                type="button"
+                class="btn"
+                onclick={onEditProfile}>Изменить профиль</button
+              >{/if}
           </li>
         {/each}
       </ul>
@@ -138,6 +148,7 @@
                 }}
               >
                 <Avatar
+                  wins6h={bot.wins6h}
                   name={bot.name}
                   colorId={bot.color}
                   isAi={true}
@@ -156,6 +167,14 @@
               </button>
 
               {#if open}
+                {#if view.viewerIsHost}<button
+                    type="button"
+                    class="btn"
+                    aria-label={`Сбросить победы ${bot.name}`}
+                    onclick={() => {
+                      onResetBotWins(bot.id);
+                    }}>Сбросить победы</button
+                  >{/if}
                 <BotSlotEditor
                   slot={bot}
                   availableHarnesses={view.availableHarnesses}
@@ -221,12 +240,13 @@
 
   .columns {
     display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
     gap: var(--sp-4);
     align-items: start;
   }
 
   .card {
+    min-width: 0;
     padding: var(--sp-4);
     display: flex;
     flex-direction: column;
@@ -252,20 +272,28 @@
 
   .player-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
     padding: 0.35rem 0;
   }
 
   .p-info {
+    flex: 1 1 10rem;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     flex-wrap: wrap;
   }
 
+  .player-row > button {
+    margin-left: auto;
+  }
+
   .p-name {
     font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   .tag {

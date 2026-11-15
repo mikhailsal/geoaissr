@@ -39,7 +39,13 @@
 <article class="bot-card panel" aria-label={`Мысли ${entry.name}`}>
   <header class="card-head">
     <div class="identity">
-      <Avatar name={entry.name} colorId={entry.color} isAi={entry.isAi} size="md" />
+      <Avatar
+        wins6h={entry.wins6h}
+        name={entry.name}
+        colorId={entry.color}
+        isAi={entry.isAi}
+        size="md"
+      />
       <div>
         <h3 class="bot-name">{entry.name}</h3>
         <p class="metrics">

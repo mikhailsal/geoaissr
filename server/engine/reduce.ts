@@ -1,3 +1,4 @@
+import { handleProfileAction } from './profile.ts';
 import { handleEndMatch, handlePlayAgain } from './final.ts';
 import {
   handleAddBot,
@@ -185,8 +186,14 @@ function handlePlayerReconnectWithWake(
   playerId: string,
   isHost: boolean,
   now: number,
+  profileId?: string,
 ): ReduceOutput {
-  const joined = handlePlayerJoinOrReclaim(state, { kind: 'reconnect', playerId, isHost });
+  const joined = handlePlayerJoinOrReclaim(state, {
+    kind: 'reconnect',
+    playerId,
+    isHost,
+    profileId,
+  });
   if (joined.state.phase === 'ROUND_LOADING') {
     return maybeStartCountdown(joined.state, now, false);
   }
@@ -226,6 +233,17 @@ function handleMiscStateEvent(state: RoomState, event: EngineEvent): ReduceOutpu
         },
         effects: [],
       };
+    case 'bot_wins_reset_result': {
+      if (!event.ok)
+        return {
+          state: { ...state, winsWarning: 'Не удалось сохранить сброс побед ИИ.' },
+          effects: [],
+        };
+      const bots = state.settings.bots.map((b) =>
+        b.id === event.botId ? { ...b, winResetAt: event.at } : b,
+      );
+      return { state: { ...state, settings: { ...state.settings, bots } }, effects: [] };
+    }
     case 'match_write_result':
       return {
         state: { ...state, matchWriteError: event.ok ? undefined : event.error },
@@ -298,10 +316,19 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
   if (misc) return misc;
 
   switch (event.type) {
+    case 'update_profile':
+    case 'reset_bot_wins':
+      return handleProfileAction(state, event, now);
     case 'player_join':
       return handlePlayerJoinOrReclaim(state, { kind: 'join', ...event });
     case 'player_reconnect':
-      return handlePlayerReconnectWithWake(state, event.playerId, event.isHost, now);
+      return handlePlayerReconnectWithWake(
+        state,
+        event.playerId,
+        event.isHost,
+        now,
+        event.profileId,
+      );
     case 'player_reclaim_nick':
       return handlePlayerJoinOrReclaim(state, { kind: 'reclaim', ...event });
     case 'player_disconnect':

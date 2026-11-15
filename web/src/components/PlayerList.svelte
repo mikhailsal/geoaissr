@@ -17,7 +17,7 @@
   <ul class="list">
     {#each visibleHumans as p (p.id)}
       <li class="row">
-        <Avatar name={p.name} colorId={p.color} size="sm" dimmed={!p.connected} />
+        <Avatar wins6h={p.wins6h} name={p.name} colorId={p.color} size="sm" dimmed={!p.connected} />
         <div class="meta">
           <span class="name">{p.name}</span>
           <span class="status" class:done={p.confirmed} class:offline={!p.connected}>
@@ -37,7 +37,7 @@
 
     {#each botProgress as bot (bot.id)}
       <li class="row">
-        <Avatar name={bot.name} colorId={bot.color} isAi={true} size="sm" />
+        <Avatar wins6h={bot.wins6h} name={bot.name} colorId={bot.color} isAi={true} size="sm" />
         <div class="meta">
           <span class="name">{bot.name}</span>
           <span

@@ -16,9 +16,12 @@ import type { ManagedProcess } from '../proc/spawn.ts';
 import { spawnManaged } from '../proc/spawn.ts';
 import { loadHarnessVerified } from '../storage/harness-verified.ts';
 import { appendMatchRecord } from '../storage/matches.ts';
+import { loadWinsHistory } from './wins-history.ts';
+import { writeNormalSettings, writeResetSettings } from './settings-writer.ts';
 import type { LoadOutcome } from '../storage/migrate.ts';
 import { buildQuotaSummaryForRoom, type QuotaManager } from '../storage/quota.ts';
-import { loadSettings, saveSettings } from '../storage/settings.ts';
+import { loadSettings } from '../storage/settings.ts';
+export { persistSettingsSafe } from './settings-writer.ts';
 import {
   createCloudflaredManager,
   probePublicReadiness,
@@ -213,15 +216,6 @@ export function printStartupBanner(opts: {
   console.log('================\n');
 }
 
-export function persistSettingsSafe(
-  settingsFile: string,
-  settings: SettingsFile,
-  sourceStatus: LoadOutcome<SettingsFile>['status'],
-): void {
-  if (sourceStatus === 'newer_version') return;
-  saveSettings(settingsFile, settings, sourceStatus);
-}
-
 export function buildQuotaSummaryForState(quotaManager: QuotaManager, state?: RoomState) {
   const botMoveLimits = (state?.settings.bots ?? [])
     .filter((b) => b.enabled)
@@ -267,7 +261,10 @@ export function buildConfiguredShell(opts: {
   onStateChanged: () => void;
 }): RoomShell {
   let shellRef: RoomShell | null = null;
-  const shell = createRoomShell(opts.initialState, {
+  const history = loadWinsHistory(opts.paths.matchesFile, opts.logger);
+  const initialState = { ...opts.initialState, winsWarning: history.warning };
+  const shell = createRoomShell(initialState, {
+    matchRecords: history.records,
     onStateChange: opts.onStateChanged,
     onAsyncError: (context, err) => {
       opts.logger.log('shell_async_error', {
@@ -275,21 +272,20 @@ export function buildConfiguredShell(opts: {
         message: err instanceof Error ? err.message : String(err),
       });
     },
-    saveSettings: (nextSettings) => {
-      try {
-        persistSettingsSafe(opts.paths.settingsFile, nextSettings, opts.settingsOutcomeStatus);
-        return Promise.resolve();
-      } catch (err) {
-        return Promise.reject(err instanceof Error ? err : new Error(String(err)));
-      }
-    },
+    saveSettings: (nextSettings) =>
+      writeNormalSettings(opts.paths.settingsFile, nextSettings, opts.settingsOutcomeStatus),
+    saveSettingsForReset: (nextSettings) =>
+      writeResetSettings(opts.paths.settingsFile, nextSettings, opts.settingsOutcomeStatus),
     confirmQuotaReset: () => {
       opts.quotaManager.confirmReset();
       return Promise.resolve(buildQuotaSummaryForState(opts.quotaManager, shellRef?.getState()));
     },
     recalculateQuotaSummary: (s) => buildQuotaSummaryForState(opts.quotaManager, s),
     prepareRound: async ({ region, excludeCountryIds, withBots }) => {
-      const target = await opts.locationService.prepareRoundLocation({ region, excludeCountryIds });
+      const target = await opts.locationService.prepareRoundLocation({
+        region,
+        excludeCountryIds,
+      });
       if (withBots) await opts.imageService.prepareStartViews(target);
       return target;
     },

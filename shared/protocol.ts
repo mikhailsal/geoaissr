@@ -37,6 +37,7 @@ export const helloMessageSchema = z.object({
   token: z.string().min(1).max(128),
   playerId: z.string().min(1).max(64).optional(),
   playerSecret: z.string().min(1).max(128).optional(),
+  profileId: z.string().min(1).max(64).optional(),
 });
 
 export const joinMessageSchema = z.object({
@@ -44,6 +45,16 @@ export const joinMessageSchema = z.object({
   seq: z.number().int().nonnegative(),
   nick: z.string().trim().min(1).max(MAX_NICK_LEN),
   color: z.enum(PARTICIPANT_COLOR_IDS),
+  profileId: z.string().min(1).max(64).optional(),
+});
+
+export const updateProfileMessageSchema = joinMessageSchema
+  .omit({ profileId: true })
+  .extend({ type: z.literal('update_profile') });
+export const resetBotWinsMessageSchema = z.object({
+  type: z.literal('reset_bot_wins'),
+  seq: z.number().int().nonnegative(),
+  botId: z.string().min(1).max(64),
 });
 
 export const pingMessageSchema = z.object({
@@ -173,6 +184,8 @@ export const retryRoundMessageSchema = z.object({
 export const clientMessageSchema = z.discriminatedUnion('type', [
   helloMessageSchema,
   joinMessageSchema,
+  updateProfileMessageSchema,
+  resetBotWinsMessageSchema,
   pingMessageSchema,
   updateLobbyMessageSchema,
   addBotMessageSchema,
@@ -213,6 +226,7 @@ export interface LobbySummary {
 }
 
 export interface PlayerView {
+  wins6h: number;
   id: string;
   name: string;
   color: (typeof PARTICIPANT_COLOR_IDS)[number];
@@ -229,6 +243,7 @@ export interface PlayerView {
 }
 
 export interface BotRoundProgressView {
+  wins6h: number;
   id: string;
   name: string;
   color: (typeof PARTICIPANT_COLOR_IDS)[number];
@@ -247,6 +262,7 @@ export interface BotTurnThumbView {
 }
 
 export interface RoundResultEntryView {
+  wins6h: number;
   id: string;
   name: string;
   color: (typeof PARTICIPANT_COLOR_IDS)[number];
@@ -304,6 +320,25 @@ export interface TunnelStatusView {
   changedSinceStart: boolean;
 }
 
+export type BotSlotLobbyView = BotSlotConfig & { wins6h: number };
+export interface FinalEntryView {
+  id: string;
+  name: string;
+  color: (typeof PARTICIPANT_COLOR_IDS)[number];
+  isAi: boolean;
+  rank: number;
+  totalScore: number;
+  answeredRounds: number;
+  wins6h: number;
+  perRound: {
+    roundNumber: number;
+    played: boolean;
+    score: number | null;
+    distanceKm: number | null;
+    botCard?: RoundResultEntryView;
+  }[];
+}
+
 export interface ClientViewState {
   matchId: string;
   gen: number;
@@ -323,10 +358,11 @@ export interface ClientViewState {
   settingsNotice?: string;
   quotaWarning?: string;
   matchWriteError?: string;
+  winsWarning?: string;
   tunnel: TunnelStatusView;
   quota: QuotaSummaryView;
   players: PlayerView[];
-  bots: BotSlotConfig[];
+  bots: BotSlotLobbyView[];
   availableHarnesses: HarnessCatalogEntry[];
   loading?: {
     waitingFor: string[];
@@ -363,22 +399,7 @@ export interface ClientViewState {
   final?: {
     playedRounds: number;
     plannedRounds: number;
-    standings: {
-      id: string;
-      name: string;
-      color: (typeof PARTICIPANT_COLOR_IDS)[number];
-      isAi: boolean;
-      rank: number;
-      totalScore: number;
-      answeredRounds: number;
-      perRound: {
-        roundNumber: number;
-        played: boolean;
-        score: number | null;
-        distanceKm: number | null;
-        botCard?: RoundResultEntryView;
-      }[];
-    }[];
+    standings: FinalEntryView[];
     humanVsAi: { visible: boolean; humansTotal: number; aiTotal: number };
   };
 }
@@ -391,6 +412,7 @@ export type ServerMessage =
       browserMapsKey: string | null;
       fakeMode: boolean;
       restoredPlayerId?: string;
+      restoredProfileId?: string;
       lobbySummary: LobbySummary;
     }
   | {
