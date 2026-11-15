@@ -155,8 +155,7 @@
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     if (onMarkerClick) {
-      for (const m of markers) {
-        if (m.isTarget) continue;
+      for (const m of [...markers].sort((a, b) => Number(!!b.isTarget) - Number(!!a.isTarget))) {
         const scale = pixelsPerDeg(width, camera.zoom);
         const mx = width / 2 + wrapLng(m.lng - camera.centerLng) * scale;
         const my = height / 2 - (m.lat - camera.centerLat) * scale;

@@ -166,7 +166,7 @@ function drawMarker(
     return;
   }
 
-  const radius = marker.selected ? 11 : 8;
+  const radius = marker.selected ? 13 : 10;
   ctx.fillStyle = marker.fillHex;
   ctx.strokeStyle = marker.selected ? MAP_COLORS.paper : MAP_COLORS.ink;
   ctx.lineWidth = marker.selected ? 3 : 2;

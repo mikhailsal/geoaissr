@@ -1,5 +1,5 @@
 import { Loader } from '@googlemaps/js-api-loader';
-import { ASPHALT_900_HEX, PAPER_HEX } from '$shared/colors';
+import { ASPHALT_900_HEX, PAPER_HEX } from '../../../shared/colors';
 
 export interface LoadedGoogleMaps {
   coreLib: google.maps.CoreLibrary;
@@ -68,7 +68,7 @@ export function loadGoogleMapsLibraries(apiKey: string): Promise<LoadedGoogleMap
   const loader = new Loader({
     apiKey,
     version: 'weekly',
-    language: 'ru',
+    language: 'en',
   });
   cachedPromise = Promise.all([
     loader.importLibrary('core'),
@@ -101,7 +101,7 @@ export function buildLightMapOptions(
   };
 }
 
-function buildPinElement(spec: PinOverlaySpec): HTMLButtonElement {
+export function buildPinElement(spec: PinOverlaySpec): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.title = spec.label;
@@ -109,6 +109,10 @@ function buildPinElement(spec: PinOverlaySpec): HTMLButtonElement {
   btn.style.position = 'absolute';
   btn.style.transform = 'translate(-50%, -50%)';
   btn.style.padding = '0';
+  btn.style.minHeight = '0';
+  btn.style.minWidth = '0';
+  btn.style.lineHeight = '1';
+  btn.style.boxSizing = 'border-box';
   btn.style.cursor = spec.onClick ? 'pointer' : 'default';
   if (spec.isTarget) {
     btn.style.width = '24px';
@@ -123,7 +127,7 @@ function buildPinElement(spec: PinOverlaySpec): HTMLButtonElement {
     const size = spec.selected ? '28px' : '22px';
     btn.style.width = size;
     btn.style.height = size;
-    btn.style.borderRadius = spec.isAi ? '5px' : '999px';
+    btn.style.borderRadius = '999px';
     btn.style.background = spec.fillHex;
     btn.style.color = spec.inkHex;
     btn.style.border = `2px solid ${spec.selected ? PAPER_HEX : ASPHALT_900_HEX}`;
@@ -230,6 +234,10 @@ export async function mountReusableGuessMap(
   };
 }
 
+export function buildStreetViewUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+}
+
 export interface GoogleResultsMapController {
   render: (
     target: { lat: number; lng: number; label: string },
@@ -285,8 +293,14 @@ export async function mountReusableResultsMap(
           lng: target.lng,
           fillHex: '',
           inkHex: '',
-          label: target.label,
+          label: `${target.label} — открыть панораму в Google Maps`,
           isTarget: true,
+          onClick: () =>
+            window.open(
+              buildStreetViewUrl(target.lat, target.lng),
+              '_blank',
+              'noopener,noreferrer',
+            ),
         }),
       );
       entry.map.fitBounds(bounds, 48);

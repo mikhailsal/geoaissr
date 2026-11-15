@@ -1,12 +1,12 @@
 # DESIGN.md — geoaissr visual language
 
-The image: **asphalt and road markings**. The panorama and the map fill the whole screen; the interface lies on top of them in dense, opaque dark panels with a crisp `1px solid var(--line)` border. The scenario: an evening, friends in a voice chat, each at their own monitor.
+The image: **asphalt and road markings**. The panorama and the map fill the whole screen; the interface lies on top of them in dense dark panels with a crisp `1px solid var(--line)` border. The scenario: an evening, friends in a voice chat, each at their own monitor.
 
 ## Principles
 
-1. **No glass, glow, gradients or decorative icons.** Text never sits directly on the panorama or the map — only on a solid opaque panel (`--asphalt-800` or `--asphalt-900`). Emoji in the interface are forbidden.
+1. **No glass, glow, gradients or decorative icons.** Text never sits directly on the panorama or the map — on a dark panel (`--asphalt-800` or `--asphalt-900`). The idle desktop round minimap is translucent; it becomes opaque on hover, focus, or expansion. Results maps and mobile open maps remain opaque. Emoji in the interface are forbidden.
 2. **Colors only from `web/src/styles/tokens.css`.** In `.svelte` files the literals `#rrggbb`, `#rgb`, `rgb(...)`, `rgba(...)` are forbidden (checked by the `scripts/check-colors.ts` script in `bun run check`).
-3. **Light map, dark interface.** The answer map (Google Maps JS API) is always in the standard light scheme with point-of-interest icons hidden and Russian labels (`language=ru`). The panels do not clash with daytime panoramas.
+3. **Light map, dark interface.** The answer map (Google Maps JS API) is always in the standard light scheme with point-of-interest icons hidden and English labels (`language=en`). The panels do not clash with daytime panoramas.
 4. **One yellow accent (`--paint`).** Used only for the screen's primary action, the timer ring and the focus ring (`2px solid var(--paint)` with a `2px` offset).
 
 ## Typography
@@ -54,7 +54,7 @@ The yellow accent is not part of the participant palette. The color of the lette
 - **Spacing scale:** `4px`, `8px`, `12px`, `16px`, `24px`, `32px`, `48px`.
 - **Corner radii:** `4px` for fields and buttons (`--radius-sm`), `8px` for panels (`--radius-md`), `6px` for the square AI avatar, `50%` for the round human avatar.
 - **Panel shadow:** `0 2px 0 rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35)`.
-- **Interactive elements:** minimum height of buttons and input fields is `44px`.
+- **Interactive elements:** minimum height of buttons and input fields is `44px`, except compact map marker buttons (`22–28px` participants and `24px` targets).
 
 ## Motion
 
@@ -71,7 +71,7 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 - **Human:** a round avatar with the first letter of the nickname.
 - **AI:** a square avatar with a `6px` corner radius and a chip icon next to the letter.
 - **Recent wins:** a meaningful trophy icon and a 14px count beside participant avatars, with an accessible name describing the six-hour window. Profile editing sits beside the viewer's identity; final-result administration stays below the standings.
-- **On the map / panorama:** a light `2px` outline and a dark offset shadow.
+- **Map markers:** compact circular participant buttons with a dark outline (light when selected); the target is a circular yellow star button. Fake maps use compact circular participants and a star target.
 - **Icons:** only `@lucide/svelte`, and only meaningful ones.
 - **Shared state components:** `StatusBanner.svelte` (connection and warnings for the host) and `InlineState.svelte` (loading, empty, error with an action button).
 
