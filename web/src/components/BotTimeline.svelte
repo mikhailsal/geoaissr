@@ -23,11 +23,9 @@
 </script>
 
 {#if thumbs.length}
+  {#if ordered[0]?.action === 'observe'}<h4>Старт · Осмотр по сторонам (observe)</h4>{/if}
   <div class="timeline" role="list" aria-label="Снимки, которые видел бот">
     {#each ordered as thumb, index (`${thumb.thumbUrl}-${index}`)}
-      {#if thumb.action === 'observe' && index === 0}<h4>
-          Старт · Осмотр по сторонам (observe)
-        </h4>{/if}
       <div class="thumb-item" role="listitem">
         {#if broken[thumb.thumbUrl]}<div class="thumb-fallback">
             Снимки этого раунда уже удалены
@@ -119,7 +117,7 @@
     border: 1px solid var(--line);
     background: var(--asphalt-800);
     color: var(--paper-dim);
-    font-size: 0.72rem;
+    font-size: 0.875rem;
     display: flex;
     align-items: center;
     text-align: center;
@@ -127,7 +125,7 @@
   .detail {
     min-width: 0;
     overflow-wrap: anywhere;
-    font-size: 0.85rem;
+    font-size: 0.875rem;
   }
   .action {
     display: flex;
@@ -146,6 +144,7 @@
     padding: var(--sp-1);
   }
   p {
+    font-size: 1rem;
     margin: var(--sp-1) 0 0;
     white-space: pre-line;
   }

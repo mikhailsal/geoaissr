@@ -15,17 +15,19 @@
 
   interface Props {
     entry: RoundResultEntryView;
+    roundNumber: number;
     onClose: () => void;
   }
 
-  let { entry, onClose }: Props = $props();
+  let { entry, roundNumber, onClose }: Props = $props();
 
   let closeBtn = $state<HTMLButtonElement | null>(null);
-  let lastEntry: RoundResultEntryView | null = null;
+  let lastSelection = '';
+  let selection = $derived(`${roundNumber}:${entry.id}`);
 
   $effect(() => {
-    if (lastEntry !== entry) {
-      lastEntry = entry;
+    if (lastSelection !== selection) {
+      lastSelection = selection;
       closeBtn?.focus();
     }
   });
@@ -68,7 +70,7 @@
     </button>
   </header>
 
-  {#key entry}
+  {#key selection}
     <BotAccounting {entry} />
     <BotReasoning {entry} />
     <BotTimeline thumbs={entry.thumbs} />

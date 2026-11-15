@@ -217,7 +217,11 @@
               {#if cardOpen && activeBotCard}
                 <tr class="bot-card-row">
                   <td colspan={5}>
-                    <BotCard {entry} onClose={closeAndRestoreFocus} />
+                    <BotCard
+                      {entry}
+                      roundNumber={view.roundNumber}
+                      onClose={closeAndRestoreFocus}
+                    />
                   </td>
                 </tr>
               {/if}

@@ -212,7 +212,11 @@
 
     {#if inspectedCard && inspectedEntry}
       <section aria-label={`Мысли бота в раунде ${inspectedCard.roundNumber}`}>
-        <BotCard entry={inspectedEntry} onClose={closeInspect} />
+        <BotCard
+          entry={inspectedEntry}
+          roundNumber={inspectedCard.roundNumber}
+          onClose={closeInspect}
+        />
       </section>
     {/if}
 

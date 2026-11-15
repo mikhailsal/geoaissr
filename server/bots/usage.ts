@@ -49,6 +49,8 @@ export function createUsageParser(harness: HarnessId): {
   let skipping = false;
   let usage: BotTokenUsage | undefined;
   let invalidTurn = false;
+  const terminalPrefix = (line: string): boolean =>
+    /"type"\s*:\s*"turn\.completed"/.test(line.slice(0, 4096));
   const consume = (line: string): void => {
     try {
       const item = object(JSON.parse(line) as unknown);
@@ -68,7 +70,7 @@ export function createUsageParser(harness: HarnessId): {
         : turn;
       if (!Number.isSafeInteger(usage.totalTokens)) invalidTurn = true;
     } catch {
-      /* Ignore malformed or unrelated lines. */
+      if (terminalPrefix(line)) invalidTurn = true;
     }
   };
   const push = (chunk: string): void => {
@@ -84,6 +86,7 @@ export function createUsageParser(harness: HarnessId): {
       const ends = part.endsWith('\n');
       if (!skipping && buffer.length + part.length <= LIMIT) buffer += part;
       else {
+        if (!skipping && terminalPrefix(buffer + part.slice(0, 4096))) invalidTurn = true;
         skipping = true;
         buffer = '';
       }

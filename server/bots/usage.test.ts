@@ -33,6 +33,17 @@ test('parses split terminal turns while skipping oversized and intermediate even
 // Value: protects=invalid terminal turns cannot publish partial or unsafe totals; fails_when=invalid turns or overflow are ignored; why_new=prior cases covered only isolated invalid counters; seam=none; no_claim=fixtures do not establish live provider format.
 test('rejects missing, invalid, and truncated usage', () => {
   for (const [harness, body] of [
+    ...[
+      '{"type":"turn.completed","usage":',
+      '{"type":"turn.completed","usage":oops}',
+      '{"type":"turn.completed","padding":"' + 'x'.repeat(300000) + '"}',
+    ].map(
+      (tail) =>
+        [
+          'codex',
+          '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}\n' + tail,
+        ] as const,
+    ),
     ['claude', '{"usage":{"input_tokens":1}}'],
     ['codex', '{"type":"turn.completed","usage":{"input_tokens":-1,"output_tokens":1}}'],
     ['claude', 'x'.repeat(300000)],

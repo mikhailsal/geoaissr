@@ -19,6 +19,9 @@
       </ul>
     </section>
   {/if}
+  {#if entry.explanation && !entry.facts && !entry.rejectedGuesses?.length && !entry.conclusion}
+    <p>{entry.explanation}</p>
+  {/if}
   {#if entry.conclusion || (entry.lat !== null && entry.lng !== null)}
     <section>
       <h4>
@@ -30,7 +33,6 @@
         </p>{/if}
     </section>
   {/if}
-  {#if entry.explanation}<p>{entry.explanation}</p>{/if}
   {#if entry.lat === null || entry.lng === null}<p class="muted">{RU.results.noBotGuess}</p>{/if}
   {#if entry.quip}<blockquote>«{entry.quip}»</blockquote>{/if}
   {#if entry.turnsUsed === 0 && entry.lat !== null && entry.lng !== null}<p class="muted">
@@ -66,14 +68,14 @@
   .coordinates,
   .muted {
     color: var(--paper-dim);
-    font-size: 0.85rem;
+    font-size: 0.875rem;
   }
   .draft {
     color: var(--paper);
     background: var(--asphalt-700);
     border-radius: var(--radius-sm);
     padding: var(--sp-1);
-    font-size: 0.75rem;
+    font-size: 0.875rem;
   }
   blockquote {
     margin: 0;

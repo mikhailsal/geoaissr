@@ -14,6 +14,15 @@ test('normalizes model names and restricts approximate matches to same provider 
   ];
   expect(matchModel('claude-haiku-4-5-high', ids)).toEqual({ id: ids[0], approximate: false });
   expect(matchModel('claude-haiku-4-7', ids)).toEqual({ id: ids[2], approximate: true });
+  const codexIds: [string, string] = ['openai/gpt-5.1-codex', 'openai/gpt-5.1-codex-max'];
+  expect(matchModel('gpt-5.1-codex-max', codexIds)).toEqual({
+    id: codexIds[1],
+    approximate: false,
+  });
+  expect(matchModel('openai/gpt-5.1-codex-max', codexIds)).toEqual({
+    id: codexIds[1],
+    approximate: false,
+  });
   expect(matchModel('claude-opus-4-5', ids)).toBeUndefined();
   expect(matchModel('claude-haiku-8-5', ids)).toBeUndefined();
 });

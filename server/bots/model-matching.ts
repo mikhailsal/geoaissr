@@ -6,7 +6,7 @@ interface Identity {
   extra: string[];
 }
 function identity(id: string): Identity | undefined {
-  let clean = id.toLowerCase().replace(/-(low|medium|high|xhigh|max)$/, '');
+  let clean = id.toLowerCase();
   if (!clean.includes('/')) {
     const prefix = clean.startsWith('claude-')
       ? 'anthropic'
@@ -40,7 +40,25 @@ export function matchModel(
   model: string,
   ids: string[],
 ): { id: string; approximate: boolean } | undefined {
-  const stripped = model.toLowerCase().replace(/-(low|medium|high|xhigh|max)$/, '');
+  const raw = model.toLowerCase();
+  const rawExact = ids.find((id) => id.toLowerCase() === raw);
+  if (rawExact) return { id: rawExact, approximate: false };
+  const rawIdentity = identity(raw);
+  const canonical =
+    rawIdentity &&
+    ids.find((id) => {
+      const candidate = identity(id);
+      return (
+        candidate &&
+        candidate.provider === rawIdentity.provider &&
+        candidate.family === rawIdentity.family &&
+        candidate.tier === rawIdentity.tier &&
+        candidate.extra.join() === rawIdentity.extra.join() &&
+        versionDistance(candidate.version, rawIdentity.version) === 0
+      );
+    });
+  if (canonical) return { id: canonical, approximate: false };
+  const stripped = raw.replace(/-(low|medium|high|xhigh|max)$/, '');
   const exact = ids.find((id) => id.toLowerCase() === stripped);
   if (exact) return { id: exact, approximate: false };
   const wanted = identity(stripped);

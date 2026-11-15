@@ -29,7 +29,7 @@ Ingress is deliberately tolerant: valid coordinates remain usable if reasoning i
 
 ## Usage and price estimates
 
-Normalized `inputTokens` includes cached reads; `cachedInputTokens` is a subset. `totalTokens` is normalized input plus output. Claude input includes its separately reported cache creation and cache reads. Codex already includes cached reads in its input count. AGY's separate cache-read treatment is inferred from the consecutive examples in its [official headless documentation](https://antigravity.google/docs/cli/headless/#read-the-results). Terminal totals are used without also summing intermediate snapshots. Missing, invalid or oversized incomplete records yield unavailable usage.
+Normalized `inputTokens` includes cached reads; `cachedInputTokens` is a subset. `totalTokens` is normalized input plus output. Claude input includes its separately reported cache creation and cache reads. Codex already includes cached reads in its input count. AGY's separate cache-read treatment is inferred from the consecutive examples in its [official headless documentation](https://antigravity.google/docs/cli/headless/#read-the-results). Terminal totals are used without also summing intermediate snapshots. Missing or invalid usage is unavailable. Codex skips unrelated oversized lines and discards accumulated counters when a malformed, truncated or oversized terminal event is identifiable in its bounded prefix.
 
 The public [OpenRouter model list](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties) supplies USD-per-token prompt, completion and optional cache-read prices. The estimate is:
 
@@ -39,6 +39,6 @@ max(0, inputTokens - cachedInputTokens) * promptPrice
   + outputTokens * completionPrice
 ```
 
-Matching removes effort suffixes, normalizes provider/version/name order and then considers nearby versions within the same provider, family and tier. Fuzzy version matches are labelled approximate. Unknown matches or unavailable prices yield `costUsd: null`.
+Matching first preserves known exact or canonical catalog IDs, then removes effort suffixes, normalizes provider/version/name order and considers nearby versions within the same provider, family and tier. This keeps a genuine model name ending in `max` distinct from an effort suffix. Fuzzy version matches are labelled approximate. Unknown matches or unavailable prices yield `costUsd: null`.
 
-The cache lives at `{dataDir}/openrouter-models-cache.json`, is fresh for 24 hours, and falls back to readable stale data on refresh failure. Pricing runs asynchronously; late estimates enrich the matching result and in-memory round archive, including its Final card, without changing scores. A different match or round generation cannot receive the update. Historical matches are not backfilled. These are reference estimates; CLI subscriptions and provider-specific charges can differ.
+The cache lives at `{dataDir}/openrouter-models-cache.json`, is fresh for 24 hours, and falls back to readable stale data on refresh failure. Pricing runs asynchronously; late estimates enrich the matching result and in-memory round archive, including its Final card, without changing scores or resetting an open card's focus, tooltip or preview. A different match or round generation cannot receive the update. Historical matches are not backfilled. These are reference estimates; CLI subscriptions and provider-specific charges can differ.

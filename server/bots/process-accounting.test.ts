@@ -71,11 +71,16 @@ test('dispatches usage before finish and enriches it asynchronously', async () =
   }
 });
 
-// Value: protects=known usage survives stop and rejected pricing cannot block completion; fails_when=stop guard discards parsed usage or estimator failure suppresses finish; why_new=existing test covers only successful pricing and normal exit; seam=none; no_claim=local child does not prove provider CLI behavior.
-test('retains stopped usage and finishes despite estimator rejection', async () => {
-  for (const stopped of [false, true]) {
+// Value: protects=known usage survives stop and optional accounting errors cannot block completion; fails_when=stop guard discards usage or accounting errors suppress finish and cleanup; why_new=existing test covers only successful pricing and normal exit; seam=none; no_claim=local child does not prove provider CLI behavior.
+test('retains stopped usage and finishes despite optional accounting errors', async () => {
+  for (const [stopped, dispatchThrows] of [
+    [false, false],
+    [true, false],
+    [false, true],
+  ] as const) {
     const dir = mkdtempSync(path.join(tmpdir(), 'geo-accounting-error-'));
     const events: EngineEvent[] = [];
+    let unregistered = false;
     const handle: ActiveBotHandle = {
       matchId: 'match',
       gen: 2,
@@ -88,11 +93,17 @@ test('retains stopped usage and finishes despite estimator rejection', async () 
       releaseObserve: () => {},
       setStartedAt: () => {},
     };
+    const activeHandles = new Map([[handle.slotId, handle]]);
     try {
       spawnAndMonitorBotProcess({
         childrenFile: path.join(dir, 'children.json'),
-        api: { baseUrl: '', unregisterBot: () => {} } as unknown as BotToolApiServer,
-        activeHandles: new Map([[handle.slotId, handle]]),
+        api: {
+          baseUrl: '',
+          unregisterBot: () => {
+            unregistered = true;
+          },
+        } as unknown as BotToolApiServer,
+        activeHandles,
         handle,
         slot: { id: 'bot', harness: 'claude', model: 'claude-haiku-4-5' } as BotSlotConfig,
         target: {} as RoundTarget,
@@ -102,6 +113,7 @@ test('retains stopped usage and finishes despite estimator rejection', async () 
         didSubmitGuess: () => true,
         dispatch: (event) => {
           events.push(event);
+          if (dispatchThrows && event.type === 'bot_accounting') throw new Error('dispatch failed');
         },
         estimateCost: () => Promise.reject(new Error('pricing unavailable')),
         buildCustomLaunchSpec: ({ workDir }) => ({
@@ -128,6 +140,10 @@ test('retains stopped usage and finishes despite estimator rejection', async () 
           costUsd: null,
         },
       });
+      if (!stopped) {
+        expect(unregistered).toBe(true);
+        expect(activeHandles.has(handle.slotId)).toBe(false);
+      }
       await Promise.resolve();
       expect(events).toHaveLength(stopped ? 1 : 2);
     } finally {

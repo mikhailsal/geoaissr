@@ -122,34 +122,42 @@ function attachBotProcessMonitor(opts: {
   void opts.proc.exited
     .then(async (exitInfo) => {
       await opts.proc.drained;
-      const tokenUsage = opts.parser.finish();
-      if (tokenUsage) {
-        const identity = {
-          matchId: opts.handle.matchId,
-          gen: opts.handle.gen,
-          roundNumber: opts.handle.roundNumber,
-          botId: opts.handle.slotId,
-        };
-        opts.dispatch({
-          type: 'bot_accounting',
-          ...identity,
-          accounting: { tokenUsage, costUsd: null },
-        });
-        if (opts.estimateCost) {
-          void Promise.resolve()
-            .then(() => opts.estimateCost?.(opts.model, tokenUsage))
-            .then((estimate) => {
-              if (estimate)
-                opts.dispatch({
-                  type: 'bot_accounting',
-                  ...identity,
-                  accounting: { tokenUsage, ...estimate },
-                });
-            })
-            .catch(() => {
-              /* Estimates are optional. */
-            });
+      try {
+        const tokenUsage = opts.parser.finish();
+        if (tokenUsage) {
+          const identity = {
+            matchId: opts.handle.matchId,
+            gen: opts.handle.gen,
+            roundNumber: opts.handle.roundNumber,
+            botId: opts.handle.slotId,
+          };
+          opts.dispatch({
+            type: 'bot_accounting',
+            ...identity,
+            accounting: { tokenUsage, costUsd: null },
+          });
+          if (opts.estimateCost) {
+            void Promise.resolve()
+              .then(() => opts.estimateCost?.(opts.model, tokenUsage))
+              .then((estimate) => {
+                if (estimate)
+                  opts.dispatch({
+                    type: 'bot_accounting',
+                    ...identity,
+                    accounting: { tokenUsage, ...estimate },
+                  });
+              })
+              .catch(() => {
+                /* Estimates are optional. */
+              });
+          }
         }
+      } catch (err) {
+        opts.logger?.log('harness_monitor_error', {
+          phase: 'accounting',
+          slotId: opts.handle.slotId,
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
       if (opts.handle.stopped) return;
       try {

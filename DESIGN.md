@@ -82,3 +82,5 @@ Reasoning appears in a fixed reading order: facts, rejected alternatives, conclu
 The inspection timeline groups initial observations above numbered paid steps. Each row pairs a clickable image with its action, camera or move parameters and hypothesis. Zoom is always derived from field of view, including a `1.0×` normal view. Long text wraps within the card on narrow screens.
 
 Token and estimated-cost details use one compact metric button. Its tooltip works with hover, keyboard focus and tap; Escape closes the tooltip before the surrounding card, and clicking outside dismisses it. The cost is labelled as an OpenRouter estimate and approximate model matches are explicit.
+
+Live accounting updates preserve the selected card's focus, open tooltip and image preview. Selecting a different bot or round resets those inspection controls.

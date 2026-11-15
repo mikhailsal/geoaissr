@@ -29,6 +29,7 @@ async function injectSnapshot(
           }
           Object.assign(entry, {
             conclusion: 'Вывод по уликам',
+            explanation: 'Дублирующее старое объяснение',
             rejectedGuesses: [{ guess: 'Версия', reason: 'Причина' }],
             facts: 'Наблюдаемые факты',
             usedDraft: true,
@@ -99,6 +100,7 @@ test('renders transparent bot snapshot and supports accounting interactions', as
     expect(text.indexOf('Факты и улики')).toBeLessThan(text.indexOf('Исключённые версии'));
     expect(text.indexOf('Исключённые версии')).toBeLessThan(text.indexOf('Итоговый вывод'));
     await expect(card.getByText('Черновик')).toBeVisible();
+    await expect(card).not.toContainText('Дублирующее старое объяснение');
     await expect(card.locator('.thumb-item').first()).toContainText('Поздний осмотр');
     await expect(card).toContainText('зум 2.6× (fov 35°)');
     await expect(card).toContainText('зум 1.0× (fov 90°)');
@@ -151,8 +153,8 @@ test('renders legacy reasoning and unavailable accounting', async ({ page }) => 
   }
 });
 
-// protects=mouse hover dismissal and replacement snapshot reset; fails_when=hover sticks or an old preview/details survives a replacement; why_new=existing interactions only use click/focus and one snapshot; seam=none; no_claim=synthetic snapshot timing does not prove server delivery timing.
-test('hover details dismiss and a replacement snapshot resets open state', async ({ page }) => {
+// protects=mouse hover dismissal and same-card snapshot continuity; fails_when=hover sticks or a price update resets preview, details or focus; why_new=existing interactions only use click/focus and one snapshot; seam=none; no_claim=synthetic snapshot timing does not prove server delivery timing.
+test('hover details dismiss and a same-card update preserves open state', async ({ page }) => {
   const server = await startIsolatedFakeServer({ seedBot: true, rounds: 1 });
   const replacement: { send?: () => void } = {};
   try {
@@ -169,14 +171,17 @@ test('hover details dismiss and a replacement snapshot resets open state', async
     await expect(card.locator('.zoomed-preview')).toBeVisible();
     await badge.click();
     await expect(details).toBeVisible();
-    // Keep the pinned panel open while moving off its future replacement geometry.
+    // Keep the pointer away so this checks pinned state without a fresh hover.
     await card.locator('h3').hover();
     await expect(details).toBeVisible();
+    await badge.focus();
+    await expect(badge).toBeFocused();
     expect(replacement.send).toBeDefined();
     replacement.send?.();
     await expect(badge).toContainText('~$0.1234');
-    await expect(card.locator('.zoomed-preview')).toHaveCount(0);
-    await expect(details).toHaveCount(0);
+    await expect(card.locator('.zoomed-preview')).toBeVisible();
+    await expect(details).toBeVisible();
+    await expect(badge).toBeFocused();
   } finally {
     await server.stop();
   }
