@@ -54,6 +54,7 @@ export const botSlotConfigSchema = z.object({
   personalityText: personalityTextSchema,
   disabledReason: z.string().optional(),
   lastVisionCheck: visionCheckRecordSchema.optional(),
+  winResetAt: z.string().optional(),
 });
 
 export type BotSlotConfig = z.infer<typeof botSlotConfigSchema>;
@@ -135,6 +136,7 @@ export const matchRoundRecordSchema = z.object({
 });
 
 export const matchParticipantSummarySchema = z.object({
+  profileId: z.string().optional(),
   id: z.string(),
   name: z.string(),
   isAi: z.boolean(),

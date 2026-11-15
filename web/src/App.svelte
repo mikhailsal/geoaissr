@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import type { DifficultyPreset } from '$shared/bot-tools';
   import type { ParticipantColorId } from '$shared/colors';
   import { COUNTDOWN_MS, type RoundResultEntryView } from '$shared/protocol';
   import type { RegionId } from '$shared/storage-schemas';
+  import ProfileModal from './components/ProfileModal.svelte';
   import StatusBanner from './components/StatusBanner.svelte';
   import { GameStore } from './lib/game-store.svelte';
   import Final from './screens/Final.svelte';
@@ -13,6 +14,24 @@
   import RoundResults from './screens/RoundResults.svelte';
 
   const store = new GameStore();
+  let editingProfile = $state(false);
+  let profileTrigger: HTMLElement | null = null;
+  function openProfile(e: MouseEvent): void {
+    profileTrigger = e.currentTarget as HTMLElement;
+    store.profile.error = null;
+    editingProfile = true;
+  }
+  function closeProfile(): void {
+    editingProfile = false;
+    void tick().then(() => {
+      if (!editingProfile) profileTrigger?.focus();
+    });
+  }
+  let wasPending = false;
+  $effect(() => {
+    if (wasPending && !store.profile.pending && !store.profile.error) closeProfile();
+    wasPending = store.profile.pending;
+  });
 
   onMount(() => {
     store.connect();
@@ -23,6 +42,11 @@
   });
 
   const view = $derived(store.view);
+  $effect(() => {
+    if (editingProfile && view && view.phase !== 'LOBBY' && view.phase !== 'FINAL') {
+      closeProfile();
+    }
+  });
   const inGamePhase = $derived(store.authState !== 'error' && store.joined && view !== null);
   const roundRemainingMs = $derived(view?.active ? store.remainingMs(view.active.endsAt) : 0);
   const countdownStartsAt = $derived(view?.loading?.countdownStartsAt ?? null);
@@ -124,6 +148,9 @@
         tunnelChanged={view.tunnel.changedSinceStart}
         onRetryConnect={handleRetryConnect}
       />
+      {#if view.winsWarning}
+        <p class="wins-warning panel" role="alert">{view.winsWarning}</p>
+      {/if}
     </div>
   {/if}
 
@@ -135,12 +162,17 @@
       lobbySummary={store.lobbySummary}
       joinPending={store.joinPending}
       joinError={store.joinError}
+      savedProfile={store.profile.saved}
       onRetry={handleRetryConnect}
       onJoin={handleJoin}
     />
   {:else if view.phase === 'LOBBY'}
     <Lobby
       {view}
+      onEditProfile={openProfile}
+      onResetBotWins={(id: string) => {
+        store.resetBotWins(id);
+      }}
       starting={store.startMatchPending}
       checkingVisionBotId={store.checkingVisionBotId}
       visionToastByBot={store.visionToastByBot}
@@ -185,9 +217,35 @@
       onClientError={handleClientError}
     />
   {:else}
-    <Final {view} onPlayAgain={handlePlayAgain} onEndMatch={handleEndMatch} />
+    <Final
+      {view}
+      onPlayAgain={handlePlayAgain}
+      onEndMatch={handleEndMatch}
+      onEditProfile={openProfile}
+      onResetBotWins={(id: string) => {
+        store.resetBotWins(id);
+      }}
+    />
   {/if}
 </div>
+
+{#if editingProfile && view && (view.phase === 'LOBBY' || view.phase === 'FINAL')}
+  {@const me = view.players.find((p) => p.id === view.viewerId)}
+  {#if me}<ProfileModal
+      name={me.name}
+      color={me.color}
+      usedColors={[
+        ...view.players.filter((p) => p.id !== me.id).map((p) => p.color),
+        ...view.bots.map((b) => b.color),
+      ]}
+      pending={store.profile.pending}
+      error={store.profile.error}
+      onSave={(nick: string, color: ParticipantColorId) => {
+        store.updateProfile(nick, color);
+      }}
+      onClose={closeProfile}
+    />{/if}
+{/if}
 
 <style>
   .app-shell {
@@ -207,5 +265,11 @@
 
   .global-banner :global(button) {
     pointer-events: auto;
+  }
+
+  .wins-warning {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    color: var(--signal);
   }
 </style>

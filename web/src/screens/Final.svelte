@@ -11,17 +11,20 @@
 
   interface Props {
     view: ClientViewState;
+    onEditProfile: (e: MouseEvent) => void;
+    onResetBotWins: (id: string) => void;
     onPlayAgain: () => void;
     onEndMatch: () => void;
   }
 
-  let { view, onPlayAgain, onEndMatch }: Props = $props();
+  let { view, onPlayAgain, onEndMatch, onEditProfile, onResetBotWins }: Props = $props();
 
   let inspectedCard = $state<{ roundNumber: number; entry: RoundResultEntryView } | null>(null);
   let lastTriggerBtn = $state<HTMLButtonElement | null>(null);
   let confettiPlayed = false;
 
   const fin = $derived(view.final);
+  const me = $derived(view.players.find((p) => p.id === view.viewerId));
   const topWinners = $derived(fin ? fin.standings.filter((s) => s.rank === 1) : []);
   const bestHuman = $derived(fin?.standings.find((s) => !s.isAi) ?? null);
   const uniqueHumanWon = $derived(
@@ -131,7 +134,13 @@
                   <td class="sticky-col">
                     <div class="who">
                       <span class="rk">#{row.rank}</span>
-                      <Avatar name={row.name} colorId={row.color} isAi={row.isAi} size="sm" />
+                      <Avatar
+                        wins6h={row.wins6h}
+                        name={row.name}
+                        colorId={row.color}
+                        isAi={row.isAi}
+                        size="sm"
+                      />
                       <span>{row.name}</span>
                     </div>
                   </td>
@@ -177,6 +186,24 @@
         </div>
       </section>
     {/if}
+
+    <section class="panel profile-controls" aria-label="Профиль и победы ИИ">
+      {#if me}
+        <div class="profile-row">
+          <Avatar name={me.name} colorId={me.color} wins6h={me.wins6h} />
+          <span>{me.name}</span>
+          <button type="button" class="btn" onclick={onEditProfile}>Изменить профиль</button>
+        </div>
+      {/if}
+      {#if view.viewerIsHost}{#each view.bots as bot (bot.id)}<button
+            type="button"
+            class="btn"
+            aria-label={`Сбросить победы ${bot.name}`}
+            onclick={() => {
+              onResetBotWins(bot.id);
+            }}>Сбросить победы {bot.name}</button
+          >{/each}{/if}
+    </section>
 
     {#if inspectedCard}
       <section aria-label={`Мысли бота в раунде ${inspectedCard.roundNumber}`}>
@@ -225,6 +252,23 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+  }
+
+  .profile-controls {
+    padding: var(--sp-4);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .profile-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    overflow-wrap: anywhere;
   }
 
   .winner-line {

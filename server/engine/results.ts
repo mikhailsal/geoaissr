@@ -81,6 +81,7 @@ function scoreHumansForRound(
     };
     if (dist !== null) answeredNames.push(p.name);
     rawEntries.push({
+      wins6h: p.profileId ? (state.wins6h.byProfileId[p.profileId] ?? 0) : 0,
       id: p.id,
       name: p.name,
       color: p.color,
@@ -126,6 +127,7 @@ function scoreBotsForRound(
     const elapsedMs = Math.max(0, (bot.finishedAt ?? now) - startedAt);
 
     rawEntries.push({
+      wins6h: state.wins6h.byBotId[bot.slotId] ?? 0,
       id: bot.slotId,
       name: bot.name,
       color: bot.color,
@@ -317,6 +319,7 @@ export function buildMatchRecord(state: RoomState, now: number): MatchRecord {
   const rankMap = computeFinalRankings(state);
   const participants = rankMap.map((r) => ({
     id: r.item.id,
+    profileId: r.item.isAi ? undefined : state.players[r.item.id]?.profileId,
     name: r.item.name,
     isAi: r.item.isAi,
     color: r.item.color,

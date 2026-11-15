@@ -34,6 +34,7 @@ function projectPlayers(state: RoomState): PlayerView[] {
     if (!p) continue;
     const hg = active?.humanGuesses[id];
     players.push({
+      wins6h: p.profileId ? (state.wins6h.byProfileId[p.profileId] ?? 0) : 0,
       id: p.id,
       name: p.name,
       color: p.color,
@@ -92,6 +93,7 @@ function projectActive(state: RoomState, viewerId: string): ClientViewState['act
     confirmedCount,
     playingHumanCount: playingHumans.length,
     botProgress: Object.values(active.bots).map((b) => ({
+      wins6h: state.wins6h.byBotId[b.slotId] ?? 0,
       id: b.slotId,
       name: b.name,
       color: b.color,
@@ -119,7 +121,12 @@ function projectResults(state: RoomState, viewerIsHost: boolean): ClientViewStat
     targetLat: res.target.lat,
     targetLng: res.target.lng,
     countryNameRu: res.target.countryNameRu,
-    entries: res.entries.map((entry) => forViewer(entry, viewerIsHost)),
+    entries: res.entries.map((entry) => ({
+      ...forViewer(entry, viewerIsHost),
+      wins6h: entry.isAi
+        ? (state.wins6h.byBotId[entry.id] ?? 0)
+        : (state.wins6h.byProfileId[state.players[entry.id]?.profileId ?? ''] ?? 0),
+    })),
     humanVsAi: res.humanVsAi,
   };
 }
@@ -128,6 +135,9 @@ function projectFinal(state: RoomState, viewerIsHost: boolean): ClientViewState[
   if (state.phase !== 'FINAL') return undefined;
   const ranked = computeFinalRankings(state);
   const standings = ranked.map(({ rank, item }) => ({
+    wins6h: item.isAi
+      ? (state.wins6h.byBotId[item.id] ?? 0)
+      : (state.wins6h.byProfileId[state.players[item.id]?.profileId ?? ''] ?? 0),
     id: item.id,
     name: item.name,
     color: item.color,
@@ -142,7 +152,10 @@ function projectFinal(state: RoomState, viewerIsHost: boolean): ClientViewState[
         played: Boolean(entry && entry.distanceKm !== null),
         score: entry ? entry.roundScore : null,
         distanceKm: entry ? entry.distanceKm : null,
-        botCard: item.isAi && entry ? forViewer(entry, viewerIsHost) : undefined,
+        botCard:
+          item.isAi && entry
+            ? { ...forViewer(entry, viewerIsHost), wins6h: state.wins6h.byBotId[item.id] ?? 0 }
+            : undefined,
       };
     }),
   }));
@@ -187,10 +200,11 @@ export function projectView(state: RoomState, viewerId: string): ClientViewState
     settingsNotice: state.settingsNotice,
     quotaWarning: state.quotaWarning,
     matchWriteError: state.matchWriteError,
+    winsWarning: state.winsWarning,
     tunnel: state.tunnel,
     quota: state.quotaSummary,
     players: projectPlayers(state),
-    bots: state.settings.bots,
+    bots: state.settings.bots.map((b) => ({ ...b, wins6h: state.wins6h.byBotId[b.id] ?? 0 })),
     availableHarnesses: state.availableHarnesses,
     loading: projectLoading(state),
     active: projectActive(state, viewerId),

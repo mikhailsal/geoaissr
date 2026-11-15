@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { matchRecordSchema, type MatchRecord } from '../../shared/storage-schemas.ts';
 
@@ -15,10 +15,15 @@ export interface ReadMatchesResult {
 }
 
 export function readMatchRecords(matchesFile: string): ReadMatchesResult {
-  if (!existsSync(matchesFile)) {
-    return { records: [], skippedNewer: 0, skippedInvalid: 0 };
+  let text: string;
+  try {
+    text = readFileSync(matchesFile, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { records: [], skippedNewer: 0, skippedInvalid: 0 };
+    }
+    throw error;
   }
-  const text = readFileSync(matchesFile, 'utf8');
   const records: MatchRecord[] = [];
   let skippedNewer = 0;
   let skippedInvalid = 0;

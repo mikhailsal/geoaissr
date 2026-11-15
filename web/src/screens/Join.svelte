@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { PARTICIPANT_COLORS, pickFirstFreeColor, type ParticipantColorId } from '$shared/colors';
   import type { LobbySummary } from '$shared/protocol';
   import type { AuthScreenError } from '../lib/game-store.svelte';
+  import type { SavedUserProfile } from '../lib/profile';
   import InlineState from '../components/InlineState.svelte';
   import { formatRoundsRu } from '../i18n/format';
   import { RU } from '../i18n/ru';
@@ -13,6 +15,7 @@
     lobbySummary: LobbySummary | null;
     joinPending: boolean;
     joinError: { code: string; message: string } | null;
+    savedProfile: SavedUserProfile | null;
     onRetry: () => void;
     onJoin: (nick: string, color: ParticipantColorId) => void;
   }
@@ -24,12 +27,13 @@
     lobbySummary,
     joinPending,
     joinError,
+    savedProfile,
     onRetry,
     onJoin,
   }: Props = $props();
 
-  let nick = $state('');
-  let selectedColor = $state<ParticipantColorId>('p-1');
+  let nick = $state(untrack(() => savedProfile?.nick ?? ''));
+  let selectedColor = $state<ParticipantColorId>(untrack(() => savedProfile?.color ?? 'p-1'));
   let dismissNarrow = $state(false);
   let viewportNarrow = $state(typeof window !== 'undefined' ? window.innerWidth < 900 : false);
   let nickInput = $state<HTMLInputElement | null>(null);
@@ -40,7 +44,7 @@
   const trimNick = $derived(nick.trim());
 
   $effect(() => {
-    if (usedColors.includes(selectedColor)) {
+    if (!savedProfile && usedColors.includes(selectedColor)) {
       const nextFree = pickFirstFreeColor(usedColors);
       if (nextFree) selectedColor = nextFree;
     }
@@ -171,7 +175,7 @@
         <button
           type="submit"
           class="btn btn-primary submit-btn"
-          disabled={!trimNick || joinPending}
+          disabled={!trimNick || joinPending || usedColors.includes(selectedColor)}
         >
           {#if joinPending}
             {RU.join.submitting}

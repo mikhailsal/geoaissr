@@ -1,5 +1,6 @@
 import type { ParticipantColorId } from '$shared/colors';
 import type { LobbySummary, ClientViewState, ServerMessage } from '$shared/protocol';
+import { getOrCreateProfileId } from './profile';
 import { MapLoadReporter, type MapLoadKind } from './map-load-reports';
 
 const TOKEN_PARAM_RE = /(?:^|&)t=([^&]+)/;
@@ -274,8 +275,8 @@ export class GeoWsClient {
     this.pendingPinPayload = null;
   }
 
-  sendJoin(nick: string, color: ParticipantColorId): boolean {
-    return this.sendSequenced('join', { nick, color });
+  sendJoin(nick: string, color: ParticipantColorId, profileId: string): boolean {
+    return this.sendSequenced('join', { nick, color, profileId });
   }
 
   sendPinThrottled(roundNumber: number, lat: number, lng: number): boolean {
@@ -329,6 +330,7 @@ export class GeoWsClient {
       ws.send(
         JSON.stringify({
           type: 'hello',
+          profileId: getOrCreateProfileId(),
           token: this.token,
           ...(saved ? { playerId: saved.playerId, playerSecret: saved.playerSecret } : {}),
         }),

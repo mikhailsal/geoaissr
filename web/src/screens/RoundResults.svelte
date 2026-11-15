@@ -168,7 +168,13 @@
                 <td class="rank-cell">{entry.rank}</td>
                 <td>
                   <div class="player-cell">
-                    <Avatar name={entry.name} colorId={entry.color} isAi={entry.isAi} size="sm" />
+                    <Avatar
+                      wins6h={entry.wins6h}
+                      name={entry.name}
+                      colorId={entry.color}
+                      isAi={entry.isAi}
+                      size="sm"
+                    />
                     <span class="p-name">{entry.name}</span>
                   </div>
                 </td>

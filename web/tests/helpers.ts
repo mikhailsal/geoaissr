@@ -5,11 +5,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import type { BotSlotConfig, MatchRecord } from '../../shared/storage-schemas';
 
 export interface StartedFakeApp {
   baseUrl: string;
   hostUrl: string;
   guestUrl: string;
+  restart: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -20,6 +22,7 @@ function writeTestSettings(
   rounds: number,
   seedBot: boolean,
   quotaCeilings?: Partial<QuotaCounts>,
+  bots?: BotSlotConfig[],
 ): void {
   const settings = {
     version: 1,
@@ -29,25 +32,27 @@ function writeTestSettings(
     region: 'world',
     aiWaitWindowSec: 5,
     ...(quotaCeilings ? { quotaCeilings } : {}),
-    bots: seedBot
-      ? [
-          {
-            id: 'bot-e2e-1',
-            name: 'Клод',
-            color: 'p-4',
-            enabled: true,
-            harness: 'claude',
-            model: 'haiku',
-            effort: 'low',
-            moveLimit: 1,
-            imageSize: 400,
-            budgetSec: 60,
-            difficultyPreset: 'amateur',
-            personalityPreset: 'braggart',
-            personalityText: '',
-          },
-        ]
-      : [],
+    bots:
+      bots ??
+      (seedBot
+        ? [
+            {
+              id: 'bot-e2e-1',
+              name: 'Клод',
+              color: 'p-4',
+              enabled: true,
+              harness: 'claude',
+              model: 'haiku',
+              effort: 'low',
+              moveLimit: 1,
+              imageSize: 400,
+              budgetSec: 60,
+              difficultyPreset: 'amateur',
+              personalityPreset: 'braggart',
+              personalityText: '',
+            },
+          ]
+        : []),
   };
   writeFileSync(path.join(configDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf8');
 }
@@ -97,18 +102,65 @@ function findFreePort(): Promise<number> {
   });
 }
 
+function launchFakeProcess(configDir: string, dataDir: string, port: number): ChildProcess {
+  return spawn(
+    'bun',
+    ['run', 'server/cli/start.ts', '--fake', '--no-tunnel', '--no-open', '--port', String(port)],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env, GEOAISSR_CONFIG_DIR: configDir, GEOAISSR_DATA_DIR: dataDir },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+}
+
+async function stopFakeProcess(proc: ChildProcess): Promise<void> {
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      proc.kill('SIGKILL');
+      resolve();
+    }, 3_000);
+    proc.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    proc.kill('SIGTERM');
+  });
+}
+
 export async function startIsolatedFakeServer(opts?: {
   seedBot?: boolean;
   rounds?: number;
   quotaCeilings?: Partial<QuotaCounts>;
   initialQuota?: QuotaCounts;
+  initialMatches?: MatchRecord[];
+  unreadableHistory?: boolean;
+  bots?: BotSlotConfig[];
 }): Promise<StartedFakeApp> {
   const root = mkdtempSync(path.join(tmpdir(), 'geo-pw-e2e-'));
   const configDir = path.join(root, 'config');
   const dataDir = path.join(root, 'data');
-  if (opts?.seedBot || opts?.rounds !== undefined || opts?.quotaCeilings) {
+  if (opts?.unreadableHistory) {
+    mkdirSync(path.join(dataDir, 'matches.jsonl'), { recursive: true });
+  }
+  if (opts?.seedBot || opts?.rounds !== undefined || opts?.quotaCeilings || opts?.bots) {
     mkdirSync(configDir, { recursive: true });
-    writeTestSettings(configDir, opts.rounds ?? 2, Boolean(opts.seedBot), opts.quotaCeilings);
+    writeTestSettings(
+      configDir,
+      opts.rounds ?? 2,
+      Boolean(opts.seedBot),
+      opts.quotaCeilings,
+      opts.bots,
+    );
+  }
+  if (opts?.initialMatches) {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(
+      path.join(dataDir, 'matches.jsonl'),
+      opts.initialMatches.map((r) => JSON.stringify(r)).join('\n') + '\n',
+      'utf8',
+    );
   }
   if (opts?.initialQuota) {
     mkdirSync(dataDir, { recursive: true });
@@ -123,27 +175,7 @@ export async function startIsolatedFakeServer(opts?: {
     );
   }
   const freePort = await findFreePort();
-  const proc = spawn(
-    'bun',
-    [
-      'run',
-      'server/cli/start.ts',
-      '--fake',
-      '--no-tunnel',
-      '--no-open',
-      '--port',
-      String(freePort),
-    ],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        GEOAISSR_CONFIG_DIR: configDir,
-        GEOAISSR_DATA_DIR: dataDir,
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
+  let proc = launchFakeProcess(configDir, dataDir, freePort);
 
   let hostUrl = '';
   let guestUrl = '';
@@ -159,20 +191,19 @@ export async function startIsolatedFakeServer(opts?: {
 
   return {
     baseUrl,
-    hostUrl,
-    guestUrl,
+    get hostUrl() {
+      return hostUrl;
+    },
+    get guestUrl() {
+      return guestUrl;
+    },
+    restart: async () => {
+      await stopFakeProcess(proc);
+      proc = launchFakeProcess(configDir, dataDir, freePort);
+      ({ hostUrl, guestUrl } = await waitForUrls(proc));
+    },
     stop: async () => {
-      proc.kill('SIGTERM');
-      await new Promise<void>((res) => {
-        const t = setTimeout(() => {
-          proc.kill('SIGKILL');
-          res();
-        }, 3_000);
-        proc.once('exit', () => {
-          clearTimeout(t);
-          res();
-        });
-      });
+      await stopFakeProcess(proc);
       rmSync(root, { recursive: true, force: true });
     },
   };

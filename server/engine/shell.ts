@@ -5,15 +5,19 @@ import type {
   RegionId,
   SettingsFile,
 } from '../../shared/storage-schemas.ts';
+import { createSettingsWrites } from './settings-writes.ts';
+import { createWinsClock } from './wins.ts';
 import { reduce } from './reduce.ts';
 import type { EngineEffect, EngineEvent, RoomState, RoundTarget } from './types.ts';
 import { projectView } from './view.ts';
 
 export interface ShellDeps {
   now?: () => number;
+  matchRecords?: MatchRecord[];
   onStateChange?: (state: RoomState, version: number) => void;
   onAsyncError?: (context: string, err: unknown) => void;
   saveSettings: (settings: SettingsFile) => Promise<void>;
+  saveSettingsForReset?: (settings: SettingsFile) => Promise<void>;
   confirmQuotaReset: () => Promise<QuotaSummaryView>;
   recalculateQuotaSummary?: (state: RoomState) => QuotaSummaryView;
   prepareRound: (opts: {
@@ -68,6 +72,11 @@ interface EffectContext {
   nowFn: () => number;
   isDisposed: () => boolean;
   dispatch: (event: EngineEvent) => AckResult | undefined;
+  settingsWrites: ReturnType<typeof createSettingsWrites>;
+}
+
+function createTimerRegistry(): TimerRegistry {
+  return { panoTimeout: null, countdown: null, deadline: null, botBudgets: new Map() };
 }
 
 function clearTimer(t: ReturnType<typeof setTimeout> | null): null {
@@ -96,9 +105,11 @@ function scheduleDelay(
 
 function runAsyncEffect(ctx: EffectContext, effect: EngineEffect, state: RoomState): void {
   if (effect.type === 'save_settings') {
-    void ctx.deps.saveSettings(effect.settings).catch((err: unknown) => {
-      ctx.deps.onAsyncError?.('save_settings', err);
-    });
+    ctx.settingsWrites.save(effect.settings);
+    return;
+  }
+  if (effect.type === 'persist_bot_wins_reset') {
+    ctx.settingsWrites.reset(effect.botId, effect.at);
     return;
   }
   if (effect.type === 'confirm_quota_reset') {
@@ -158,7 +169,8 @@ function runAsyncEffect(ctx: EffectContext, effect: EngineEffect, state: RoomSta
     void ctx.deps
       .appendMatchRecord(effect.record)
       .then(() => {
-        if (!ctx.isDisposed()) ctx.dispatch({ type: 'match_write_result', ok: true });
+        if (!ctx.isDisposed())
+          ctx.dispatch({ type: 'match_write_result', ok: true, record: effect.record });
       })
       .catch((err: unknown) => {
         if (!ctx.isDisposed()) {
@@ -282,20 +294,90 @@ function runSyncEffect(ctx: EffectContext, effect: EngineEffect, currentState: R
   }
 }
 
-export function createRoomShell(initialState: RoomState, deps: ShellDeps): RoomShell {
+function updateLobbyQuota(state: RoomState, event: EngineEvent, deps: ShellDeps): RoomState {
+  if (
+    deps.recalculateQuotaSummary &&
+    state.phase === 'LOBBY' &&
+    event.type !== 'quota_updated' &&
+    event.type !== 'confirm_quota_reset'
+  ) {
+    return { ...state, quotaSummary: deps.recalculateQuotaSummary(state) };
+  }
+  return state;
+}
+
+function settingsQueue(
+  deps: ShellDeps,
+  getState: () => RoomState,
+  dispatch: (event: EngineEvent) => AckResult | undefined,
+  isDisposed: () => boolean,
+) {
+  return createSettingsWrites({
+    getState,
+    save: deps.saveSettings,
+    saveReset: deps.saveSettingsForReset ?? deps.saveSettings,
+    dispatch,
+    onError: deps.onAsyncError,
+    isDisposed,
+  });
+}
+
+function applyShellEvent(
+  state: RoomState,
+  event: EngineEvent,
+  deps: ShellDeps,
+  now: number,
+  records: MatchRecord[],
+) {
+  if (event.type === 'start_match' && deps.recalculateQuotaSummary && state.phase === 'LOBBY') {
+    state = { ...state, quotaSummary: deps.recalculateQuotaSummary(state) };
+  }
+  const prevState = state;
+  const out = reduce(state, event, now);
+  const nextState = updateLobbyQuota(out.state, event, deps);
+  if (event.type === 'match_write_result' && event.ok && event.record) records.push(event.record);
+  return {
+    prevState,
+    nextState,
+    out,
+    refreshWins:
+      (event.type === 'bot_wins_reset_result' && event.ok) ||
+      (event.type === 'match_write_result' && event.ok && !!event.record),
+  };
+}
+
+export function createRoomShell(
+  initialState: RoomState,
+  { matchRecords, ...deps }: ShellDeps,
+): RoomShell {
   const nowFn = deps.now ?? (() => Date.now());
   let state = initialState;
   let version = 1;
   let disposed = false;
+  const records = [...(matchRecords ?? [])];
+  const winsClock = createWinsClock(
+    records,
+    nowFn,
+    () => Object.fromEntries(state.settings.bots.map((b) => [b.id, b.winResetAt])),
+    (wins6h, broadcast) => {
+      state = { ...state, wins6h };
+      if (broadcast) {
+        version += 1;
+        deps.onStateChange?.(state, version);
+      }
+    },
+  );
+  winsClock.refresh();
+  const timers = createTimerRegistry();
 
-  const timers: TimerRegistry = {
-    panoTimeout: null,
-    countdown: null,
-    deadline: null,
-    botBudgets: new Map(),
-  };
-
+  const settingsWrites = settingsQueue(
+    deps,
+    () => state,
+    dispatch,
+    () => disposed,
+  );
   const ctx: EffectContext = {
+    settingsWrites,
     deps,
     timers,
     nowFn,
@@ -305,23 +387,16 @@ export function createRoomShell(initialState: RoomState, deps: ShellDeps): RoomS
 
   function dispatch(event: EngineEvent): AckResult | undefined {
     if (disposed) return undefined;
-    if (event.type === 'start_match' && deps.recalculateQuotaSummary && state.phase === 'LOBBY') {
-      // Gate the start on the live quota counters, not on the summary cached at the last lobby edit.
-      state = { ...state, quotaSummary: deps.recalculateQuotaSummary(state) };
-    }
-    const prevState = state;
-    const out = reduce(prevState, event, nowFn());
-    let nextState = out.state;
-    if (
-      deps.recalculateQuotaSummary &&
-      nextState.phase === 'LOBBY' &&
-      event.type !== 'quota_updated' &&
-      event.type !== 'confirm_quota_reset'
-    ) {
-      nextState = { ...nextState, quotaSummary: deps.recalculateQuotaSummary(nextState) };
-    }
+    const { prevState, nextState, out, refreshWins } = applyShellEvent(
+      state,
+      event,
+      deps,
+      nowFn(),
+      records,
+    );
     const changed = nextState !== prevState;
     state = nextState;
+    if (refreshWins) winsClock.refresh();
 
     if (changed && prevState.gen !== nextState.gen) {
       clearAllTimers(timers);
@@ -343,6 +418,7 @@ export function createRoomShell(initialState: RoomState, deps: ShellDeps): RoomS
     dispatch,
     dispose: () => {
       disposed = true;
+      winsClock.dispose();
       clearAllTimers(timers);
       deps.stopAllBots('room_disposed');
     },

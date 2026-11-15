@@ -81,12 +81,21 @@ The AI opponents use CLI tools that are already installed and signed in on the h
 
 ---
 
+## Profiles and recent wins
+
+Your browser remembers your name, color and a profile UUID, and automatically joins when its previous session cannot be restored. If the name or color is occupied, choose another on the prefilled join form. Use **«Изменить профиль»** in the lobby or final results to edit your profile; editing is unavailable during a match.
+
+The trophy beside each avatar counts wins from the last six hours. Only complete matches with exactly one first-place finisher count; ties and early finishes do not. Human wins follow the profile UUID, and AI wins follow the bot slot even after a rename. The host can reset an individual bot's count in the lobby or final results. Matches and reset timestamps persist on the server; a storage error is reported in the room.
+
+Profiles belong to one browser and origin. A new Quick Tunnel hostname, browser, or cleared site storage creates a separate profile; use a stable `--public-url` to retain it across tunnel restarts. Profile IDs identify statistics, while session secrets control seat restoration.
+
 ## Keyboard controls and accessibility
 
 - **Enter** in an active round — submit the placed marker («Угадать», "Guess").
 - **M** — expand/collapse the minimap in a round (or open the map sheet on a narrow screen `< 900px`).
 - **Space** on the round results screen — instantly show all arcs and pins without waiting for the animation.
-- **Esc** — close an open AI bot «почему?» ("why?") card (returning focus to the button) or the host dropdown menu.
+- **Esc** — close the profile editor, an open AI bot «почему?» ("why?") card, or the host dropdown menu, returning focus to its button.
 - The interface supports `prefers-reduced-motion: reduce`, `Tab` navigation, `aria-live` announcements of timer/status changes, text contrast >= 4.5:1 and distinct avatar shapes (a circle for humans, a square with a processor icon for AI).
 
 Detailed CLI error codes are described in [docs/errors.md](docs/errors.md).
+Interface conventions are described in [DESIGN.md](DESIGN.md).

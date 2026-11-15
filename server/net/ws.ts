@@ -144,7 +144,12 @@ function handleHelloMsg(
       restoredId = existing.id;
       ws.data.playerId = existing.id;
       closePreviousTabForPlayer(ctx, existing.id, ws);
-      ctx.shell.dispatch({ type: 'player_reconnect', playerId: existing.id, isHost: isHostTok });
+      ctx.shell.dispatch({
+        type: 'player_reconnect',
+        playerId: existing.id,
+        isHost: isHostTok,
+        profileId: msg.profileId,
+      });
     }
   }
 
@@ -155,6 +160,7 @@ function handleHelloMsg(
     browserMapsKey: ctx.browserMapsKey,
     fakeMode: ctx.fakeMode,
     restoredPlayerId: restoredId,
+    restoredProfileId: restoredId ? ctx.shell.getState().players[restoredId]?.profileId : undefined,
     lobbySummary: computeLobbySummary(ctx.shell.getState()),
   });
   ws.data.authenticated = true;
@@ -173,7 +179,7 @@ function checkNewJoinEligibility(
   role: 'host' | 'guest' | null,
 ): { ok: true } | { ok: false; code: 'color_taken' | 'room_full'; message: string } {
   const colorTakenByHuman = state.playerOrder.some((id) => state.players[id]?.color === color);
-  const colorTakenByBot = state.settings.bots.some((b) => b.enabled && b.color === color);
+  const colorTakenByBot = state.settings.bots.some((b) => b.color === color);
   if (colorTakenByHuman || colorTakenByBot) {
     return {
       ok: false,
@@ -191,6 +197,10 @@ function checkNewJoinEligibility(
     };
   }
   return { ok: true };
+}
+
+function botNameTaken(state: RoomState, nick: string): boolean {
+  return state.settings.bots.some((b) => b.name.trim().toLowerCase() === nick.toLowerCase());
 }
 
 function handleJoinMsg(
@@ -223,7 +233,7 @@ function handleJoinMsg(
     .map((id) => state.players[id])
     .find((p) => p && p.name.toLowerCase() === cleanNick.toLowerCase());
 
-  if (existingByNick?.connected) {
+  if ((!existingByNick && botNameTaken(state, cleanNick)) || existingByNick?.connected) {
     sendJoinErr('nick_taken', 'Этот ник уже занят в текущей комнате.');
     return;
   }
@@ -248,14 +258,13 @@ function handleJoinMsg(
   const playerId = existingByNick ? existingByNick.id : randomBytes(8).toString('hex');
   const playerSecret = randomBytes(16).toString('hex');
   ws.data.playerId = playerId;
-  if (existingByNick) {
-    closePreviousTabForPlayer(ctx, playerId, ws);
-  }
+  if (existingByNick) closePreviousTabForPlayer(ctx, playerId, ws);
   sendJson(ws, { type: 'join_ok', serverNow: Date.now(), playerId, playerSecret });
 
   if (existingByNick) {
     ctx.shell.dispatch({
       type: 'player_reclaim_nick',
+      profileId: msg.profileId,
       playerId,
       oldPlayerId: existingByNick.id,
       newSecret: playerSecret,
@@ -267,6 +276,7 @@ function handleJoinMsg(
       playerId,
       secret: playerSecret,
       name: cleanNick,
+      profileId: msg.profileId,
       color: msg.color,
       isHost: ws.data.role === 'host',
     });

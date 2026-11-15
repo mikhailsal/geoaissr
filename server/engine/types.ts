@@ -17,6 +17,7 @@ import type {
 } from '../../shared/storage-schemas.ts';
 
 export interface PlayerState {
+  profileId?: string;
   id: string;
   secret: string;
   name: string;
@@ -114,6 +115,7 @@ export interface RoundArchiveRecord {
 }
 
 export interface RoomState {
+  wins6h: { byProfileId: Record<string, number>; byBotId: Record<string, number> };
   matchId: string;
   gen: number;
   matchStartedAt: string | null;
@@ -123,6 +125,7 @@ export interface RoomState {
   settingsNotice?: string;
   quotaWarning?: string;
   matchWriteError?: string;
+  winsWarning?: string;
   quotaSummary: QuotaSummaryView;
   tunnel: TunnelStatusView;
   availableHarnesses: HarnessCatalogEntry[];
@@ -139,21 +142,25 @@ export interface RoomState {
 export type EngineEvent =
   | {
       type: 'player_join';
+      profileId?: string;
       playerId: string;
       secret: string;
       name: string;
       color: BotSlotConfig['color'];
       isHost: boolean;
     }
-  | { type: 'player_reconnect'; playerId: string; isHost: boolean }
+  | { type: 'player_reconnect'; playerId: string; isHost: boolean; profileId?: string }
   | {
       type: 'player_reclaim_nick';
+      profileId?: string;
       playerId: string;
       oldPlayerId: string;
       newSecret: string;
       isHost?: boolean;
     }
   | { type: 'player_disconnect'; playerId: string }
+  | { type: 'update_profile'; playerId: string; nick: string; color: BotSlotConfig['color'] }
+  | { type: 'reset_bot_wins'; playerId: string; botId: string }
   | {
       type: 'client_error';
       playerId: string;
@@ -247,10 +254,12 @@ export type EngineEvent =
   | { type: 'next_round'; playerId: string; roundNumber: number }
   | { type: 'end_match'; playerId: string }
   | { type: 'play_again'; playerId: string }
-  | { type: 'match_write_result'; ok: boolean; error?: string };
+  | { type: 'bot_wins_reset_result'; botId: string; at: string; ok: boolean }
+  | { type: 'match_write_result'; ok: boolean; error?: string; record?: MatchRecord };
 
 export type EngineEffect =
   | { type: 'save_settings'; settings: SettingsFile }
+  | { type: 'persist_bot_wins_reset'; botId: string; at: string }
   | { type: 'confirm_quota_reset' }
   | {
       type: 'prepare_round';
@@ -311,6 +320,10 @@ export function createInitialRoomState(opts: {
   availableHarnesses: HarnessCatalogEntry[];
 }): RoomState {
   return {
+    wins6h: {
+      byProfileId: Object.create(null) as Record<string, number>,
+      byBotId: Object.create(null) as Record<string, number>,
+    },
     matchId: opts.matchId,
     gen: 1,
     matchStartedAt: null,
@@ -340,10 +353,7 @@ export function computeLobbySummary(state: RoomState): LobbySummary {
   const humans = players.filter((p) => p.connected).map((p) => p.name);
   const disconnected = players.filter((p) => !p.connected).map((p) => p.name);
   const aiCount = state.settings.bots.filter((b) => b.enabled).length;
-  const usedColors = [
-    ...players.map((p) => p.color),
-    ...state.settings.bots.filter((b) => b.enabled).map((b) => b.color),
-  ];
+  const usedColors = [...players.map((p) => p.color), ...state.settings.bots.map((b) => b.color)];
   return {
     humans,
     aiCount,

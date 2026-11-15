@@ -8,6 +8,8 @@ import type {
 } from '$shared/protocol';
 import type { HarnessId, RegionId } from '$shared/storage-schemas';
 import { ServerClock } from './clock';
+import { getOrCreateProfileId } from './profile';
+import { ProfileSession } from './profile-session.svelte';
 import { subscribeMapsAuthFailure } from './maps-loader';
 import { GeoWsClient, type WsClientCallbacks } from './ws-client';
 import { RU } from '../i18n/ru';
@@ -52,6 +54,7 @@ export class GameStore {
 
   private readonly clock = new ServerClock();
   private readonly wsClient: GeoWsClient;
+  readonly profile: ProfileSession;
   private backOnlineTimer: number | null = null;
   private clockTimer: number | null = null;
   private unsubMapsAuth: (() => void) | null = null;
@@ -64,6 +67,7 @@ export class GameStore {
 
   constructor() {
     this.wsClient = new GeoWsClient(this.buildWsCallbacks());
+    this.profile = new ProfileSession(this.wsClient);
   }
 
   private handleHelloOk(msg: Extract<ServerMessage, { type: 'hello_ok' }>): void {
@@ -74,12 +78,19 @@ export class GameStore {
     this.fakeMode = msg.fakeMode;
     this.lobbySummary = msg.lobbySummary;
     this.joined = Boolean(msg.restoredPlayerId);
+    if (msg.restoredPlayerId) this.profile.restore(msg.restoredProfileId ?? getOrCreateProfileId());
     this.resendPinOnNextState = true;
     this.authError = null;
     this.authState = 'ready';
+    if (!msg.restoredPlayerId && this.profile.saved) {
+      this.authState = 'checking';
+      this.join(this.profile.saved.nick, this.profile.saved.color);
+    }
   }
 
-  private handleAck(seq: number): void {
+  private handleAck(msg: Extract<ServerMessage, { type: 'ack' }>): void {
+    const { seq } = msg;
+    this.profile.onAck(msg);
     if (seq === this.submitGuessSeq) {
       this.submittingGuess = false;
       this.submitGuessSeq = null;
@@ -144,7 +155,7 @@ export class GameStore {
         this.applyJoinError(msg);
       },
       onAck: (msg) => {
-        this.handleAck(msg.seq);
+        this.handleAck(msg);
       },
       onVisionCheckResult: (msg) => {
         if (this.checkingVisionBotId === msg.botId) this.checkingVisionBotId = null;
@@ -163,6 +174,7 @@ export class GameStore {
   }
 
   private clearTransientPending(): void {
+    this.profile.clearPending();
     this.joinPending = false;
     this.checkingVisionBotId = null;
     this.startMatchPending = false;
@@ -186,6 +198,8 @@ export class GameStore {
 
   private applyJoinError(msg: Extract<ServerMessage, { type: 'join_error' }>): void {
     this.joinPending = false;
+    this.profile.cancelJoin();
+    this.authState = 'ready';
     this.lobbySummary = msg.lobbySummary;
     const msgByCode: Record<typeof msg.code, string> = {
       nick_taken: RU.join.nickTaken,
@@ -227,6 +241,7 @@ export class GameStore {
     const prevRound = this.view?.roundNumber;
     const prevPhase = this.view?.phase;
     this.view = view;
+    this.profile.onState(view);
     this.joined = view.viewerId !== '__unjoined__';
     if (view.phase !== 'LOBBY') {
       this.startMatchPending = false;
@@ -321,10 +336,19 @@ export class GameStore {
     this.lastJoinNick = nick.trim();
     this.joinError = null;
     this.joinPending = true;
-    if (!this.wsClient.sendJoin(nick, color)) {
+    if (!this.profile.join(nick, color)) {
+      this.authState = 'ready';
       this.joinPending = false;
       this.joinError = { code: 'offline', message: RU.join.serverUnreachable };
     }
+  }
+
+  updateProfile(nick: string, color: ParticipantColorId): void {
+    this.profile.update(nick, color);
+  }
+
+  resetBotWins(botId: string): void {
+    this.wsClient.sendSequenced('reset_bot_wins', { botId });
   }
 
   updateLobby(patch: {
