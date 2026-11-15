@@ -75,6 +75,34 @@ async function awaitRoundStart(st: QueueState): Promise<boolean> {
   return !isSignalAborted(st.signal);
 }
 
+async function executeGuess(
+  st: QueueState,
+  toolName: string,
+  rawArgs: unknown,
+): Promise<ToolResponsePayload> {
+  const guess = parseGuessInput(rawArgs);
+  if (!guess) return recordQueueFailure(st, 'Неверные координаты догадки.');
+  if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
+  const missingReasoning =
+    toolName !== 'submit_guess' && !guess.facts && !guess.conclusion && !guess.explanation;
+  const finalized = toolName !== 'draft_guess' && !missingReasoning;
+  st.handlers.onGuess(guess, finalized);
+  st.finalized = finalized;
+  if (missingReasoning) {
+    return {
+      text: 'Координаты сохранены как черновик. Добавь непустое объяснение: facts (до 1000 символов) или conclusion (до 600); повтори вызов с lat и lng.',
+      ...(toolName === 'final_guess' ? { isError: true } : {}),
+    };
+  }
+  const remMoves = Math.max(0, st.moveLimit - st.turnsUsed);
+  const remSec = Math.max(0, Math.round(st.handlers.getRemainingTimeSec()));
+  return {
+    text: finalized
+      ? 'Окончательная догадка принята.'
+      : `Черновик сохранён. Осталось ходов: ${remMoves}, времени: ${remSec} с.${remSec > 15 ? ' Продолжай исследование, если не уверен окончательно.' : ''}`,
+  };
+}
+
 async function executeQueuedTool(
   st: QueueState,
   toolName: string,
@@ -94,19 +122,7 @@ async function executeQueuedTool(
   }
 
   if (toolName === 'submit_guess' || toolName === 'final_guess' || toolName === 'draft_guess') {
-    const guess = parseGuessInput(rawArgs);
-    if (!guess) return recordQueueFailure(st, 'Неверные координаты догадки.');
-    if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
-    const finalized = toolName !== 'draft_guess';
-    st.handlers.onGuess(guess, finalized);
-    st.finalized = finalized;
-    const remMoves = Math.max(0, st.moveLimit - st.turnsUsed);
-    const remSec = Math.max(0, Math.round(st.handlers.getRemainingTimeSec()));
-    return {
-      text: finalized
-        ? 'Окончательная догадка принята.'
-        : `Черновик сохранён. Осталось ходов: ${remMoves}, времени: ${remSec} с — продолжай исследование, если не уверен окончательно.`,
-    };
+    return executeGuess(st, toolName, rawArgs);
   }
 
   if (toolName === 'look') {
@@ -174,7 +190,15 @@ export function createBotToolQueue(opts: {
   let tail: Promise<unknown> = Promise.resolve();
 
   function dispatch(toolName: string, rawArgs: unknown): Promise<ToolResponsePayload> {
-    const next = tail.then(() => executeQueuedTool(st, toolName, rawArgs));
+    const next = tail.then(async () => {
+      const result = await executeQueuedTool(st, toolName, rawArgs);
+      const remaining = Math.max(0, Math.floor(st.handlers.getRemainingTimeSec()));
+      const urgent = remaining <= 15 && !st.finalized && !st.signal.aborted;
+      return {
+        ...result,
+        text: `${result.text}\nОсталось времени: ${remaining} с.${urgent ? ' Немедленно отправь лучшую версию через final_guess.' : ''}`,
+      };
+    });
     tail = next.catch(() => undefined);
     return next;
   }

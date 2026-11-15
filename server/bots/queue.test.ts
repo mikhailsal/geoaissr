@@ -79,7 +79,7 @@ test('observe blocks on waitObserveRelease until released and submit_guess stays
   releaseFn?.();
   const obs = await obsPromise;
   expect(released).toBe(true);
-  expect(obs.text).toBe('observe-ok');
+  expect(obs.text).toContain('observe-ok');
 
   const mvDisabled = await q.dispatch('move', { heading: 0 });
   expect(mvDisabled.isError).toBe(true);
@@ -136,12 +136,16 @@ test('drafts remain free, final is accepted at the limit and closes the queue', 
       onGuess: (g, finalized) => guesses.push({ lat: g.lat, finalized }),
     }),
   });
-  expect((await q.dispatch('draft_guess', { lat: 1, lng: 190 })).text).toContain(
+  expect((await q.dispatch('draft_guess', { lat: 1, lng: 190, facts: 'Дорога' })).text).toContain(
     'Осталось ходов: 1',
   );
   expect((await q.dispatch('look', { heading: 0 })).isError).toBeUndefined();
-  expect((await q.dispatch('draft_guess', { lat: 2, lng: 0 })).isError).toBeUndefined();
-  expect((await q.dispatch('final_guess', { lat: 3, lng: 0 })).isError).toBeUndefined();
+  expect(
+    (await q.dispatch('draft_guess', { lat: 2, lng: 0, facts: 'Дорога' })).isError,
+  ).toBeUndefined();
+  expect(
+    (await q.dispatch('final_guess', { lat: 3, lng: 0, facts: 'Дорога' })).isError,
+  ).toBeUndefined();
   expect((await q.dispatch('draft_guess', { lat: 4, lng: 0 })).isError).toBe(true);
   expect(guesses).toEqual([
     { lat: 1, finalized: false },
