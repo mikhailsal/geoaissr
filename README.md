@@ -98,3 +98,4 @@ Profiles belong to one browser and origin. A new Quick Tunnel hostname, browser,
 - The interface supports `prefers-reduced-motion: reduce`, `Tab` navigation, `aria-live` announcements of timer/status changes, text contrast >= 4.5:1 and distinct avatar shapes (a circle for humans, a square with a processor icon for AI).
 
 Detailed CLI error codes are described in [docs/errors.md](docs/errors.md).
+Interface conventions are described in [DESIGN.md](DESIGN.md).

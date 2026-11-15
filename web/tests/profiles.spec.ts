@@ -188,7 +188,7 @@ test('saved name and color conflicts retain the rejected profile for correction'
   }
 });
 
-// protects=successful Lobby/FINAL edits broadcast and persist while rejected edits do not persist and active phases hide editing; fails_when=another client stays stale, identity changes, or midmatch editing appears; no_claim=does not cover every concurrent edit ordering
+// protects=successful Lobby/FINAL edits broadcast and persist while rejected edits do not persist, active phases hide editing, and Final Escape closes/restores focus; fails_when=another client stays stale, identity changes, midmatch editing appears, or Final global keys swallow Escape; no_claim=does not cover every concurrent edit ordering
 test('profile modal edits in Lobby and Final and preserves rejected values', async ({
   browser,
 }) => {
@@ -251,6 +251,13 @@ test('profile modal edits in Lobby and Final and preserves rejected values', asy
     );
     await assertAxeClean(host, 'ProfileModal');
     await assertNoHorizontalOverflow(host);
+    await dialog.getByLabel('Имя', { exact: true }).fill('Не сохранять');
+    await host.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(host.getByRole('button', { name: 'Изменить профиль', exact: true })).toBeFocused();
+    expect(await savedProfile(host)).toEqual({ ...original, nick: 'Новое имя', color: 'p-5' });
+    await host.getByRole('button', { name: 'Изменить профиль', exact: true }).click();
+    await expect(dialog.getByLabel('Имя', { exact: true })).toHaveValue('Новое имя');
     await dialog.getByLabel('Имя', { exact: true }).fill('Финальное имя');
     await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
     await expect(dialog).toHaveCount(0);

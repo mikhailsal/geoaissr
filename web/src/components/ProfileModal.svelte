@@ -21,7 +21,17 @@
   });
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="profile-title" onclose={onClose}>
+<dialog
+  bind:this={dialog}
+  aria-labelledby="profile-title"
+  onclose={onClose}
+  onkeydown={(event) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    dialog.close();
+  }}
+>
   <form
     onsubmit={(e) => {
       e.preventDefault();
