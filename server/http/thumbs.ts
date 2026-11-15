@@ -23,23 +23,29 @@ export function createThumbStore(maxBytes: number = DEFAULT_MAX_BYTES): ThumbSto
   const thumbMap = new Map<string, Buffer>();
   const fullMap = new Map<string, Buffer>();
   let totalBytes = 0;
+  let thumbBytes = 0;
 
   return {
     put(jpegBuffer: Buffer, tier: ThumbTier = 'thumb'): string {
       const id = randomBytes(16).toString('hex');
       if (maxBytes > 0) {
         if (jpegBuffer.byteLength > maxBytes) return id;
+        if (tier === 'full' && thumbBytes + jpegBuffer.byteLength > maxBytes) return id;
         while (
           (fullMap.size > 0 || thumbMap.size > 0) &&
           totalBytes + jpegBuffer.byteLength > maxBytes
         ) {
           // Evict heavy full-size frames globally before dropping strip thumbnails.
-          totalBytes -= fullMap.size > 0 ? evictOldest(fullMap) : evictOldest(thumbMap);
+          const evictFull = fullMap.size > 0;
+          const evictedBytes = evictOldest(evictFull ? fullMap : thumbMap);
+          totalBytes -= evictedBytes;
+          if (!evictFull) thumbBytes -= evictedBytes;
         }
       }
       const target = tier === 'full' ? fullMap : thumbMap;
       target.set(id, jpegBuffer);
       totalBytes += jpegBuffer.byteLength;
+      if (tier === 'thumb') thumbBytes += jpegBuffer.byteLength;
       return id;
     },
     get(id: string): Buffer | null {
@@ -57,6 +63,7 @@ export function createThumbStore(maxBytes: number = DEFAULT_MAX_BYTES): ThumbSto
       thumbMap.clear();
       fullMap.clear();
       totalBytes = 0;
+      thumbBytes = 0;
     },
     size(): number {
       return thumbMap.size + fullMap.size;

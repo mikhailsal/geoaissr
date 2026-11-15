@@ -53,3 +53,48 @@ test('thumb store evicts full-tier entries globally before thumb-tier entries', 
   expect(store.get(full2)).not.toBeNull();
   expect(store.get(thumb2)).not.toBeNull();
 });
+
+// Value: protects=strip thumbnails survive rejected full images and cache accounting survives eviction and clear; fails_when=full admission evicts thumbs or byte accounting drifts; why_new=existing tests only admit thumbnails under pressure; seam=none; no_claim=unit cache behavior only
+test('thumb store rejects full-tier inserts rather than evicting thumbnails', () => {
+  const store = createThumbStore(10);
+  const thumb1 = store.put(Buffer.alloc(4, 1), 'thumb');
+  const thumb2 = store.put(Buffer.alloc(4, 2), 'thumb');
+  const rejectedFull = store.put(Buffer.alloc(3, 3), 'full');
+
+  expect(store.get(rejectedFull)).toBeNull();
+  expect(store.get(thumb1)).not.toBeNull();
+  expect(store.get(thumb2)).not.toBeNull();
+  expect(store.size()).toBe(2);
+
+  const thumb3 = store.put(Buffer.alloc(4, 4), 'thumb');
+  const fittingFull = store.put(Buffer.alloc(2, 5), 'full');
+  expect(store.get(thumb1)).toBeNull();
+  expect(store.get(thumb2)).not.toBeNull();
+  expect(store.get(thumb3)).not.toBeNull();
+  expect(store.get(fittingFull)).not.toBeNull();
+
+  store.clear();
+  const fullAfterClear = store.put(Buffer.alloc(10, 6), 'full');
+  expect(store.get(fullAfterClear)).not.toBeNull();
+  expect(store.size()).toBe(1);
+});
+
+// Value: protects=rejected full images preserve cached previews while fitting replacements remain possible; fails_when=rejection evicts cached frames or fitting replacements are rejected; why_new=existing tests do not reject full inserts with cached full images; seam=none; no_claim=unit cache behavior only
+test('thumb store preserves existing full images when rejecting a full-tier insert', () => {
+  const store = createThumbStore(10);
+  const thumb = store.put(Buffer.alloc(6, 1), 'thumb');
+  const full = store.put(Buffer.alloc(3, 2), 'full');
+  const rejectedFull = store.put(Buffer.alloc(5, 3), 'full');
+
+  expect(store.get(rejectedFull)).toBeNull();
+  expect(store.get(thumb)).not.toBeNull();
+  expect(store.get(full)).not.toBeNull();
+
+  const extraThumb = store.put(Buffer.alloc(1, 4), 'thumb');
+  const replacementFull = store.put(Buffer.alloc(3, 5), 'full');
+  expect(store.get(full)).toBeNull();
+  expect(store.get(thumb)).not.toBeNull();
+  expect(store.get(extraThumb)).not.toBeNull();
+  expect(store.get(replacementFull)).not.toBeNull();
+  expect(store.size()).toBe(3);
+});
