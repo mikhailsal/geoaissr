@@ -139,8 +139,8 @@ async function renderLabeled(
   const label = formatImageLabel(action, heading, step);
   const jpeg = await annotateStreetViewImage(raw, size, label);
   const thumbBuf = await createThumb(jpeg);
-  const fullId = thumbStore.put(jpeg);
-  const thumbId = thumbStore.put(thumbBuf);
+  const fullId = thumbStore.put(jpeg, 'full');
+  const thumbId = thumbStore.put(thumbBuf, 'thumb');
   return {
     jpeg,
     thumbId,
