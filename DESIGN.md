@@ -54,7 +54,7 @@ The yellow accent is not part of the participant palette. The color of the lette
 - **Spacing scale:** `4px`, `8px`, `12px`, `16px`, `24px`, `32px`, `48px`.
 - **Corner radii:** `4px` for fields and buttons (`--radius-sm`), `8px` for panels (`--radius-md`), `6px` for the square AI avatar, `50%` for the round human avatar.
 - **Panel shadow:** `0 2px 0 rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35)`.
-- **Interactive elements:** minimum height of buttons and input fields is `44px`.
+- **Interactive elements:** minimum height of buttons and input fields is `44px`, except compact map marker buttons (`22–28px` participants and `24px` targets).
 
 ## Motion
 
