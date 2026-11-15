@@ -20,11 +20,11 @@
   let brokenThumbs = $state<Record<string, boolean>>({});
   let zoomedUrl = $state<string | null>(null);
   let closeBtn = $state<HTMLButtonElement | null>(null);
-  let lastEntryId = '';
+  let lastEntry: RoundResultEntryView | null = null;
 
   $effect(() => {
-    if (lastEntryId !== entry.id) {
-      lastEntryId = entry.id;
+    if (lastEntry !== entry) {
+      lastEntry = entry;
       brokenThumbs = {};
       zoomedUrl = null;
       closeBtn?.focus();

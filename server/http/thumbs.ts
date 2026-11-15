@@ -17,6 +17,7 @@ export function createThumbStore(maxBytes: number = DEFAULT_MAX_BYTES): ThumbSto
     put(jpegBuffer: Buffer): string {
       const id = randomBytes(16).toString('hex');
       if (maxBytes > 0) {
+        if (jpegBuffer.byteLength > maxBytes) return id;
         while (map.size > 0 && totalBytes + jpegBuffer.byteLength > maxBytes) {
           const oldestKey = map.keys().next().value;
           if (oldestKey === undefined) break;

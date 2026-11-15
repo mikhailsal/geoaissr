@@ -30,4 +30,11 @@ test('thumb store evicts least-recently-used entries when maxBytes is exceeded',
   expect(store.get(a)).not.toBeNull();
   expect(store.get(c)).not.toBeNull();
   expect(store.size()).toBe(2);
+
+  // An oversized buffer (> maxBytes) should be dropped without evicting `a` or `c`.
+  const oversized = store.put(Buffer.alloc(11, 4));
+  expect(store.get(oversized)).toBeNull();
+  expect(store.get(a)).not.toBeNull();
+  expect(store.get(c)).not.toBeNull();
+  expect(store.size()).toBe(2);
 });
