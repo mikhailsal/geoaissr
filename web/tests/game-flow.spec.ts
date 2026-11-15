@@ -32,6 +32,40 @@ async function joinPlayer(page: Page, url: string, nick: string): Promise<void> 
   await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
 }
 
+async function assertInviteHeader(page: Page): Promise<void> {
+  const invite = page.getByRole('button', { name: /^(Скопировать приглашение|Скопировано)$/ });
+  await expect(invite).toHaveCount(1);
+  await expect(page.locator('.host-menu-bar .copy-btn')).toBeVisible();
+  await expect(page.locator('.host-menu-bar .copy-btn')).toHaveCount(1);
+}
+
+async function assertInviteViewports(page: Page): Promise<void> {
+  await assertInviteBounds(page, 375, 667);
+  await assertInviteBounds(page, 1280, 720);
+}
+
+async function assertInviteBounds(page: Page, width: number, height: number): Promise<void> {
+  await page.setViewportSize({ width, height });
+  await assertInviteHeader(page);
+  const box = await page.locator('.host-menu-bar .copy-btn').boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) throw new Error('Invite button has no bounding box');
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(width);
+  expect(box.y + box.height).toBeLessThanOrEqual(height);
+  await assertNoHorizontalOverflow(page);
+}
+
+async function assertHostMenu(page: Page): Promise<void> {
+  const menu = page.getByRole('button', { name: 'Меню хоста' });
+  await expect(menu).toBeVisible();
+  await menu.click();
+  await expect(page.getByRole('menuitem')).toHaveCount(1);
+  await expect(page.getByRole('menuitem', { name: 'Завершить партию' })).toBeVisible();
+  await menu.click();
+}
+
 async function placePinOnFakeMap(page: Page, offsetX: number, offsetY: number): Promise<void> {
   const canvas = page.getByTestId('fake-guess-map').locator('canvas');
   await expect(canvas).toBeVisible();
@@ -60,6 +94,10 @@ async function playRoundOne(hostPage: Page, guestPage: Page): Promise<void> {
   await assertAxeClean(hostPage, 'Round');
   await assertNoHorizontalOverflow(hostPage);
   await assertNoHorizontalOverflow(guestPage);
+  await assertInviteHeader(hostPage);
+  await assertInviteHeader(guestPage);
+  await assertHostMenu(hostPage);
+  await assertInviteViewports(hostPage);
 
   await placePinOnFakeMap(hostPage, 140, 110);
   await hostPage.keyboard.press('Enter');
@@ -73,6 +111,10 @@ async function playRoundOne(hostPage: Page, guestPage: Page): Promise<void> {
   await hostPage.keyboard.press('Space');
   await assertAxeClean(hostPage, 'RoundResults');
   await assertNoHorizontalOverflow(hostPage);
+  await assertInviteHeader(hostPage);
+  await assertInviteHeader(guestPage);
+  await assertHostMenu(hostPage);
+  await assertInviteViewports(hostPage);
 
   await assertBotCardInteractions(hostPage);
 }
@@ -140,8 +182,13 @@ async function playRoundTwoAndFinal(hostPage: Page, guestPage: Page): Promise<vo
   });
   await assertAxeClean(hostPage, 'Final');
   await assertNoHorizontalOverflow(hostPage);
+  await assertInviteHeader(hostPage);
+  await assertInviteHeader(guestPage);
+  await expect(hostPage.getByRole('button', { name: 'Меню хоста' })).toHaveCount(0);
+  await assertInviteViewports(hostPage);
 }
 
+// protects=single header invitation in each phase, host menu actions, clipboard and responsive bounds in each phase; fails_when=duplicates, missing controls, incorrect clipboard or overflow occur; why_new=the match journey did not cover invite behavior across phases or viewport sizes; seam=none; no_claim=does not cover every viewport or operating-system clipboard implementation
 test('full 2-round match satisfies T53 map telemetry, axe WCAG AA, and BotCard/Space/Esc flows', async ({
   browser,
 }) => {
@@ -170,11 +217,19 @@ test('full 2-round match satisfies T53 map telemetry, axe WCAG AA, and BotCard/S
     await assertAxeClean(hostPage, 'Lobby');
     await assertNoHorizontalOverflow(hostPage);
 
-    await hostPage.getByRole('button', { name: 'Скопировать приглашение' }).first().click();
+    await expect(hostPage.locator('.alone-box')).toHaveText(
+      'Пока вы одни. Отправьте друзьям приглашение',
+    );
+    await expect(hostPage.locator('.alone-box button')).toHaveCount(0);
+    await expect(hostPage.getByRole('button', { name: 'Меню хоста' })).toHaveCount(0);
+    await assertInviteViewports(hostPage);
+    await hostPage.getByRole('button', { name: 'Скопировать приглашение' }).click();
     await expect(hostPage.getByText('Скопировано').first()).toBeVisible();
+    expect(await hostPage.evaluate(() => navigator.clipboard.readText())).toBe(srv.guestUrl);
 
     await joinPlayer(guestPage, srv.guestUrl, 'Дима');
     await expect(hostPage.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await assertInviteHeader(guestPage);
 
     await hostPage.getByRole('button', { name: 'Начать' }).click();
     await playRoundOne(hostPage, guestPage);

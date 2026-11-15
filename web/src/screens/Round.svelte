@@ -54,6 +54,7 @@
   let mapHovered = $state(false);
   const desktopExpanded = $derived(mapPinned || mapHovered);
   let mobileMapOpen = $state(false);
+  let hudHeight = $state(0);
 
   const me = $derived(view.players.find((p) => p.id === view.viewerId));
   const myColor = $derived<ParticipantColorId>(me?.color ?? 'p-1');
@@ -108,7 +109,7 @@
   });
 </script>
 
-<main class="round-stage">
+<main class="round-stage" style:--hud-height={`${hudHeight}px`}>
   {#if panoId}
     <PanoView
       fakeMode={view.fakeMode}
@@ -125,7 +126,7 @@
     />
   {/if}
 
-  <header class="hud-top">
+  <header class="hud-top" bind:clientHeight={hudHeight}>
     <div class="round-chip panel">
       <span>{RU.round.roundTitle(view.roundNumber, view.totalRounds)}</span>
     </div>
@@ -450,6 +451,14 @@
   }
 
   @media (max-width: 899px) {
+    .hud-top {
+      flex-wrap: wrap;
+    }
+
+    .hud-left {
+      top: calc(var(--hud-height) + 2 * var(--sp-3));
+    }
+
     .mobile-map-fab {
       display: inline-flex;
       position: absolute;
