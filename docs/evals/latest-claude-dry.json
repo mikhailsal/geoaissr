@@ -1,0 +1,20 @@
+{
+  "harness": "claude",
+  "dry": true,
+  "samples": 3,
+  "repeats": 1,
+  "baseline": {
+    "armName": "baseline",
+    "runs": 3,
+    "medianKm": 54.3,
+    "iqrKm": 2.6,
+    "distancesKm": [52.093671509092715, 57.24634913430954, 54.26311198010786]
+  },
+  "candidate": {
+    "armName": "candidate",
+    "runs": 3,
+    "medianKm": 54.3,
+    "iqrKm": 2.6,
+    "distancesKm": [52.093671509092715, 57.24634913430954, 54.26311198010786]
+  }
+}

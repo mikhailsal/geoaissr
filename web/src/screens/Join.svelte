@@ -1,0 +1,309 @@
+<script lang="ts">
+  import { PARTICIPANT_COLORS, pickFirstFreeColor, type ParticipantColorId } from '$shared/colors';
+  import type { LobbySummary } from '$shared/protocol';
+  import type { AuthScreenError } from '../lib/game-store.svelte';
+  import InlineState from '../components/InlineState.svelte';
+  import { formatRoundsRu } from '../i18n/format';
+  import { RU } from '../i18n/ru';
+
+  interface Props {
+    authState: 'checking' | 'error' | 'ready';
+    authError: AuthScreenError | null;
+    fakeMode: boolean;
+    lobbySummary: LobbySummary | null;
+    joinPending: boolean;
+    joinError: { code: string; message: string } | null;
+    onRetry: () => void;
+    onJoin: (nick: string, color: ParticipantColorId) => void;
+  }
+
+  let {
+    authState,
+    authError,
+    fakeMode,
+    lobbySummary,
+    joinPending,
+    joinError,
+    onRetry,
+    onJoin,
+  }: Props = $props();
+
+  let nick = $state('');
+  let selectedColor = $state<ParticipantColorId>('p-1');
+  let dismissNarrow = $state(false);
+  let viewportNarrow = $state(typeof window !== 'undefined' ? window.innerWidth < 900 : false);
+  let nickInput = $state<HTMLInputElement | null>(null);
+
+  const usedColors = $derived(lobbySummary?.usedColors ?? []);
+  const isMidMatch = $derived(lobbySummary !== null && lobbySummary.phase !== 'LOBBY');
+  const disconnectedNames = $derived(lobbySummary?.disconnected ?? []);
+  const trimNick = $derived(nick.trim());
+
+  $effect(() => {
+    if (usedColors.includes(selectedColor)) {
+      const nextFree = pickFirstFreeColor(usedColors);
+      if (nextFree) selectedColor = nextFree;
+    }
+  });
+
+  $effect(() => {
+    if (authState === 'ready') {
+      nickInput?.focus();
+    }
+  });
+
+  $effect(() => {
+    const onResize = (): void => {
+      viewportNarrow = window.innerWidth < 900;
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
+  });
+
+  const authErrorText = $derived.by(() => {
+    switch (authError) {
+      case 'no_token':
+        return RU.join.noToken;
+      case 'invalid_token':
+        return RU.join.invalidLink;
+      case 'replaced_tab':
+        return RU.connection.replacedTab;
+      case 'room_full':
+        return RU.join.roomFull;
+      default:
+        return RU.join.serverUnreachable;
+    }
+  });
+
+  function handleSubmit(event: Event): void {
+    event.preventDefault();
+    if (!trimNick || joinPending) return;
+    onJoin(trimNick, selectedColor);
+  }
+</script>
+
+<main class="join-page">
+  <section class="join-card panel" aria-labelledby="join-title">
+    <header class="brand-head">
+      <h1 id="join-title" class="display-title brand">{RU.appName}</h1>
+      {#if fakeMode}
+        <span class="fake-tag">{RU.fakeModeBadge}</span>
+      {/if}
+    </header>
+
+    {#if viewportNarrow && !dismissNarrow}
+      <div class="narrow-box" role="note">
+        <p>{RU.join.narrowWarning}</p>
+        <button type="button" class="btn" onclick={() => (dismissNarrow = true)}>
+          {RU.join.enterAnyway}
+        </button>
+      </div>
+    {:else if authState === 'checking'}
+      <InlineState variant="loading" message={RU.join.checkingLink} />
+    {:else if authState === 'error'}
+      <InlineState
+        variant="error"
+        message={authErrorText}
+        actionLabel={authError === 'unreachable' ? RU.join.retry : undefined}
+        onAction={authError === 'unreachable' ? onRetry : undefined}
+      />
+    {:else}
+      {#if lobbySummary}
+        <p class="context-line">
+          Людей: {lobbySummary.humans.length} · ИИ: {lobbySummary.aiCount} ·
+          {formatRoundsRu(lobbySummary.totalRounds)}
+        </p>
+      {/if}
+
+      {#if isMidMatch && lobbySummary}
+        <p class="notice" role="status">
+          {RU.join.spectatorNotice(lobbySummary.roundNumber, lobbySummary.totalRounds)}
+        </p>
+      {/if}
+
+      {#if disconnectedNames.length > 0}
+        <p class="notice" role="status">{RU.join.reconnectHint(disconnectedNames)}</p>
+      {/if}
+
+      <form class="join-form" onsubmit={handleSubmit}>
+        <label class="field">
+          <span class="lbl">{RU.join.nameLabel}</span>
+          <input
+            bind:this={nickInput}
+            type="text"
+            class="field-input"
+            maxlength={20}
+            required
+            placeholder="Например, Оля"
+            bind:value={nick}
+          />
+          <span class="hint">{RU.join.nameHint}</span>
+        </label>
+
+        <fieldset class="color-group">
+          <legend class="lbl">{RU.join.colorLabel}</legend>
+          <div class="swatches" role="radiogroup" aria-label={RU.join.colorLabel}>
+            {#each PARTICIPANT_COLORS as c (c.id)}
+              {@const taken = usedColors.includes(c.id)}
+              <button
+                type="button"
+                class="swatch"
+                class:selected={selectedColor === c.id}
+                style="background-color: var({c.cssVar}); color: var({c.inkToken});"
+                role="radio"
+                aria-checked={selectedColor === c.id}
+                aria-label={c.labelRu}
+                disabled={taken}
+                onclick={() => (selectedColor = c.id)}
+              >
+                {#if selectedColor === c.id}✓{/if}
+              </button>
+            {/each}
+          </div>
+        </fieldset>
+
+        {#if joinError}
+          <p class="err-msg" role="alert">{joinError.message}</p>
+        {/if}
+
+        <button
+          type="submit"
+          class="btn btn-primary submit-btn"
+          disabled={!trimNick || joinPending}
+        >
+          {#if joinPending}
+            {RU.join.submitting}
+          {:else if isMidMatch}
+            {RU.join.submitSpectate}
+          {:else}
+            {RU.join.submitEnter}
+          {/if}
+        </button>
+      </form>
+    {/if}
+  </section>
+</main>
+
+<style>
+  .join-page {
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-4);
+  }
+
+  .join-card {
+    width: 100%;
+    max-width: 440px;
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+
+  .brand-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+  }
+
+  .brand {
+    font-size: 2rem;
+    color: var(--paint);
+  }
+
+  .fake-tag {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--paint);
+    color: var(--paint);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .context-line,
+  .hint {
+    margin: 0;
+    color: var(--paper-dim);
+    font-size: 0.88rem;
+  }
+
+  .notice,
+  .narrow-box {
+    margin: 0;
+    padding: var(--sp-3);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--paint);
+    background-color: var(--asphalt-900);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .narrow-box p {
+    margin: 0;
+  }
+
+  .join-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .lbl {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .color-group {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.45rem;
+  }
+
+  .swatch {
+    height: var(--control-h);
+    border-radius: var(--radius-sm);
+    border: 2px solid transparent;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .swatch.selected {
+    border-color: var(--paper);
+    outline: 2px solid var(--paint);
+  }
+
+  .swatch:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+
+  .err-msg {
+    margin: 0;
+    color: var(--signal);
+    font-weight: 600;
+  }
+
+  .submit-btn {
+    width: 100%;
+    font-size: 1rem;
+  }
+</style>

@@ -1,0 +1,80 @@
+:root {
+  /* Asphalt & Paper Palette */
+  --asphalt-900: #14171b;
+  --asphalt-800: #1b1e23;
+  --asphalt-700: #2a2e35;
+  --line: #3a3f47;
+  --paper: #f4f1ea;
+  --paper-dim: #b9b4a8;
+
+  /* Semantic & Accent */
+  --paint: #ffd23f;
+  --paint-ink: #14171b;
+  --signal: #ff6369;
+  --ok: #3dbb7a;
+
+  /* Shadows & Overlays (derived in CSS variables only) */
+  --shadow-panel: 0 2px 0 rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-marker: 0 2px 6px rgba(0, 0, 0, 0.55);
+  --avatar-ring: rgba(244, 241, 234, 0.92);
+  --arc-stroke: rgba(20, 23, 27, 0.55);
+
+  /* 12 Participant Colors (no yellow accent) */
+  --p-1: #e8590c;
+  --p-2: #c2255c;
+  --p-3: #9c36b5;
+  --p-4: #7048e8;
+  --p-5: #339af0;
+  --p-6: #1098ad;
+  --p-7: #0ca678;
+  --p-8: #74b816;
+  --p-9: #8d5524;
+  --p-10: #868e96;
+  --p-11: #f06595;
+  --p-12: #22b8cf;
+
+  /* Typography */
+  --font-display: 'Unbounded Variable', sans-serif;
+  --font-ui: 'Onest Variable', sans-serif;
+
+  /* Type Scale */
+  --text-xs: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 40px;
+  --text-3xl: 64px;
+
+  /* Spacing Scale */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-ai: 6px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-panel: 240ms;
+  --dur-sort: 400ms;
+  --dur-fly: 800ms;
+
+  /* Control Sizing */
+  --control-h: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-panel: 0ms;
+    --dur-sort: 0ms;
+    --dur-fly: 0ms;
+  }
+}

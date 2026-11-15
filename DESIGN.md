@@ -1,0 +1,75 @@
+# DESIGN.md — geoaissr visual language
+
+The image: **asphalt and road markings**. The panorama and the map fill the whole screen; the interface lies on top of them in dense, opaque dark panels with a crisp `1px solid var(--line)` border. The scenario: an evening, friends in a voice chat, each at their own monitor.
+
+## Principles
+
+1. **No glass, glow, gradients or decorative icons.** Text never sits directly on the panorama or the map — only on a solid opaque panel (`--asphalt-800` or `--asphalt-900`). Emoji in the interface are forbidden.
+2. **Colors only from `web/src/styles/tokens.css`.** In `.svelte` files the literals `#rrggbb`, `#rgb`, `rgb(...)`, `rgba(...)` are forbidden (checked by the `scripts/check-colors.ts` script in `bun run check`).
+3. **Light map, dark interface.** The answer map (Google Maps JS API) is always in the standard light scheme with point-of-interest icons hidden and Russian labels (`language=ru`). The panels do not clash with daytime panoramas.
+4. **One yellow accent (`--paint`).** Used only for the screen's primary action, the timer ring and the focus ring (`2px solid var(--paint)` with a `2px` offset).
+
+## Typography
+
+The fonts are bundled in the repository (`@fontsource-variable/unbounded`, `@fontsource-variable/onest`, OFL, no requests to external servers):
+
+- **Display (`--font-display`):** `'Unbounded Variable', sans-serif` — the `geoaissr` name, timer, scores, screen headings.
+- **UI (`--font-ui`):** `'Onest Variable', sans-serif` — everything else.
+- **Numerals:** `font-variant-numeric: tabular-nums` everywhere.
+- **Size scale:** `14px` (captions and labels), `16px` (body text, the minimum for body), `20px`, `28px`, `40px`, `64px`.
+
+## Color palette (`web/src/styles/tokens.css`)
+
+| Token           | Value     | Purpose                                                        |
+| --------------- | --------- | -------------------------------------------------------------- |
+| `--asphalt-900` | `#14171B` | Screen background, countdown shutter, text on top of `--paint` |
+| `--asphalt-800` | `#1B1E23` | Dense interface panel                                          |
+| `--asphalt-700` | `#2A2E35` | Hover, secondary surface                                       |
+| `--line`        | `#3A3F47` | Panel borders and dividers (`1px solid`)                       |
+| `--paper`       | `#F4F1EA` | Primary text                                                   |
+| `--paper-dim`   | `#B9B4A8` | Secondary text and captions                                    |
+| `--paint`       | `#FFD23F` | Primary accent, focus, main button, timer                      |
+| `--signal`      | `#FF6369` | Errors, the last-10-seconds countdown                          |
+| `--ok`          | `#3DBB7A` | Success, confirmed answer, connection healthy                  |
+
+### Participant palette (`--p-1` … `--p-12`)
+
+The yellow accent is not part of the participant palette. The color of the letters on top of an avatar (light `--paper` or dark `--asphalt-900`) is chosen automatically for a contrast of >= 4.5:1.
+
+- `--p-1: #E8590C` (orange)
+- `--p-2: #C2255C` (crimson)
+- `--p-3: #9C36B5` (lilac)
+- `--p-4: #7048E8` (violet)
+- `--p-5: #339AF0` (blue)
+- `--p-6: #1098AD` (turquoise)
+- `--p-7: #0CA678` (emerald)
+- `--p-8: #74B816` (lime)
+- `--p-9: #8D5524` (brown)
+- `--p-10: #868E96` (gray)
+- `--p-11: #F06595` (pink)
+- `--p-12: #22B8CF` (light blue)
+
+## Geometry, spacing, shadows
+
+- **Spacing scale:** `4px`, `8px`, `12px`, `16px`, `24px`, `32px`, `48px`.
+- **Corner radii:** `4px` for fields and buttons (`--radius-sm`), `8px` for panels (`--radius-md`), `6px` for the square AI avatar, `50%` for the round human avatar.
+- **Panel shadow:** `0 2px 0 rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35)`.
+- **Interactive elements:** minimum height of buttons and input fields is `44px`.
+
+## Motion
+
+Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
+
+- `120ms` — press, hover
+- `240ms` — panel expansion, state change
+- `400ms` — table row reordering
+- `800ms` — results map fly-over (`flyTo`)
+- With `prefers-reduced-motion: reduce`, motion and animations are turned off, leaving an instant change of states.
+
+## Avatars, markers and states
+
+- **Human:** a round avatar with the first letter of the nickname.
+- **AI:** a square avatar with a `6px` corner radius and a chip icon next to the letter.
+- **On the map / panorama:** a light `2px` outline and a dark offset shadow.
+- **Icons:** only `@lucide/svelte`, and only meaningful ones.
+- **Shared state components:** `StatusBanner.svelte` (connection and warnings for the host) and `InlineState.svelte` (loading, empty, error with an action button).

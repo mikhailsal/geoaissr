@@ -1,0 +1,58 @@
+{
+  "harnesses": [
+    {
+      "id": "claude",
+      "binary": "claude",
+      "deliveryMode": "mcp",
+      "readsOwnerFiles": false,
+      "defaultModel": "claude-haiku-5-5",
+      "fallbackModels": [
+        "claude-haiku-5-5",
+        "claude-haiku-4-5",
+        "claude-sonnet-5-5",
+        "claude-sonnet-5",
+        "claude-sonnet-4-6",
+        "claude-opus-5-5",
+        "claude-opus-5",
+        "claude-opus-4-8",
+        "claude-opus-4-7",
+        "claude-opus-4-6",
+        "claude-opus-4-5",
+        "claude-fable-5-2",
+        "claude-fable-5-1",
+        "claude-fable-5"
+      ],
+      "modelAliases": {
+        "haiku": "claude-haiku-5-5",
+        "sonnet": "claude-sonnet-5-5",
+        "opus": "claude-opus-5-5",
+        "fable": "claude-fable-5-2"
+      }
+    },
+    {
+      "id": "codex",
+      "binary": "codex",
+      "deliveryMode": "mcp",
+      "readsOwnerFiles": false,
+      "defaultModel": "gpt-6-luna",
+      "fallbackModels": [
+        "gpt-6-luna",
+        "gpt-6.1-sol",
+        "gpt-6-astra",
+        "gpt-6.1-terra",
+        "gpt-6-sol",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna"
+      ]
+    },
+    {
+      "id": "agy",
+      "binary": "agy",
+      "deliveryMode": "file",
+      "readsOwnerFiles": true,
+      "defaultModel": "gemini-3.8-flash-low",
+      "fallbackModels": ["gemini-3.8-flash-low", "gemini-3.8-flash", "gemini-3-pro"]
+    }
+  ]
+}

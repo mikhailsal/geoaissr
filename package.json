@@ -1,0 +1,55 @@
+{
+  "name": "geoaissr",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "bun": ">=1.4.2"
+  },
+  "scripts": {
+    "start": "bun run server/cli/start.ts",
+    "dev": "bun run server/cli/dev.ts",
+    "doctor": "bun run server/cli/doctor.ts",
+    "build": "vite build",
+    "check": "bun run scripts/check.ts",
+    "test": "bun test ./shared/ ./server/ ./test/ ./web/src/ ./scripts/",
+    "test:e2e": "bunx playwright test",
+    "test:harness": "bun run scripts/test-harness.ts",
+    "test:tunnel": "bun run scripts/test-tunnel.ts",
+    "hooks:install": "bun run scripts/install-hooks.ts",
+    "setup:dev": "bun run scripts/setup-dev.ts",
+    "eval:bots": "bun run scripts/eval-bots.ts",
+    "build:regions": "bun run scripts/build-regions.ts"
+  },
+  "dependencies": {
+    "@fontsource-variable/onest": "^5.2.0",
+    "@fontsource-variable/unbounded": "^5.2.0",
+    "@googlemaps/js-api-loader": "^1.16.8",
+    "@lucide/svelte": "^0.511.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "canvas-confetti": "^1.9.3",
+    "sharp": "^0.34.1",
+    "zod": "^3.25.0",
+    "zod-to-json-schema": "^3.24.5"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@eslint/js": "^9.26.0",
+    "@playwright/test": "^1.52.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@types/bun": "^1.2.13",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/google.maps": "^3.58.1",
+    "eslint": "^9.26.0",
+    "eslint-plugin-svelte": "^3.5.1",
+    "globals": "^16.0.0",
+    "prettier": "^3.5.3",
+    "prettier-plugin-svelte": "^3.4.0",
+    "svelte": "^5.28.0",
+    "svelte-check": "^4.1.6",
+    "svelte-eslint-parser": "^1.1.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.1",
+    "vite": "^6.3.5"
+  }
+}
