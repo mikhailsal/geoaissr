@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { loadHarnessVerified } from '../storage/harness-verified.ts';
-import { createQuotaManager, QUOTA_CEILINGS, QUOTA_FREE_MONTHLY } from '../storage/quota.ts';
+import { buildQuotaSummaryForRoom, QUOTA_FREE_MONTHLY } from '../storage/quota.ts';
+import { createConfiguredQuotaManager, formatQuotaUsageLine } from './quota.ts';
 import { loadSettings } from '../storage/settings.ts';
 import { detectAllHarnesses } from '../bots/adapters/index.ts';
 import type { CommandProbe } from '../bots/adapters/types.ts';
@@ -380,13 +381,13 @@ function checkStorageAndDevTools(
   });
 
   try {
-    const qm = createQuotaManager(paths.quotaFile);
+    const qm = createConfiguredQuotaManager(paths, sOutcome.value);
     const q = qm.getState();
     items.push({
       code: 'QUOTA_STATUS',
       level: 'warning',
       ok: !qm.needsResetConfirm(),
-      what: `Квота за ${q.month} (UTC): Static ${q.staticRequests}/${QUOTA_CEILINGS.staticRequests}, Pano ${q.panoLoads}/${QUOTA_CEILINGS.panoLoads}, Карты ${q.mapLoads}/${QUOTA_CEILINGS.mapLoads}`,
+      what: `Квота за ${q.month} (UTC): ${formatQuotaUsageLine(buildQuotaSummaryForRoom(qm))}`,
       fix: qm.needsResetConfirm() ? 'Подтвердите сброс счётчика квоты в лобби хоста' : '',
       context: `resetNeeded=${qm.needsResetConfirm()}`,
     });

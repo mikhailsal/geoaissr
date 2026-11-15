@@ -6,7 +6,7 @@ import { startAppHttpServer } from '../server/net/http.ts';
 import { createAuthRateLimiter } from '../server/net/rate-limit.ts';
 import { createWsRoomCoordinator } from '../server/net/ws.ts';
 import { createFakeLocationService } from '../server/location.ts';
-import { createQuotaManager } from '../server/storage/quota.ts';
+import { buildQuotaSummaryForRoom, createQuotaManager } from '../server/storage/quota.ts';
 import { createCloudflaredManager } from '../server/tunnel/cloudflared.ts';
 import { createDefaultSettings } from '../shared/storage-schemas.ts';
 import type { TunnelStatusView } from '../shared/protocol.ts';
@@ -74,19 +74,7 @@ function createTunnelSmokeServer(dir: string, hostToken: string, guestToken: str
       matchId: 'tunnel-smoke',
       fakeMode: true,
       settings: createDefaultSettings(),
-      quotaSummary: {
-        staticUsed: 0,
-        staticCeiling: 8000,
-        staticWorstCase: 0,
-        panoUsed: 0,
-        panoCeiling: 4000,
-        panoWorstCase: 0,
-        mapUsed: 0,
-        mapCeiling: 8000,
-        mapWorstCase: 0,
-        needsResetConfirm: false,
-        sufficient: true,
-      },
+      quotaSummary: buildQuotaSummaryForRoom(qm),
       tunnel: { mode: 'tunnel', status: 'checking', inviteUrl: null, changedSinceStart: false },
       availableHarnesses: [],
     }),

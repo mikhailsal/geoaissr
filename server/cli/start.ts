@@ -18,7 +18,8 @@ import { createWsRoomCoordinator } from '../net/ws.ts';
 import { resolveAppPaths, type AppPaths } from '../paths.ts';
 import { acquireDataDirLock } from '../proc/lock.ts';
 import { cleanupOrphanedChildren } from '../proc/registry.ts';
-import { createQuotaManager, QUOTA_CEILINGS } from '../storage/quota.ts';
+import type { createQuotaManager } from '../storage/quota.ts';
+import { createConfiguredQuotaManager, formatQuotaUsageLine } from './quota.ts';
 import { type TunnelManager } from '../tunnel/cloudflared.ts';
 import { exitWithGeoError } from './report-error.ts';
 import {
@@ -125,7 +126,7 @@ function createServerPipeline(opts: PipelineBuildOpts) {
     availableHarnesses,
     fakeMode: cli.fake,
   });
-  const quotaManager = createQuotaManager(paths.quotaFile);
+  const quotaManager = createConfiguredQuotaManager(paths, settings);
   const thumbStore = createThumbStore();
   const locationService = cli.fake
     ? createFakeLocationService()
@@ -225,12 +226,12 @@ async function runStartupAwaiters(opts: {
   });
   opts.setTunnelMgr(tunnelPhase.tunnelMgr);
   const [, resolvedTunnel] = await Promise.all([buildPromise, tunnelPhase.readyPromise]);
-  const qState = opts.pipeline.quotaManager.getState();
+  const quotaSummary = buildQuotaSummaryForState(opts.pipeline.quotaManager);
   printStartupBanner({
     hostUrl: opts.hostUrl,
     tunnel: resolvedTunnel,
     elapsedMs: Date.now() - opts.tStart,
-    quotaLine: `Static ${qState.staticRequests}/${QUOTA_CEILINGS.staticRequests}, Pano ${qState.panoLoads}/${QUOTA_CEILINGS.panoLoads}, Карты ${qState.mapLoads}/${QUOTA_CEILINGS.mapLoads}`,
+    quotaLine: formatQuotaUsageLine(quotaSummary),
     harnesses: opts.pipeline.availableHarnesses,
     fakeMode: opts.cli.fake,
   });

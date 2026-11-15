@@ -1,9 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, test } from 'bun:test';
 import { saveHarnessVerifiedEntry } from '../storage/harness-verified.ts';
 import type { CommandProbe } from '../bots/adapters/types.ts';
+import { createDefaultSettings } from '../../shared/storage-schemas.ts';
+import { saveSettings } from '../storage/settings.ts';
 import {
   classifyMapsJsErrorCode,
   interpretMetadataProbeResponse,
@@ -104,6 +106,41 @@ test('runDoctorChecks returns structured JSON checks, flags harness version mism
     const refInfo = result.checks.find((c) => c.code === 'BROWSER_KEY_GUIDANCE');
     expect(refInfo?.what).toContain('https://geo.example.com/*');
     expect(refInfo?.fix).toContain('Maps JS 500/день');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// protects=doctor uses saved ceilings and rounds actual usage to percentages; fails_when=diagnostics use hardcoded limits; no_claim=Google metadata is stubbed, no billing balance is checked.
+test('doctor displays configured quota ceilings and rounded percentages', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-doc-quota-'));
+  try {
+    const configDir = path.join(dir, 'c');
+    const dataDir = path.join(dir, 'd');
+    saveSettings(path.join(configDir, 'settings.json'), {
+      ...createDefaultSettings(),
+      quotaCeilings: { staticRequests: 200, panoLoads: 60, mapLoads: 20 },
+    });
+    mkdirSync(dataDir);
+    writeFileSync(
+      path.join(dataDir, 'quota.json'),
+      JSON.stringify({
+        version: 1,
+        month: new Date().toISOString().slice(0, 7),
+        staticRequests: 17,
+        panoLoads: 3,
+        mapLoads: 4,
+      }),
+    );
+    const result = await runDoctorChecks(parseDoctorArgs(['--no-tunnel']), {
+      env: { GEOAISSR_CONFIG_DIR: configDir, GEOAISSR_DATA_DIR: dataDir },
+      fetchImpl: () => Promise.resolve(Response.json({ status: 'OK' })),
+      probe: makeOkProbe(),
+      which: (bin) => `/usr/bin/${bin}`,
+    });
+    expect(result.checks.find((item) => item.code === 'QUOTA_STATUS')?.what).toContain(
+      'Static 17/200 (9%), Pano 3/60 (5%), Карты 4/20 (20%)',
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

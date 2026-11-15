@@ -7,6 +7,7 @@ export interface AppPaths {
   settingsFile: string;
   harnessVerifiedFile: string;
   quotaFile: string;
+  apiUsageFile: string;
   matchesFile: string;
   logsDir: string;
   runDir: string;
@@ -42,6 +43,7 @@ export function resolveAppPaths(env: Record<string, string | undefined> = proces
     settingsFile: path.join(configDir, 'settings.json'),
     harnessVerifiedFile: path.join(configDir, 'harness-verified.json'),
     quotaFile: path.join(dataDir, 'quota.json'),
+    apiUsageFile: path.join(dataDir, 'api-usage.jsonl'),
     matchesFile: path.join(dataDir, 'matches.jsonl'),
     logsDir,
     runDir,

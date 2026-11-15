@@ -3,6 +3,7 @@
   import { REGION_IDS, type RegionId } from '$shared/storage-schemas';
   import { formatRoundsRu, formatSecondsOnly } from '../i18n/format';
   import { REGION_LABELS, RU } from '../i18n/ru';
+  import QuotaMetric from './QuotaMetric.svelte';
 
   interface Props {
     view: ClientViewState;
@@ -130,9 +131,9 @@
   <div class="quota-box">
     <span class="lbl">Квота за месяц</span>
     <div class="quota-lines">
-      <span>Static: {view.quota.staticUsed} / {view.quota.staticCeiling}</span>
-      <span>Pano: {view.quota.panoUsed} / {view.quota.panoCeiling}</span>
-      <span>Карты: {view.quota.mapUsed} / {view.quota.mapCeiling}</span>
+      <QuotaMetric kind="static" metric={view.quota.metrics.static} />
+      <QuotaMetric kind="pano" metric={view.quota.metrics.pano} />
+      <QuotaMetric kind="map" metric={view.quota.metrics.map} />
     </div>
     {#if view.quota.exceedsMessage}
       <p class="err-msg" role="alert">{view.quota.exceedsMessage}</p>

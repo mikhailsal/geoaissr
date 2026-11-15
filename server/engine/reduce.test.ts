@@ -1,3 +1,4 @@
+import { buildQuotaMetric } from '../storage/quota.ts';
 import { expect, test } from 'bun:test';
 import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
@@ -37,6 +38,11 @@ function makeRoom(overrides: Partial<RoomState> = {}): RoomState {
     fakeMode: false,
     settings: makeSettings(),
     quotaSummary: {
+      metrics: {
+        static: buildQuotaMetric(0, 8000),
+        pano: buildQuotaMetric(0, 4000),
+        map: buildQuotaMetric(0, 8000),
+      },
       staticUsed: 0,
       staticCeiling: 8000,
       staticWorstCase: 10,

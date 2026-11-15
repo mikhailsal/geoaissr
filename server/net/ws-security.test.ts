@@ -10,7 +10,7 @@ import { computeFinalRankings } from '../engine/results.ts';
 import { createRoomShell } from '../engine/shell.ts';
 import { createInitialRoomState } from '../engine/types.ts';
 import { createThumbStore } from '../http/thumbs.ts';
-import { createQuotaManager } from '../storage/quota.ts';
+import { buildQuotaMetric, createQuotaManager } from '../storage/quota.ts';
 import { startAppHttpServer } from './http.ts';
 import { createAuthRateLimiter } from './rate-limit.ts';
 import { MAX_UNJOINED_AUTHENTICATED } from './ws-actions.ts';
@@ -91,6 +91,11 @@ function buildSecInitialState(fakeMode: boolean) {
       bots: [],
     },
     quotaSummary: {
+      metrics: {
+        static: buildQuotaMetric(0, 8000),
+        pano: buildQuotaMetric(0, 4000),
+        map: buildQuotaMetric(0, 8000),
+      },
       staticUsed: 0,
       staticCeiling: 8000,
       staticWorstCase: 0,
@@ -348,6 +353,11 @@ test('spectators are excluded from final rankings and pre-join state is masked',
       bots: [],
     },
     quotaSummary: {
+      metrics: {
+        static: buildQuotaMetric(0, 8000),
+        pano: buildQuotaMetric(0, 4000),
+        map: buildQuotaMetric(0, 8000),
+      },
       staticUsed: 0,
       staticCeiling: 8000,
       staticWorstCase: 0,
@@ -567,6 +577,11 @@ test('check_bot_vision emits vision_check_result on completion and on mid-check 
 
 test('RoomShell confirm_quota_reset keeps the gate closed when persisting fails', async () => {
   const baseSummary = {
+    metrics: {
+      static: buildQuotaMetric(0, 8000),
+      pano: buildQuotaMetric(0, 4000),
+      map: buildQuotaMetric(0, 8000),
+    },
     staticUsed: 0,
     staticCeiling: 8000,
     staticWorstCase: 0,

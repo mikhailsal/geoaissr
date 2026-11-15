@@ -1,3 +1,4 @@
+import { buildQuotaMetric } from '../storage/quota.ts';
 import { expect, test } from 'bun:test';
 import type { QuotaSummaryView } from '../../shared/protocol.ts';
 import { reduce } from './reduce.ts';
@@ -6,6 +7,11 @@ import { createInitialRoomState, type RoomState } from './types.ts';
 
 function makeSummary(overrides: Partial<QuotaSummaryView> = {}): QuotaSummaryView {
   return {
+    metrics: {
+      static: buildQuotaMetric(0, 8000),
+      pano: buildQuotaMetric(0, 4000),
+      map: buildQuotaMetric(0, 8000),
+    },
     staticUsed: 0,
     staticCeiling: 8000,
     staticWorstCase: 0,

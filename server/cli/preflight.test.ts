@@ -6,7 +6,7 @@ import { createThumbStore } from '../http/thumbs.ts';
 import { startAppHttpServer } from '../net/http.ts';
 import { createAuthRateLimiter } from '../net/rate-limit.ts';
 import { createWsRoomCoordinator } from '../net/ws.ts';
-import { createQuotaManager } from '../storage/quota.ts';
+import { buildQuotaMetric, createQuotaManager } from '../storage/quota.ts';
 import { assertPortAvailable, parseStartArgs, resolveGoogleEnvKeys } from './preflight.ts';
 
 test('parseStartArgs parses defaults, PORT env, flags, and rejects conflicts', () => {
@@ -71,6 +71,11 @@ test('assertPortAvailable throws GEO_PORT_BUSY when TCP port is already bound', 
 
 function makePortTestShell() {
   const quotaSummary = {
+    metrics: {
+      static: buildQuotaMetric(0, 8000),
+      pano: buildQuotaMetric(0, 4000),
+      map: buildQuotaMetric(0, 8000),
+    },
     staticUsed: 0,
     staticCeiling: 8000,
     staticWorstCase: 0,

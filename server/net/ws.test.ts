@@ -6,7 +6,7 @@ import type { ServerMessage } from '../../shared/protocol.ts';
 import { createRoomShell } from '../engine/shell.ts';
 import { createInitialRoomState } from '../engine/types.ts';
 import { createThumbStore } from '../http/thumbs.ts';
-import { createQuotaManager } from '../storage/quota.ts';
+import { buildQuotaSummaryForRoom, createQuotaManager } from '../storage/quota.ts';
 import { startAppHttpServer } from './http.ts';
 import { createAuthRateLimiter } from './rate-limit.ts';
 import { createWsRoomCoordinator } from './ws.ts';
@@ -57,19 +57,7 @@ function setupTestServer(dir: string) {
       aiWaitWindowSec: 30,
       bots: [],
     },
-    quotaSummary: {
-      staticUsed: 0,
-      staticCeiling: 8000,
-      staticWorstCase: 0,
-      panoUsed: 0,
-      panoCeiling: 4000,
-      panoWorstCase: 4,
-      mapUsed: 0,
-      mapCeiling: 8000,
-      mapWorstCase: 4,
-      needsResetConfirm: false,
-      sufficient: true,
-    },
+    quotaSummary: buildQuotaSummaryForRoom(quota, { rounds: 2 }),
     tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },
     availableHarnesses: [],
   });

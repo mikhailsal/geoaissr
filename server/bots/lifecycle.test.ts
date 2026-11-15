@@ -1,3 +1,4 @@
+import { buildQuotaMetric } from '../storage/quota.ts';
 import { expect, test } from 'bun:test';
 import { botNameFromModel } from '../../shared/bot-tools.ts';
 import { handleAddBot, handleUpdateBot } from '../engine/lobby.ts';
@@ -73,6 +74,11 @@ test('lobby bot IDs avoid collisions and unavailable harness keeps enabled false
       bots: [],
     },
     quotaSummary: {
+      metrics: {
+        static: buildQuotaMetric(0, 8000),
+        pano: buildQuotaMetric(0, 4000),
+        map: buildQuotaMetric(0, 8000),
+      },
       staticUsed: 0,
       staticCeiling: 8000,
       staticWorstCase: 0,
@@ -158,6 +164,11 @@ function makeEarlyFailState(matchId = 'm-early') {
       ],
     },
     quotaSummary: {
+      metrics: {
+        static: buildQuotaMetric(0, 8000),
+        pano: buildQuotaMetric(0, 4000),
+        map: buildQuotaMetric(0, 8000),
+      },
       staticUsed: 0,
       staticCeiling: 8000,
       staticWorstCase: 10,
@@ -334,6 +345,11 @@ function makeLobbyWithModels(): RoomState {
       bots: [],
     },
     quotaSummary: {
+      metrics: {
+        static: buildQuotaMetric(0, 8000),
+        pano: buildQuotaMetric(0, 4000),
+        map: buildQuotaMetric(0, 8000),
+      },
       staticUsed: 0,
       staticCeiling: 8000,
       staticWorstCase: 1,
