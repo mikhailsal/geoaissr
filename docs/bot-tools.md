@@ -18,12 +18,16 @@ Failed calls do not spend a turn. A final submission remains available after the
 Advertised draft and final schemas are strict. Their field order is `facts`, `rejected_guesses`, `conclusion`, `lat`, `lng`, then optional `quip`:
 
 - `facts`: nonempty text, at most 1,000 characters.
-- `rejected_guesses`: 1–3 objects with `guess` (1–120 characters) and `reason` (1–300 characters).
+- `rejected_guesses`: optional; when provided, 1–3 objects with `guess` (1–120 characters) and `reason` (1–300 characters).
 - `conclusion`: nonempty text, at most 600 characters.
 - `lat`: finite number in `[-90, 90]`; `lng`: finite number, normalized to `[-180, 180]`.
 - `quip`: optional text, at most 120 characters.
 
-Ingress is deliberately tolerant: valid coordinates remain usable if reasoning is missing or malformed. Valid reasoning blocks are retained independently, and legacy `explanation` fills the conclusion slot when no valid conclusion exists, including with partial structured blocks. The prompt recommends 2–3 rejected alternatives and continued exploration while uncertain with time and turns available; this is an instruction to the model, not a guarantee of its behavior.
+Ingress preserves valid coordinates even if reasoning is missing or malformed. Long text is truncated to its field limit, and valid rejected alternatives are retained independently. Legacy `explanation` fills the conclusion slot when no valid conclusion exists, including with partial structured blocks. Modern calls with no nonempty `facts`, `conclusion` or legacy `explanation` save a draft and request an explanation; an empty `final_guess` returns an error without closing the session, allowing correction. The deprecated `submit_guess` retains its previous finalization behavior.
+
+The prompt requests a short evidence-based draft immediately after viewing the initial frames. Explanations must name visible details and connect them to a geographic deduction or a rejected alternative, acknowledging uncertainty rather than inventing clues. Alternatives are optional. File-based harnesses may use `read_file` only for game-provided images. These instructions do not guarantee a model's compliance or geographic accuracy.
+
+The advertised time budget is capped by the round duration. Every tool response reports remaining time; at 15 seconds or less it requests a final answer, while the prompt asks the bot to reserve time for submission. An early end to the shared AI waiting window can still end the round before that personal budget.
 
 `look` accepts heading, optional pitch, optional `fov` and optional `zoom` in `1..9`. Explicit finite `fov` takes precedence and is clamped to `10..120`; otherwise `fov = clamp(round(90 / zoom), 10, 120)`, defaulting to 90. A field of view of 20–45 zooms in, while 120 is wide. Fake images use the same field-of-view projection. `look` and `move` advertise a nonempty hypothesis of at most 300 characters; older or incomplete calls can omit it. Successful step records preserve the effective parameters and valid hypothesis.
 
