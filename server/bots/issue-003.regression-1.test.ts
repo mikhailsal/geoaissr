@@ -55,70 +55,79 @@ const quota = {
 // Regression: ISSUE-003
 // Found by /qa on 2026-11-16
 // Report: .gstack/qa-reports/run-results-feedback/qa-report-geoaissr-2026-11-16.md
-// Protects the actual shell-to-runner contract when a bot budget exceeds the round.
-test('runner receives the effective round deadline budget without mutating settings', () => {
-  let state = createInitialRoomState({
-    matchId: 'm',
-    fakeMode: true,
-    settings: { ...createDefaultSettings(), roundDurationSec: 60 },
-    quotaSummary: quota,
-    tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },
-    availableHarnesses: [
-      { id: 'agy', available: true, readsOwnerFiles: true, models: ['gemini-3.8-flash-low'] },
-    ],
-  });
-  state = reduce(
-    state,
-    {
-      type: 'player_join',
-      playerId: 'host',
-      secret: 's',
-      name: 'Host',
-      color: 'p-1',
-      isHost: true,
-    },
-    1,
-  ).state;
-  state = reduce(state, { type: 'add_bot', playerId: 'host' }, 2).state;
-  const bot = state.settings.bots[0];
-  if (!bot) throw new Error('Expected a bot');
-  bot.budgetSec = 120;
-  state = reduce(state, { type: 'start_match', playerId: 'host' }, 3).state;
-  let received = 0;
-  const shell = createRoomShell(state, {
-    saveSettings: async () => {},
-    confirmQuotaReset: () => Promise.resolve(quota),
-    prepareRound: () => new Promise(() => {}),
-    startBotProcesses: ({ bots }) => {
-      received = bots[0]?.budgetSec ?? 0;
-    },
-    releaseBotObserve: () => {},
-    stopBotProcess: () => {},
-    stopAllBots: () => {},
-    clearRoundImages: () => {},
-    clearThumbs: () => {},
-    appendMatchRecord: async () => {},
-    logRoundEnd: () => {},
-  });
-  try {
-    shell.dispatch({
-      type: 'round_prepared',
-      matchId: state.matchId,
-      gen: state.gen,
-      roundNumber: 1,
-      target: {
-        panoId: 'p',
-        lat: 0,
-        lng: 0,
-        countryId: 'x',
-        countryNameRu: 'x',
-        region: 'world',
-        fakeSceneIndex: 0,
+// Value: protects=runner gets literal minimum at over/equal/under budget boundaries; fails_when=shell ignores either limit; why_new=prior test covered only bot-over-round; seam=none; no_claim=no real runner process or provider is exercised.
+test('runner receives the literal effective budget at over, equal and under boundaries', () => {
+  for (const scenario of [
+    { roundDurationSec: 60, botBudgetSec: 120, expectedBudgetSec: 60 },
+    { roundDurationSec: 60, botBudgetSec: 30, expectedBudgetSec: 30 },
+    { roundDurationSec: 60, botBudgetSec: 60, expectedBudgetSec: 60 },
+  ]) {
+    let state = createInitialRoomState({
+      matchId: 'm',
+      fakeMode: true,
+      settings: {
+        ...createDefaultSettings(),
+        roundDurationSec: scenario.roundDurationSec,
       },
+      quotaSummary: quota,
+      tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },
+      availableHarnesses: [
+        { id: 'agy', available: true, readsOwnerFiles: true, models: ['gemini-3.8-flash-low'] },
+      ],
     });
-    expect(received).toBe(60);
-    expect(shell.getState().settings.bots[0]?.budgetSec).toBe(120);
-  } finally {
-    shell.dispose();
+    state = reduce(
+      state,
+      {
+        type: 'player_join',
+        playerId: 'host',
+        secret: 's',
+        name: 'Host',
+        color: 'p-1',
+        isHost: true,
+      },
+      1,
+    ).state;
+    state = reduce(state, { type: 'add_bot', playerId: 'host' }, 2).state;
+    const bot = state.settings.bots[0];
+    if (!bot) throw new Error('Expected a bot');
+    bot.budgetSec = scenario.botBudgetSec;
+    state = reduce(state, { type: 'start_match', playerId: 'host' }, 3).state;
+    let received = 0;
+    const shell = createRoomShell(state, {
+      saveSettings: async () => {},
+      confirmQuotaReset: () => Promise.resolve(quota),
+      prepareRound: () => new Promise(() => {}),
+      startBotProcesses: ({ bots }) => {
+        received = bots[0]?.budgetSec ?? 0;
+      },
+      releaseBotObserve: () => {},
+      stopBotProcess: () => {},
+      stopAllBots: () => {},
+      clearRoundImages: () => {},
+      clearThumbs: () => {},
+      appendMatchRecord: async () => {},
+      logRoundEnd: () => {},
+    });
+    try {
+      shell.dispatch({
+        type: 'round_prepared',
+        matchId: state.matchId,
+        gen: state.gen,
+        roundNumber: 1,
+        target: {
+          panoId: 'p',
+          lat: 0,
+          lng: 0,
+          countryId: 'x',
+          countryNameRu: 'x',
+          region: 'world',
+          fakeSceneIndex: 0,
+        },
+      });
+      expect(received).toBe(scenario.expectedBudgetSec);
+      expect(shell.getState().settings.bots[0]?.budgetSec).toBe(scenario.botBudgetSec);
+    } finally {
+      shell.dispose();
+    }
   }
 });

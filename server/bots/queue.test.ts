@@ -14,6 +14,56 @@ function makeHandlers(overrides: Partial<BotSessionHandlers> = {}): BotSessionHa
   };
 }
 
+// Value: protects=urgency is limited to active unfinished rounds near the deadline; fails_when=urgency appears above the cutoff or after final/abort; why_new=existing tests checked urgency only at five seconds; seam=none; no_claim=queue fixture does not prove model follows the advice.
+test('urgent final advice is limited to the active fifteen-second window', async () => {
+  let remaining = 16;
+  const q = createBotToolQueue({
+    moveLimit: 1,
+    moveEnabled: true,
+    handlers: makeHandlers({ getRemainingTimeSec: () => remaining }),
+  });
+
+  const notUrgent = await q.dispatch('observe', {});
+  expect(notUrgent.text).toContain('16 с');
+  expect(notUrgent.text).not.toContain('Немедленно отправь лучшую версию через final_guess.');
+
+  remaining = 15;
+  const urgent = await q.dispatch('observe', {});
+  expect(urgent.text).toContain('Немедленно отправь лучшую версию через final_guess.');
+
+  remaining = 5;
+  const final = await q.dispatch('final_guess', { lat: 1, lng: 2, facts: 'Улица с вывеской' });
+  expect(final.isError).toBeUndefined();
+  expect(final.text).not.toContain('Немедленно отправь лучшую версию через final_guess.');
+  const afterFinal = await q.dispatch('observe', {});
+  expect(afterFinal.isError).toBe(true);
+  expect(afterFinal.text).not.toContain('Немедленно отправь лучшую версию через final_guess.');
+
+  const aborted = createBotToolQueue({
+    moveLimit: 1,
+    moveEnabled: true,
+    handlers: makeHandlers({ getRemainingTimeSec: () => remaining }),
+  });
+  aborted.abort('round ended');
+  const afterAbort = await aborted.dispatch('observe', {});
+  expect(afterAbort.isError).toBe(true);
+  expect(afterAbort.text).not.toContain('Немедленно отправь лучшую версию через final_guess.');
+});
+
+// Regression: SHIP-001 — fractional seconds produced contradictory instructions.
+// Found by /ship on 2026-11-16
+// Value: protects=draft guidance never requests continued exploration and immediate final together; fails_when=the two instructions use different rounding at the urgency boundary; why_new=the original queue tests used integer remaining seconds; seam=none; no_claim=checks protocol instructions, not model compliance.
+test('draft guidance never contradicts urgency at fractional remaining time', async () => {
+  const q = createBotToolQueue({
+    moveLimit: 1,
+    moveEnabled: true,
+    handlers: makeHandlers({ getRemainingTimeSec: () => 15.5 }),
+  });
+  const reply = await q.dispatch('draft_guess', { lat: 1, lng: 2, facts: 'Улица с вывеской' });
+  const text = reply.text.toLowerCase();
+  expect(text.includes('продолжай исследование') && text.includes('немедленно')).toBe(false);
+});
+
 test('only successful look and move consume turns', async () => {
   let turns = 0;
   const q = createBotToolQueue({

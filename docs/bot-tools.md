@@ -11,7 +11,7 @@ Bots inspect the panorama through the local bridge. Reasoning and usage appear i
 | `move`         | Move along the road when movement is enabled          | 1 on success |
 | `draft_guess`  | Replace the current checkpoint and continue exploring | 0            |
 | `final_guess`  | Freeze the final answer                               | 0            |
-| `submit_guess` | Deprecated alias of `final_guess`                     | 0            |
+| `submit_guess` | Deprecated final submission with legacy behavior      | 0            |
 
 Failed calls do not spend a turn. A final submission remains available after the paid-turn limit. Final answers cannot be overwritten. If the process exits or time expires without a final answer, the latest draft is scored; without either, the bot has no guess. Process completion drains terminal usage without holding round completion for a price request.
 
@@ -27,7 +27,7 @@ Ingress preserves valid coordinates even if reasoning is missing or malformed. L
 
 The prompt requests a short evidence-based draft immediately after viewing the initial frames. Explanations must name visible details and connect them to a geographic deduction or a rejected alternative, acknowledging uncertainty rather than inventing clues. Alternatives are optional. File-based harnesses may use `read_file` only for game-provided images. These instructions do not guarantee a model's compliance or geographic accuracy.
 
-The advertised time budget is capped by the round duration. Every tool response reports remaining time; at 15 seconds or less it requests a final answer, while the prompt asks the bot to reserve time for submission. An early end to the shared AI waiting window can still end the round before that personal budget.
+The advertised time budget is capped by the round duration. Every tool response reports remaining time; at 15 seconds or less, an active bot without a final answer is asked to submit one, while the prompt asks the bot to reserve time for submission. An early end to the shared AI waiting window can still end the round before that personal budget.
 
 `look` accepts heading, optional pitch, optional `fov` and optional `zoom` in `1..9`. Explicit finite `fov` takes precedence and is clamped to `10..120`; otherwise `fov = clamp(round(90 / zoom), 10, 120)`, defaulting to 90. A field of view of 20–45 zooms in, while 120 is wide. Fake images use the same field-of-view projection. `look` and `move` advertise a nonempty hypothesis of at most 300 characters; older or incomplete calls can omit it. Successful step records preserve the effective parameters and valid hypothesis.
 
