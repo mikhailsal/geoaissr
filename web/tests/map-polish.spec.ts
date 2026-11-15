@@ -12,6 +12,14 @@ test.beforeAll(() => {
     '--target=browser',
     '--outfile=.gstack/tmp/maps-loader-test.js',
   ]);
+  execFileSync('bun', [
+    'build',
+    'web/src/lib/fake-canvas.ts',
+    '--tsconfig-override',
+    'tsconfig.web.json',
+    '--target=browser',
+    '--outfile=.gstack/tmp/fake-canvas-test.js',
+  ]);
 });
 
 async function startRound(page: Page, url: string): Promise<void> {
@@ -22,7 +30,76 @@ async function startRound(page: Page, url: string): Promise<void> {
   await expect(page.getByTestId('fake-guess-map')).toBeVisible({ timeout: 12_000 });
 }
 
-// protects=idle, hover, focus, keyboard and mobile opacity plus actual pin geometry under global CSS; fails_when=any state or cascade stretches pins; no_claim=fake mode does not load Google tiles.
+async function assertComparableMapMarkers(page: Page, bundle: string): Promise<void> {
+  const fakeCanvasBundle = readFileSync('.gstack/tmp/fake-canvas-test.js', 'utf8');
+  const markerBounds = await page.evaluate(
+    async ({ source, pinSource }) => {
+      const fake = (await import(
+        URL.createObjectURL(new Blob([source], { type: 'text/javascript' }))
+      )) as typeof import('../src/lib/fake-canvas');
+      const pinModule = (await import(
+        URL.createObjectURL(new Blob([pinSource], { type: 'text/javascript' }))
+      )) as typeof import('../src/lib/maps-loader');
+      const baseline = document.createElement('canvas');
+      const marked = document.createElement('canvas');
+      baseline.width = marked.width = 100;
+      baseline.height = marked.height = 100;
+      const baselineContext = baseline.getContext('2d');
+      const context = marked.getContext('2d');
+      if (!baselineContext || !context) throw new Error('2D canvas context unavailable');
+      const camera = { centerLat: 0, centerLng: 0, zoom: 1 };
+      fake.renderFakeMapCanvas(baselineContext, 100, 100, camera, [], []);
+      fake.renderFakeMapCanvas(
+        context,
+        100,
+        100,
+        camera,
+        [{ id: 'participant', label: '', lat: 0, lng: 0, fillHex: '#c81414', inkHex: '#000000' }],
+        [],
+      );
+      const before = baselineContext.getImageData(0, 0, 100, 100).data;
+      const after = context.getImageData(0, 0, 100, 100).data;
+      const points: Array<{ x: number; y: number }> = [];
+      for (let y = 35; y < 65; y += 1) {
+        for (let x = 35; x < 65; x += 1) {
+          const offset = (y * 100 + x) * 4;
+          if (
+            before[offset] !== after[offset] ||
+            before[offset + 1] !== after[offset + 1] ||
+            before[offset + 2] !== after[offset + 2]
+          ) {
+            points.push({ x, y });
+          }
+        }
+      }
+      const fakeDiameter =
+        Math.max(...points.map((point) => point.x)) -
+        Math.min(...points.map((point) => point.x)) +
+        1;
+      const pin = pinModule.buildPinElement({
+        id: 'participant',
+        lat: 0,
+        lng: 0,
+        fillHex: '#c81414',
+        inkHex: '#000000',
+        label: '',
+      });
+      document.body.appendChild(pin);
+      const domDiameter = pin.getBoundingClientRect().width;
+      pin.remove();
+      return { fakeDiameter, domDiameter };
+    },
+    { source: fakeCanvasBundle, pinSource: bundle },
+  );
+  // Allow 3px for the fake 2px outline and subpixel rasterization.
+  expect(markerBounds.fakeDiameter).toBeGreaterThan(0);
+  expect(Math.abs(markerBounds.fakeDiameter - markerBounds.domDiameter)).toBeLessThanOrEqual(3);
+}
+
+// Value: protects=minimap opacity states, pin geometry under global CSS and comparable fake canvas marker size;
+// fails_when=an active state stays translucent, idle stays opaque or marker dimensions diverge;
+// why_new=existing game flow does not compare these map contracts; seam=none;
+// no_claim=fake mode does not load Google tiles or dispatch live Google overlays.
 test('round minimap opacity and real pin geometry', async ({ page }) => {
   const server = await startIsolatedFakeServer({ seedBot: true, rounds: 1 });
   try {
@@ -70,6 +147,7 @@ test('round minimap opacity and real pin geometry', async ({ page }) => {
       expect(pin.radius).not.toBe('5px');
       expect(Number.parseFloat(pin.radius)).toBeGreaterThanOrEqual(pin.width / 2);
     }
+    await assertComparableMapMarkers(page, bundle);
     await page.setViewportSize({ width: 375, height: 800 });
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Карта' }).click();
@@ -82,7 +160,9 @@ test('round minimap opacity and real pin geometry', async ({ page }) => {
   }
 });
 
-// protects=physical overlapping target click opens exact pano URL in a new tab; fails_when=target loses hit priority or open arguments differ; no_claim=fake canvas does not exercise Google OverlayView.
+// Value: protects=physical overlapping target click opens exact pano URL in a new tab;
+// fails_when=target loses hit priority or open arguments differ; why_new=existing results flow has no target popup assertion;
+// seam=none; no_claim=fake canvas does not exercise Google OverlayView.
 test('results target opens Street View', async ({ page }) => {
   const server = await startIsolatedFakeServer({ seedBot: true, rounds: 1 });
   let target = { lat: 0, lng: 0 };

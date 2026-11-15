@@ -2,14 +2,17 @@ import { expect, test, mock, spyOn } from 'bun:test';
 import { Loader } from '@googlemaps/js-api-loader';
 import { buildPinElement, buildStreetViewUrl, loadGoogleMapsLibraries } from './maps-loader';
 
-// protects=exact pano URL and coordinates; fails_when=query keys or values change; no_claim=external coverage or page availability.
+// Value: protects=exact pano URL and coordinates; fails_when=query keys or values change;
+// why_new=no existing URL contract test; seam=none; no_claim=external coverage or page availability.
 test('builds a Street View URL', () => {
   expect(buildStreetViewUrl(-12.5, 45.125)).toBe(
     'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=-12.5,45.125',
   );
 });
 
-// protects=pin resets, circular shape, target click and English Loader; fails_when=styles, click or language regress; no_claim=inline CSS does not prove browser cascade.
+// Value: protects=pin resets, circular shape, target click and English Loader; fails_when=styles, click or language regress;
+// why_new=no existing pin or language unit contract; seam=buildPinElement (non-test caller: createPinOverlay in maps-loader.ts);
+// no_claim=inline CSS does not prove browser cascade.
 test('configures compact pins and English maps', async () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
