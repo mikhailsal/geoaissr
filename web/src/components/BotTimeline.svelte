@@ -1,5 +1,7 @@
 <script lang="ts">
   import { Eye, Move, ScanEye, X } from '@lucide/svelte';
+  import { untrack } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import type { BotTurnThumbView } from '$shared/protocol';
   import { formatZoom } from '../i18n/format';
   let { thumbs }: { thumbs: BotTurnThumbView[] } = $props();
@@ -8,7 +10,35 @@
     ...thumbs.filter((t) => t.action !== 'observe'),
   ]);
   let broken = $state<Record<string, boolean>>({});
-  let zoomedUrl = $state<string | null>(null);
+  let activeThumb = $state<BotTurnThumbView | null>(null);
+  let loaded = $state<Record<string, boolean>>({});
+  let zoomedUrl = $derived(
+    activeThumb
+      ? activeThumb.fullUrl && loaded[activeThumb.fullUrl] && !broken[activeThumb.fullUrl]
+        ? activeThumb.fullUrl
+        : activeThumb.thumbUrl
+      : null,
+  );
+  const prefetched = new SvelteSet<string>();
+  let disposed = false;
+  $effect(() => () => {
+    disposed = true;
+  });
+  $effect(() => {
+    for (const thumb of thumbs) {
+      const url = thumb.fullUrl;
+      if (!url || untrack(() => prefetched.has(url))) continue;
+      const image = new Image();
+      prefetched.add(url);
+      image.onload = () => {
+        if (!disposed) loaded = { ...loaded, [url]: true };
+      };
+      image.onerror = () => {
+        if (!disposed) markBroken(url);
+      };
+      image.src = url;
+    }
+  });
   let previewDialog = $state<HTMLDialogElement | null>(null);
   $effect(() => {
     if (zoomedUrl && previewDialog && !previewDialog.open) previewDialog.showModal();
@@ -19,10 +49,8 @@
   function previewError(): void {
     if (!zoomedUrl) return;
     const failed = zoomedUrl;
-    const thumb = thumbs.find((t) => t.fullUrl === failed || t.thumbUrl === failed);
     markBroken(failed);
-    zoomedUrl =
-      thumb && failed === thumb.fullUrl && !broken[thumb.thumbUrl] ? thumb.thumbUrl : null;
+    if (activeThumb?.thumbUrl === failed) activeThumb = null;
   }
 </script>
 
@@ -35,14 +63,12 @@
             Снимки этого раунда уже удалены
           </div>
         {:else}
-          {@const preview =
-            thumb.fullUrl && !broken[thumb.fullUrl] ? thumb.fullUrl : thumb.thumbUrl}
           <button
             type="button"
             class="thumb-btn"
             aria-haspopup="dialog"
             onclick={() => {
-              zoomedUrl = preview;
+              activeThumb = thumb;
             }}
           >
             <img
@@ -83,7 +109,7 @@
     class="zoomed-preview"
     aria-label="Снимок бота"
     bind:this={previewDialog}
-    onclose={() => (zoomedUrl = null)}
+    onclose={() => (activeThumb = null)}
     onkeydown={(event) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
