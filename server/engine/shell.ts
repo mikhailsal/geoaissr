@@ -250,7 +250,10 @@ function runSyncEffect(ctx: EffectContext, effect: EngineEffect, currentState: R
           gen: effect.gen,
           roundNumber: effect.roundNumber,
           target,
-          bots: effect.bots,
+          bots: effect.bots.map((bot) => ({
+            ...bot,
+            budgetSec: Math.min(bot.budgetSec, currentState.settings.roundDurationSec),
+          })),
           moveEnabled: effect.moveEnabled,
         });
       }

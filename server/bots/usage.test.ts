@@ -67,16 +67,17 @@ test('rejects missing, invalid, and truncated usage', () => {
   }
 });
 
-// Consecutive result examples: https://antigravity.google/docs/cli/headless/#read-the-results
-test('normalizes AGY terminal cache reads separately from raw input', () => {
+// The reported total establishes that this AGY example includes cache reads in input.
+// https://antigravity.google/docs/cli/headless/#read-the-results
+test('normalizes AGY terminal input that includes cache reads', () => {
   const parser = createUsageParser('agy');
   parser.push(
     '{"status":"SUCCESS","usage":{"input_tokens":30662,"output_tokens":8,"cache_read_tokens":30214,"total_tokens":30670}}',
   );
   expect(parser.finish()).toEqual({
-    inputTokens: 60876,
+    inputTokens: 30662,
     outputTokens: 8,
     cachedInputTokens: 30214,
-    totalTokens: 60884,
+    totalTokens: 30670,
   });
 });

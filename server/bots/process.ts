@@ -9,6 +9,7 @@ import { formatStderrTail, type ServerLogger } from '../log.ts';
 import { spawnManaged, type ManagedProcess } from '../proc/spawn.ts';
 import { getHarnessAdapter } from './adapters/index.ts';
 import { buildSanitizedChildEnv } from './adapters/shared.ts';
+import { logAgyToolAttempts, logBotDiagnostic } from './diagnostics.ts';
 import type { BotToolApiServer } from './api.ts';
 import type { EngineEvent, RoundTarget } from '../engine/types.ts';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
@@ -33,6 +34,7 @@ export interface ActiveBotHandle {
   stopped: boolean;
   releaseObserve: () => void;
   setStartedAt: (ms: number) => void;
+  flushDiagnostics?: () => void;
 }
 
 export function cleanDirSafe(dir: string): void {
@@ -52,6 +54,13 @@ export function cleanupBotHandle(
   handle.releaseObserve();
   handle.abortQueue('stopped');
   api.unregisterBot(handle.token);
+  const flush = handle.flushDiagnostics;
+  handle.flushDiagnostics = undefined;
+  try {
+    flush?.();
+  } catch {
+    // Optional diagnostics must not prevent cleanup.
+  }
   cleanDirSafe(handle.workDir);
   if (activeHandles.get(handle.slotId) === handle) {
     activeHandles.delete(handle.slotId);
@@ -105,18 +114,6 @@ export function resolveInstalledCliVersions(
   return out;
 }
 
-function logBotMonitorEvent(
-  logger: ServerLogger | undefined,
-  event: 'harness_end' | 'harness_monitor_error',
-  data: Record<string, unknown>,
-): void {
-  try {
-    logger?.log(event, data);
-  } catch {
-    // Diagnostic I/O must not interrupt bot completion or cleanup.
-  }
-}
-
 function attachBotProcessMonitor(opts: {
   proc: ManagedProcess;
   api: BotToolApiServer;
@@ -135,43 +132,24 @@ function attachBotProcessMonitor(opts: {
     .then(async (exitInfo) => {
       await opts.proc.drained;
       try {
-        const tokenUsage = opts.parser.finish();
-        if (tokenUsage) {
-          const identity = {
-            matchId: opts.handle.matchId,
-            gen: opts.handle.gen,
-            roundNumber: opts.handle.roundNumber,
-            botId: opts.handle.slotId,
-          };
-          opts.dispatch({
-            type: 'bot_accounting',
-            ...identity,
-            accounting: { tokenUsage, costUsd: null },
-          });
-          if (opts.estimateCost) {
-            void Promise.resolve()
-              .then(() => opts.estimateCost?.(opts.model, tokenUsage))
-              .then((estimate) => {
-                if (estimate)
-                  opts.dispatch({
-                    type: 'bot_accounting',
-                    ...identity,
-                    accounting: { tokenUsage, ...estimate },
-                  });
-              })
-              .catch(() => {
-                /* Estimates are optional. */
-              });
-          }
-        }
+        recordBotAccounting(opts);
       } catch (err) {
-        logBotMonitorEvent(opts.logger, 'harness_monitor_error', {
+        logBotDiagnostic(opts.logger, 'harness_monitor_error', {
+          ...botLogIdentity(opts),
           phase: 'accounting',
-          slotId: opts.handle.slotId,
           message: err instanceof Error ? err.message : String(err),
         });
       }
-      if (opts.handle.stopped) return;
+      if (opts.handle.stopped) {
+        logBotDiagnostic(opts.logger, 'harness_end', {
+          ...botLogIdentity(opts),
+          durationMs: Date.now() - opts.startedAtMs,
+          exitCode: exitInfo.code,
+          signal: exitInfo.signal,
+          stopped: true,
+        });
+        return;
+      }
       try {
         reportBotExit(opts, exitInfo);
       } finally {
@@ -179,8 +157,56 @@ function attachBotProcessMonitor(opts: {
       }
     })
     .catch((err: unknown) => {
-      logBotMonitorEvent(opts.logger, 'harness_monitor_error', {
-        slotId: opts.handle.slotId,
+      logBotDiagnostic(opts.logger, 'harness_monitor_error', {
+        ...botLogIdentity(opts),
+        message: err instanceof Error ? err.message : String(err),
+      });
+    });
+}
+
+function botLogIdentity(opts: Parameters<typeof attachBotProcessMonitor>[0]) {
+  return {
+    matchId: opts.handle.matchId,
+    gen: opts.handle.gen,
+    roundNumber: opts.handle.roundNumber,
+    slotId: opts.handle.slotId,
+    harness: opts.harnessName,
+    model: opts.model,
+  };
+}
+
+function recordBotAccounting(opts: Parameters<typeof attachBotProcessMonitor>[0]): void {
+  const tokenUsage = opts.parser.finish();
+  logBotDiagnostic(opts.logger, 'harness_usage', {
+    ...botLogIdentity(opts),
+    ...opts.parser.getDiagnostics(),
+    rawCounterScope: opts.harnessName === 'codex' ? 'last-turn' : 'terminal',
+    tokenUsage: tokenUsage ?? null,
+  });
+  if (!tokenUsage) return;
+  const identity = {
+    matchId: opts.handle.matchId,
+    gen: opts.handle.gen,
+    roundNumber: opts.handle.roundNumber,
+    botId: opts.handle.slotId,
+  };
+  opts.dispatch({ type: 'bot_accounting', ...identity, accounting: { tokenUsage, costUsd: null } });
+  if (!opts.estimateCost) return;
+  void Promise.resolve()
+    .then(() => opts.estimateCost?.(opts.model, tokenUsage))
+    .then((estimate) => {
+      if (!estimate) return;
+      logBotDiagnostic(opts.logger, 'harness_cost', { ...botLogIdentity(opts), ...estimate });
+      opts.dispatch({
+        type: 'bot_accounting',
+        ...identity,
+        accounting: { tokenUsage, ...estimate },
+      });
+    })
+    .catch((err: unknown) => {
+      logBotDiagnostic(opts.logger, 'harness_cost', {
+        ...botLogIdentity(opts),
+        costUsd: null,
         message: err instanceof Error ? err.message : String(err),
       });
     });
@@ -211,6 +237,14 @@ export function dispatchBotLaunchFailure(opts: {
   const detail = opts.err instanceof Error ? opts.err.message : String(opts.err);
   // Mask first, then clip: clipping first could cut a secret in half and leave a readable part.
   const masked = maskDiagnostics(detail, opts.token ?? '', opts.logger);
+  logBotDiagnostic(opts.logger, 'harness_monitor_error', {
+    phase: 'launch',
+    matchId: opts.matchId,
+    gen: opts.gen,
+    roundNumber: opts.roundNumber,
+    slotId: opts.botId,
+    message: masked,
+  });
   opts.dispatch({
     type: 'bot_finished',
     matchId: opts.matchId,
@@ -236,10 +270,8 @@ function reportBotExit(
     : exitInfo.code !== 0
       ? `ошибка процесса (код ${codeNum})`
       : 'вышел без ответа';
-  logBotMonitorEvent(opts.logger, 'harness_end', {
-    slotId: opts.handle.slotId,
-    harness: opts.harnessName,
-    roundNumber: opts.handle.roundNumber,
+  logBotDiagnostic(opts.logger, 'harness_end', {
+    ...botLogIdentity(opts),
     durationMs: Date.now() - opts.startedAtMs,
     exitCode: exitInfo.code,
     signal: exitInfo.signal,
@@ -271,15 +303,38 @@ function logBotStart(
   },
   argv?: string[],
 ): number {
-  opts.logger?.registerSecrets([], [opts.handle.token]);
+  try {
+    opts.logger?.registerSecrets([], [opts.handle.token]);
+  } catch {
+    // Diagnostic setup must not prevent a bot from launching.
+  }
   const startedAtMs = Date.now();
-  opts.logger?.log('harness_start', {
+  logBotDiagnostic(opts.logger, 'harness_start', {
+    matchId: opts.handle.matchId,
+    gen: opts.handle.gen,
     slotId: opts.slot.id,
     harness: opts.slot.harness,
+    model: opts.slot.model,
+    effort: opts.slot.effort,
     roundNumber: opts.roundNumber,
-    argv,
+    command: argv?.[0],
+    workDir: opts.handle.workDir,
   });
   return startedAtMs;
+}
+
+function attachAgyAudit(opts: Parameters<typeof spawnAndMonitorBotProcess>[0]): void {
+  if (opts.slot.harness !== 'agy') return;
+  opts.handle.flushDiagnostics = () => {
+    logAgyToolAttempts(opts.logger, opts.handle.workDir, {
+      matchId: opts.handle.matchId,
+      gen: opts.handle.gen,
+      roundNumber: opts.roundNumber,
+      slotId: opts.slot.id,
+      harness: opts.slot.harness,
+      model: opts.slot.model,
+    });
+  };
 }
 
 export function spawnAndMonitorBotProcess(opts: {
@@ -320,6 +375,7 @@ export function spawnAndMonitorBotProcess(opts: {
         });
 
     const startedAtMs = logBotStart(opts, spec.cmd);
+    attachAgyAudit(opts);
     const parser = createUsageParser(opts.slot.harness);
     const proc = spawnManaged({
       cmd: spec.cmd,

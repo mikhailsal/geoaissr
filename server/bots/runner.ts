@@ -10,6 +10,7 @@ import type { ServerLogger } from '../log.ts';
 import { joinUnder } from '../paths.ts';
 import { getHarnessAdapter } from './adapters/index.ts';
 import { createBotToolApiServer, type BotToolApiServer } from './api.ts';
+import { logBotDiagnostic } from './diagnostics.ts';
 import { startMonitoredFakeBot } from './fake-bot.ts';
 import { createMoveTracker, type MoveTracker } from './move.ts';
 import {
@@ -29,7 +30,6 @@ import {
 } from './queue.ts';
 import { dispatchObserveThumbs, makeThumb } from './thumbs.ts';
 import { runVisionCheck } from './vision-check.ts';
-
 const REGION_LABELS_RU: Record<RegionId, string> = {
   world: 'Весь мир',
   europe: 'Европа',
@@ -176,28 +176,6 @@ async function runMoveTool(
   }
 }
 
-function createLoggedToolExecutor<TArgs, TRes extends { isError?: boolean }>(
-  ctx: RunnerCtx,
-  slotId: string,
-  roundNumber: number,
-  tool: string,
-  fn: (args: TArgs) => Promise<TRes>,
-): (args: TArgs) => Promise<TRes> {
-  return async (args) => {
-    const t0 = Date.now();
-    const res = await fn(args);
-    ctx.logger?.log('bot_tool_call', {
-      slotId,
-      roundNumber,
-      tool,
-      args, // heading/pitch/fov of a look, direction of a move: where the bot spent its turns
-      durationMs: Date.now() - t0,
-      ok: !res.isError,
-    });
-    return res;
-  };
-}
-
 function buildRoundHandlers(
   ctx: RunnerCtx,
   params: RoundBotParams,
@@ -213,7 +191,6 @@ function buildRoundHandlers(
   return {
     waitObserveRelease: deps.waitObserveRelease,
     async executeObserve(): Promise<ToolResponsePayload> {
-      const t0 = Date.now();
       try {
         const views = await ctx.imageService.getObserveViews({ target, size: slot.imageSize });
         dispatchObserveThumbs(
@@ -222,13 +199,6 @@ function buildRoundHandlers(
           deps.getTurnsUsed(),
           views,
         );
-        ctx.logger?.log('bot_tool_call', {
-          slotId: slot.id,
-          roundNumber,
-          tool: 'observe',
-          durationMs: Date.now() - t0,
-          ok: true,
-        });
         return {
           text: `Стартовые 4 кадра (С, В, Ю, З). Регион: ${REGION_LABELS_RU[target.region]}, макс. масштаб D ≈ ${Math.round(getRegionDiagonalKm(target.region))} км.`,
           images: toImageBlocks(views),
@@ -237,21 +207,10 @@ function buildRoundHandlers(
         return { text: err instanceof Error ? err.message : String(err), isError: true };
       }
     },
-    executeLook: createLoggedToolExecutor(ctx, slot.id, roundNumber, 'look', (args) =>
-      runLookTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args),
-    ),
-    executeMove: createLoggedToolExecutor(ctx, slot.id, roundNumber, 'move', (args) =>
-      runMoveTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args),
-    ),
+    executeLook: (args) => runLookTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args),
+    executeMove: (args) => runMoveTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args),
     onGuess(guess, finalized) {
       deps.onSubmittedGuess();
-      ctx.logger?.log('bot_tool_call', {
-        slotId: slot.id,
-        roundNumber,
-        tool: finalized ? 'final_guess' : 'draft_guess',
-        args: { lat: guess.lat, lng: guess.lng },
-        ok: true,
-      });
       ctx.dispatch({
         type: 'bot_guess_recorded',
         matchId,
@@ -348,6 +307,17 @@ function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
   const queue = createBotToolQueue({
     moveLimit: slot.moveLimit,
     moveEnabled,
+    requireCompleteReasoning: true,
+    onDispatch: (audit) => {
+      logBotDiagnostic(ctx.logger, 'bot_tool_call', {
+        matchId,
+        gen,
+        roundNumber,
+        slotId: slot.id,
+        ...audit,
+        ok: audit.result ? !audit.result.isError : false,
+      });
+    },
     handlers: buildRoundHandlers(ctx, params, {
       tracker,
       waitObserveRelease: gate.waitObserveRelease,

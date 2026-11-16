@@ -79,8 +79,10 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 
 Reasoning appears in a fixed reading order: facts, rejected alternatives, conclusion and coordinates. A draft badge identifies checkpoint fallback. A legacy explanation fills the conclusion slot when no valid conclusion exists, including alongside partial structured reasoning. Absent reasoning does not imply that coordinates were missing.
 
-The inspection timeline groups initial observations above numbered paid steps. Each row pairs a clickable image with its action, camera or move parameters and hypothesis. Zoom is always derived from field of view, including a `1.0×` normal view. Long text wraps within the card on narrow screens.
+The inspection timeline groups initial observations above numbered paid steps. Each row pairs a clickable image with its action, camera or move parameters and hypothesis. Image buttons use a pointer cursor and open a native modal dialog above the page. Escape, its close button and a backdrop click dismiss it and restore thumbnail focus. Zoom is always derived from field of view, including a `1.0×` normal view. Long text wraps within the card on narrow screens.
 
-Token and estimated-cost details use one compact metric button. Its tooltip works with hover, keyboard focus and tap; Escape closes the tooltip before the surrounding card, and clicking outside dismisses it. The cost is labelled as an OpenRouter estimate and approximate model matches are explicit.
+Token and estimated-cost details use one compact metric button. Its tooltip works with hover, keyboard focus and tap; Escape closes the tooltip before the surrounding card, and clicking outside dismisses it. Reference API prices show three decimal places and the label “API-цена для справки”; approximate model matches are explicit.
 
 Live accounting updates preserve the selected card's focus, open tooltip and image preview. Selecting a different bot or round resets those inspection controls.
+
+Monthly quota readings use thin usage meters with icons and percentages, transparent backgrounds and no button borders. Their color communicates quota status; they have no selected state. Hover, keyboard focus and tap reveal usage and forecast details.

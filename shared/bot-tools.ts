@@ -124,24 +124,40 @@ export const moveInputSchema = z
   .strict();
 
 const guessShape = {
-  facts: z.string().trim().min(1).max(1000),
+  facts: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1000)
+    .describe('Конкретный видимый признак и почему он указывает на регион'),
   rejected_guesses: z
     .array(
       z
         .object({
           guess: z.string().trim().min(1).max(120),
-          reason: z.string().trim().min(1).max(300),
+          reason: z
+            .string()
+            .trim()
+            .min(1)
+            .max(300)
+            .describe('Какой видимый признак противоречит версии и почему'),
         })
         .strict(),
     )
-    .min(1)
     .max(3),
-  conclusion: z.string().trim().min(1).max(600),
+  conclusion: z
+    .string()
+    .trim()
+    .min(1)
+    .max(600)
+    .describe('Вывод из видимых признаков и оставшаяся неопределённость'),
   lat: z.number().finite().min(-90).max(90),
   lng: z.number().finite(),
   quip: z.string().trim().max(120).optional(),
 };
-export const draftGuessInputSchema = z.object(guessShape).strict();
+export const draftGuessInputSchema = z
+  .object({ ...guessShape, rejected_guesses: guessShape.rejected_guesses.optional() })
+  .strict();
 export const finalGuessInputSchema = z.object(guessShape).strict();
 // Kept for legacy clients that discover the deprecated tool.
 export const submitGuessInputSchema = finalGuessInputSchema;
@@ -168,17 +184,36 @@ const guessIngressSchema = z
   })
   .passthrough();
 
+function boundedText(value: unknown, max: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return value.trim().slice(0, max) || undefined;
+}
+
+function parseRejectedGuesses(value: unknown): BotReasoning['rejectedGuesses'] {
+  if (!Array.isArray(value)) return undefined;
+  const result: NonNullable<BotReasoning['rejectedGuesses']> = [];
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) continue;
+    const entry = item as Record<string, unknown>;
+    const guess = boundedText(entry.guess, 120);
+    const reason = boundedText(entry.reason, 300);
+    if (guess && reason) result.push({ guess, reason });
+    if (result.length === 3) break;
+  }
+  return result.length > 0 || value.length === 0 ? result : undefined;
+}
+
 export function parseGuessInput(raw: unknown): NormalizedGuessInput | undefined {
   const parsed = guessIngressSchema.safeParse(raw);
   if (!parsed.success) return undefined;
   const data = parsed.data;
-  const facts = guessShape.facts.safeParse(data.facts);
-  const rejected = guessShape.rejected_guesses.safeParse(data.rejected_guesses);
-  const conclusion = guessShape.conclusion.safeParse(data.conclusion);
+  const facts = boundedText(data.facts, 1000);
+  const rejected = parseRejectedGuesses(data.rejected_guesses);
+  const conclusion = boundedText(data.conclusion, 600);
   const reasoning = {
-    ...(facts.success ? { facts: facts.data } : {}),
-    ...(rejected.success ? { rejectedGuesses: rejected.data } : {}),
-    ...(conclusion.success ? { conclusion: conclusion.data } : {}),
+    ...(facts ? { facts } : {}),
+    ...(rejected ? { rejectedGuesses: rejected } : {}),
+    ...(conclusion ? { conclusion } : {}),
   };
   const explanation =
     typeof data.explanation === 'string'

@@ -64,7 +64,7 @@
     <Coins size={16} aria-hidden="true" />
     {entry.tokenUsage ? formatNumberRu(entry.tokenUsage.totalTokens) : 'н/д'} · {entry.costUsd !=
     null
-      ? `~$${entry.costUsd.toFixed(4)}`
+      ? `~$${entry.costUsd.toFixed(3)}`
       : 'н/д'}
   </button>
   {#if open}
@@ -74,7 +74,7 @@
       role="region"
       aria-label="Расход токенов и оценка стоимости"
     >
-      <strong>Оценка OpenRouter</strong>
+      <strong>API-цена для справки</strong>
       <span>Input: {entry.tokenUsage ? formatNumberRu(entry.tokenUsage.inputTokens) : 'н/д'}</span>
       <span>Output: {entry.tokenUsage ? formatNumberRu(entry.tokenUsage.outputTokens) : 'н/д'}</span
       >
@@ -88,7 +88,6 @@
           ? ' (приблизительное совпадение)'
           : ''}</span
       >
-      <span>Оценка OpenRouter, не фактическая стоимость подписки.</span>
     </div>
   {/if}
 </div>

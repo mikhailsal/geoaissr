@@ -13,6 +13,20 @@ export interface ToolResponsePayload {
   isError?: boolean;
 }
 
+export interface ToolDispatchAudit {
+  tool: string;
+  args: unknown;
+  durationMs: number;
+  checkpointSaved: boolean;
+  result?: {
+    text: string;
+    isError: boolean;
+    imageCount: number;
+    images: Array<{ name: string; mimeType: string }>;
+  };
+  error?: string;
+}
+
 export interface BotSessionHandlers {
   waitObserveRelease: (signal: AbortSignal) => Promise<void>;
   executeObserve: () => Promise<ToolResponsePayload>;
@@ -44,6 +58,8 @@ interface QueueState {
   failedCalls: number;
   roundStartedPromise: Promise<void> | null;
   finalized: boolean;
+  requireCompleteReasoning: boolean;
+  checkpoints: number;
 }
 
 function recordQueueFailure(st: QueueState, baseMsg: string): ToolResponsePayload {
@@ -75,6 +91,45 @@ async function awaitRoundStart(st: QueueState): Promise<boolean> {
   return !isSignalAborted(st.signal);
 }
 
+async function executeGuess(
+  st: QueueState,
+  toolName: string,
+  rawArgs: unknown,
+): Promise<ToolResponsePayload> {
+  const guess = parseGuessInput(rawArgs);
+  if (!guess) return recordQueueFailure(st, 'Неверные координаты догадки.');
+  if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
+  const missingReasoning =
+    toolName !== 'submit_guess' && !guess.facts && !guess.conclusion && !guess.explanation;
+  const incompleteFinal =
+    toolName === 'final_guess' &&
+    st.requireCompleteReasoning &&
+    (!guess.facts || !guess.conclusion || !guess.rejectedGuesses);
+  const finalized = toolName !== 'draft_guess' && !missingReasoning && !incompleteFinal;
+  st.handlers.onGuess(guess, finalized);
+  st.checkpoints += 1;
+  st.finalized = finalized;
+  if (incompleteFinal) {
+    return {
+      text: 'Координаты сохранены как черновик. Повтори final_guess с lat, lng, непустыми facts и conclusion и списком rejected_guesses; если обоснованных исключённых версий нет, укажи [].',
+      isError: true,
+    };
+  }
+  if (missingReasoning) {
+    return {
+      text: 'Координаты сохранены как черновик. Добавь непустое объяснение: facts (до 1000 символов) или conclusion (до 600); повтори вызов с lat и lng.',
+      ...(toolName === 'final_guess' ? { isError: true } : {}),
+    };
+  }
+  const remMoves = Math.max(0, st.moveLimit - st.turnsUsed);
+  const remSec = Math.max(0, Math.floor(st.handlers.getRemainingTimeSec()));
+  return {
+    text: finalized
+      ? 'Окончательная догадка принята.'
+      : `Черновик сохранён. Осталось ходов: ${remMoves}, времени: ${remSec} с.${remSec > 15 ? ' Продолжай исследование, если не уверен окончательно.' : ''}`,
+  };
+}
+
 async function executeQueuedTool(
   st: QueueState,
   toolName: string,
@@ -94,19 +149,7 @@ async function executeQueuedTool(
   }
 
   if (toolName === 'submit_guess' || toolName === 'final_guess' || toolName === 'draft_guess') {
-    const guess = parseGuessInput(rawArgs);
-    if (!guess) return recordQueueFailure(st, 'Неверные координаты догадки.');
-    if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
-    const finalized = toolName !== 'draft_guess';
-    st.handlers.onGuess(guess, finalized);
-    st.finalized = finalized;
-    const remMoves = Math.max(0, st.moveLimit - st.turnsUsed);
-    const remSec = Math.max(0, Math.round(st.handlers.getRemainingTimeSec()));
-    return {
-      text: finalized
-        ? 'Окончательная догадка принята.'
-        : `Черновик сохранён. Осталось ходов: ${remMoves}, времени: ${remSec} с — продолжай исследование, если не уверен окончательно.`,
-    };
+    return executeGuess(st, toolName, rawArgs);
   }
 
   if (toolName === 'look') {
@@ -155,10 +198,36 @@ async function executeQueuedTool(
   return recordQueueFailure(st, `Неизвестный инструмент: ${toolName}`);
 }
 
+function emitDispatchAudit(
+  observer: ((audit: ToolDispatchAudit) => void) | undefined,
+  audit: Omit<ToolDispatchAudit, 'result'>,
+  result: ToolResponsePayload | undefined,
+): void {
+  try {
+    observer?.({
+      ...audit,
+      ...(result
+        ? {
+            result: {
+              text: result.text,
+              isError: result.isError === true,
+              imageCount: result.images?.length ?? 0,
+              images: (result.images ?? []).map(({ name, mimeType }) => ({ name, mimeType })),
+            },
+          }
+        : {}),
+    });
+  } catch {
+    // Logging must never change the result of a tool call.
+  }
+}
+
 export function createBotToolQueue(opts: {
   moveLimit: number;
   moveEnabled: boolean;
   handlers: BotSessionHandlers;
+  requireCompleteReasoning?: boolean;
+  onDispatch?: (audit: ToolDispatchAudit) => void;
 }): BotToolQueue {
   const ac = new AbortController();
   const st: QueueState = {
@@ -170,11 +239,47 @@ export function createBotToolQueue(opts: {
     failedCalls: 0,
     roundStartedPromise: null,
     finalized: false,
+    requireCompleteReasoning: opts.requireCompleteReasoning ?? false,
+    checkpoints: 0,
   };
   let tail: Promise<unknown> = Promise.resolve();
 
   function dispatch(toolName: string, rawArgs: unknown): Promise<ToolResponsePayload> {
-    const next = tail.then(() => executeQueuedTool(st, toolName, rawArgs));
+    const startedAt = Date.now();
+    const next = tail.then(async () => {
+      const checkpoints = st.checkpoints;
+      let result: ToolResponsePayload | undefined;
+      let error: string | undefined;
+      try {
+        const response = await executeQueuedTool(st, toolName, rawArgs);
+        const remaining = Math.max(0, Math.floor(st.handlers.getRemainingTimeSec()));
+        const urgent = remaining <= 15 && !st.finalized && !st.signal.aborted;
+        result = {
+          ...response,
+          text: `${response.text}\nОсталось времени: ${remaining} с.${urgent ? ' Немедленно отправь лучшую версию через final_guess.' : ''}`,
+        };
+        return result;
+      } catch (err) {
+        try {
+          error = err instanceof Error ? err.message : String(err);
+        } catch {
+          error = 'Unprintable error';
+        }
+        throw err;
+      } finally {
+        emitDispatchAudit(
+          opts.onDispatch,
+          {
+            tool: toolName,
+            args: rawArgs,
+            durationMs: Date.now() - startedAt,
+            checkpointSaved: st.checkpoints > checkpoints,
+            ...(error !== undefined ? { error } : {}),
+          },
+          result,
+        );
+      }
+    });
     tail = next.catch(() => undefined);
     return next;
   }

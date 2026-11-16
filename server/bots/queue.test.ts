@@ -79,7 +79,7 @@ test('observe blocks on waitObserveRelease until released and submit_guess stays
   releaseFn?.();
   const obs = await obsPromise;
   expect(released).toBe(true);
-  expect(obs.text).toBe('observe-ok');
+  expect(obs.text).toContain('observe-ok');
 
   const mvDisabled = await q.dispatch('move', { heading: 0 });
   expect(mvDisabled.isError).toBe(true);
@@ -136,12 +136,16 @@ test('drafts remain free, final is accepted at the limit and closes the queue', 
       onGuess: (g, finalized) => guesses.push({ lat: g.lat, finalized }),
     }),
   });
-  expect((await q.dispatch('draft_guess', { lat: 1, lng: 190 })).text).toContain(
+  expect((await q.dispatch('draft_guess', { lat: 1, lng: 190, facts: 'Дорога' })).text).toContain(
     'Осталось ходов: 1',
   );
   expect((await q.dispatch('look', { heading: 0 })).isError).toBeUndefined();
-  expect((await q.dispatch('draft_guess', { lat: 2, lng: 0 })).isError).toBeUndefined();
-  expect((await q.dispatch('final_guess', { lat: 3, lng: 0 })).isError).toBeUndefined();
+  expect(
+    (await q.dispatch('draft_guess', { lat: 2, lng: 0, facts: 'Дорога' })).isError,
+  ).toBeUndefined();
+  expect(
+    (await q.dispatch('final_guess', { lat: 3, lng: 0, facts: 'Дорога' })).isError,
+  ).toBeUndefined();
   expect((await q.dispatch('draft_guess', { lat: 4, lng: 0 })).isError).toBe(true);
   expect(guesses).toEqual([
     { lat: 1, finalized: false },
@@ -170,4 +174,61 @@ test('look resolves zoom and explicit fov and tolerates absent hypothesis', asyn
   expect(views.map((v) => v.fov)).toEqual([30, 120, 10]);
   expect(views[0]?.hypothesis).toBe('sign');
   expect(views[1]?.hypothesis).toBeUndefined();
+});
+
+// protects=original tool audit; fails_when=a rejected final is reported as a successful draft.
+test('audit preserves rejected final guess and checkpoint with structured reasoning', async () => {
+  const audits: import('./queue.ts').ToolDispatchAudit[] = [];
+  const args = { lat: 1, lng: 2, facts: 'road', conclusion: 'country' };
+  const q = createBotToolQueue({
+    moveLimit: 1,
+    moveEnabled: true,
+    requireCompleteReasoning: true,
+    handlers: makeHandlers(),
+    onDispatch: (audit) => audits.push(audit),
+  });
+  const result = await q.dispatch('final_guess', args);
+  expect(result.isError).toBe(true);
+  expect(audits).toHaveLength(1);
+  expect(audits[0]).toMatchObject({
+    tool: 'final_guess',
+    args,
+    checkpointSaved: true,
+    result: { isError: true, text: result.text, images: [] },
+  });
+  expect(audits[0]?.durationMs).toBeGreaterThanOrEqual(0);
+});
+
+test('audit covers invalid, unknown, aborted, image and thrown calls without changing behavior', async () => {
+  const audits: import('./queue.ts').ToolDispatchAudit[] = [];
+  const q = createBotToolQueue({
+    moveLimit: 1,
+    moveEnabled: true,
+    handlers: makeHandlers({
+      executeObserve: () =>
+        Promise.resolve({
+          text: 'ok',
+          images: [{ name: 'frame.jpg', mimeType: 'image/jpeg', base64: 'SECRET_IMAGE_DATA' }],
+        }),
+      executeLook: () => Promise.reject(new Error('broken handler')),
+    }),
+    onDispatch: (audit) => {
+      audits.push(audit);
+      throw new Error('broken logger');
+    },
+  });
+  expect((await q.dispatch('observe', {})).text).toContain('ok');
+  expect((await q.dispatch('look', { heading: 999 })).isError).toBe(true);
+  expect((await q.dispatch('unknown', {})).isError).toBe(true);
+  const thrown = await q.dispatch('look', { heading: 0 }).catch((err: unknown) => err);
+  expect(thrown).toEqual(new Error('broken handler'));
+  q.abort('ended');
+  expect((await q.dispatch('observe', {})).isError).toBe(true);
+  expect(audits.map((a) => a.tool)).toEqual(['observe', 'look', 'unknown', 'look', 'observe']);
+  expect(audits[0]?.result?.images).toEqual([{ name: 'frame.jpg', mimeType: 'image/jpeg' }]);
+  expect(JSON.stringify(audits)).not.toContain('SECRET_IMAGE_DATA');
+  expect(audits[1]?.result?.isError).toBe(true);
+  expect(audits[2]?.result?.isError).toBe(true);
+  expect(audits[3]?.error).toBe('broken handler');
+  expect(audits[4]?.result?.isError).toBe(true);
 });

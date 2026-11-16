@@ -11,6 +11,25 @@ import {
 } from './registry.ts';
 import { spawnManaged } from './spawn.ts';
 
+async function waitForChildReady(stdout: ReadableStream<Uint8Array>): Promise<void> {
+  const reader = stdout.getReader();
+  let readinessTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      reader.read(),
+      new Promise<never>((_, reject) => {
+        readinessTimer = setTimeout(() => {
+          reject(new Error('Child did not become ready'));
+        }, 3000);
+      }),
+    ]);
+    expect(new TextDecoder().decode(result.value)).toBe('ready\n');
+  } finally {
+    clearTimeout(readinessTimer);
+    reader.releaseLock();
+  }
+}
+
 test('spawnManaged stops entire detached process group including forked children', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-proc-group-'));
   try {
@@ -51,19 +70,13 @@ test('spawnManaged stops entire detached process group including forked children
 test('cleanupOrphanedChildren verifies 3 fields and ignores mismatched startTime/command', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-proc-orphan-'));
   const sleeper = Bun.spawn(
-    [process.execPath, '-e', "process.stdout.write('ready\\n'); setInterval(() => {}, 1000)"],
+    [process.execPath, '-e', "console.log('ready'); await Bun.sleep(30000)"],
     { stdout: 'pipe', stderr: 'ignore' },
   );
   try {
     const childrenFile = path.join(dir, 'children.json');
     // Bun.spawn can return before exec; the child itself must establish readiness.
-    const reader = sleeper.stdout.getReader();
-    try {
-      const { value } = await reader.read();
-      expect(new TextDecoder().decode(value)).toBe('ready\n');
-    } finally {
-      reader.releaseLock();
-    }
+    await waitForChildReady(sleeper.stdout);
     const sleeperStart = getProcessStartTime(sleeper.pid);
     expect(sleeperStart).not.toBeNull();
     if (sleeperStart === null) throw new Error('Ready child has no process start time');
@@ -98,7 +111,7 @@ test('cleanupOrphanedChildren verifies 3 fields and ignores mismatched startTime
     await sleeper.exited;
     expect(isProcessAlive(sleeper.pid)).toBe(false);
   } finally {
-    sleeper.kill();
+    if (sleeper.exitCode === null && sleeper.signalCode === null) sleeper.kill();
     await sleeper.exited;
     rmSync(dir, { recursive: true, force: true });
   }

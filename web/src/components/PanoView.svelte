@@ -139,6 +139,7 @@
           shownPanoKey = loadKey;
           pano.setPano(panoId);
           pano.setPov({ heading: 0, pitch: 0 });
+          pano.setZoom(0);
         }
         heading = pano.getPov().heading;
         if (alreadyLoaded) {
