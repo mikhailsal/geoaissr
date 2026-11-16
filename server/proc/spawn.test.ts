@@ -11,6 +11,25 @@ import {
 } from './registry.ts';
 import { spawnManaged } from './spawn.ts';
 
+async function waitForChildReady(stdout: ReadableStream<Uint8Array>): Promise<void> {
+  const reader = stdout.getReader();
+  let readinessTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      reader.read(),
+      new Promise<never>((_, reject) => {
+        readinessTimer = setTimeout(() => {
+          reject(new Error('Child did not become ready'));
+        }, 3000);
+      }),
+    ]);
+    expect(new TextDecoder().decode(result.value)).toBe('ready\n');
+  } finally {
+    clearTimeout(readinessTimer);
+    reader.releaseLock();
+  }
+}
+
 test('spawnManaged stops entire detached process group including forked children', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-proc-group-'));
   try {
@@ -57,22 +76,7 @@ test('cleanupOrphanedChildren verifies 3 fields and ignores mismatched startTime
   try {
     const childrenFile = path.join(dir, 'children.json');
     // Bun.spawn can return before exec; the child itself must establish readiness.
-    const reader = sleeper.stdout.getReader();
-    let readinessTimer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const result = await Promise.race([
-        reader.read(),
-        new Promise<never>((_, reject) => {
-          readinessTimer = setTimeout(() => {
-            reject(new Error('Child did not become ready'));
-          }, 3000);
-        }),
-      ]);
-      expect(new TextDecoder().decode(result.value)).toBe('ready\n');
-    } finally {
-      clearTimeout(readinessTimer);
-      reader.releaseLock();
-    }
+    await waitForChildReady(sleeper.stdout);
     const sleeperStart = getProcessStartTime(sleeper.pid);
     expect(sleeperStart).not.toBeNull();
     if (sleeperStart === null) throw new Error('Ready child has no process start time');
@@ -83,6 +87,19 @@ test('cleanupOrphanedChildren verifies 3 fields and ignores mismatched startTime
     ]);
     const killedMismatch = await cleanupOrphanedChildren(childrenFile);
     expect(killedMismatch).toHaveLength(0);
+    expect(isProcessAlive(sleeper.pid)).toBe(true);
+
+    // Mismatched start time must also leave the same live child alone.
+    writeChildrenRegistry(childrenFile, [
+      {
+        pid: sleeper.pid,
+        startTime: `${sleeperStart}-different`,
+        command: process.execPath,
+        kind: 'fake',
+      },
+    ]);
+    const killedStartMismatch = await cleanupOrphanedChildren(childrenFile);
+    expect(killedStartMismatch).toHaveLength(0);
     expect(isProcessAlive(sleeper.pid)).toBe(true);
 
     // Exact match (pid + startTime + command) kills orphan
