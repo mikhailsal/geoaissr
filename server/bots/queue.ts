@@ -106,7 +106,7 @@ async function executeGuess(
     };
   }
   const remMoves = Math.max(0, st.moveLimit - st.turnsUsed);
-  const remSec = Math.max(0, Math.round(st.handlers.getRemainingTimeSec()));
+  const remSec = Math.max(0, Math.floor(st.handlers.getRemainingTimeSec()));
   return {
     text: finalized
       ? 'Окончательная догадка принята.'
