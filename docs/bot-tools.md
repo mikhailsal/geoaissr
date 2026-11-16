@@ -48,3 +48,22 @@ max(0, inputTokens - cachedInputTokens) * promptPrice
 Matching first preserves known exact or canonical catalog IDs, then removes effort suffixes, normalizes provider/version/name order and considers nearby versions within the same provider, family and tier. This keeps a genuine model name ending in `max` distinct from an effort suffix. Fuzzy version matches are labelled approximate. Unknown matches or unavailable prices yield `costUsd: null`.
 
 The cache lives at `{dataDir}/openrouter-models-cache.json`, is fresh for 24 hours, and falls back to readable stale data on refresh failure. Pricing runs asynchronously; late estimates enrich the matching result and in-memory round archive, including its Final card, without changing scores or resetting an open card's focus, tooltip or preview. A different match or round generation cannot receive the update. Historical matches are not backfilled. These are reference estimates; CLI subscriptions and provider-specific charges can differ.
+
+## Server diagnostics
+
+The server writes daily JSON Lines files at `{dataDir}/logs/YYYY-MM-DD.jsonl` and prunes log files older than 14 days. Diagnostic records identify a bot run with `matchId`, `gen`, `roundNumber` and `slotId`; timestamps are UTC. Bot diagnostics are bounded and secret-redacted before they reach the log.
+
+- `bot_tool_call` records each requested game tool, including rejected calls and final-answer submissions. It includes bounded original arguments, result text and image metadata/counts (not image bytes), whether a checkpoint was saved, duration and `ok` status.
+- `harness_start` and `harness_end` record the selected model, context and process lifecycle. `harness_usage` records raw counters, usage status (`reported`, `missing`, `invalid` or `truncated`), normalized `tokenUsage` or `null`, the number of terminal usage records, and safe CLI metadata when available (`conversation_id`, `status`, `num_turns`, `duration_seconds`). `num_turns` is the CLI's counter; it is not a count of model generations. `rawCounterScope` is `terminal` for Claude and AGY and `last-turn` for Codex.
+- `harness_cost` records an asynchronous reference price estimate. It is not the provider's actual bill.
+- `harness_tool_call` copies AGY guard attempts with `phase: "attempt"`, observed time, tool and allow/deny decision; a record shows an attempted operation, not proof that it completed successfully. The hook journal is copied before the round's `workDir` is removed. It is bounded to 256 KiB and 512 records; malformed or overflowing journals produce `harness_monitor_error`.
+- `harness_monitor_error` reports issues collecting usage or diagnostics. Diagnostic capture is best-effort and does not alter gameplay.
+
+The logger redacts known tokens and keys, omits payload fields such as base64/data and data URIs, and bounds diagnostic content (strings to 4,096 characters, approximately 16 KiB of total text, nesting depth 6, arrays to 32 items and objects to 40 keys). Terminal JSON does not provide hidden model reasoning or per-generation provider usage, so those details are not captured. Usage values and cost estimates describe only the counters and pricing available from the CLI and catalog.
+
+For example, filter one match and event from the current day's file with `jq`:
+
+```sh
+jq 'select(.data.matchId == "MATCH_ID" and .event == "bot_tool_call")' \
+  "$GEOAISSR_DATA_DIR/logs/$(date -u +%F).jsonl"
+```

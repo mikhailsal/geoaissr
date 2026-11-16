@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
@@ -7,6 +7,7 @@ import type { EngineEvent } from '../engine/types.ts';
 import { createThumbStore } from '../http/thumbs.ts';
 import { createBotImageService } from '../images/bot-image-service.ts';
 import { createFakeLocationService } from '../location.ts';
+import { createServerLogger, type ServerLogger } from '../log.ts';
 import { createQuotaManager } from '../storage/quota.ts';
 import { createBotRunner } from './runner.ts';
 
@@ -117,10 +118,13 @@ test('runner records paid tool parameters and requests effective fov', async () 
       return Promise.resolve(new Response(new Uint8Array(image)));
     },
   });
+  const logger = createServerLogger(path.join(dir, 'logs'));
+  logger.registerSecrets(['secret-clue']);
   const runner = createBotRunner({
     runDir: path.join(dir, 'run'),
     childrenFile: path.join(dir, 'children.json'),
     fakeMode: true,
+    logger,
     imageService,
     locationService: createFakeLocationService(),
     dispatch: (event) => events.push(event),
@@ -137,6 +141,7 @@ test('runner records paid tool parameters and requests effective fov', async () 
         }
         await call('look', {heading:359.6,pitch:4.6,zoom:3,hypothesis:'Проверяю знак'});
         await call('move', {heading:90.4,hypothesis:'Проверяю дорогу'});
+        await fetch(base + '/tool/final_guess', {method:'POST', headers:{authorization:'Bearer '+token,'content-type':'application/json'}, body:JSON.stringify({lat:1,lng:2,facts:'secret-clue',conclusion:'Test',base64:'PRIVATE_IMAGE_DATA'})});
         await call('final_guess', {lat:1,lng:2,facts:'Test clue',conclusion:'Test',rejected_guesses:[]});
       `,
       ],
@@ -165,8 +170,35 @@ test('runner records paid tool parameters and requests effective fov', async () 
     expect(lookUrl.searchParams.get('heading')).toBe('0');
     expect(lookUrl.searchParams.get('pitch')).toBe('5');
     expect(lookUrl.searchParams.get('fov')).toBe('30');
+    assertToolAudit(logger);
   } finally {
     await runner.close();
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+function assertToolAudit(logger: ServerLogger): void {
+  const logText = readFileSync(
+    path.join(logger.getLogsDir(), `${new Date().toISOString().slice(0, 10)}.jsonl`),
+    'utf8',
+  );
+  expect(logText).not.toContain('secret-clue');
+  expect(logText).not.toContain('PRIVATE_IMAGE_DATA');
+  const records = logText
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line) as { event: string; data: Record<string, unknown> });
+  const calls = records.filter((record) => record.event === 'bot_tool_call');
+  expect(calls).toHaveLength(4);
+  expect(calls[2]?.data).toMatchObject({
+    matchId: 'm1',
+    gen: 1,
+    roundNumber: 1,
+    slotId: 'b1',
+    tool: 'final_guess',
+    checkpointSaved: true,
+    ok: false,
+    result: { isError: true },
+    args: { facts: '[REDACTED]', conclusion: 'Test' },
+  });
+}

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { detectAllHarnesses, getHarnessAdapter } from './index.ts';
@@ -7,7 +7,7 @@ import { buildBotRoundPrompt } from '../prompt.ts';
 import { readClaudeCodeModelOptions } from './claude.ts';
 import { parseCodexModelsCatalog } from './codex.ts';
 import { buildSanitizedChildEnv, withDefaultFirst } from './shared.ts';
-import { agyEffortArgs } from './agy.ts';
+import { agyEffortArgs, agyToolAuditPath } from './agy.ts';
 import type { CommandProbe } from './types.ts';
 
 test('detectAllHarnesses reports missing/unauthed CLIs accurately and discovers agy models', () => {
@@ -179,6 +179,57 @@ test('agy guard allows only the exact geo tools, not other MCP servers with a ge
         args: { path: '.agents/plugins/geo/mcp_config.json' },
       }),
     ).toBe('deny');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agy guard records tool attempts and permission decisions without argument contents', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-agy-audit-'));
+  try {
+    const spec = getHarnessAdapter('agy').buildLaunchSpec({
+      workDir: dir,
+      model: 'gemini-3.8-flash-low',
+      effort: 'low',
+      prompt: 'test',
+      apiUrl: 'http://127.0.0.1:9999',
+      botToken: 'tok-1',
+      moveEnabled: true,
+    });
+    const guardPath = path.join(spec.cwd, '.agents', 'plugins', 'geo', 'guard.ts');
+    writeFileSync(path.join(spec.cwd, 'frame.jpg'), 'image');
+    expect(runAgyGuard(guardPath, { name: 'read_file', args: { Path: 'frame.jpg' } })).toBe(
+      'allow',
+    );
+    expect(runAgyGuard(guardPath, { name: 'read_file', args: { Path: '/etc/passwd' } })).toBe(
+      'deny',
+    );
+    expect(
+      runAgyGuard(guardPath, {
+        name: 'call_mcp_tool',
+        args: { ServerName: 'geo_geo', ToolName: 'look', Arguments: { secret: 'do-not-log' } },
+      }),
+    ).toBe('allow');
+    const log = readFileSync(agyToolAuditPath(spec.cwd), 'utf8');
+    const events = log
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, string>);
+    expect(events.map(({ ts: _ts, ...event }) => event)).toEqual([
+      { tool: 'read_file', decision: 'allow', file: 'frame.jpg' },
+      { tool: 'read_file', decision: 'deny', file: 'passwd' },
+      { tool: 'call_mcp_tool', decision: 'allow', server: 'geo_geo', mcpTool: 'look' },
+    ]);
+    expect(log).not.toContain('do-not-log');
+    expect(log).not.toContain('/etc/');
+    expect(
+      events.every((event) => typeof event.ts === 'string' && !Number.isNaN(Date.parse(event.ts))),
+    ).toBe(true);
+    rmSync(agyToolAuditPath(spec.cwd));
+    mkdirSync(agyToolAuditPath(spec.cwd));
+    expect(runAgyGuard(guardPath, { name: 'read_file', args: { Path: 'frame.jpg' } })).toBe(
+      'allow',
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

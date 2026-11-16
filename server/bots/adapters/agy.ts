@@ -44,19 +44,31 @@ export function agyEffortArgs(model: string, effort: string): string[] {
 /** Only the game's own MCP tools pass the guard; other servers loaded from the owner's config do not. */
 const GEO_TOOL_NAMES = getBotToolDefinitions().map((t) => t.name);
 
+/** PreToolUse attempts, consumed by the bot runner before its work directory is removed. */
+export function agyToolAuditPath(workDir: string): string {
+  return path.join(workDir, '.agents', 'plugins', 'geo', 'tool-audit.jsonl');
+}
+
 function buildAgyGuardScript(realWorkDir: string): string {
   return [
     `import path from 'node:path';`,
-    `import { existsSync, realpathSync } from 'node:fs';`,
+    `import { appendFileSync, existsSync, realpathSync } from 'node:fs';`,
     `const wd = ${JSON.stringify(realWorkDir)};`,
+    `const auditPath = ${JSON.stringify(agyToolAuditPath(realWorkDir))};`,
     `let allow = false;`,
     `let n = '';`,
+    `let auditFile = '';`,
+    `let auditServer = '';`,
+    `let auditMcpTool = '';`,
+    `const safeName = (v: unknown) => typeof v === 'string' && /^[a-zA-Z0-9_.-]{1,128}$/.test(v) ? v : '';`,
     `try {`,
     `  const p = JSON.parse(await new Response(Bun.stdin.stream()).text());`,
     `  n = String(p?.toolCall?.name ?? '');`,
     `  const a = (p?.toolCall?.args && typeof p.toolCall.args === 'object' ? p.toolCall.args : {}) as Record<string, unknown>;`,
     `  const srvVals = ['serverName', 'ServerName', 'server_name'].map((k) => a[k]).filter((v) => v !== undefined);`,
     `  const s = srvVals.length === 1 || (srvVals.length > 1 && srvVals.every((v) => v === srvVals[0])) ? String(srvVals[0] ?? '') : '';`,
+    `  auditServer = safeName(s);`,
+    `  auditMcpTool = safeName(a.ToolName ?? a.toolName ?? a.tool_name);`,
     `  const geoTools = new Set(${JSON.stringify(GEO_TOOL_NAMES.map((t) => `mcp_geo_geo_${t}`))});`,
     `  allow = geoTools.has(n) || (n === 'call_mcp_tool' && (s === 'geo_geo' || s === 'geo'));`,
     `  if (!allow && (n === 'read_file' || n === 'view_file')) {`,
@@ -64,6 +76,7 @@ function buildAgyGuardScript(realWorkDir: string): string {
     `    const rawPaths = pathKeys.map((k) => a[k]).filter((v): v is string => typeof v === 'string');`,
     `    const raw = rawPaths.length > 0 && rawPaths.every((v) => v === rawPaths[0]) ? rawPaths[0] : null;`,
     `    if (raw) {`,
+    `      auditFile = safeName(path.basename(raw));`,
     `      const abs = path.resolve(wd, raw);`,
     `      const resolved = existsSync(abs) ? realpathSync(abs) : realpathSync(path.dirname(abs));`,
     `      const agentsRoot = path.join(wd, '.agents');`,
@@ -73,6 +86,9 @@ function buildAgyGuardScript(realWorkDir: string): string {
     `    }`,
     `  }`,
     `} catch { allow = false; }`,
+    `try {`,
+    `  appendFileSync(auditPath, JSON.stringify({ ts: new Date().toISOString(), tool: safeName(n) || 'unknown', decision: allow ? 'allow' : 'deny', ...(auditFile && { file: auditFile }), ...(auditServer && { server: auditServer }), ...(auditMcpTool && { mcpTool: auditMcpTool }) }) + '\\n', { mode: 0o600 });`,
+    `} catch { /* Audit failures must not change the permission decision. */ }`,
     `console.log(JSON.stringify(allow ? { decision: 'allow' } : { decision: 'deny', reason: 'geo_geo only (' + n + ')' }));`,
   ].join('\n');
 }

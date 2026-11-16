@@ -13,6 +13,20 @@ export interface ToolResponsePayload {
   isError?: boolean;
 }
 
+export interface ToolDispatchAudit {
+  tool: string;
+  args: unknown;
+  durationMs: number;
+  checkpointSaved: boolean;
+  result?: {
+    text: string;
+    isError: boolean;
+    imageCount: number;
+    images: Array<{ name: string; mimeType: string }>;
+  };
+  error?: string;
+}
+
 export interface BotSessionHandlers {
   waitObserveRelease: (signal: AbortSignal) => Promise<void>;
   executeObserve: () => Promise<ToolResponsePayload>;
@@ -45,6 +59,7 @@ interface QueueState {
   roundStartedPromise: Promise<void> | null;
   finalized: boolean;
   requireCompleteReasoning: boolean;
+  checkpoints: number;
 }
 
 function recordQueueFailure(st: QueueState, baseMsg: string): ToolResponsePayload {
@@ -92,6 +107,7 @@ async function executeGuess(
     (!guess.facts || !guess.conclusion || !guess.rejectedGuesses);
   const finalized = toolName !== 'draft_guess' && !missingReasoning && !incompleteFinal;
   st.handlers.onGuess(guess, finalized);
+  st.checkpoints += 1;
   st.finalized = finalized;
   if (incompleteFinal) {
     return {
@@ -182,11 +198,36 @@ async function executeQueuedTool(
   return recordQueueFailure(st, `Неизвестный инструмент: ${toolName}`);
 }
 
+function emitDispatchAudit(
+  observer: ((audit: ToolDispatchAudit) => void) | undefined,
+  audit: Omit<ToolDispatchAudit, 'result'>,
+  result: ToolResponsePayload | undefined,
+): void {
+  try {
+    observer?.({
+      ...audit,
+      ...(result
+        ? {
+            result: {
+              text: result.text,
+              isError: result.isError === true,
+              imageCount: result.images?.length ?? 0,
+              images: (result.images ?? []).map(({ name, mimeType }) => ({ name, mimeType })),
+            },
+          }
+        : {}),
+    });
+  } catch {
+    // Logging must never change the result of a tool call.
+  }
+}
+
 export function createBotToolQueue(opts: {
   moveLimit: number;
   moveEnabled: boolean;
   handlers: BotSessionHandlers;
   requireCompleteReasoning?: boolean;
+  onDispatch?: (audit: ToolDispatchAudit) => void;
 }): BotToolQueue {
   const ac = new AbortController();
   const st: QueueState = {
@@ -199,18 +240,45 @@ export function createBotToolQueue(opts: {
     roundStartedPromise: null,
     finalized: false,
     requireCompleteReasoning: opts.requireCompleteReasoning ?? false,
+    checkpoints: 0,
   };
   let tail: Promise<unknown> = Promise.resolve();
 
   function dispatch(toolName: string, rawArgs: unknown): Promise<ToolResponsePayload> {
+    const startedAt = Date.now();
     const next = tail.then(async () => {
-      const result = await executeQueuedTool(st, toolName, rawArgs);
-      const remaining = Math.max(0, Math.floor(st.handlers.getRemainingTimeSec()));
-      const urgent = remaining <= 15 && !st.finalized && !st.signal.aborted;
-      return {
-        ...result,
-        text: `${result.text}\nОсталось времени: ${remaining} с.${urgent ? ' Немедленно отправь лучшую версию через final_guess.' : ''}`,
-      };
+      const checkpoints = st.checkpoints;
+      let result: ToolResponsePayload | undefined;
+      let error: string | undefined;
+      try {
+        const response = await executeQueuedTool(st, toolName, rawArgs);
+        const remaining = Math.max(0, Math.floor(st.handlers.getRemainingTimeSec()));
+        const urgent = remaining <= 15 && !st.finalized && !st.signal.aborted;
+        result = {
+          ...response,
+          text: `${response.text}\nОсталось времени: ${remaining} с.${urgent ? ' Немедленно отправь лучшую версию через final_guess.' : ''}`,
+        };
+        return result;
+      } catch (err) {
+        try {
+          error = err instanceof Error ? err.message : String(err);
+        } catch {
+          error = 'Unprintable error';
+        }
+        throw err;
+      } finally {
+        emitDispatchAudit(
+          opts.onDispatch,
+          {
+            tool: toolName,
+            args: rawArgs,
+            durationMs: Date.now() - startedAt,
+            checkpointSaved: st.checkpoints > checkpoints,
+            ...(error !== undefined ? { error } : {}),
+          },
+          result,
+        );
+      }
     });
     tail = next.catch(() => undefined);
     return next;

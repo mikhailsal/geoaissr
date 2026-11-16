@@ -175,3 +175,60 @@ test('look resolves zoom and explicit fov and tolerates absent hypothesis', asyn
   expect(views[0]?.hypothesis).toBe('sign');
   expect(views[1]?.hypothesis).toBeUndefined();
 });
+
+// protects=original tool audit; fails_when=a rejected final is reported as a successful draft.
+test('audit preserves rejected final guess and checkpoint with structured reasoning', async () => {
+  const audits: import('./queue.ts').ToolDispatchAudit[] = [];
+  const args = { lat: 1, lng: 2, facts: 'road', conclusion: 'country' };
+  const q = createBotToolQueue({
+    moveLimit: 1,
+    moveEnabled: true,
+    requireCompleteReasoning: true,
+    handlers: makeHandlers(),
+    onDispatch: (audit) => audits.push(audit),
+  });
+  const result = await q.dispatch('final_guess', args);
+  expect(result.isError).toBe(true);
+  expect(audits).toHaveLength(1);
+  expect(audits[0]).toMatchObject({
+    tool: 'final_guess',
+    args,
+    checkpointSaved: true,
+    result: { isError: true, text: result.text, images: [] },
+  });
+  expect(audits[0]?.durationMs).toBeGreaterThanOrEqual(0);
+});
+
+test('audit covers invalid, unknown, aborted, image and thrown calls without changing behavior', async () => {
+  const audits: import('./queue.ts').ToolDispatchAudit[] = [];
+  const q = createBotToolQueue({
+    moveLimit: 1,
+    moveEnabled: true,
+    handlers: makeHandlers({
+      executeObserve: () =>
+        Promise.resolve({
+          text: 'ok',
+          images: [{ name: 'frame.jpg', mimeType: 'image/jpeg', base64: 'SECRET_IMAGE_DATA' }],
+        }),
+      executeLook: () => Promise.reject(new Error('broken handler')),
+    }),
+    onDispatch: (audit) => {
+      audits.push(audit);
+      throw new Error('broken logger');
+    },
+  });
+  expect((await q.dispatch('observe', {})).text).toContain('ok');
+  expect((await q.dispatch('look', { heading: 999 })).isError).toBe(true);
+  expect((await q.dispatch('unknown', {})).isError).toBe(true);
+  const thrown = await q.dispatch('look', { heading: 0 }).catch((err: unknown) => err);
+  expect(thrown).toEqual(new Error('broken handler'));
+  q.abort('ended');
+  expect((await q.dispatch('observe', {})).isError).toBe(true);
+  expect(audits.map((a) => a.tool)).toEqual(['observe', 'look', 'unknown', 'look', 'observe']);
+  expect(audits[0]?.result?.images).toEqual([{ name: 'frame.jpg', mimeType: 'image/jpeg' }]);
+  expect(JSON.stringify(audits)).not.toContain('SECRET_IMAGE_DATA');
+  expect(audits[1]?.result?.isError).toBe(true);
+  expect(audits[2]?.result?.isError).toBe(true);
+  expect(audits[3]?.error).toBe('broken handler');
+  expect(audits[4]?.result?.isError).toBe(true);
+});
