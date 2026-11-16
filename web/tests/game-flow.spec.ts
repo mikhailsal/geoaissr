@@ -28,8 +28,10 @@ async function joinPlayer(page: Page, url: string, nick: string): Promise<void> 
   await expect(page.getByLabel('Ваше имя')).toBeVisible();
   await expect.poll(() => page.url()).not.toContain('#t=');
   await page.getByLabel('Ваше имя').fill(nick);
-  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
   await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+  const notice = page.getByRole('button', { name: 'Понятно', exact: true });
+  if (await notice.isVisible()) await notice.click();
 }
 
 async function assertInviteHeader(page: Page): Promise<void> {

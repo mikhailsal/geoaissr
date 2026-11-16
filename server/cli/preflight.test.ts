@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { ProfileStore } from '../storage/profiles.ts';
 import { expect, test } from 'bun:test';
 import { createRoomShell } from '../engine/shell.ts';
 import { createInitialRoomState } from '../engine/types.ts';
@@ -122,11 +126,13 @@ function makePortTestShell() {
 }
 
 test('startAppHttpServer maps bind EADDRINUSE to GEO_PORT_BUSY without TOCTOU crash', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-port-profile-'));
   const blocker = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response('ok') });
   const shell = makePortTestShell();
   const rl = createAuthRateLimiter('local');
   const coord = createWsRoomCoordinator({
     shell,
+    profiles: new ProfileStore(path.join(dir, 'profiles.json')),
     hostToken: 'h',
     guestToken: 'g',
     browserMapsKey: null,
@@ -149,6 +155,7 @@ test('startAppHttpServer maps bind EADDRINUSE to GEO_PORT_BUSY without TOCTOU cr
   } finally {
     shell.dispose();
     void blocker.stop(true);
+    rmSync(dir, { recursive: true, force: true });
   }
   expect(caught).toBeInstanceOf(GeoError);
   expect((caught as GeoError).code).toBe('GEO_PORT_BUSY');

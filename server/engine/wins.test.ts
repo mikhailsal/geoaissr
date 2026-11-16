@@ -67,8 +67,8 @@ function room(): RoomState {
   } as unknown as RoomState;
 }
 
-test('profile updates exclude self but reject other humans and disabled bots', () => {
-  // protects: name and color uniqueness and FINAL editing; fails_when: disabled bot or another human is ignored; no_claim: client storage.
+test('profile edits allow duplicate human and bot display values and preserve phase rules', () => {
+  // U6 protects: duplicate presentation values and phase/input rules; fails_when: occupied values block edits or invalid phase/input succeeds; no_claim: isolated functions; not browser, tunnel or hosted model.
   const state = room();
   expect(
     handleProfileAction(
@@ -83,14 +83,27 @@ test('profile updates exclude self but reject other humans and disabled bots', (
       { type: 'update_profile', playerId: 'g', nick: 'bot', color: 'p-4' },
       now,
     ).ack,
-  ).toBe('invalid');
+  ).toBe('ok');
   expect(
     handleProfileAction(
       state,
       { type: 'update_profile', playerId: 'g', nick: 'New', color: 'p-3' },
       now,
     ).ack,
+  ).toBe('ok');
+  expect(
+    handleProfileAction(
+      state,
+      { type: 'update_profile', playerId: 'g', nick: 'Valid', color: 'invalid' as 'p-1' },
+      now,
+    ).ack,
   ).toBe('invalid');
+  for (const nick of ['', ' '.repeat(2), 'x'.repeat(21)]) {
+    expect(
+      handleProfileAction(state, { type: 'update_profile', playerId: 'g', nick, color: 'p-1' }, now)
+        .ack,
+    ).toBe('invalid');
+  }
   expect(
     handleProfileAction(
       { ...state, phase: 'FINAL' },
@@ -270,4 +283,19 @@ test('wins cache prunes expired, invalid and irrelevant records and keeps future
   } finally {
     clock.dispose();
   }
+});
+
+// U7 protects: equal display values keep separate six-hour wins through renames;
+// fails_when: wins combine or move between profile IDs; no_claim: isolated functions; not browser, tunnel or hosted model.
+// why_new=Permanent profile credentials add an authority and persistence contract absent from earlier coverage; seam=none.
+test('equal names and colors do not merge profile wins through renames', () => {
+  const a = { ...person('profile-a'), name: 'Same', color: 'p-1' as const };
+  const b = { ...person('profile-b'), name: 'Same', color: 'p-1' as const };
+  const records = [
+    record(now, [a]),
+    record(now - 1, [b]),
+    record(now - 2, [{ ...a, name: 'Renamed' }]),
+    record(now - WIN_WINDOW_MS - 1, [b]),
+  ];
+  expect(computeWins6h(records, now, {}).byProfileId).toEqual({ 'profile-a': 2, 'profile-b': 1 });
 });

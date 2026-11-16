@@ -11,10 +11,19 @@
     roundNumber: number;
     totalRounds: number;
     onEndMatch: () => void;
+    onOpenProfile?: (event: MouseEvent) => void;
   }
 
-  let { fakeMode, viewerIsHost, phase, inviteUrl, roundNumber, totalRounds, onEndMatch }: Props =
-    $props();
+  let {
+    fakeMode,
+    viewerIsHost,
+    phase,
+    inviteUrl,
+    roundNumber,
+    totalRounds,
+    onEndMatch,
+    onOpenProfile,
+  }: Props = $props();
 
   let copied = $state(false);
   let menuOpen = $state(false);
@@ -50,6 +59,7 @@
 <svelte:window onkeydown={handleWindowKeyDown} />
 
 <div class="host-menu-bar">
+  {#if onOpenProfile}<button type="button" class="btn" onclick={onOpenProfile}>Профиль</button>{/if}
   {#if fakeMode}
     <span class="fake-pill">{RU.fakeModeBadge}</span>
   {/if}

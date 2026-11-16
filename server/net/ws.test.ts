@@ -7,6 +7,7 @@ import { createRoomShell } from '../engine/shell.ts';
 import { createInitialRoomState } from '../engine/types.ts';
 import { createThumbStore } from '../http/thumbs.ts';
 import { buildQuotaSummaryForRoom, createQuotaManager } from '../storage/quota.ts';
+import { ProfileStore } from '../storage/profiles.ts';
 import { startAppHttpServer } from './http.ts';
 import { createAuthRateLimiter } from './rate-limit.ts';
 import { createWsRoomCoordinator } from './ws.ts';
@@ -92,6 +93,7 @@ function setupTestServer(dir: string) {
   const rateLimiter = createAuthRateLimiter('local');
   const coordinator = createWsRoomCoordinator({
     shell,
+    profiles: new ProfileStore(path.join(dir, 'profiles.json')),
     hostToken: 'host-secret-tok',
     guestToken: 'guest-secret-tok',
     browserMapsKey: null,

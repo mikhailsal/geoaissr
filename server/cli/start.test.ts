@@ -4,6 +4,8 @@ import path from 'node:path';
 import { expect, spyOn, test } from 'bun:test';
 import { GeoError } from '../errors.ts';
 import { saveSettings } from '../storage/settings.ts';
+import { ProfileStore } from '../storage/profiles.ts';
+import { formatProfileToken } from '../../shared/profile-token.ts';
 import { createDefaultSettings } from '../../shared/storage-schemas.ts';
 import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { BotRunner } from '../bots/runner.ts';
@@ -170,40 +172,65 @@ test('startGeoServer reads quota ceilings once at startup and reports percentage
   });
 });
 
+// protects=loaded profile codes and invitations stay private in actual startup crash diagnostics;
+// fails_when=the crash console bypasses registered credentials or accepted display variants leak;
+// why_new=permanent profiles add loaded secrets outside the original invitation-only crash coverage;
+// seam=none; no_claim=isolated fake startup and native crash handler, not process-signal delivery.
 test('startGeoServer rejects concurrent second server on same dataDir and writes redacted crash logs', async () => {
-  await withTempAppEnv(async () => {
-    const srv = await startGeoServer(
-      { ...parseStartArgs(['--fake', '--no-tunnel', '--no-open']), port: 0 },
-      {
-        skipClientBuild: true,
-      },
-    );
-    let lockErr: unknown = null;
+  await withTempAppEnv(async ({ dataDir }) => {
+    const profile = new ProfileStore(path.join(dataDir, 'profiles.json')).create({
+      nick: 'Private fixture',
+      color: 'p-1',
+      role: 'host',
+    });
+    const variants = [
+      profile.profileToken,
+      formatProfileToken(profile.profileToken).toUpperCase(),
+      profile.profileToken.match(/.{4}/g)?.join(' \t') ?? profile.profileToken,
+    ];
+    const errors = spyOn(console, 'error').mockImplementation(() => {});
+    let srv: Awaited<ReturnType<typeof startGeoServer>> | undefined;
     try {
-      await startGeoServer(
+      srv = await startGeoServer(
         { ...parseStartArgs(['--fake', '--no-tunnel', '--no-open']), port: 0 },
         {
           skipClientBuild: true,
         },
       );
-    } catch (err) {
-      lockErr = err;
+      let lockErr: unknown = null;
+      try {
+        await startGeoServer(
+          { ...parseStartArgs(['--fake', '--no-tunnel', '--no-open']), port: 0 },
+          {
+            skipClientBuild: true,
+          },
+        );
+      } catch (err) {
+        lockErr = err;
+      }
+      expect(lockErr).toBeInstanceOf(GeoError);
+      expect((lockErr as GeoError).code).toBe('GEO_ALREADY_RUNNING');
+
+      const hz = await fetch(`${srv.baseUrl}/healthz`);
+      expect(hz.status).toBe(200);
+      expect(await hz.json()).toEqual({ ok: true });
+
+      const crash = await srv.simulateCrash(
+        new Error(
+          `boom token=${srv.hostToken} guest=${srv.guestToken} profiles=${variants.join(' | ')}`,
+        ),
+      );
+      expect(crash.exitCode).toBe(70);
+      expect(existsSync(crash.crashFile)).toBe(true);
+      const crashContent = readFileSync(crash.crashFile, 'utf8');
+      const credentials = [srv.hostToken, srv.guestToken, ...variants];
+      const consoleOutput = errors.mock.calls.flat().join('\n');
+      expect(credentials.some((value) => consoleOutput.includes(value))).toBe(false);
+      expect(credentials.some((value) => crashContent.includes(value))).toBe(false);
+    } finally {
+      await srv?.stop();
+      errors.mockRestore();
     }
-    expect(lockErr).toBeInstanceOf(GeoError);
-    expect((lockErr as GeoError).code).toBe('GEO_ALREADY_RUNNING');
-
-    const hz = await fetch(`${srv.baseUrl}/healthz`);
-    expect(hz.status).toBe(200);
-    expect(await hz.json()).toEqual({ ok: true });
-
-    const crash = await srv.simulateCrash(
-      new Error(`boom token=${srv.hostToken} guest=${srv.guestToken}`),
-    );
-    expect(crash.exitCode).toBe(70);
-    expect(existsSync(crash.crashFile)).toBe(true);
-    const crashContent = readFileSync(crash.crashFile, 'utf8');
-    expect(crashContent).not.toContain(srv.hostToken);
-    expect(crashContent).not.toContain(srv.guestToken);
   });
 });
 

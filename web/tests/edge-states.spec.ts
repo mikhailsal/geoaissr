@@ -21,33 +21,15 @@ test.afterEach(async () => {
   server = undefined;
 });
 
-test('join error states cover missing link, bad token, and duplicate nick', async ({ browser }) => {
+// protects=normal signed-out entry and invalid invitation recovery; fails_when=the bare page demands an invitation or invalid invitations hide code login; why_new=the homepage now permits returning players without invitations; seam=none; no_claim=does not establish server-side authorization
+test('homepage and invalid invitations offer personal-code entry', async ({ page }) => {
   const srv = getServer();
-  const ctxA = await browser.newContext();
-  const ctxB = await browser.newContext();
-  const pageA = await ctxA.newPage();
-  const pageB = await ctxB.newPage();
-
-  try {
-    await pageA.goto(srv.baseUrl);
-    await expect(pageA.getByText('Нужна пригласительная ссылка')).toBeVisible();
-
-    await pageA.goto(`${srv.baseUrl}/#t=wrong_token_value`);
-    await expect(pageA.getByText('Ссылка устарела или неверна')).toBeVisible();
-
-    await pageA.goto(srv.hostUrl);
-    await pageA.getByLabel('Ваше имя').fill('Ведущий');
-    await pageA.getByRole('button', { name: 'Войти' }).click();
-    await expect(pageA.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
-
-    await pageB.goto(srv.guestUrl);
-    await pageB.getByLabel('Ваше имя').fill('ведущий');
-    await pageB.getByRole('button', { name: 'Войти' }).click();
-    await expect(pageB.getByText('Ник занят')).toBeVisible();
-  } finally {
-    await ctxA.close();
-    await ctxB.close();
-  }
+  await page.goto(srv.baseUrl);
+  await expect(page.getByLabel('Код профиля')).toBeVisible();
+  await expect(page.getByLabel('Ваше имя')).toHaveCount(0);
+  await expect(page.getByText('Нужна пригласительная ссылка')).toHaveCount(0);
+  await page.goto(`${srv.baseUrl}/#t=wrong_token_value`);
+  await expect(page.getByText('Ссылка устарела или неверна')).toBeVisible();
 });
 
 test('mobile viewport, reconnect banner, and early end match work cleanly', async ({ browser }) => {
@@ -62,7 +44,7 @@ test('mobile viewport, reconnect banner, and early end match work cleanly', asyn
     await page.getByRole('button', { name: 'Всё равно войти' }).click();
 
     await page.getByLabel('Ваше имя').fill('Саша');
-    await page.getByRole('button', { name: 'Войти' }).click();
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
     await expect(page.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
     await assertNoHorizontalOverflow(page);
 
@@ -84,36 +66,5 @@ test('mobile viewport, reconnect banner, and early end match work cleanly', asyn
     await expect(page.getByText('Партия завершена до первого результата')).toBeVisible();
   } finally {
     await ctx.close();
-  }
-});
-
-test('a disconnected guest nick points to the same browser, matching the server rule', async ({
-  browser,
-}) => {
-  const srv = getServer();
-  const host = await (await browser.newContext()).newPage();
-  const guestCtx = await browser.newContext();
-  const otherCtx = await browser.newContext();
-
-  try {
-    await host.goto(srv.hostUrl);
-    await host.getByLabel('Ваше имя').fill('Ведущий');
-    await host.getByRole('button', { name: 'Войти' }).click();
-    const guest = await guestCtx.newPage();
-    await guest.goto(srv.guestUrl);
-    await guest.getByLabel('Ваше имя').fill('Гость');
-    await guest.getByRole('button', { name: 'Войти' }).click();
-    await expect(host.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
-    await guestCtx.close();
-
-    const other = await otherCtx.newPage();
-    await other.goto(srv.guestUrl);
-    await expect(other.getByText(/откройте ссылку в том же браузере/)).toBeVisible();
-    await other.getByLabel('Ваше имя').fill('Гость');
-    await other.getByRole('button', { name: 'Войти' }).click();
-    await expect(other.getByText(/только из того же браузера/)).toBeVisible();
-  } finally {
-    await host.context().close();
-    await otherCtx.close();
   }
 });

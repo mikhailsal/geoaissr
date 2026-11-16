@@ -1,3 +1,4 @@
+import { PARTICIPANT_COLOR_IDS } from '../../shared/colors.ts';
 import type { EngineEvent, ReduceOutput, RoomState } from './types.ts';
 
 export function handleProfileAction(
@@ -12,17 +13,7 @@ export function handleProfileAction(
     return { state, effects: [], ack: 'invalid' };
   if (event.type === 'update_profile') {
     const name = event.nick.trim();
-    const occupied = [
-      ...Object.values(state.players).filter((p) => p.id !== player.id),
-      ...state.settings.bots,
-    ];
-    if (
-      !name ||
-      name.length > 20 ||
-      occupied.some(
-        (p) => p.name.trim().toLowerCase() === name.toLowerCase() || p.color === event.color,
-      )
-    ) {
+    if (!name || name.length > 20 || !PARTICIPANT_COLOR_IDS.includes(event.color)) {
       return { state, effects: [], ack: 'invalid' };
     }
     return {

@@ -14,6 +14,7 @@ const RETENTION_DAYS = 14;
 const MS_PER_DAY = 86_400_000;
 
 export type LogEventType =
+  | 'profiles_unavailable'
   | 'server_start'
   | 'round_start'
   | 'round_end'
@@ -99,7 +100,11 @@ export function createServerLogger(
   const log = (event: LogEventType, data: Record<string, unknown>): void => {
     const nowMs = nowFn();
     const record: LogRecord = { ts: new Date(nowMs).toISOString(), event, data };
-    const safeLine = redactString(JSON.stringify(record));
+    const safeLine = redactString(
+      JSON.stringify(record, (_key: string, value: unknown) =>
+        typeof value === 'string' ? redactString(value) : value,
+      ),
+    );
     const file = path.join(logsDir, `${formatUtcDate(nowMs)}.jsonl`);
     appendFileSync(file, `${safeLine}\n`, 'utf8');
   };

@@ -38,6 +38,27 @@ test('maskToken and redactSecrets strip keys and shorten tokens to 4 chars', () 
   expect(redacted).toContain('Host…');
 });
 
+// protects=registered profile credentials are masked in every accepted display spelling;
+// fails_when=uppercase, hyphens or whitespace bypass masking, or arbitrary tokens become regex;
+// why_new=profile login accepts normalized codes absent from prior error-format coverage;
+// seam=none; no_claim=registered fixture strings only, not a claim about unknown secrets.
+test('redactSecrets masks normalized profile code variants and keeps literal invitation matching', () => {
+  const code = 'abcdef0123456789abcdef0123456789';
+  const grouped = code.match(/.{4}/g) ?? [];
+  const variants = [
+    code,
+    code.toUpperCase(),
+    grouped.join('-'),
+    grouped.join(' \t-').toUpperCase(),
+  ];
+  const input = variants.map((value) => `profile=${value}`).join(' | ');
+  const redacted = redactSecrets(input, [], [code]);
+  expect(variants.some((value) => redacted.includes(value))).toBe(false);
+  expect(redacted.match(/abcd…/g)?.length).toBe(variants.length);
+  const literal = 'invite.[a-z]+(token)';
+  expect(redactSecrets(`${literal} inviteZa-token`, [], [literal])).toBe('invi… inviteZa-token');
+});
+
 test('formatCliError snapshot for GEO_TUNNEL_NOT_READY matches contract', () => {
   const out = formatCliError({
     command: 'start',

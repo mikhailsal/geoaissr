@@ -211,7 +211,11 @@ export function redactSecrets(
     }
   }
   for (const token of knownTokens) {
-    if (token && token.length >= 8) {
+    if (/^[0-9a-f]{32}$/i.test(token)) {
+      // Only hex credentials become patterns; invitation tokens otherwise stay literal.
+      const spelling = new RegExp(token.split('').join('[\\s-]*'), 'gi');
+      out = out.replace(spelling, maskToken(token));
+    } else if (token && token.length >= 8) {
       out = out.split(token).join(maskToken(token));
     }
   }

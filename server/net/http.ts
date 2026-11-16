@@ -91,6 +91,7 @@ function handleHttpFetch(
         authenticated: false,
         role: null,
         playerId: null,
+        profileId: null,
         authTimer: null,
         authenticatedAt: null,
         lastSeqByPlayer: new Map(),

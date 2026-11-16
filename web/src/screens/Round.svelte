@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Map as MapIcon, X } from '@lucide/svelte';
-  import type { ParticipantColorId } from '$shared/colors';
   import type { ClientViewState } from '$shared/protocol';
   import GuessMap from '../components/GuessMap.svelte';
   import HostMenu from '../components/HostMenu.svelte';
@@ -12,6 +11,7 @@
   import { RU } from '../i18n/ru';
 
   interface Props {
+    onEditProfile: (event: MouseEvent) => void;
     view: ClientViewState;
     browserMapsKey: string | null;
     localPin: { roundNumber: number; lat: number; lng: number } | null;
@@ -30,6 +30,7 @@
   }
 
   let {
+    onEditProfile,
     view,
     browserMapsKey,
     localPin,
@@ -55,8 +56,7 @@
   let mobileMapOpen = $state(false);
   let hudHeight = $state(0);
 
-  const me = $derived(view.players.find((p) => p.id === view.viewerId));
-  const myColor = $derived<ParticipantColorId>(me?.color ?? 'p-1');
+  const myColor = $derived(view.players.find((p) => p.id === view.viewerId)?.color ?? 'p-1');
   const panoId = $derived(view.active?.panoId ?? view.loading?.panoId ?? '');
   const fakeSceneIndex = $derived(
     view.active?.fakeSceneIndex ?? view.loading?.fakeSceneIndex ?? view.roundNumber - 1,
@@ -143,6 +143,7 @@
     </div>
 
     <HostMenu
+      onOpenProfile={onEditProfile}
       fakeMode={view.fakeMode}
       viewerIsHost={view.viewerIsHost}
       phase={view.phase}
@@ -411,7 +412,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--sp-4);
-    z-index: 50;
+    z-index: 24;
   }
 
   .loading-box {

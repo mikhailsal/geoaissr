@@ -1,23 +1,37 @@
 <script lang="ts">
+  import { formatProfileToken } from '../lib/profile';
   import { onMount, untrack } from 'svelte';
   import { PARTICIPANT_COLORS, type ParticipantColorId } from '$shared/colors';
   interface Props {
     name: string;
     color: ParticipantColorId;
-    usedColors: ParticipantColorId[];
+    profileToken?: string;
+    editable?: boolean;
+    onLogout: () => void;
     pending: boolean;
     error: string | null;
     onSave: (nick: string, color: ParticipantColorId) => void;
     onClose: () => void;
   }
-  let { name, color, usedColors, pending, error, onSave, onClose }: Props = $props();
+  let {
+    name,
+    color,
+    profileToken,
+    editable = true,
+    onLogout,
+    pending,
+    error,
+    onSave,
+    onClose,
+  }: Props = $props();
   let nick = $state(untrack(() => name));
   let selected = $state(untrack(() => color));
+  let copyMessage = $state('');
   let dialog: HTMLDialogElement;
-  let nameInput: HTMLInputElement;
+  let nameInput = $state<HTMLInputElement | undefined>();
   onMount(() => {
     dialog.showModal();
-    nameInput.focus();
+    nameInput?.focus();
   });
 </script>
 
@@ -35,36 +49,62 @@
   <form
     onsubmit={(e) => {
       e.preventDefault();
-      onSave(nick.trim(), selected);
+      if (editable) onSave(nick.trim(), selected);
     }}
   >
-    <h2 id="profile-title">Редактирование профиля</h2>
-    <label
-      >Имя<input
-        class="field-input"
-        bind:value={nick}
-        bind:this={nameInput}
-        maxlength="20"
-        required
-      /></label
-    >
-    <fieldset>
-      <legend>Цвет</legend>
-      <div class="swatches" role="radiogroup" aria-label="Цвет">
-        {#each PARTICIPANT_COLORS as c (c.id)}
-          <button
-            type="button"
-            role="radio"
-            aria-label={c.labelRu}
-            aria-checked={selected === c.id}
-            class:selected={selected === c.id}
-            style="background-color: var({c.cssVar}); color: var({c.inkToken});"
-            disabled={usedColors.includes(c.id)}
-            onclick={() => (selected = c.id)}>{selected === c.id ? '✓' : ''}</button
-          >
-        {/each}
-      </div>
-    </fieldset>
+    <h2 id="profile-title">Профиль</h2>
+    {#if profileToken}
+      <label
+        >Код профиля<input
+          class="field-input"
+          readonly
+          value={formatProfileToken(profileToken)}
+          onclick={(event) => {
+            event.currentTarget.select();
+          }}
+        /></label
+      >
+      <button
+        type="button"
+        class="btn"
+        onclick={async () => {
+          try {
+            await navigator.clipboard.writeText(formatProfileToken(profileToken));
+            copyMessage = 'Код скопирован.';
+          } catch {
+            copyMessage = 'Не удалось скопировать. Выделите код и скопируйте вручную.';
+          }
+        }}>Скопировать код</button
+      >
+      {#if copyMessage}<p role="status">{copyMessage}</p>{/if}
+    {/if}
+    {#if editable}
+      <label
+        >Имя<input
+          class="field-input"
+          bind:value={nick}
+          bind:this={nameInput}
+          maxlength="20"
+          required
+        /></label
+      >
+      <fieldset>
+        <legend>Цвет</legend>
+        <div class="swatches" role="radiogroup" aria-label="Цвет">
+          {#each PARTICIPANT_COLORS as c (c.id)}
+            <button
+              type="button"
+              role="radio"
+              aria-label={c.labelRu}
+              aria-checked={selected === c.id}
+              class:selected={selected === c.id}
+              style="background-color: var({c.cssVar}); color: var({c.inkToken});"
+              onclick={() => (selected = c.id)}>{selected === c.id ? '✓' : ''}</button
+            >
+          {/each}
+        </div>
+      </fieldset>
+    {/if}
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="actions">
       <button
@@ -74,7 +114,10 @@
           dialog.close();
         }}>Закрыть</button
       >
-      <button class="btn btn-primary" disabled={pending || !nick.trim()}>Сохранить</button>
+      {#if editable}<button class="btn btn-primary" disabled={pending || !nick.trim()}
+          >Сохранить</button
+        >{/if}
+      <button type="button" class="btn" onclick={onLogout}>Выйти</button>
     </div>
   </form>
 </dialog>
@@ -130,7 +173,7 @@
     justify-content: flex-end;
     gap: var(--sp-2);
   }
-  p {
+  p[role='alert'] {
     color: var(--signal);
   }
 </style>

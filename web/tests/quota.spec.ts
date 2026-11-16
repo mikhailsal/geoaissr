@@ -6,7 +6,7 @@ async function join(page: Page, url: string, name: string) {
   const continueButton = page.getByRole('button', { name: 'Всё равно войти' });
   if (await continueButton.isVisible()) await continueButton.click();
   await page.getByLabel('Ваше имя').fill(name);
-  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
   await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
 }
 
