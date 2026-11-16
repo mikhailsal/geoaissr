@@ -50,3 +50,11 @@ A single root `package.json` (no workspaces):
 - Config and data paths are set only through `server/paths.ts` (`GEOAISSR_CONFIG_DIR`, `GEOAISSR_DATA_DIR`). In `--fake` test mode `.geoaissr-dev/` is used.
 - Error code registry: `server/errors.ts` and [docs/errors.md](./docs/errors.md).
 - Visual language: [DESIGN.md](./DESIGN.md).
+
+## Releases
+
+- This is a locally run application. There is no hosted deployment step; a release does not restart the local app.
+- Use `package.json` as the version source, pinned by `.gstack/version-path`.
+- Update `CHANGELOG.md` for the release, run the required checks, and commit the version and changelog together.
+- After CI passes for the release commit on `main`, create and push an annotated Git tag named `v<version>` at that commit.
+- Preserve published tags. Never replace or force-push an existing release tag.

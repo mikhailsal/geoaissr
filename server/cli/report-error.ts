@@ -1,3 +1,4 @@
+import appPackage from '../../package.json';
 import {
   ERROR_REGISTRY,
   GeoError,
@@ -6,7 +7,7 @@ import {
   type ExitCode,
 } from '../errors.ts';
 
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = appPackage.version;
 
 export interface FormatErrorOptions {
   command: string;

@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatCliError } from './cli/report-error.ts';
+import appPackage from '../package.json';
 import { ERROR_CODES, ERROR_REGISTRY, maskToken, redactSecrets } from './errors.ts';
 
 test('every error code in ERROR_REGISTRY has a matching section in docs/errors.md', () => {
@@ -59,6 +60,8 @@ test('redactSecrets masks normalized profile code variants and keeps literal inv
   expect(redactSecrets(`${literal} inviteZa-token`, [], [literal])).toBe('invi… inviteZa-token');
 });
 
+// Protects the published version in CLI diagnostics; fails when a stale constant
+// differs from package.json. Exercises formatted output, not a live tunnel.
 test('formatCliError snapshot for GEO_TUNNEL_NOT_READY matches contract', () => {
   const out = formatCliError({
     command: 'start',
@@ -72,7 +75,7 @@ test('formatCliError snapshot for GEO_TUNNEL_NOT_READY matches contract', () => 
     [
       'start: публичная ссылка https://demo.trycloudflare.com не ответила за 60 с: DNS не разрешает имя (GEO_TUNNEL_NOT_READY)',
       '  причина: DoH cloudflare-dns.com и dns.google вернули NXDOMAIN',
-      `  контекст: geoaissr 0.1.0, bun ${Bun.version}; cloudflared 2025.11.1; сервер работает на localhost:5174, партия не начата`,
+      `  контекст: geoaissr ${appPackage.version}, bun ${Bun.version}; cloudflared 2025.11.1; сервер работает на localhost:5174, партия не начата`,
       '  исправить: остановите start (Ctrl+C) и запустите снова `bun run start`; повторять можно, ничего не потеряется (docs/errors.md#GEO_TUNNEL_NOT_READY)',
     ].join('\n'),
   );
@@ -104,7 +107,7 @@ test('formatCliError snapshot for GEO_ENV_KEY_MISSING uses registry templates', 
     [
       'start: не задан ключ Google в .env (GEO_ENV_KEY_MISSING)',
       '  причина: отсутствует GOOGLE_MAPS_SERVER_KEY в .env',
-      `  контекст: geoaissr 0.1.0, bun ${Bun.version}`,
+      `  контекст: geoaissr ${appPackage.version}, bun ${Bun.version}`,
       '  исправить: скопируйте .env.example в .env и заполните GOOGLE_MAPS_BROWSER_KEY и GOOGLE_MAPS_SERVER_KEY по разделу README «How to get Google Maps Platform keys» (docs/errors.md#GEO_ENV_KEY_MISSING)',
     ].join('\n'),
   );
