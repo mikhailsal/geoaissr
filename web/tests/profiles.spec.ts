@@ -44,6 +44,32 @@ async function guess(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Угадать', exact: true }).click();
 }
 
+async function assertGuessHitTargets(page: Page): Promise<void> {
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 720 });
+    if (width < 900) await page.getByRole('button', { name: 'Карта', exact: true }).click();
+    const canvas = page.getByTestId('fake-guess-map').locator('canvas');
+    await expect(canvas).toBeVisible();
+    await canvas.click({ position: { x: 140, y: 110 } });
+    const submit = page.getByRole('button', { name: 'Угадать', exact: true });
+    await expect(submit).toBeEnabled();
+    const profileRect = await page
+      .getByRole('button', { name: 'Профиль', exact: true })
+      .boundingBox();
+    const submitRect = await submit.boundingBox();
+    expect(profileRect).not.toBeNull();
+    expect(submitRect).not.toBeNull();
+    if (!profileRect || !submitRect) throw new Error('Missing profile or guess hit target');
+    expect(
+      profileRect.x < submitRect.x + submitRect.width &&
+        profileRect.x + profileRect.width > submitRect.x &&
+        profileRect.y < submitRect.y + submitRect.height &&
+        profileRect.y + profileRect.height > submitRect.y,
+    ).toBe(false);
+    await submit.click({ trial: true });
+  }
+}
+
 function bot(id: string, name: string, color: ParticipantColorId): BotSlotConfig {
   return {
     id,
@@ -248,7 +274,7 @@ test('manual login works without storage and rejects malformed codes', async ({ 
   }
 });
 
-// protects=B5: another device resumes the submitted active-round seat and displaces its old connection; fails_when=the guess disappears, another seat is created, or the old page reconnects; why_new=active-seat takeover must preserve submitted input on a different device; seam=none; no_claim=fake maps do not test Google Maps or model quality
+// Value: protects=B5 and displaced-page controls/credential isolation: another device resumes the submitted active-round seat and displaces its old connection; fails_when=the guess disappears, another seat is created, or the old page reconnects; why_new=active-seat takeover must preserve submitted input on a different device; seam=none; no_claim=fake maps do not test Google Maps or model quality
 test('code takeover retains an active submitted guess', async ({ browser }) => {
   const server = await startIsolatedFakeServer({ rounds: 1 });
   const hostContext = await browser.newContext();
@@ -269,8 +295,21 @@ test('code takeover retains an active submitted guess', async ({ browser }) => {
     await replacement.getByRole('button', { name: 'Войти по коду', exact: true }).click();
     await expect(replacement.getByText(/Ответ принят/)).toBeVisible();
     await expect(guest.getByText(/другой вкладке|другом устройстве|новая вкладка/i)).toBeVisible();
+    await expect(guest.getByTestId('fake-guess-map')).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Угадать', exact: true })).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Меню хоста', exact: true })).toHaveCount(0);
+    await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await expect(guest.getByLabel('Имя', { exact: true })).toHaveCount(0);
+    await guest.keyboard.press('Escape');
+    expect((await savedProfile(guest)).profileToken).toBe(code);
     await guess(host);
     await expect(replacement.getByText(/Правильный ответ:/)).toBeVisible({ timeout: 12_000 });
+    const sharedReplacement = await guestContext.newPage();
+    await sharedReplacement.goto(server.baseUrl);
+    await expect(sharedReplacement.getByText(/Правильный ответ:/)).toBeVisible();
+    expect((await savedProfile(sharedReplacement)).profileToken).toBe(code);
+    await sharedReplacement.reload();
+    await expect(sharedReplacement.getByText(/Правильный ответ:/)).toBeVisible();
     expect(registry(server.dataDir)).toHaveLength(2);
   } finally {
     await hostContext.close();
@@ -280,7 +319,7 @@ test('code takeover retains an active submitted guess', async ({ browser }) => {
   }
 });
 
-// protects=B6/B7: identical display values remain independent seats and explicit logout propagates before switching profiles; fails_when=names reclaim seats or another tab restores logged-out credentials; why_new=old tests rejected duplicates and lacked explicit cross-tab logout; seam=none; no_claim=does not establish cross-origin logout propagation
+// Value: protects=B6/B7 and logout without crypto.randomUUID: identical display values remain independent seats and explicit logout propagates before switching profiles; fails_when=names reclaim seats or another tab restores logged-out credentials; why_new=old tests rejected duplicates and lacked explicit cross-tab logout; seam=none; no_claim=does not establish cross-origin logout propagation
 test('duplicate display values and same-origin logout stay isolated', async ({ browser }) => {
   const server = await startIsolatedFakeServer();
   const firstContext = await browser.newContext();
@@ -303,6 +342,9 @@ test('duplicate display values and same-origin logout stay isolated', async ({ b
     const tab = await firstContext.newPage();
     await tab.goto(server.baseUrl);
     await expect(tab.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await tab.evaluate(() => {
+      Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
+    });
     await tab.getByRole('button', { name: 'Профиль', exact: true }).click();
     await tab.getByRole('button', { name: 'Выйти', exact: true }).click();
     await expect(tab.getByLabel('Код профиля')).toBeVisible();
@@ -321,7 +363,7 @@ test('duplicate display values and same-origin logout stay isolated', async ({ b
   }
 });
 
-// protects=B7 and phase restrictions: duplicate name/color edits persist without changing code, while the profile remains viewable in a match; fails_when=an occupied value is rejected or midmatch editing mutates identity; why_new=old tests rejected occupied values and lacked all-phase code access; seam=none; no_claim=fake maps do not establish external map or model behavior
+// Value: protects=B7, phase restrictions, loading-phase Profile hit target and desktop/narrow guess hit targets: duplicate name/color edits persist without changing code, while the profile remains viewable in a match; fails_when=an occupied value is rejected or midmatch editing mutates identity; why_new=old tests rejected occupied values and lacked all-phase code access; seam=none; no_claim=fake maps do not establish external map or model behavior
 test('profile edits accept occupied values and code remains visible during a match', async ({
   browser,
 }) => {
@@ -345,14 +387,37 @@ test('profile edits accept occupied values and code remains visible during a mat
       .toMatchObject({ nick: 'Общее', color: 'p-1', profileToken: code });
     await expect(host.getByText('Общее', { exact: true })).toHaveCount(2);
     await host.getByRole('button', { name: 'Начать', exact: true }).click();
+    await expect(guest.locator('.loading-veil')).toBeVisible();
+    const loadingHit = await guest
+      .getByRole('button', { name: 'Профиль', exact: true })
+      .evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        return {
+          duringLoading: !!document.querySelector('.loading-veil'),
+          profileReceivesPointer: el.contains(hit),
+        };
+      });
+    expect(loadingHit).toEqual({ duringLoading: true, profileReceivesPointer: true });
+    await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await expect(guest.getByRole('dialog').getByLabel('Код профиля')).toHaveValue(
+      Array.from({ length: 8 }, (_, i) => code.slice(i * 4, i * 4 + 4)).join('-'),
+    );
+    await expect(guest.getByRole('button', { name: 'Скопировать код', exact: true })).toBeVisible();
+    await expect(guest.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+    await expect(guest.getByLabel('Имя', { exact: true })).toHaveCount(0);
+    await guest.keyboard.press('Escape');
     await expect(guest.getByTestId('fake-guess-map')).toBeVisible({ timeout: 12_000 });
     await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
     await expect(guest.getByRole('button', { name: 'Скопировать код', exact: true })).toBeVisible();
     await expect(guest.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
     await expect(guest.getByLabel('Имя', { exact: true })).toHaveCount(0);
     await guest.keyboard.press('Escape');
+    const notice = guest.getByRole('button', { name: 'Понятно', exact: true });
+    if (await notice.isVisible()) await notice.click();
+    await assertGuessHitTargets(guest);
     await guess(host);
-    await guess(guest);
+    await guest.getByRole('button', { name: 'Угадать', exact: true }).click();
     await expect(host.getByText(/Правильный ответ:/)).toBeVisible({ timeout: 12_000 });
     await host.getByRole('button', { name: 'К итогам', exact: true }).click();
     await expect(guest.getByRole('button', { name: 'Профиль', exact: true })).toBeVisible();
@@ -446,6 +511,115 @@ test('unreadable match history warns the room while play remains available', asy
     await expectWins(page, 'История', 0);
   } finally {
     await page.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=fresh invitation fragments after code selection/logout and explicit recovery from rejected cached credentials; fails_when=a stale cache traps registration or changing the hash needs a reload; why_new=same-document authentication transitions had no browser acceptance coverage; seam=none; no_claim=does not establish cross-origin storage propagation
+test('fresh invitation fragments recover code selection, logout and rejected caches', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.goto(server.guestUrl);
+    const documentStarted = await page.evaluate(() => performance.timeOrigin);
+    await page.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+    await expect(page.getByLabel('Код профиля')).toBeVisible();
+    const inviteHash = new URL(server.guestUrl).hash;
+    await page.evaluate(() => {
+      location.hash = '';
+    });
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, inviteHash);
+    await expect(page.getByLabel('Ваше имя')).toBeVisible();
+    await page.getByLabel('Ваше имя').fill('Первый фрагмент');
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
+    await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+    const original = await savedProfile(page);
+    await page.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await page.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await expect(page.getByLabel('Код профиля')).toBeVisible();
+    expect(await savedProfile(page)).toBeNull();
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, inviteHash);
+    await expect(page.getByLabel('Ваше имя')).toBeVisible();
+    expect(await page.evaluate(() => performance.timeOrigin)).toBe(documentStarted);
+    // A well-formed but unknown code and an already claimed legacy ID both need an explicit escape.
+    for (const { cached, error } of [
+      {
+        cached: { ...original, profileToken: '0'.repeat(32) },
+        error: 'Неверный код профиля.',
+      },
+      {
+        cached: { profileId: original.profileId, nick: original.nick, color: original.color },
+        error: 'Этот профиль уже зарегистрирован. Войдите по коду профиля на главной странице.',
+      },
+    ]) {
+      await page.evaluate((value) => {
+        localStorage.setItem(`geoaissr:profile:${location.origin}`, JSON.stringify(value));
+      }, cached);
+      await page.reload();
+      await expect(page.getByLabel('Код профиля')).toBeVisible();
+      await expect(page.getByRole('alert')).toHaveText(error);
+      await page.getByRole('button', { name: 'Выйти', exact: true }).click();
+      expect(await savedProfile(page)).toBeNull();
+      await page.evaluate((hash) => {
+        location.hash = hash;
+      }, inviteHash);
+      await expect(page.getByLabel('Ваше имя')).toBeVisible();
+    }
+    await page.getByLabel('Ваше имя').fill('Свежий профиль');
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
+    await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+    expect((await savedProfile(page)).profileId).not.toBe(original.profileId);
+    expect(registry(server.dataDir)).toHaveLength(2);
+  } finally {
+    await context.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=initial code notice for a midmatch spectator and read-only Enter without a profile update; fails_when=late registration hides its recovery code or Enter emits update_profile/shows an update error; why_new=all-phase registration and read-only form submission lacked browser acceptance; seam=none; no_claim=fake maps do not establish external map behavior
+test('midmatch spectators see their initial code and read-only Enter sends no update', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer({ rounds: 1 });
+  const host = await browser.newPage();
+  const spectator = await browser.newPage();
+  const updates: string[] = [];
+  spectator.on('websocket', (socket) => {
+    socket.on('framesent', ({ payload }) => {
+      if (String(payload).includes('update_profile')) updates.push(String(payload));
+    });
+  });
+  try {
+    await join(host, server.hostUrl, 'Ведущий');
+    await host.getByRole('button', { name: 'Начать', exact: true }).click();
+    await expect(host.getByTestId('fake-guess-map')).toBeVisible({ timeout: 12_000 });
+    await spectator.goto(server.guestUrl);
+    await spectator.getByLabel('Ваше имя').fill('Поздний наблюдатель');
+    await spectator.getByRole('button', { name: 'Смотреть раунд', exact: true }).click();
+    await expect(spectator.getByText(/Сохраните код профиля/)).toBeVisible();
+    const code = await codeOf(spectator);
+    await spectator.getByRole('button', { name: 'Показать код', exact: true }).click();
+    const dialog = spectator.getByRole('dialog');
+    await expect(dialog.getByLabel('Код профиля')).toHaveValue(
+      Array.from({ length: 8 }, (_, i) => code.slice(i * 4, i * 4 + 4)).join('-'),
+    );
+    await expect(dialog.getByLabel('Имя', { exact: true })).toHaveCount(0);
+    await dialog.getByLabel('Код профиля').press('Enter');
+    await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await spectator.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await expect(spectator.getByRole('dialog').getByRole('alert')).toHaveCount(0);
+    expect(updates).toEqual([]);
+    expect((await savedProfile(spectator)).profileToken).toBe(code);
+  } finally {
+    await host.close();
+    await spectator.close();
     await server.stop();
   }
 });

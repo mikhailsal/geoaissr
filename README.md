@@ -89,11 +89,11 @@ The [bot tool and accounting reference](docs/bot-tools.md) describes draft/final
 
 ## Profiles and recent wins
 
-Your browser remembers your name, color and a profile UUID, and automatically joins when its previous session cannot be restored. If the name or color is occupied, choose another on the prefilled join form. Use **«Изменить профиль»** in the lobby or final results to edit your profile; editing is unavailable during a match.
+Your browser remembers your profile and permanent code and automatically signs you in on later visits. Names and colors may coincide with other participants. Use **«Профиль»** in the lobby or final results to edit your name and color; editing is unavailable during a match.
 
 The trophy beside each avatar counts wins from the last six hours. Only complete matches with exactly one first-place finisher count; ties and early finishes do not. Human wins follow the profile UUID, and AI wins follow the bot slot even after a rename. The host can reset an individual bot's count in the lobby or final results. Matches and reset timestamps persist on the server; a storage error is reported in the room.
 
-Profiles belong to one browser and origin. A new Quick Tunnel hostname, browser, or cleared site storage creates a separate profile; use a stable `--public-url` to retain it across tunnel restarts. Profile IDs identify statistics, while session secrets control seat restoration.
+Browser storage remains origin-specific. On a new hostname, browser, or cleared site storage, enter your permanent profile code on the homepage to restore the same identity. See [Permanent profile codes](#permanent-profile-codes) for login, logout, and recovery details.
 
 ## Keyboard controls and accessibility
 

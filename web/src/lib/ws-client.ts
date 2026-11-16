@@ -184,6 +184,7 @@ export class GeoWsClient {
     this.profileToken = null;
     this.wasAuthenticatedOnce = false;
     clearStoredSessionToken();
+    this.attachBrowserListeners();
     this.callbacks.onNoToken();
   }
 

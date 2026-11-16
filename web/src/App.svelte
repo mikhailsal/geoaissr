@@ -39,7 +39,8 @@
     store.destroy();
   });
   const view = $derived(store.view);
-  const inGamePhase = $derived(store.joined && view !== null);
+  const hasProfile = $derived(store.joined && view !== null);
+  const inGamePhase = $derived(hasProfile && store.authState !== 'error');
   const roundRemainingMs = $derived(view?.active ? store.remainingMs(view.active.endsAt) : 0);
   const countdownStartsAt = $derived(view?.loading?.countdownStartsAt ?? null);
   const countdownSeconds = $derived(
@@ -130,18 +131,10 @@
 </script>
 
 <div class="app-shell">
-  {#if inGamePhase && store.authError === 'replaced_tab'}
-    <p class="session-error panel" role="alert">
-      Открыта новая вкладка с вашим профилем. Для выхода откройте «Профиль».
-    </p>
-  {/if}
-  {#if inGamePhase}<button type="button" class="btn owner-menu" onclick={openProfile}
+  {#if hasProfile && !inGamePhase}<button type="button" class="btn owner-menu" onclick={openProfile}
       >Профиль</button
     >{/if}
-  {#if store.showCodeNotice && inGamePhase && (view?.phase === 'LOBBY' || view?.phase === 'FINAL')}<div
-      class="save-code-notice panel"
-      role="status"
-    >
+  {#if store.showCodeNotice && inGamePhase}<div class="save-code-notice panel" role="status">
       <p>
         Сохраните код профиля. Он нужен для входа с другого устройства или по новому адресу сервера.
       </p>
@@ -175,6 +168,10 @@
       joinPending={store.joinPending}
       joinError={store.joinError}
       savedProfile={store.profile.saved}
+      sessionActive={hasProfile}
+      onLogout={() => {
+        store.logout();
+      }}
       onRetry={handleRetryConnect}
       onLogin={(code: string) => {
         store.login(code);
@@ -207,6 +204,7 @@
   {:else if view.phase === 'ROUND_LOADING' || view.phase === 'ROUND_ACTIVE'}
     <Round
       {view}
+      onEditProfile={openProfile}
       browserMapsKey={store.browserMapsKey}
       localPin={store.localPin}
       submittingGuess={store.submittingGuess}
@@ -225,6 +223,7 @@
   {:else if view.phase === 'ROUND_RESULTS'}
     <RoundResults
       {view}
+      onEditProfile={openProfile}
       browserMapsKey={store.browserMapsKey}
       activeBotCard={store.activeBotCard}
       onSelectBotCard={handleSelectBotCard}
@@ -253,7 +252,7 @@
       name={me.name}
       color={me.color}
       profileToken={store.profile.saved?.profileToken}
-      editable={view.phase === 'LOBBY' || view.phase === 'FINAL'}
+      editable={inGamePhase && (view.phase === 'LOBBY' || view.phase === 'FINAL')}
       onLogout={() => {
         editingProfile = false;
         store.logout();
@@ -268,19 +267,8 @@
 {/if}
 
 <style>
-  .session-error {
-    position: fixed;
-    top: 1rem;
-    left: 1rem;
-    z-index: 100;
-    max-width: 400px;
-    padding: var(--sp-3);
-  }
   .owner-menu {
-    position: fixed;
-    right: var(--sp-3);
-    bottom: var(--sp-3);
-    z-index: 85;
+    margin: var(--sp-3);
   }
   .save-code-notice {
     width: min(560px, calc(100% - 2rem));

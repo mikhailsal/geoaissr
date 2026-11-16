@@ -385,6 +385,71 @@ test('legacy opaque ID enrolls once and bound seat secret keeps authoritative ID
     rmSync(dir, { recursive: true, force: true });
   }
 });
+// protects=legacy host seats enroll only with host authority and retain their authoritative ID;
+// fails_when=guest invitation creates an unusable guest credential for a host or mutates rejected seats;
+// why_new=legacy hosts without a registry entry exercise the new permanent-code enrollment gap;
+// seam=none; no_claim=local WS and isolated files, not public network or production credentials.
+test('legacy host enrollment rejects guest authority before persistence and accepts host invitation', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  try {
+    const unrelated = f.profiles.create({ nick: 'Other', color: 'p-2', role: 'guest' });
+    const file = path.join(dir, 'profiles.json');
+    const registryBefore = readFileSync(file, 'utf8');
+    for (const bound of [false, true]) {
+      const playerId = `legacy-host-${bound}`;
+      const profileId = `authoritative-host-${bound}`;
+      f.shell.dispatch({
+        type: 'player_join',
+        playerId,
+        secret: 'test',
+        name: 'Legacy host',
+        color: 'p-1',
+        isHost: true,
+        profileId: bound ? profileId : undefined,
+      });
+      const before = structuredClone(f.shell.getState().players[playerId]);
+      const rejected = await connect(f.url);
+      rejected.send({
+        type: 'hello',
+        token: 'guest',
+        playerId,
+        playerSecret: 'test',
+        profileId: bound ? 'submitted-different-ID' : profileId,
+      });
+      expect((await rejected.next('profile_login_error')).code).toBe('profile_store_unavailable');
+      expect(await rejected.closeCode()).toBe(4003);
+      expect(f.shell.getState().players[playerId]).toEqual(before);
+      expect(readFileSync(file, 'utf8') === registryBefore).toBe(true);
+    }
+    const accepted = await connect(f.url);
+    accepted.send({
+      type: 'hello',
+      token: 'host',
+      playerId: 'legacy-host-true',
+      playerSecret: 'test',
+      profileId: 'submitted-different-ID',
+    });
+    const hello = await accepted.next('hello_ok');
+    expect(hello.role).toBe('host');
+    expect(hello.profile?.profileId).toBe('authoritative-host-true');
+    expect(f.profiles.getById('submitted-different-ID')).toBeUndefined();
+    expect(f.profiles.getById(unrelated.profileId)?.profileToken === unrelated.profileToken).toBe(
+      true,
+    );
+    const persisted = new ProfileStore(file).getById('authoritative-host-true');
+    expect(persisted?.role).toBe('host');
+    if (!persisted) throw new Error('host profile missing');
+    const returned = await login(f, persisted);
+    expect(returned.ok.playerId).toBe('legacy-host-true');
+    expect(returned.ok.profile.role).toBe('host');
+    returned.c.socket.close();
+    accepted.socket.close();
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 // I8 protects: both auth paths retain one-shot authentication and failure limits;
 // fails_when: profile login permits identity switching or bypasses accounting;
 // no_claim: local server/WS and isolated files with fake dependencies; not a public tunnel or paid model.

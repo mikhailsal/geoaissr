@@ -133,6 +133,7 @@ export class GameStore extends GameCommands {
       },
       onHashToken: () => {
         this.resetForHashToken();
+        if (this.clockTimer === null) this.startRuntime();
       },
       onSocketConnecting: () => {
         if (this.connectionState !== 'reconnecting') this.connectionState = 'connecting';
@@ -161,16 +162,12 @@ export class GameStore extends GameCommands {
       onPong: (serverNow, clientNow) => {
         this.clock.recordPong(serverNow, clientNow, Date.now());
       },
-      onHelloOk: (msg) => {
-        this.handleHelloOk(msg);
-      },
+      onHelloOk: this.handleHelloOk.bind(this),
       onHelloError: (msg) => {
         this.clearTransientPending();
         this.applyHelloError(msg.code);
       },
-      onProfileLoginOk: (msg) => {
-        this.handleProfileLoginOk(msg);
-      },
+      onProfileLoginOk: this.handleProfileLoginOk.bind(this),
       onProfileLoginError: (msg) => {
         this.authState = 'error';
         this.authError = msg.code;
@@ -360,15 +357,16 @@ export class GameStore extends GameCommands {
     this.showCodeNotice = false;
     if (notify) {
       try {
-        window.localStorage.setItem(logoutStorageKey(), crypto.randomUUID());
+        window.localStorage.setItem(logoutStorageKey(), `${Date.now()}-${Math.random()}`);
       } catch {
         /* unavailable */
       }
     }
     window.addEventListener('storage', this.handleStorage);
+    this.wsClient.start();
   }
 
-  connect(): void {
+  private startRuntime(): void {
     window.addEventListener('storage', this.handleStorage);
     this.unsubMapsAuth?.();
     this.unsubMapsAuth = subscribeMapsAuthFailure((msg) => {
@@ -382,6 +380,10 @@ export class GameStore extends GameCommands {
     this.clockTimer = window.setInterval(() => {
       this.clockTick += 1;
     }, 250);
+  }
+
+  connect(): void {
+    this.startRuntime();
     this.wsClient.start();
   }
 

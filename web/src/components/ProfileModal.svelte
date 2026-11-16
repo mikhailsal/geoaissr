@@ -49,7 +49,7 @@
   <form
     onsubmit={(e) => {
       e.preventDefault();
-      onSave(nick.trim(), selected);
+      if (editable) onSave(nick.trim(), selected);
     }}
   >
     <h2 id="profile-title">Профиль</h2>
@@ -173,7 +173,7 @@
     justify-content: flex-end;
     gap: var(--sp-2);
   }
-  p {
+  p[role='alert'] {
     color: var(--signal);
   }
 </style>

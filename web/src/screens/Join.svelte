@@ -17,6 +17,8 @@
     joinPending: boolean;
     joinError: { code: string; message: string } | null;
     savedProfile: SavedUserProfile | null;
+    sessionActive: boolean;
+    onLogout: () => void;
     onRetry: () => void;
     onLogin: (code: string) => void;
     onCodeLogin: () => void;
@@ -31,6 +33,8 @@
     joinPending,
     joinError,
     savedProfile,
+    sessionActive,
+    onLogout,
     onRetry,
     onLogin,
     onCodeLogin,
@@ -44,7 +48,9 @@
   let nickInput = $state<HTMLInputElement | null>(null);
 
   let profileCode = $state('');
-  const loginMode = $derived(authState === 'error' && authError !== 'replaced_tab');
+  const loginMode = $derived(
+    authState === 'error' && authError !== 'replaced_tab' && !sessionActive,
+  );
   const isMidMatch = $derived(lobbySummary !== null && lobbySummary.phase !== 'LOBBY');
   const disconnectedNames = $derived(lobbySummary?.disconnected ?? []);
   const trimNick = $derived(nick.trim());
@@ -111,10 +117,10 @@
       <InlineState variant="loading" message={RU.join.checkingLink} />
     {:else if loginMode}
       <h2>Войти по коду</h2>
+      {#if savedProfile}<button class="btn" onclick={onLogout}>Выйти</button>{/if}
       {#if joinError}<p role="alert">{joinError.message}</p>{/if}
       <p>Введите сохранённый код профиля. Для нового профиля нужна ссылка приглашения.</p>
       {#if authErrorText}<p class="err-msg" role="alert">{authErrorText}</p>{/if}
-      {#if joinError}<p class="notice">{joinError.message}</p>{/if}
       <form
         class="join-form"
         onsubmit={(event) => {
@@ -147,8 +153,12 @@
       <InlineState
         variant="error"
         message={authErrorText}
-        actionLabel={authError === 'unreachable' ? RU.join.retry : undefined}
-        onAction={authError === 'unreachable' ? onRetry : undefined}
+        actionLabel={['unreachable', 'profile_store_unavailable', 'room_full'].includes(
+          authError ?? '',
+        )
+          ? RU.join.retry
+          : undefined}
+        onAction={onRetry}
       />
     {:else}
       {#if lobbySummary}

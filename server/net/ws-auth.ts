@@ -203,7 +203,7 @@ export function handleHelloMsg(
       return;
     }
     profile = authoritativeId ? ctx.profiles.getById(authoritativeId) : undefined;
-    if (profile && existing.isHost && profile.role !== 'host') {
+    if (existing.isHost && (profile?.role ?? ws.data.role) !== 'host') {
       profileError(ws, 'profile_store_unavailable');
       return;
     }
