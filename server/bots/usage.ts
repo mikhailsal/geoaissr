@@ -28,8 +28,14 @@ function normalize(harness: HarnessId, raw: unknown): BotTokenUsage | undefined 
   const created = harness === 'claude' ? counter(u.cache_creation_input_tokens, true) : 0;
   if (input === undefined || output === undefined || cached === undefined || created === undefined)
     return undefined;
-  // AGY's consecutive official examples imply input excludes cache reads.
-  const normalized = harness === 'codex' ? input : input + cached + created;
+  let normalized = harness === 'codex' ? input : input + cached + created;
+  if (harness === 'agy') {
+    const reported = counter(u.total_tokens, cached === 0);
+    if (reported === undefined) return undefined;
+    if (u.total_tokens === undefined && cached === 0) normalized = input;
+    else if (reported === input + output && cached <= input) normalized = input;
+    else if (reported !== input + cached + output) return undefined;
+  }
   const total = normalized + output;
   if (!Number.isSafeInteger(total) || cached > normalized) return undefined;
   return {
