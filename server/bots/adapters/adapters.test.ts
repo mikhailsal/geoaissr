@@ -301,3 +301,78 @@ test('round prompt describes checkpoints, exploration and image delivery', () =>
   expect(mcp).toContain('прямо в ответе MCP');
   expect(file).toContain('прочитай их через read_file');
 });
+
+test('agy audit caps the journal and records truncation without denying a permitted call', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-agy-audit-cap-'));
+  try {
+    const spec = getHarnessAdapter('agy').buildLaunchSpec({
+      workDir: dir,
+      model: 'gemini-3.8-flash-low',
+      effort: 'low',
+      prompt: 'test',
+      apiUrl: 'http://127.0.0.1:9999',
+      botToken: 'tok-1',
+      moveEnabled: true,
+    });
+    const audit = agyToolAuditPath(spec.cwd);
+    writeFileSync(audit, 'x'.repeat(256 * 1024 - 1));
+    const guard = path.join(spec.cwd, '.agents', 'plugins', 'geo', 'guard.ts');
+    expect(runAgyGuard(guard, { name: 'mcp_geo_geo_observe', args: {} })).toBe('allow');
+    expect(readFileSync(audit).length).toBeLessThanOrEqual(256 * 1024);
+    expect(existsSync(`${audit}.truncated`)).toBe(true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agy audit bounds concurrent writes and preserves decisions with a stale lock', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-agy-audit-parallel-'));
+  try {
+    const spec = getHarnessAdapter('agy').buildLaunchSpec({
+      workDir: dir,
+      model: 'gemini-3.8-flash-low',
+      effort: 'low',
+      prompt: 'test',
+      apiUrl: 'http://127.0.0.1:9999',
+      botToken: 'tok-1',
+      moveEnabled: true,
+    });
+    const audit = agyToolAuditPath(spec.cwd);
+    const guard = path.join(spec.cwd, '.agents', 'plugins', 'geo', 'guard.ts');
+    const prefix = 'x'.repeat(256 * 1024 - 240) + '\n';
+    writeFileSync(audit, prefix);
+    const children = Array.from({ length: 4 }, () =>
+      Bun.spawn([process.execPath, 'run', guard], {
+        stdin: new TextEncoder().encode(
+          JSON.stringify({ toolCall: { name: 'mcp_geo_geo_observe', args: {} } }),
+        ),
+        stdout: 'pipe',
+        stderr: 'pipe',
+      }),
+    );
+    const outputs = await Promise.all(
+      children.map(async (child) => {
+        const out = await new Response(child.stdout).text();
+        expect(await child.exited).toBe(0);
+        return (JSON.parse(out) as { decision: string }).decision;
+      }),
+    );
+    expect(outputs).toEqual(['allow', 'allow', 'allow', 'allow']);
+    const text = readFileSync(audit, 'utf8');
+    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(256 * 1024);
+    const lines = text.slice(prefix.length).trim().split('\n').filter(Boolean);
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.length).toBeLessThan(4);
+    for (const line of lines)
+      expect(JSON.parse(line)).toMatchObject({ tool: 'mcp_geo_geo_observe', decision: 'allow' });
+    expect(existsSync(`${audit}.truncated`)).toBe(true);
+    rmSync(`${audit}.truncated`);
+    writeFileSync(`${audit}.lock`, 'stale');
+    expect(runAgyGuard(guard, { name: 'mcp_geo_geo_observe', args: {} })).toBe('allow');
+    expect(runAgyGuard(guard, { name: 'run_command', args: {} })).toBe('deny');
+    expect(existsSync(`${audit}.truncated`)).toBe(true);
+    expect(readFileSync(`${audit}.lock`, 'utf8')).toBe('stale');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

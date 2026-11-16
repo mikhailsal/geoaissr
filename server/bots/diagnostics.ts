@@ -1,4 +1,4 @@
-import { closeSync, constants, fstatSync, openSync, readSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, openSync, readSync } from 'node:fs';
 import type { LogEventType, ServerLogger } from '../log.ts';
 import { agyToolAuditPath } from './adapters/agy.ts';
 
@@ -10,7 +10,7 @@ function boundedData(logger: ServerLogger, data: Record<string, unknown>): Recor
   let remaining = 16_384;
   const seen = new WeakSet<object>();
   const visit = (value: unknown, depth: number): unknown => {
-    if (remaining <= 0 || depth > 6) return OMITTED;
+    if (remaining <= 8 || depth > 6) return OMITTED;
     remaining -= 8;
     if (typeof value === 'string') {
       if (/data:image\/[^;]+;base64,/i.test(value)) return OMITTED;
@@ -33,7 +33,9 @@ function boundedData(logger: ServerLogger, data: Record<string, unknown>): Recor
     }
     return out;
   };
-  return visit(data, 0) as Record<string, unknown>;
+  // Preserve outcomes and correlation fields before spending the remainder on model arguments.
+  const { args, ...metadata } = data;
+  return visit({ ...metadata, ...('args' in data ? { args } : {}) }, 0) as Record<string, unknown>;
 }
 
 /** Diagnostic I/O is optional and must never change a tool result or bot lifecycle. */
@@ -76,6 +78,7 @@ export function logAgyToolAttempts(
 ): void {
   if (!logger) return;
   let fd: number | undefined;
+  const marker = existsSync(`${agyToolAuditPath(workDir)}.truncated`);
   try {
     fd = openSync(agyToolAuditPath(workDir), constants.O_RDONLY | constants.O_NOFOLLOW);
     if (!fstatSync(fd).isFile()) throw new Error('Tool audit is not a regular file');
@@ -96,7 +99,7 @@ export function logAgyToolAttempts(
         invalidRecords++;
       }
     }
-    const truncated = size === buffer.length || lines.length > 513;
+    const truncated = marker || size === buffer.length || lines.length > 513;
     if (truncated || invalidRecords)
       logBotDiagnostic(logger, 'harness_monitor_error', {
         ...identity,
@@ -105,7 +108,14 @@ export function logAgyToolAttempts(
         truncated,
       });
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT')
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT' && marker)
+      logBotDiagnostic(logger, 'harness_monitor_error', {
+        ...identity,
+        phase: 'tool-audit',
+        invalidRecords: 0,
+        truncated: true,
+      });
+    else if ((err as NodeJS.ErrnoException).code !== 'ENOENT')
       logBotDiagnostic(logger, 'harness_monitor_error', {
         ...identity,
         phase: 'tool-audit',

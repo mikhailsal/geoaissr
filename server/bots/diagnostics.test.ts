@@ -57,6 +57,49 @@ test('diagnostic redaction and log-write failures do not escape', () => {
   }
 });
 
+// Value: protects=untrusted arguments cannot hide outcomes or escape the diagnostic size bound; fails_when=argument data consumes metadata or a near-empty budget permits a large tail; why_new=previous bounds test used one long field; seam=none; no_claim=provider responses.
+test('preserves outcomes and bounds strings at every near-exhausted argument budget', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-audit-budget-'));
+  let record: Record<string, unknown> = {};
+  let largest = 0;
+  let missingOutcomes = 0;
+  const logger = {
+    ...createServerLogger(dir),
+    log: (_event: string, data: Record<string, unknown>) => {
+      record = data;
+    },
+  };
+  try {
+    for (let padding = 3800; padding < 4100; padding++) {
+      logBotDiagnostic(logger, 'bot_tool_call', {
+        args: {
+          first: 'x'.repeat(4096),
+          second: 'y'.repeat(4096),
+          third: 'z'.repeat(4096),
+          padding: 'p'.repeat(padding),
+          tail: 'q'.repeat(100_000),
+        },
+        durationMs: 7,
+        checkpointSaved: true,
+        result: { isError: true, text: 'Correct the final answer' },
+        ok: false,
+      });
+      largest = Math.max(largest, JSON.stringify(record).length);
+      if (
+        record.ok !== false ||
+        record.durationMs !== 7 ||
+        record.checkpointSaved !== true ||
+        !(record.result as { isError?: boolean } | undefined)?.isError
+      )
+        missingOutcomes++;
+    }
+    expect(largest).toBeLessThan(24_000);
+    expect(missingOutcomes).toBe(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // Value: protects=AGY permission attempts remain reconstructable without trusting journal payloads; fails_when=invalid records or arbitrary file content enter logs; why_new=adapter tests stop before journal ingestion; seam=none; no_claim=tool execution success.
 test('copies validated AGY attempts while reporting malformed and excessive journals', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-agy-journal-'));
@@ -121,6 +164,33 @@ test('journal ingestion rejects symlink files and accepts a missing journal', ()
       data: { slotId: 'bot', phase: 'tool-audit' },
     });
     expect(JSON.stringify(rows)).not.toContain('PRIVATE_BYTES');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('reports the truncation marker with a short or missing audit journal', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-agy-marker-'));
+  try {
+    const logger = createServerLogger(path.join(dir, 'logs'));
+    const file = agyToolAuditPath(dir);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(`${file}.truncated`, 'DO_NOT_COPY');
+    logAgyToolAttempts(logger, dir, { slotId: 'bot' });
+    writeFileSync(
+      file,
+      JSON.stringify({ ts: new Date().toISOString(), tool: 'read_file', decision: 'allow' }) + '\n',
+    );
+    logAgyToolAttempts(logger, dir, { slotId: 'bot' });
+    const rows = readLogs(logger.getLogsDir());
+    expect(rows.filter((r) => r.event === 'harness_monitor_error')).toHaveLength(2);
+    expect(
+      rows
+        .filter((r) => r.event === 'harness_monitor_error')
+        .every((r) => r.data.truncated === true),
+    ).toBe(true);
+    expect(rows.filter((r) => r.event === 'harness_tool_call')).toHaveLength(1);
+    expect(JSON.stringify(rows)).not.toContain('DO_NOT_COPY');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

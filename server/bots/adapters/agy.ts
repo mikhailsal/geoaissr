@@ -49,10 +49,32 @@ export function agyToolAuditPath(workDir: string): string {
   return path.join(workDir, '.agents', 'plugins', 'geo', 'tool-audit.jsonl');
 }
 
+function buildAgyAuditLines(): string[] {
+  return [
+    `const markTruncated = () => { try { writeFileSync(auditPath + '.truncated', '1', { flag: 'wx', mode: 0o600 }); } catch {} };`,
+    `let lock: number | undefined;`,
+    `try {`,
+    `  for (let i = 0; i < 10; i++) {`,
+    `    try { lock = openSync(auditPath + '.lock', 'wx', 0o600); break; }`,
+    `    catch (err) { if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err; await Bun.sleep(5); }`,
+    `  }`,
+    `  if (lock === undefined) { markTruncated(); } else {`,
+    `    const line = JSON.stringify({ ts: new Date().toISOString(), tool: safeName(n) || 'unknown', decision: allow ? 'allow' : 'deny', ...(auditFile && { file: auditFile }), ...(auditServer && { server: auditServer }), ...(auditMcpTool && { mcpTool: auditMcpTool }) }) + '\\n';`,
+    `    let size = 0;`,
+    `    try { size = statSync(auditPath).size; } catch (err) { if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err; }`,
+    `    if (size + Buffer.byteLength(line) > 256 * 1024) markTruncated();`,
+    `    else appendFileSync(auditPath, line, { mode: 0o600 });`,
+    `  }`,
+    `} catch { markTruncated(); } finally {`,
+    `  if (lock !== undefined) { try { closeSync(lock); } catch {} try { unlinkSync(auditPath + '.lock'); } catch {} }`,
+    `}`,
+  ];
+}
+
 function buildAgyGuardScript(realWorkDir: string): string {
   return [
     `import path from 'node:path';`,
-    `import { appendFileSync, existsSync, realpathSync } from 'node:fs';`,
+    `import { appendFileSync, closeSync, existsSync, openSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';`,
     `const wd = ${JSON.stringify(realWorkDir)};`,
     `const auditPath = ${JSON.stringify(agyToolAuditPath(realWorkDir))};`,
     `let allow = false;`,
@@ -86,9 +108,7 @@ function buildAgyGuardScript(realWorkDir: string): string {
     `    }`,
     `  }`,
     `} catch { allow = false; }`,
-    `try {`,
-    `  appendFileSync(auditPath, JSON.stringify({ ts: new Date().toISOString(), tool: safeName(n) || 'unknown', decision: allow ? 'allow' : 'deny', ...(auditFile && { file: auditFile }), ...(auditServer && { server: auditServer }), ...(auditMcpTool && { mcpTool: auditMcpTool }) }) + '\\n', { mode: 0o600 });`,
-    `} catch { /* Audit failures must not change the permission decision. */ }`,
+    ...buildAgyAuditLines(),
     `console.log(JSON.stringify(allow ? { decision: 'allow' } : { decision: 'deny', reason: 'geo_geo only (' + n + ')' }));`,
   ].join('\n');
 }
