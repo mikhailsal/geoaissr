@@ -44,12 +44,29 @@ test('spawnManaged stops entire detached process group including forked children
   }
 });
 
+// Value: protects=orphan cleanup verifies PID, start time and command on a ready child;
+// fails_when=either identity guard is removed or a matching orphan is not killed;
+// why_new=the old fixture raced exec and omitted the start-time mismatch; seam=none;
+// no_claim=Linux process identity behavior, not every operating system.
 test('cleanupOrphanedChildren verifies 3 fields and ignores mismatched startTime/command', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-proc-orphan-'));
+  const sleeper = Bun.spawn(
+    [process.execPath, '-e', "process.stdout.write('ready\\n'); setInterval(() => {}, 1000)"],
+    { stdout: 'pipe', stderr: 'ignore' },
+  );
   try {
     const childrenFile = path.join(dir, 'children.json');
-    const sleeper = Bun.spawn(['sleep', '30'], { stdout: 'ignore', stderr: 'ignore' });
-    const sleeperStart = getProcessStartTime(sleeper.pid) ?? 'unknown';
+    // Bun.spawn can return before exec; the child itself must establish readiness.
+    const reader = sleeper.stdout.getReader();
+    try {
+      const { value } = await reader.read();
+      expect(new TextDecoder().decode(value)).toBe('ready\n');
+    } finally {
+      reader.releaseLock();
+    }
+    const sleeperStart = getProcessStartTime(sleeper.pid);
+    expect(sleeperStart).not.toBeNull();
+    if (sleeperStart === null) throw new Error('Ready child has no process start time');
 
     // Mismatched command must NOT kill sleeper
     writeChildrenRegistry(childrenFile, [
@@ -59,15 +76,30 @@ test('cleanupOrphanedChildren verifies 3 fields and ignores mismatched startTime
     expect(killedMismatch).toHaveLength(0);
     expect(isProcessAlive(sleeper.pid)).toBe(true);
 
+    // Mismatched start time must also leave the same live child alone.
+    writeChildrenRegistry(childrenFile, [
+      {
+        pid: sleeper.pid,
+        startTime: `${sleeperStart}-different`,
+        command: process.execPath,
+        kind: 'fake',
+      },
+    ]);
+    const killedStartMismatch = await cleanupOrphanedChildren(childrenFile);
+    expect(killedStartMismatch).toHaveLength(0);
+    expect(isProcessAlive(sleeper.pid)).toBe(true);
+
     // Exact match (pid + startTime + command) kills orphan
     writeChildrenRegistry(childrenFile, [
-      { pid: sleeper.pid, startTime: sleeperStart, command: 'sleep', kind: 'fake' },
+      { pid: sleeper.pid, startTime: sleeperStart, command: process.execPath, kind: 'fake' },
     ]);
     const killedMatch = await cleanupOrphanedChildren(childrenFile);
     expect(killedMatch).toHaveLength(1);
-    await Bun.sleep(100);
+    await sleeper.exited;
     expect(isProcessAlive(sleeper.pid)).toBe(false);
   } finally {
+    sleeper.kill();
+    await sleeper.exited;
     rmSync(dir, { recursive: true, force: true });
   }
 });
