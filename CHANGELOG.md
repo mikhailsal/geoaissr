@@ -2,6 +2,27 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.2.1] - 2026-11-16
+
+### Added
+
+- Retain redacted bot usage counters, normalized totals, reference price estimates, and game-tool outcomes in daily application logs.
+- Record bounded AGY tool and file-read attempts before bot workspace cleanup.
+- Document the observed AGY vision-bridge image offload and its verification limits.
+
+### Changed
+
+- Display enlarged bot snapshots in an accessible dialog that stays within the viewport.
+- Show quota usage as meters and reference API prices with three decimal places.
+
+### Fixed
+
+- Prefetch full bot snapshots and keep the loaded thumbnail visible while an image loads or fails.
+- Reset human panorama zoom at the start of each round while preserving camera changes within the same round.
+- Use reported AGY totals to count cached input once and leave ambiguous usage unavailable.
+- Require facts, a conclusion, and an explicit rejected-alternatives list for game finals while preserving drafts and legacy tool compatibility.
+- Keep bot deadline instructions consistent with the remaining round budget.
+
 ## [0.2.0] - 2026-11-16
 
 ### Added
