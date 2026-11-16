@@ -76,9 +76,10 @@ export function saveProfile(profile: SavedUserProfile): void {
     /* Page-session cache remains available. */
   }
 }
-export function clearProfile(): void {
+export function clearProfile(clearShared = true): void {
   memoryProfile = null;
   temporaryId = null;
+  if (!clearShared) return;
   try {
     window.localStorage.removeItem(profileStorageKey());
   } catch {

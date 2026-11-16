@@ -623,3 +623,135 @@ test('midmatch spectators see their initial code and read-only Enter sends no up
     await server.stop();
   }
 });
+
+// Value: protects=manual code recovery after an unjoined invitation expires during reconnect; fails_when=an earlier hello_ok leaves code login checking forever or requests a new name; why_new=existing restart coverage only reconnects registered profiles; seam=none; no_claim=fake server does not establish real tunnel behavior
+test('expired unjoined invitation reconnect accepts an existing profile code', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const existingContext = await browser.newContext();
+  const newcomerContext = await browser.newContext();
+  const existing = await existingContext.newPage();
+  const newcomer = await newcomerContext.newPage();
+  try {
+    await join(existing, server.hostUrl, 'Профиль Б');
+    const code = await codeOf(existing);
+    const before = await savedProfile(existing);
+    const invitation = server.guestUrl;
+    await newcomer.goto(invitation);
+    // This form is shown only after hello_ok; the invited visitor has no registered seat yet.
+    await expect(newcomer.getByLabel('Ваше имя')).toBeVisible();
+    expect(await savedProfile(newcomer)).toBeNull();
+    await existing.close();
+    await server.restart();
+    expect(server.guestUrl === invitation).toBe(false);
+    await expect(newcomer.getByLabel('Код профиля')).toBeVisible();
+    await newcomer.getByLabel('Код профиля').fill(code);
+    await newcomer.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+    await expect(newcomer.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
+    await expect(newcomer.getByLabel('Ваше имя')).toHaveCount(0);
+    expect((await savedProfile(newcomer)).profileId === before.profileId).toBe(true);
+    expect((await savedProfile(newcomer)).profileToken === code).toBe(true);
+    await expect(newcomer.getByRole('button', { name: 'Начать', exact: true })).toBeVisible();
+    expect(registry(server.dataDir)).toHaveLength(1);
+  } finally {
+    await existingContext.close();
+    await newcomerContext.close();
+    await server.stop();
+  }
+});
+
+async function holdLogoutEvents(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const state = window as typeof window & {
+      heldLogout?: StorageEvent;
+      holdLogout?: (event: StorageEvent) => void;
+    };
+    state.holdLogout = (event: StorageEvent) => {
+      if (event.key !== `geoaissr:logout:${location.origin}`) return;
+      event.stopImmediatePropagation();
+      state.heldLogout = event;
+    };
+    window.addEventListener('storage', state.holdLogout, true);
+  });
+}
+
+// Value: protects=newly saved profile and seat credentials when a real same-origin logout event arrives late; fails_when=the delayed event erases profile B or a reload cannot restore its seat; why_new=ordinary cross-tab logout coverage delivers the event before a subsequent login; seam=none; no_claim=browser-event scheduling fixture does not establish cross-origin logout propagation
+test('delayed same-origin logout preserves a newer profile and seat credentials', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const sharedContext = await browser.newContext();
+  const otherContext = await browser.newContext();
+  const first = await sharedContext.newPage();
+  const other = await otherContext.newPage();
+  const oldTab = await sharedContext.newPage();
+  try {
+    await join(first, server.hostUrl, 'Профиль А');
+    await join(other, server.guestUrl, 'Профиль Б');
+    const otherCode = await codeOf(other);
+    const otherProfile = await savedProfile(other);
+    await holdLogoutEvents(oldTab);
+    await oldTab.goto(server.baseUrl);
+    await expect(oldTab.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await first.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await first.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await expect(first.getByLabel('Код профиля')).toBeVisible();
+    await expect
+      .poll(() =>
+        oldTab.evaluate(() =>
+          Boolean((window as typeof window & { heldLogout?: StorageEvent }).heldLogout),
+        ),
+      )
+      .toBe(true);
+    await first.getByLabel('Код профиля').fill(otherCode);
+    await first.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+    await expect(first.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    expect((await savedProfile(first)).profileId === otherProfile.profileId).toBe(true);
+    const saved = await first.evaluate(() => ({
+      profile: localStorage.getItem(`geoaissr:profile:${location.origin}`),
+      player: localStorage.getItem(`geoaissr:player:${location.origin}`),
+    }));
+    expect(Boolean(saved.profile && saved.player)).toBe(true);
+    await oldTab.evaluate(() => {
+      const state = window as typeof window & {
+        heldLogout?: StorageEvent;
+        holdLogout?: (event: StorageEvent) => void;
+      };
+      if (!state.heldLogout || !state.holdLogout) throw new Error('Missing held logout event');
+      window.removeEventListener('storage', state.holdLogout, true);
+      const event = state.heldLogout;
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: event.key,
+          oldValue: event.oldValue,
+          newValue: event.newValue,
+          url: event.url,
+          storageArea: event.storageArea,
+        }),
+      );
+    });
+    await expect(oldTab.getByLabel('Код профиля')).toBeVisible();
+    expect(
+      await first.evaluate(
+        (before) => ({
+          profileUnchanged:
+            localStorage.getItem(`geoaissr:profile:${location.origin}`) === before.profile,
+          playerUnchanged:
+            localStorage.getItem(`geoaissr:player:${location.origin}`) === before.player,
+        }),
+        saved,
+      ),
+    ).toEqual({ profileUnchanged: true, playerUnchanged: true });
+    await first.reload();
+    await expect(first.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await expect(first.getByLabel('Ваше имя')).toHaveCount(0);
+    expect((await savedProfile(first)).profileId === otherProfile.profileId).toBe(true);
+    expect((await savedProfile(first)).profileToken === otherCode).toBe(true);
+    expect(registry(server.dataDir)).toHaveLength(2);
+  } finally {
+    await sharedContext.close();
+    await otherContext.close();
+    await server.stop();
+  }
+});

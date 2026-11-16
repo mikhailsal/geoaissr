@@ -335,9 +335,10 @@ export class GameStore extends GameCommands {
   }
 
   logout(notify = true): void {
-    this.wsClient.logout();
+    this.wsClient.logout(notify);
     this.destroy();
-    clearProfile();
+    // The originating tab already cleared shared storage before broadcasting.
+    clearProfile(notify);
     this.profile.reset();
     this.resetForHashToken();
     this.authState = 'error';
@@ -363,7 +364,7 @@ export class GameStore extends GameCommands {
       }
     }
     window.addEventListener('storage', this.handleStorage);
-    this.wsClient.start();
+    this.wsClient.useCodeLogin();
   }
 
   private startRuntime(): void {

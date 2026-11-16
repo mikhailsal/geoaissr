@@ -171,8 +171,9 @@ export class GeoWsClient {
   }
 
   login(raw: string): void {
-    if (this.wasAuthenticatedOnce) return;
+    if (this.wasAuthenticatedOnce && this.profileToken) return;
     this.close();
+    this.wasAuthenticatedOnce = false;
     this.token = null;
     this.profileToken = normalizeProfileToken(raw) ?? raw;
     this.retry();
@@ -188,14 +189,14 @@ export class GeoWsClient {
     this.callbacks.onNoToken();
   }
 
-  logout(): void {
+  logout(clearShared = true): void {
     this.close();
     this.token = null;
     this.profileToken = null;
     this.wasAuthenticatedOnce = false;
     this.pendingPinPayload = null;
     this.mapLoads.reset();
-    clearCreds();
+    if (clearShared) clearCreds();
     clearStoredSessionToken();
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }
