@@ -68,6 +68,7 @@
   <header class="top-bar">
     <h1 class="display-title brand">{RU.appName}</h1>
     <HostMenu
+      onOpenProfile={onEditProfile}
       fakeMode={view.fakeMode}
       viewerIsHost={view.viewerIsHost}
       phase={view.phase}

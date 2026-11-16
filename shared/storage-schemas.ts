@@ -189,3 +189,26 @@ export type HarnessVerifiedFile = z.infer<typeof harnessVerifiedFileSchema>;
 export function isValidImageSize(val: number): val is (typeof IMAGE_SIZES)[number] {
   return (IMAGE_SIZES as readonly number[]).includes(val);
 }
+
+export const storedProfileSchema = z.object({
+  profileId: z.string().min(1).max(64),
+  profileToken: z.string().regex(/^[0-9a-f]{32}$/),
+  nick: z.string().trim().min(1).max(20),
+  color: z.enum(PARTICIPANT_COLOR_IDS),
+  role: z.enum(['host', 'guest']),
+});
+export type StoredProfile = z.infer<typeof storedProfileSchema>;
+export type ProfileRole = StoredProfile['role'];
+export const profilesFileSchema = z
+  .object({
+    version: z.literal(1),
+    profiles: z.array(storedProfileSchema),
+  })
+  .superRefine((file, ctx) => {
+    for (const field of ['profileId', 'profileToken'] as const) {
+      if (new Set(file.profiles.map((p) => p[field])).size !== file.profiles.length) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Duplicate profile identity' });
+      }
+    }
+  });
+export type ProfilesFile = z.infer<typeof profilesFileSchema>;

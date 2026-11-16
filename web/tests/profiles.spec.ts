@@ -1,14 +1,23 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import type { ParticipantColorId } from '../../shared/colors';
 import type { BotSlotConfig, MatchRecord } from '../../shared/storage-schemas';
-import { assertAxeClean, assertNoHorizontalOverflow, startIsolatedFakeServer } from './helpers';
+import { assertAxeClean, startIsolatedFakeServer } from './helpers';
 
 const PROFILE_ID = 'a676dfca-4d53-4b64-83c4-aaf373546aa9';
-type Profile = { profileId: string; nick: string; color: ParticipantColorId };
+type Profile = {
+  profileId: string;
+  nick: string;
+  color: ParticipantColorId;
+  profileToken?: string;
+  version?: number;
+};
 
 async function seedProfile(context: BrowserContext, profile: Profile): Promise<void> {
   await context.addInitScript((value) => {
-    localStorage.setItem(`geoaissr:profile:${location.origin}`, JSON.stringify(value));
+    const key = `geoaissr:profile:${location.origin}`;
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(value));
   }, profile);
 }
 
@@ -27,10 +36,38 @@ async function join(page: Page, url: string, name: string): Promise<void> {
 }
 
 async function guess(page: Page): Promise<void> {
+  const notice = page.getByRole('button', { name: 'Понятно', exact: true });
+  if (await notice.isVisible()) await notice.click();
   const canvas = page.getByTestId('fake-guess-map').locator('canvas');
   await expect(canvas).toBeVisible({ timeout: 12_000 });
   await canvas.click({ position: { x: 140, y: 110 } });
   await page.getByRole('button', { name: 'Угадать', exact: true }).click();
+}
+
+async function assertGuessHitTargets(page: Page): Promise<void> {
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 720 });
+    if (width < 900) await page.getByRole('button', { name: 'Карта', exact: true }).click();
+    const canvas = page.getByTestId('fake-guess-map').locator('canvas');
+    await expect(canvas).toBeVisible();
+    await canvas.click({ position: { x: 140, y: 110 } });
+    const submit = page.getByRole('button', { name: 'Угадать', exact: true });
+    await expect(submit).toBeEnabled();
+    const profileRect = await page
+      .getByRole('button', { name: 'Профиль', exact: true })
+      .boundingBox();
+    const submitRect = await submit.boundingBox();
+    expect(profileRect).not.toBeNull();
+    expect(submitRect).not.toBeNull();
+    if (!profileRect || !submitRect) throw new Error('Missing profile or guess hit target');
+    expect(
+      profileRect.x < submitRect.x + submitRect.width &&
+        profileRect.x + profileRect.width > submitRect.x &&
+        profileRect.y < submitRect.y + submitRect.height &&
+        profileRect.y + profileRect.height > submitRect.y,
+    ).toBe(false);
+    await submit.click({ trial: true });
+  }
 }
 
 function bot(id: string, name: string, color: ParticipantColorId): BotSlotConfig {
@@ -86,49 +123,65 @@ async function expectWins(page: Page, name: string, count: number): Promise<void
   expect(await badges.count()).toBeGreaterThan(0);
 }
 
-// protects=browser profile survives restore/restart and autojoins without a manual form even without randomUUID; fails_when=identity changes, stale session blocks entry, or Join flashes; no_claim=does not cover another browser or unavailable browser storage
-test('saved profile autojoins after a server restart with a fresh session', async ({ browser }) => {
-  const server = await startIsolatedFakeServer({ rounds: 1 });
-  const context = await browser.newContext();
-  // HTTP origins can expose getRandomValues while omitting randomUUID.
-  await context.addInitScript(() => {
-    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
-  });
+function registry(dataDir: string): Array<Profile & { role: string }> {
+  const data = JSON.parse(readFileSync(path.join(dataDir, 'profiles.json'), 'utf8')) as {
+    profiles: Array<Profile & { role: string }>;
+  };
+  return data.profiles;
+}
+
+async function login(page: Page, baseUrl: string, code: string): Promise<void> {
+  await page.goto(baseUrl);
+  await page.getByLabel('Код профиля').fill(code);
+  await page.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+  await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+}
+
+async function codeOf(page: Page): Promise<string> {
+  await expect.poll(async () => (await savedProfile(page)).profileToken).toMatch(/^[0-9a-f]{32}$/);
+  const code = (await savedProfile(page)).profileToken;
+  if (!code) throw new Error('Registration did not cache a profile code');
+  return code;
+}
+
+// protects=B1/B2: invited registration issues one durable code and same-origin reload uses it without invitation or seat secret; fails_when=homepage demands an invite or reload creates a new identity; why_new=cached credential precedence and owner clipboard were previously untested; seam=none; no_claim=fake maps and bots do not establish model or Cloudflare quality
+test('registration, code display and cached reload', async ({ browser }) => {
+  const server = await startIsolatedFakeServer();
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
   try {
+    await page.goto(server.baseUrl);
+    await expect(page.getByLabel('Код профиля')).toBeVisible();
+    await expect(page.getByLabel('Ваше имя')).toHaveCount(0);
+    await assertAxeClean(page, 'Code login');
     await join(page, server.hostUrl, 'Возвращаюсь');
-    const profile = await savedProfile(page);
-    expect(profile).toMatchObject({ nick: 'Возвращаюсь', color: 'p-1' });
-    expect(profile.profileId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    const code = await codeOf(page);
+    await expect(page.getByText(/Сохраните код профиля/)).toBeVisible();
+    const saved = await savedProfile(page);
+    expect(registry(server.dataDir)).toMatchObject([
+      {
+        profileId: saved.profileId,
+        profileToken: code,
+        nick: saved.nick,
+        color: saved.color,
+        role: 'host',
+      },
+    ]);
+    await page.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await page.getByRole('button', { name: 'Скопировать код', exact: true }).click();
+    expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/[-\s]/g, '')).toBe(
+      code,
     );
+    await page.keyboard.press('Escape');
     await page.evaluate(() => {
-      localStorage.removeItem(`geoaissr:profile:${location.origin}`);
+      localStorage.removeItem(`geoaissr:player:${location.origin}`);
     });
-    await page.reload();
+    await page.goto(server.guestUrl);
     await expect(page.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
-    await expect.poll(() => savedProfile(page)).toEqual(profile);
-    const oldSession = await page.evaluate(() =>
-      localStorage.getItem(`geoaissr:player:${location.origin}`),
-    );
-    await page.addInitScript(() => {
-      const state = window as Window & { joinFormSeen?: boolean };
-      state.joinFormSeen = false;
-      new MutationObserver(() => {
-        if (document.querySelector('.join-form')) state.joinFormSeen = true;
-      }).observe(document, { childList: true, subtree: true });
-    });
-    await server.restart();
-    await page.goto('about:blank');
-    await page.goto(server.hostUrl);
+    await expect(page.getByRole('button', { name: 'Начать', exact: true })).toBeVisible();
+    await page.goto(server.baseUrl);
     await expect(page.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
-    expect(await savedProfile(page)).toEqual(profile);
-    expect(
-      await page.evaluate(() => localStorage.getItem(`geoaissr:player:${location.origin}`)),
-    ).not.toBe(oldSession);
-    expect(
-      await page.evaluate(() => (window as Window & { joinFormSeen?: boolean }).joinFormSeen),
-    ).toBe(false);
+    expect(await savedProfile(page)).toEqual(saved);
     await expect(page.getByLabel('Ваше имя')).toHaveCount(0);
   } finally {
     await context.close();
@@ -136,60 +189,182 @@ test('saved profile autojoins after a server restart with a fresh session', asyn
   }
 });
 
-// protects=automatic name/color conflicts return to a prefilled form without replacing the saved profile or stealing a seat; fails_when=conflicts silently pick another color/name or erase stored values; no_claim=does not prove session-secret cryptography
-test('saved name and color conflicts retain the rejected profile for correction', async ({
-  browser,
-}) => {
-  const server = await startIsolatedFakeServer();
-  const host = await browser.newPage();
-  const contexts: BrowserContext[] = [];
+// protects=B3/B4: a new origin and restarted server recover both roles and legacy six-hour wins using the original codes; fails_when=login requires an invite or loses identity, wins, or authority; why_new=recovery across origin and restart previously depended on invitations; seam=none; no_claim=fake server does not test a real tunnel
+test('codes restore both roles across origins and restart', async ({ browser }) => {
+  const server = await startIsolatedFakeServer({
+    initialMatches: [win('h1', 'old-session', false)],
+  });
+  const hostContext = await browser.newContext();
+  const guestContext = await browser.newContext();
+  await seedProfile(hostContext, { profileId: PROFILE_ID, nick: 'С победами', color: 'p-1' });
+  const host = await hostContext.newPage();
+  const guest = await guestContext.newPage();
+  const restoredHostContext = await browser.newContext();
+  const restoredGuestContext = await browser.newContext();
   try {
-    await join(host, server.hostUrl, 'Занято');
-    for (const profile of [
-      { profileId: PROFILE_ID, nick: 'Занято', color: 'p-2' },
-      { profileId: 'd22113bd-604b-4fae-bc6e-a02fc288ea2b', nick: 'Новичок', color: 'p-1' },
-    ] satisfies Profile[]) {
-      const context = await browser.newContext();
-      contexts.push(context);
-      await seedProfile(context, profile);
-      const page = await context.newPage();
-      await page.goto(server.guestUrl);
-      await expect(page.getByRole('alert')).toContainText(
-        profile.color === 'p-1' ? 'Цвет уже занят' : 'Ник занят',
-      );
-      await expect(page.getByLabel('Ваше имя')).toHaveValue(profile.nick);
-      await expect(
-        page.getByRole('radio', {
-          name: profile.color === 'p-1' ? 'оранжевый' : 'малиновый',
-          exact: true,
-        }),
-      ).toHaveAttribute('aria-checked', 'true');
-      expect(await savedProfile(page)).toEqual(profile);
-    }
+    await host.goto(server.hostUrl);
     await expect(host.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
-    const recovery = contexts[1];
-    if (!recovery) throw new Error('Missing conflict context');
-    const page = recovery.pages()[0];
-    if (!page) throw new Error('Missing conflict page');
-    await page.getByRole('radio', { name: 'сиреневый', exact: true }).click();
-    await page.getByRole('button', { name: 'Войти', exact: true }).click();
-    await expect(host.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
-    await expect
-      .poll(() => savedProfile(page))
-      .toMatchObject({
-        nick: 'Новичок',
-        color: 'p-3',
-        profileId: 'd22113bd-604b-4fae-bc6e-a02fc288ea2b',
-      });
-  } finally {
-    for (const context of contexts) await context.close();
+    const hostCode = await codeOf(host);
+    await join(guest, server.guestUrl, 'Гость');
+    const guestCode = await codeOf(guest);
+    const before = registry(server.dataDir);
+    const oldHostUrl = server.hostUrl;
     await host.close();
+    await guest.close();
+    await server.restart();
+    expect(server.hostUrl).not.toBe(oldHostUrl);
+    expect(new URL(server.baseUrl).origin).not.toBe(new URL(server.alternateBaseUrl).origin);
+    const newHost = await restoredHostContext.newPage();
+    const newGuest = await restoredGuestContext.newPage();
+    const formatted = hostCode.toUpperCase().match(/.{4}/g)?.join('-') ?? hostCode;
+    await login(newHost, server.alternateBaseUrl, `  ${formatted}  `);
+    await expectWins(newHost, 'С победами', 1);
+    await expect(newHost.getByRole('button', { name: 'Начать', exact: true })).toBeVisible();
+    await login(newGuest, server.alternateBaseUrl, guestCode);
+    await expect(newGuest.getByRole('button', { name: 'Начать', exact: true })).toHaveCount(0);
+    expect(await savedProfile(newHost)).toMatchObject({
+      profileId: PROFILE_ID,
+      profileToken: hostCode,
+    });
+    expect(registry(server.dataDir)).toEqual(before);
+  } finally {
+    await hostContext.close();
+    await guestContext.close();
+    await restoredHostContext.close();
+    await restoredGuestContext.close();
     await server.stop();
   }
 });
 
-// protects=successful Lobby/FINAL edits broadcast and persist while rejected edits do not persist, active phases hide editing, and Final Escape closes/restores focus; fails_when=another client stays stale, identity changes, midmatch editing appears, or Final global keys swallow Escape; no_claim=does not cover every concurrent edit ordering
-test('profile modal edits in Lobby and Final and preserves rejected values', async ({
+// protects=manual authentication when browser storage is unavailable and invalid code rejection; fails_when=storage exceptions prevent login or malformed input acquires a seat; why_new=storage errors and the raw 64-character limit were untested; seam=none; no_claim=does not simulate every browser privacy mode
+test('manual login works without storage and rejects malformed codes', async ({ browser }) => {
+  const server = await startIsolatedFakeServer();
+  const original = await browser.newContext();
+  const privateContext = await browser.newContext();
+  const host = await original.newPage();
+  try {
+    await join(host, server.hostUrl, 'Без хранилища');
+    const code = await codeOf(host);
+    await privateContext.addInitScript(() => {
+      for (const name of ['getItem', 'setItem', 'removeItem'] as const) {
+        Object.defineProperty(Storage.prototype, name, {
+          value: () => {
+            throw new Error('storage disabled');
+          },
+        });
+      }
+    });
+    const page = await privateContext.newPage();
+    await page.goto(server.alternateBaseUrl);
+    const tooLong = `${' '.repeat(33)}${code}`;
+    await page.getByLabel('Код профиля').fill(tooLong);
+    await expect(page.getByLabel('Код профиля')).toHaveValue(tooLong);
+    await expect(page.getByRole('button', { name: 'Войти по коду', exact: true })).toBeDisabled();
+    await expect(page.getByText(/ИГРОКИ/)).toHaveCount(0);
+    await page.getByLabel('Код профиля').fill(code);
+    await page.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+    await expect(page.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel('Код профиля')).toBeVisible();
+    expect(registry(server.dataDir)).toHaveLength(1);
+  } finally {
+    await original.close();
+    await privateContext.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=B5 and displaced-page controls/credential isolation: another device resumes the submitted active-round seat and displaces its old connection; fails_when=the guess disappears, another seat is created, or the old page reconnects; why_new=active-seat takeover must preserve submitted input on a different device; seam=none; no_claim=fake maps do not test Google Maps or model quality
+test('code takeover retains an active submitted guess', async ({ browser }) => {
+  const server = await startIsolatedFakeServer({ rounds: 1 });
+  const hostContext = await browser.newContext();
+  const guestContext = await browser.newContext();
+  const replacementContext = await browser.newContext();
+  const host = await hostContext.newPage();
+  const guest = await guestContext.newPage();
+  try {
+    await join(host, server.hostUrl, 'Хост');
+    await join(guest, server.guestUrl, 'Игрок');
+    const code = await codeOf(guest);
+    await host.getByRole('button', { name: 'Начать', exact: true }).click();
+    await guess(guest);
+    await expect(guest.getByText(/Ответ принят/)).toBeVisible();
+    const replacement = await replacementContext.newPage();
+    await replacement.goto(server.alternateBaseUrl);
+    await replacement.getByLabel('Код профиля').fill(code);
+    await replacement.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+    await expect(replacement.getByText(/Ответ принят/)).toBeVisible();
+    await expect(guest.getByText(/другой вкладке|другом устройстве|новая вкладка/i)).toBeVisible();
+    await expect(guest.getByTestId('fake-guess-map')).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Угадать', exact: true })).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Меню хоста', exact: true })).toHaveCount(0);
+    await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await expect(guest.getByLabel('Имя', { exact: true })).toHaveCount(0);
+    await guest.keyboard.press('Escape');
+    expect((await savedProfile(guest)).profileToken).toBe(code);
+    await guess(host);
+    await expect(replacement.getByText(/Правильный ответ:/)).toBeVisible({ timeout: 12_000 });
+    const sharedReplacement = await guestContext.newPage();
+    await sharedReplacement.goto(server.baseUrl);
+    await expect(sharedReplacement.getByText(/Правильный ответ:/)).toBeVisible();
+    expect((await savedProfile(sharedReplacement)).profileToken).toBe(code);
+    await sharedReplacement.reload();
+    await expect(sharedReplacement.getByText(/Правильный ответ:/)).toBeVisible();
+    expect(registry(server.dataDir)).toHaveLength(2);
+  } finally {
+    await hostContext.close();
+    await guestContext.close();
+    await replacementContext.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=B6/B7 and logout without crypto.randomUUID: identical display values remain independent seats and explicit logout propagates before switching profiles; fails_when=names reclaim seats or another tab restores logged-out credentials; why_new=old tests rejected duplicates and lacked explicit cross-tab logout; seam=none; no_claim=does not establish cross-origin logout propagation
+test('duplicate display values and same-origin logout stay isolated', async ({ browser }) => {
+  const server = await startIsolatedFakeServer();
+  const firstContext = await browser.newContext();
+  const secondContext = await browser.newContext();
+  const first = await firstContext.newPage();
+  const second = await secondContext.newPage();
+  try {
+    await join(first, server.hostUrl, 'Одинаково');
+    const firstCode = await codeOf(first);
+    await second.goto(server.guestUrl);
+    await second.getByLabel('Ваше имя').fill('Одинаково');
+    await second.getByRole('radio', { name: 'оранжевый', exact: true }).click();
+    await second.getByRole('button', { name: 'Войти', exact: true }).click();
+    await expect(second.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    const secondCode = await codeOf(second);
+    expect(firstCode).not.toBe(secondCode);
+    expect(registry(server.dataDir)).toHaveLength(2);
+    await expect(first.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await expect(first.getByText('Одинаково', { exact: true })).toHaveCount(2);
+    const tab = await firstContext.newPage();
+    await tab.goto(server.baseUrl);
+    await expect(tab.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await tab.evaluate(() => {
+      Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
+    });
+    await tab.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await tab.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await expect(tab.getByLabel('Код профиля')).toBeVisible();
+    await expect(first.getByLabel('Код профиля')).toBeVisible();
+    await tab.reload();
+    await expect(tab.getByLabel('Код профиля')).toBeVisible();
+    await login(tab, server.baseUrl, secondCode);
+    expect((await savedProfile(tab)).profileToken).toBe(secondCode);
+    expect(registry(server.dataDir).map((p) => p.profileToken)).toEqual(
+      expect.arrayContaining([firstCode, secondCode]),
+    );
+  } finally {
+    await firstContext.close();
+    await secondContext.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=B7, phase restrictions, loading-phase Profile hit target and desktop/narrow guess hit targets: duplicate name/color edits persist without changing code, while the profile remains viewable in a match; fails_when=an occupied value is rejected or midmatch editing mutates identity; why_new=old tests rejected occupied values and lacked all-phase code access; seam=none; no_claim=fake maps do not establish external map or model behavior
+test('profile edits accept occupied values and code remains visible during a match', async ({
   browser,
 }) => {
   const server = await startIsolatedFakeServer({ rounds: 1 });
@@ -198,71 +373,57 @@ test('profile modal edits in Lobby and Final and preserves rejected values', asy
   const host = await hostContext.newPage();
   const guest = await guestContext.newPage();
   try {
-    await join(host, server.hostUrl, 'abcdefghijklmnopqrst');
-    await join(guest, server.guestUrl, 'Сосед');
-    await host.setViewportSize({ width: 375, height: 667 });
-    const editBounds = await host
-      .getByRole('button', { name: 'Изменить профиль', exact: true })
-      .boundingBox();
-    expect(editBounds).not.toBeNull();
-    if (editBounds) expect(editBounds.x + editBounds.width).toBeLessThanOrEqual(375);
-    await assertNoHorizontalOverflow(host);
-    await host.setViewportSize({ width: 1280, height: 720 });
-    const original = await savedProfile(host);
-    await host.getByRole('button', { name: 'Изменить профиль', exact: true }).click();
-    const dialog = host.getByRole('dialog', { name: 'Редактирование профиля' });
-    await expect(dialog.getByLabel('Имя', { exact: true })).toBeFocused();
-    await dialog.getByLabel('Имя', { exact: true }).fill('Сосед');
-    await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    await expect(dialog.getByRole('alert')).toBeVisible();
-    expect(await savedProfile(host)).toEqual(original);
-    await dialog.getByLabel('Имя', { exact: true }).fill('Новое имя');
-    await dialog.getByRole('radio', { name: 'синий', exact: true }).click();
+    await join(host, server.hostUrl, 'Общее');
+    await join(guest, server.guestUrl, 'Другое');
+    const code = await codeOf(guest);
+    await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
+    const dialog = guest.getByRole('dialog');
+    await dialog.getByLabel('Имя', { exact: true }).fill('Общее');
+    await dialog.getByRole('radio', { name: 'оранжевый', exact: true }).click();
     await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(guest.getByText('Новое имя', { exact: true })).toBeVisible();
-    expect(await savedProfile(host)).toEqual({ ...original, nick: 'Новое имя', color: 'p-5' });
-    await expect(host.getByRole('button', { name: 'Изменить профиль', exact: true })).toBeFocused();
-
-    await guest.getByRole('button', { name: 'Изменить профиль', exact: true }).click();
-    const guestDialog = guest.getByRole('dialog', { name: 'Редактирование профиля' });
-    await guestDialog.getByLabel('Имя', { exact: true }).fill('Не сохранять');
+    await expect
+      .poll(() => savedProfile(guest))
+      .toMatchObject({ nick: 'Общее', color: 'p-1', profileToken: code });
+    await expect(host.getByText('Общее', { exact: true })).toHaveCount(2);
     await host.getByRole('button', { name: 'Начать', exact: true }).click();
-    await expect(guestDialog).toHaveCount(0);
+    await expect(guest.locator('.loading-veil')).toBeVisible();
+    const loadingHit = await guest
+      .getByRole('button', { name: 'Профиль', exact: true })
+      .evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        return {
+          duringLoading: !!document.querySelector('.loading-veil'),
+          profileReceivesPointer: el.contains(hit),
+        };
+      });
+    expect(loadingHit).toEqual({ duringLoading: true, profileReceivesPointer: true });
+    await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await expect(guest.getByRole('dialog').getByLabel('Код профиля')).toHaveValue(
+      Array.from({ length: 8 }, (_, i) => code.slice(i * 4, i * 4 + 4)).join('-'),
+    );
+    await expect(guest.getByRole('button', { name: 'Скопировать код', exact: true })).toBeVisible();
+    await expect(guest.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+    await expect(guest.getByLabel('Имя', { exact: true })).toHaveCount(0);
+    await guest.keyboard.press('Escape');
+    await expect(guest.getByTestId('fake-guess-map')).toBeVisible({ timeout: 12_000 });
+    await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await expect(guest.getByRole('button', { name: 'Скопировать код', exact: true })).toBeVisible();
+    await expect(guest.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+    await expect(guest.getByLabel('Имя', { exact: true })).toHaveCount(0);
+    await guest.keyboard.press('Escape');
+    const notice = guest.getByRole('button', { name: 'Понятно', exact: true });
+    if (await notice.isVisible()) await notice.click();
+    await assertGuessHitTargets(guest);
     await guess(host);
-    await expect(host.getByRole('button', { name: 'Изменить профиль', exact: true })).toHaveCount(
-      0,
-    );
-    await guess(guest);
+    await guest.getByRole('button', { name: 'Угадать', exact: true }).click();
     await expect(host.getByText(/Правильный ответ:/)).toBeVisible({ timeout: 12_000 });
-    await expect(host.getByRole('button', { name: 'Изменить профиль', exact: true })).toHaveCount(
-      0,
-    );
     await host.getByRole('button', { name: 'К итогам', exact: true }).click();
-    await expect(host.getByRole('button', { name: 'Ещё раз', exact: true })).toBeVisible();
-    await expect(guestDialog).toHaveCount(0);
-    expect(await savedProfile(guest)).toMatchObject({ nick: 'Сосед' });
-    await host.getByRole('button', { name: 'Изменить профиль', exact: true }).click();
-    await host.setViewportSize({ width: 375, height: 667 });
-    await expect(dialog.getByLabel('Имя', { exact: true })).toHaveValue('Новое имя');
-    await expect(dialog.getByRole('radio', { name: 'синий', exact: true })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
-    await assertAxeClean(host, 'ProfileModal');
-    await assertNoHorizontalOverflow(host);
-    await dialog.getByLabel('Имя', { exact: true }).fill('Не сохранять');
-    await host.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    await expect(host.getByRole('button', { name: 'Изменить профиль', exact: true })).toBeFocused();
-    expect(await savedProfile(host)).toEqual({ ...original, nick: 'Новое имя', color: 'p-5' });
-    await host.getByRole('button', { name: 'Изменить профиль', exact: true }).click();
-    await expect(dialog.getByLabel('Имя', { exact: true })).toHaveValue('Новое имя');
-    await dialog.getByLabel('Имя', { exact: true }).fill('Финальное имя');
-    await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(guest.getByText('Финальное имя', { exact: true }).first()).toBeVisible();
-    expect(await savedProfile(host)).toEqual({ ...original, nick: 'Финальное имя', color: 'p-5' });
+    await expect(guest.getByRole('button', { name: 'Профиль', exact: true })).toBeVisible();
+    await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await expect(guest.getByLabel('Имя', { exact: true })).toHaveValue('Общее');
+    expect((await savedProfile(guest)).profileToken).toBe(code);
   } finally {
     await hostContext.close();
     await guestContext.close();
@@ -270,7 +431,7 @@ test('profile modal edits in Lobby and Final and preserves rejected values', asy
   }
 });
 
-// protects=history-backed avatar counts in all phases and perbot host reset broadcasts/persists without clearing another identity; fails_when=one screen omits wins, a partial match adds a win, or reset leaks across participants/restart; no_claim=does not wait six real hours or use paid model providers
+// Value: protects=history-backed avatar counts and bot resets persist for both code-restored clients; fails_when=counts change or only one saved profile returns after restart; why_new=code login restores the guest as well as the host after invitations change; seam=none; no_claim=does not wait six real hours or use paid model providers
 test('six-hour badges span every phase and individual bot resets survive restart', async ({
   browser,
 }) => {
@@ -323,10 +484,13 @@ test('six-hour badges span every phase and individual bot resets survive restart
     }
     await server.restart();
     await host.goto(server.hostUrl);
-    await expect(host.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
-    await expectWins(host, 'Первый', 0);
-    await expectWins(host, 'Второй', 1);
-    await expectWins(host, 'С победами', 2);
+    // Both saved personal codes restore their seats after the room invitation changes.
+    for (const page of [host, guest]) {
+      await expect(page.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+      await expectWins(page, 'Первый', 0);
+      await expectWins(page, 'Второй', 1);
+      await expectWins(page, 'С победами', 2);
+    }
   } finally {
     await context.close();
     await guest.close();
@@ -347,6 +511,324 @@ test('unreadable match history warns the room while play remains available', asy
     await expectWins(page, 'История', 0);
   } finally {
     await page.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=fresh invitation fragments after code selection/logout and explicit recovery from rejected cached credentials; fails_when=a stale cache traps registration or changing the hash needs a reload; why_new=same-document authentication transitions had no browser acceptance coverage; seam=none; no_claim=does not establish cross-origin storage propagation
+test('fresh invitation fragments recover code selection, logout and rejected caches', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.goto(server.guestUrl);
+    const documentStarted = await page.evaluate(() => performance.timeOrigin);
+    await page.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+    await expect(page.getByLabel('Код профиля')).toBeVisible();
+    const inviteHash = new URL(server.guestUrl).hash;
+    await page.evaluate(() => {
+      location.hash = '';
+    });
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, inviteHash);
+    await expect(page.getByLabel('Ваше имя')).toBeVisible();
+    await page.getByLabel('Ваше имя').fill('Первый фрагмент');
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
+    await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+    const original = await savedProfile(page);
+    await page.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await page.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await expect(page.getByLabel('Код профиля')).toBeVisible();
+    expect(await savedProfile(page)).toBeNull();
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, inviteHash);
+    await expect(page.getByLabel('Ваше имя')).toBeVisible();
+    expect(await page.evaluate(() => performance.timeOrigin)).toBe(documentStarted);
+    // A well-formed but unknown code and an already claimed legacy ID both need an explicit escape.
+    for (const { cached, error } of [
+      {
+        cached: { ...original, profileToken: '0'.repeat(32) },
+        error: 'Неверный код профиля.',
+      },
+      {
+        cached: { profileId: original.profileId, nick: original.nick, color: original.color },
+        error: 'Этот профиль уже зарегистрирован. Войдите по коду профиля на главной странице.',
+      },
+    ]) {
+      await page.evaluate((value) => {
+        localStorage.setItem(`geoaissr:profile:${location.origin}`, JSON.stringify(value));
+      }, cached);
+      await page.reload();
+      await expect(page.getByLabel('Код профиля')).toBeVisible();
+      await expect(page.getByRole('alert')).toHaveText(error);
+      await page.getByRole('button', { name: 'Выйти', exact: true }).click();
+      expect(await savedProfile(page)).toBeNull();
+      await page.evaluate((hash) => {
+        location.hash = hash;
+      }, inviteHash);
+      await expect(page.getByLabel('Ваше имя')).toBeVisible();
+    }
+    await page.getByLabel('Ваше имя').fill('Свежий профиль');
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
+    await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+    expect((await savedProfile(page)).profileId).not.toBe(original.profileId);
+    expect(registry(server.dataDir)).toHaveLength(2);
+  } finally {
+    await context.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=initial code notice for a midmatch spectator and read-only Enter without a profile update; fails_when=late registration hides its recovery code or Enter emits update_profile/shows an update error; why_new=all-phase registration and read-only form submission lacked browser acceptance; seam=none; no_claim=fake maps do not establish external map behavior
+test('midmatch spectators see their initial code and read-only Enter sends no update', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer({ rounds: 1 });
+  const host = await browser.newPage();
+  const spectator = await browser.newPage();
+  const updates: string[] = [];
+  spectator.on('websocket', (socket) => {
+    socket.on('framesent', ({ payload }) => {
+      if (String(payload).includes('update_profile')) updates.push(String(payload));
+    });
+  });
+  try {
+    await join(host, server.hostUrl, 'Ведущий');
+    await host.getByRole('button', { name: 'Начать', exact: true }).click();
+    await expect(host.getByTestId('fake-guess-map')).toBeVisible({ timeout: 12_000 });
+    await spectator.goto(server.guestUrl);
+    await spectator.getByLabel('Ваше имя').fill('Поздний наблюдатель');
+    await spectator.getByRole('button', { name: 'Смотреть раунд', exact: true }).click();
+    await expect(spectator.getByText(/Сохраните код профиля/)).toBeVisible();
+    const code = await codeOf(spectator);
+    await spectator.getByRole('button', { name: 'Показать код', exact: true }).click();
+    const dialog = spectator.getByRole('dialog');
+    await expect(dialog.getByLabel('Код профиля')).toHaveValue(
+      Array.from({ length: 8 }, (_, i) => code.slice(i * 4, i * 4 + 4)).join('-'),
+    );
+    await expect(dialog.getByLabel('Имя', { exact: true })).toHaveCount(0);
+    await dialog.getByLabel('Код профиля').press('Enter');
+    await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await spectator.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await expect(spectator.getByRole('dialog').getByRole('alert')).toHaveCount(0);
+    expect(updates).toEqual([]);
+    expect((await savedProfile(spectator)).profileToken).toBe(code);
+  } finally {
+    await host.close();
+    await spectator.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=manual code recovery after an unjoined invitation expires during reconnect; fails_when=an earlier hello_ok leaves code login checking forever or requests a new name; why_new=existing restart coverage only reconnects registered profiles; seam=none; no_claim=fake server does not establish real tunnel behavior
+test('expired unjoined invitation reconnect accepts an existing profile code', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const existingContext = await browser.newContext();
+  const newcomerContext = await browser.newContext();
+  const existing = await existingContext.newPage();
+  const newcomer = await newcomerContext.newPage();
+  try {
+    await join(existing, server.hostUrl, 'Профиль Б');
+    const code = await codeOf(existing);
+    const before = await savedProfile(existing);
+    const invitation = server.guestUrl;
+    await newcomer.goto(invitation);
+    // This form is shown only after hello_ok; the invited visitor has no registered seat yet.
+    await expect(newcomer.getByLabel('Ваше имя')).toBeVisible();
+    expect(await savedProfile(newcomer)).toBeNull();
+    await existing.close();
+    await server.restart();
+    expect(server.guestUrl === invitation).toBe(false);
+    await expect(newcomer.getByLabel('Код профиля')).toBeVisible();
+    await newcomer.getByLabel('Код профиля').fill(code);
+    await newcomer.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+    await expect(newcomer.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
+    await expect(newcomer.getByLabel('Ваше имя')).toHaveCount(0);
+    expect((await savedProfile(newcomer)).profileId === before.profileId).toBe(true);
+    expect((await savedProfile(newcomer)).profileToken === code).toBe(true);
+    await expect(newcomer.getByRole('button', { name: 'Начать', exact: true })).toBeVisible();
+    expect(registry(server.dataDir)).toHaveLength(1);
+  } finally {
+    await existingContext.close();
+    await newcomerContext.close();
+    await server.stop();
+  }
+});
+
+async function holdLogoutEvents(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const state = window as typeof window & {
+      heldLogout?: StorageEvent;
+      holdLogout?: (event: StorageEvent) => void;
+    };
+    state.holdLogout = (event: StorageEvent) => {
+      if (event.key !== `geoaissr:logout:${location.origin}`) return;
+      event.stopImmediatePropagation();
+      state.heldLogout = event;
+    };
+    window.addEventListener('storage', state.holdLogout, true);
+  });
+}
+
+async function releaseLogoutEvent(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const state = window as typeof window & {
+      heldLogout?: StorageEvent;
+      holdLogout?: (event: StorageEvent) => void;
+    };
+    if (!state.heldLogout || !state.holdLogout) throw new Error('Missing held logout event');
+    window.removeEventListener('storage', state.holdLogout, true);
+    const event = state.heldLogout;
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: event.key,
+        oldValue: event.oldValue,
+        newValue: event.newValue,
+        url: event.url,
+        storageArea: event.storageArea,
+      }),
+    );
+  });
+}
+
+async function assertOtherProfileIgnoresLogout(target: Page, source: Page): Promise<void> {
+  const notice = await source.evaluate(() => {
+    const event = (window as typeof window & { heldLogout?: StorageEvent }).heldLogout;
+    if (!event) throw new Error('Missing held logout event');
+    return { key: event.key, newValue: event.newValue, url: event.url };
+  });
+  await target.evaluate((notice) => {
+    window.dispatchEvent(new StorageEvent('storage', { ...notice, storageArea: localStorage }));
+  }, notice);
+  await expect(target.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+  await expect(target.getByLabel('Код профиля')).toHaveCount(0);
+}
+
+// Value: protects=newly saved profile and seat credentials plus a newer active profile when a real same-origin logout event arrives late; fails_when=the delayed event signs out or erases profile B or a reload cannot restore its seat; why_new=ordinary cross-tab logout coverage delivers the event before a subsequent login; seam=none; no_claim=browser-event scheduling fixture does not establish cross-origin logout propagation
+test('delayed same-origin logout preserves a newer profile and seat credentials', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const sharedContext = await browser.newContext();
+  const otherContext = await browser.newContext();
+  const first = await sharedContext.newPage();
+  const other = await otherContext.newPage();
+  const oldTab = await sharedContext.newPage();
+  try {
+    await join(first, server.hostUrl, 'Профиль А');
+    await join(other, server.guestUrl, 'Профиль Б');
+    const otherCode = await codeOf(other);
+    const otherProfile = await savedProfile(other);
+    await holdLogoutEvents(oldTab);
+    await oldTab.goto(server.baseUrl);
+    await expect(oldTab.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await first.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await first.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await expect(first.getByLabel('Код профиля')).toBeVisible();
+    await expect
+      .poll(() =>
+        oldTab.evaluate(() =>
+          Boolean((window as typeof window & { heldLogout?: StorageEvent }).heldLogout),
+        ),
+      )
+      .toBe(true);
+    await first.getByLabel('Код профиля').fill(otherCode);
+    await first.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+    await expect(first.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    expect((await savedProfile(first)).profileId === otherProfile.profileId).toBe(true);
+    const current = await sharedContext.newPage();
+    await current.goto(server.baseUrl);
+    await expect(current.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await assertOtherProfileIgnoresLogout(current, oldTab);
+    const saved = await first.evaluate(() => ({
+      profile: localStorage.getItem(`geoaissr:profile:${location.origin}`),
+      player: localStorage.getItem(`geoaissr:player:${location.origin}`),
+    }));
+    expect(Boolean(saved.profile && saved.player)).toBe(true);
+    await releaseLogoutEvent(oldTab);
+    await expect(oldTab.getByLabel('Код профиля')).toBeVisible();
+    expect(
+      await first.evaluate(
+        (before) => ({
+          profileUnchanged:
+            localStorage.getItem(`geoaissr:profile:${location.origin}`) === before.profile,
+          playerUnchanged:
+            localStorage.getItem(`geoaissr:player:${location.origin}`) === before.player,
+        }),
+        saved,
+      ),
+    ).toEqual({ profileUnchanged: true, playerUnchanged: true });
+    await first.reload();
+    await expect(first.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await expect(first.getByLabel('Ваше имя')).toHaveCount(0);
+    expect((await savedProfile(first)).profileId === otherProfile.profileId).toBe(true);
+    expect((await savedProfile(first)).profileToken === otherCode).toBe(true);
+    expect(registry(server.dataDir)).toHaveLength(2);
+  } finally {
+    await sharedContext.close();
+    await otherContext.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=explicit logout when a delayed tab reconnects with its old in-memory code before receiving the logout; fails_when=reconnected credentials survive logout and reload restores the signed-out profile; why_new=preserving a newer profile must still remove credentials re-saved by the logged-out profile; seam=none; no_claim=browser-event scheduling does not establish real tunnel behavior
+test('delayed logout clears credentials re-saved by the logged-out profile reconnect', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const context = await browser.newContext();
+  const first = await context.newPage();
+  const oldTab = await context.newPage();
+  try {
+    await join(first, server.hostUrl, 'Профиль А');
+    const original = await savedProfile(first);
+    await holdLogoutEvents(oldTab);
+    await oldTab.goto(server.baseUrl);
+    await expect(oldTab.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
+    await oldTab.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await first.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await first.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await expect(first.getByLabel('Код профиля')).toBeVisible();
+    await expect
+      .poll(() =>
+        oldTab.evaluate(() =>
+          Boolean((window as typeof window & { heldLogout?: StorageEvent }).heldLogout),
+        ),
+      )
+      .toBe(true);
+    expect(await savedProfile(first)).toBeNull();
+    await oldTab.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect
+      .poll(() =>
+        oldTab.evaluate(() =>
+          Boolean(
+            localStorage.getItem(`geoaissr:profile:${location.origin}`) &&
+            localStorage.getItem(`geoaissr:player:${location.origin}`),
+          ),
+        ),
+      )
+      .toBe(true);
+    expect((await savedProfile(oldTab)).profileId === original.profileId).toBe(true);
+    await releaseLogoutEvent(oldTab);
+    await expect(oldTab.getByLabel('Код профиля')).toBeVisible();
+    expect(
+      await first.evaluate(() => ({
+        profileCleared: localStorage.getItem(`geoaissr:profile:${location.origin}`) === null,
+        playerCleared: localStorage.getItem(`geoaissr:player:${location.origin}`) === null,
+      })),
+    ).toEqual({ profileCleared: true, playerCleared: true });
+    await first.reload();
+    await expect(first.getByLabel('Код профиля')).toBeVisible();
+    await expect(first.getByLabel('Ваше имя')).toHaveCount(0);
+    await expect(first.getByText(/ИГРОКИ/)).toHaveCount(0);
+  } finally {
+    await context.close();
     await server.stop();
   }
 });

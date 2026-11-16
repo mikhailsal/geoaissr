@@ -10,6 +10,7 @@
   import { RU } from '../i18n/ru';
 
   interface Props {
+    onEditProfile: (event: MouseEvent) => void;
     view: ClientViewState;
     browserMapsKey: string | null;
     activeBotCard: { roundNumber: number; entry: RoundResultEntryView } | null;
@@ -22,6 +23,7 @@
   }
 
   let {
+    onEditProfile,
     view,
     browserMapsKey,
     activeBotCard,
@@ -88,6 +90,7 @@
       <div class="map-top-bar">
         <span class="country-pill panel">{RU.results.correctCountry(res.countryNameRu)}</span>
         <HostMenu
+          onOpenProfile={onEditProfile}
           fakeMode={view.fakeMode}
           viewerIsHost={view.viewerIsHost}
           phase={view.phase}

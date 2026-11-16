@@ -9,6 +9,8 @@ import type { BotSlotConfig, MatchRecord } from '../../shared/storage-schemas';
 
 export interface StartedFakeApp {
   baseUrl: string;
+  alternateBaseUrl: string;
+  dataDir: string;
   hostUrl: string;
   guestUrl: string;
   restart: () => Promise<void>;
@@ -103,15 +105,11 @@ function findFreePort(): Promise<number> {
 }
 
 function launchFakeProcess(configDir: string, dataDir: string, port: number): ChildProcess {
-  return spawn(
-    'bun',
-    ['run', 'server/cli/start.ts', '--fake', '--no-tunnel', '--no-open', '--port', String(port)],
-    {
-      cwd: process.cwd(),
-      env: { ...process.env, GEOAISSR_CONFIG_DIR: configDir, GEOAISSR_DATA_DIR: dataDir },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
+  return spawn('bun', ['run', 'test/fixtures/browser-server.ts', String(port)], {
+    cwd: process.cwd(),
+    env: { ...process.env, GEOAISSR_CONFIG_DIR: configDir, GEOAISSR_DATA_DIR: dataDir },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 }
 
 async function stopFakeProcess(proc: ChildProcess): Promise<void> {
@@ -139,8 +137,7 @@ export async function startIsolatedFakeServer(opts?: {
   bots?: BotSlotConfig[];
 }): Promise<StartedFakeApp> {
   const root = mkdtempSync(path.join(tmpdir(), 'geo-pw-e2e-'));
-  const configDir = path.join(root, 'config');
-  const dataDir = path.join(root, 'data');
+  const [configDir, dataDir] = [path.join(root, 'config'), path.join(root, 'data')];
   if (opts?.unreadableHistory) {
     mkdirSync(path.join(dataDir, 'matches.jsonl'), { recursive: true });
   }
@@ -191,6 +188,8 @@ export async function startIsolatedFakeServer(opts?: {
 
   return {
     baseUrl,
+    alternateBaseUrl: `${parsed.protocol}//${parsed.hostname === 'localhost' ? '127.0.0.1' : 'localhost'}:${parsed.port}`,
+    dataDir,
     get hostUrl() {
       return hostUrl;
     },

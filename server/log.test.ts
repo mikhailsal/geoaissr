@@ -2,6 +2,8 @@ import { expect, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { normalizeProfileToken } from '../shared/profile-token.ts';
 import {
   cleanupOldLogs,
   createServerLogger,
@@ -49,6 +51,30 @@ test('logger.redact masks registered keys and tokens the way the log file does',
     expect(out).toContain('[REDACTED]');
     expect(out).toContain('Invi…');
     expect(out).toContain('a plain line');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Value: protects=registered code spellings are scrubbed before JSON escaping;
+// fails_when=decoded nested log strings still authenticate as the private code;
+// why_new=raw-string and crash tests do not cover JSON-escaped whitespace; seam=none;
+// no_claim=arbitrary intentional encodings are not profile-code spellings.
+test('JSON log fields cannot recover a code through escaped whitespace', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-log-profile-'));
+  try {
+    const logger = createServerLogger(dir, () => Date.UTC(2026, 10, 13));
+    const profileToken = randomBytes(16).toString('hex');
+    logger.registerSecrets([], [profileToken]);
+    const groups = Array.from({ length: 8 }, (_, i) => profileToken.slice(i * 4, i * 4 + 4));
+    const variants = [profileToken.toUpperCase(), groups.join('-'), groups.join('\t\n')];
+    logger.log('client_error', { spellings: variants, nested: { value: variants[2] } });
+    const record = JSON.parse(readFileSync(path.join(dir, '2026-11-13.jsonl'), 'utf8')) as {
+      data: { spellings: string[]; nested: { value: string } };
+    };
+    for (const value of [...record.data.spellings, record.data.nested.value]) {
+      expect(normalizeProfileToken(value) === profileToken).toBe(false);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

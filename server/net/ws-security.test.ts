@@ -11,6 +11,7 @@ import { createRoomShell } from '../engine/shell.ts';
 import { createInitialRoomState } from '../engine/types.ts';
 import { createThumbStore } from '../http/thumbs.ts';
 import { buildQuotaMetric, createQuotaManager } from '../storage/quota.ts';
+import { ProfileStore } from '../storage/profiles.ts';
 import { startAppHttpServer } from './http.ts';
 import { createAuthRateLimiter } from './rate-limit.ts';
 import { MAX_UNJOINED_AUTHENTICATED } from './ws-actions.ts';
@@ -151,7 +152,9 @@ function createSecServer(
     logRoundEnd: () => undefined,
   });
   const rateLimiter = createAuthRateLimiter(mode);
+  const profiles = new ProfileStore(path.join(dir, 'profiles.json'));
   const coord = createWsRoomCoordinator({
+    profiles,
     shell,
     hostToken: 'host-tok',
     guestToken: 'guest-tok',
@@ -170,7 +173,7 @@ function createSecServer(
     wsCoordinator: coord,
     rateLimiter,
   });
-  return { shell, srv, quota, coord };
+  return { shell, srv, quota, coord, profiles };
 }
 
 test('rate limiter public_url ignores per-IP cap at 11 and bans only >30 globally', () => {
@@ -213,68 +216,47 @@ test('blocked WS closes silently on bad token and a blocked IP cannot reconnect'
   }
 });
 
-test('nick alone reclaims only the host seat; a guest returns with their saved secret', async () => {
+// I3 protects: claimed identity/role cannot be overwritten by public IDs or display values;
+// fails_when: stranger rebinds a profile, learns its code or gains host authority;
+// no_claim: local server/WS and isolated files with fake dependencies; not a public tunnel or paid model.
+// why_new=Permanent profile credentials add an authority and persistence contract absent from earlier coverage; seam=none.
+test('identical names and colors create independent guest and host seats', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-sec-nick-'));
   const { shell, srv } = createSecServer(dir, 'local', true);
   try {
-    const url = srv.baseUrl.replace('http://', 'ws://') + '/ws';
-    const host = await connectWs(url);
-    host.ws.send(JSON.stringify({ type: 'hello', token: 'host-tok' }));
-    await host.nextMsg();
-    await host.nextMsg();
-    host.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: 'HostNick', color: 'p-1' }));
-    const hJoin = await host.nextMsg();
-    expect(hJoin?.type).toBe('join_ok');
-    const hostId = (hJoin as Extract<ServerMessage, { type: 'join_ok' }>).playerId;
-    host.ws.close();
-    await Bun.sleep(40);
-
-    const attacker = await connectWs(url);
-    attacker.ws.send(JSON.stringify({ type: 'hello', token: 'guest-tok' }));
-    await attacker.nextMsg();
-    await attacker.nextMsg();
-    attacker.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: 'HostNick', color: 'p-2' }));
-    const aErr = await attacker.nextMsg();
-    expect(aErr?.type).toBe('join_error');
-    expect((aErr as Extract<ServerMessage, { type: 'join_error' }>).code).toBe('nick_taken');
-
-    attacker.ws.send(JSON.stringify({ type: 'join', seq: 2, nick: 'GuestOne', color: 'p-2' }));
-    const gJoin = (await attacker.nextMsg()) as Extract<ServerMessage, { type: 'join_ok' }>;
-    const guestId = gJoin.playerId;
-    attacker.ws.close();
-    await Bun.sleep(40);
-
-    const host2 = await connectWs(url);
-    host2.ws.send(JSON.stringify({ type: 'hello', token: 'host-tok' }));
-    await host2.nextMsg();
-    await host2.nextMsg();
-    host2.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: 'hostnick', color: 'p-1' }));
-    const hRejoin = (await host2.nextMsg()) as Extract<ServerMessage, { type: 'join_ok' }>;
-    expect(hRejoin.playerId).toBe(hostId);
-
+    const url = `ws://127.0.0.1:${srv.port}/ws`;
+    const registrations = [];
+    for (const token of ['host-tok', 'guest-tok', 'host-tok']) {
+      const client = await connectWs(url);
+      client.ws.send(JSON.stringify({ type: 'hello', token }));
+      await messageOfType(client, 'hello_ok');
+      client.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: 'Same', color: 'p-1' }));
+      const joined = await messageOfType(client, 'join_ok');
+      registrations.push(joined);
+      expect(joined.profile.role).toBe(token === 'host-tok' ? 'host' : 'guest');
+      client.ws.close();
+      await client.waitClose();
+    }
+    expect(new Set(registrations.map((r) => r.playerId)).size).toBe(3);
+    expect(new Set(registrations.map((r) => r.profile.profileId)).size).toBe(3);
+    expect(shell.getState().playerOrder).toHaveLength(3);
+    const owner = registrations[0];
+    if (!owner) throw new Error('owner missing');
     const thief = await connectWs(url);
     thief.ws.send(JSON.stringify({ type: 'hello', token: 'guest-tok' }));
-    await thief.nextMsg();
-    await thief.nextMsg();
-    thief.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: 'guestone', color: 'p-3' }));
-    const tErr = (await thief.nextMsg()) as Extract<ServerMessage, { type: 'join_error' }>;
-    expect(tErr.code).toBe('nick_taken');
-    thief.ws.close();
-
-    const g2 = await connectWs(url);
-    g2.ws.send(
+    await messageOfType(thief, 'hello_ok');
+    thief.ws.send(
       JSON.stringify({
-        type: 'hello',
-        token: 'guest-tok',
-        playerId: guestId,
-        playerSecret: gJoin.playerSecret,
+        type: 'join',
+        seq: 1,
+        nick: 'Same',
+        color: 'p-1',
+        profileId: owner.profile.profileId,
       }),
     );
-    const gHello = (await g2.nextMsg()) as Extract<ServerMessage, { type: 'hello_ok' }>;
-    expect(gHello.restoredPlayerId).toBe(guestId);
-    expect(shell.getState().players[guestId]?.isHost).toBe(false);
-    host2.ws.close();
-    g2.ws.close();
+    expect((await messageOfType(thief, 'join_error')).code).toBe('profile_token_required');
+    expect(shell.getState().players[owner.playerId]?.isHost).toBe(true);
+    thief.ws.close();
   } finally {
     srv.stop();
     shell.dispose();
@@ -717,10 +699,8 @@ test('profile ID does not reclaim a disconnected guest and profile updates broad
     guest.ws.send(
       JSON.stringify({ type: 'join', seq: 1, nick: 'Guest', color: 'p-2', profileId: 'public-id' }),
     );
-    let joined = await guest.nextMsg();
-    if (joined?.type === 'state') joined = await guest.nextMsg();
-    expect(joined?.type).toBe('join_ok');
-    if (joined?.type !== 'join_ok') throw new Error('join failed');
+    const joined = await messageOfType(guest, 'join_ok');
+    expect(joined.type).toBe('join_ok');
     guest.ws.send(
       JSON.stringify({ type: 'update_profile', seq: 2, nick: 'Renamed', color: 'p-3' }),
     );
@@ -744,7 +724,7 @@ test('profile ID does not reclaim a disconnected guest and profile updates broad
     );
     let rejected = await attacker.nextMsg();
     if (rejected?.type === 'state') rejected = await attacker.nextMsg();
-    expect(rejected?.type === 'join_error' && rejected.code).toBe('nick_taken');
+    expect(rejected?.type === 'join_error' && rejected.code).toBe('profile_token_required');
   } finally {
     guest.ws.close();
     attacker.ws.close();
@@ -765,8 +745,8 @@ async function messageOfType<T extends ServerMessage['type']>(
   }
 }
 
-test('host nickname reclaim adopts the submitted profile while preserving omitted identity', async () => {
-  // protects: authorized host reclaim uses the new browser profile and preserves it when omitted; fails_when: stale profile survives replacement; no_claim: public ID authenticates anyone.
+test('host invitations create distinct seats even with the same nickname', async () => {
+  // protects: invitations cannot reclaim seats by name; fails_when: matching display values select an old profile; no_claim: local fake WS, not public tunnel or paid model.
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-host-profile-'));
   const { shell, srv } = createSecServer(dir, 'local');
   const url = `ws://127.0.0.1:${srv.port}/ws`;
@@ -781,7 +761,9 @@ test('host nickname reclaim adopts the submitted profile while preserving omitte
         JSON.stringify({ type: 'join', seq: 1, nick: 'Host', color: 'p-1', profileId }),
       );
       const joined = await messageOfType(client, 'join_ok');
-      expect(shell.getState().players[joined.playerId]?.profileId).toBe(profileId ?? 'second');
+      expect(shell.getState().players[joined.playerId]?.profileId).toBe(joined.profile.profileId);
+      if (profileId) expect(joined.profile.profileId).toBe(profileId);
+      expect(shell.getState().playerOrder).toHaveLength(clients.length);
       client.ws.close();
       await client.waitClose();
     }
@@ -804,8 +786,15 @@ test('secret restore attaches legacy profile once and reports authoritative iden
     clients.push(first);
     first.ws.send(JSON.stringify({ type: 'hello', token: 'guest-tok' }));
     await messageOfType(first, 'hello_ok');
-    first.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: 'Legacy', color: 'p-2' }));
-    const joined = await messageOfType(first, 'join_ok');
+    shell.dispatch({
+      type: 'player_join',
+      playerId: 'legacy-seat',
+      secret: 'test-old',
+      name: 'Legacy',
+      color: 'p-2',
+      isHost: false,
+    });
+    const joined = { playerId: 'legacy-seat', playerSecret: 'test-old' };
     first.ws.close();
     await first.waitClose();
     for (const [submitted, expected] of [

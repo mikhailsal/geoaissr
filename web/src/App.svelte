@@ -32,22 +32,15 @@
     if (wasPending && !store.profile.pending && !store.profile.error) closeProfile();
     wasPending = store.profile.pending;
   });
-
   onMount(() => {
     store.connect();
   });
-
   onDestroy(() => {
     store.destroy();
   });
-
   const view = $derived(store.view);
-  $effect(() => {
-    if (editingProfile && view && view.phase !== 'LOBBY' && view.phase !== 'FINAL') {
-      closeProfile();
-    }
-  });
-  const inGamePhase = $derived(store.authState !== 'error' && store.joined && view !== null);
+  const hasProfile = $derived(store.joined && view !== null);
+  const inGamePhase = $derived(hasProfile && store.authState !== 'error');
   const roundRemainingMs = $derived(view?.active ? store.remainingMs(view.active.endsAt) : 0);
   const countdownStartsAt = $derived(view?.loading?.countdownStartsAt ?? null);
   const countdownSeconds = $derived(
@@ -138,6 +131,18 @@
 </script>
 
 <div class="app-shell">
+  {#if hasProfile && !inGamePhase}<button type="button" class="btn owner-menu" onclick={openProfile}
+      >Профиль</button
+    >{/if}
+  {#if store.showCodeNotice && inGamePhase}<div class="save-code-notice panel" role="status">
+      <p>
+        Сохраните код профиля. Он нужен для входа с другого устройства или по новому адресу сервера.
+      </p>
+      <button class="btn" onclick={openProfile}>Показать код</button><button
+        class="btn"
+        onclick={() => (store.showCodeNotice = false)}>Понятно</button
+      >
+    </div>{/if}
   {#if inGamePhase && view}
     <div class="global-banner">
       <StatusBanner
@@ -163,7 +168,17 @@
       joinPending={store.joinPending}
       joinError={store.joinError}
       savedProfile={store.profile.saved}
+      sessionActive={hasProfile}
+      onLogout={() => {
+        store.logout();
+      }}
       onRetry={handleRetryConnect}
+      onLogin={(code: string) => {
+        store.login(code);
+      }}
+      onCodeLogin={() => {
+        store.useCodeLogin();
+      }}
       onJoin={handleJoin}
     />
   {:else if view.phase === 'LOBBY'}
@@ -189,6 +204,7 @@
   {:else if view.phase === 'ROUND_LOADING' || view.phase === 'ROUND_ACTIVE'}
     <Round
       {view}
+      onEditProfile={openProfile}
       browserMapsKey={store.browserMapsKey}
       localPin={store.localPin}
       submittingGuess={store.submittingGuess}
@@ -207,6 +223,7 @@
   {:else if view.phase === 'ROUND_RESULTS'}
     <RoundResults
       {view}
+      onEditProfile={openProfile}
       browserMapsKey={store.browserMapsKey}
       activeBotCard={store.activeBotCard}
       onSelectBotCard={handleSelectBotCard}
@@ -229,15 +246,17 @@
   {/if}
 </div>
 
-{#if editingProfile && view && (view.phase === 'LOBBY' || view.phase === 'FINAL')}
+{#if editingProfile && view}
   {@const me = view.players.find((p) => p.id === view.viewerId)}
   {#if me}<ProfileModal
       name={me.name}
       color={me.color}
-      usedColors={[
-        ...view.players.filter((p) => p.id !== me.id).map((p) => p.color),
-        ...view.bots.map((b) => b.color),
-      ]}
+      profileToken={store.profile.saved?.profileToken}
+      editable={inGamePhase && (view.phase === 'LOBBY' || view.phase === 'FINAL')}
+      onLogout={() => {
+        editingProfile = false;
+        store.logout();
+      }}
       pending={store.profile.pending}
       error={store.profile.error}
       onSave={(nick: string, color: ParticipantColorId) => {
@@ -248,6 +267,14 @@
 {/if}
 
 <style>
+  .owner-menu {
+    margin: var(--sp-3);
+  }
+  .save-code-notice {
+    width: min(560px, calc(100% - 2rem));
+    margin: var(--sp-3) auto;
+    padding: var(--sp-3);
+  }
   .app-shell {
     min-height: 100dvh;
     position: relative;

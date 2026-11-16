@@ -478,13 +478,15 @@ export function buildCrashHandler(opts: {
       // Best-effort cleanup during crash handling.
     }
     console.error(
-      `${formatCliError({
-        command: 'start',
-        code: 'GEO_CRASH',
-        cause: err instanceof Error ? err.message : String(err),
-        context: `crashFile=${crashFile}`,
-        knownTokens: [opts.hostToken, opts.guestToken],
-      })}\nФайл сбоя: ${crashFile}`,
+      opts.logger.redact(
+        `${formatCliError({
+          command: 'start',
+          code: 'GEO_CRASH',
+          cause: err instanceof Error ? err.message : String(err),
+          context: `crashFile=${crashFile}`,
+          knownTokens: [opts.hostToken, opts.guestToken],
+        })}\nФайл сбоя: ${crashFile}`,
+      ),
     );
     opts.onUnexpectedCrash?.(crashFile, err);
     return { exitCode: 70, crashFile };

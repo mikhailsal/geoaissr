@@ -9,6 +9,7 @@ export interface AppPaths {
   quotaFile: string;
   apiUsageFile: string;
   matchesFile: string;
+  profilesFile: string;
   logsDir: string;
   runDir: string;
   lockFile: string;
@@ -45,6 +46,7 @@ export function resolveAppPaths(env: Record<string, string | undefined> = proces
     quotaFile: path.join(dataDir, 'quota.json'),
     apiUsageFile: path.join(dataDir, 'api-usage.jsonl'),
     matchesFile: path.join(dataDir, 'matches.jsonl'),
+    profilesFile: path.join(dataDir, 'profiles.json'),
     logsDir,
     runDir,
     lockFile: path.join(runDir, 'server.lock'),

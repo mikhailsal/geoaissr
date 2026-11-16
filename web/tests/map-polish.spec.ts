@@ -25,7 +25,7 @@ test.beforeAll(() => {
 async function startRound(page: Page, url: string): Promise<void> {
   await page.goto(url);
   await page.getByLabel('Ваше имя').fill('Оля');
-  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
   await page.getByRole('button', { name: 'Начать' }).click();
   await expect(page.getByTestId('fake-guess-map')).toBeVisible({ timeout: 12_000 });
 }
