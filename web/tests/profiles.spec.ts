@@ -676,7 +676,41 @@ async function holdLogoutEvents(page: Page): Promise<void> {
   });
 }
 
-// Value: protects=newly saved profile and seat credentials when a real same-origin logout event arrives late; fails_when=the delayed event erases profile B or a reload cannot restore its seat; why_new=ordinary cross-tab logout coverage delivers the event before a subsequent login; seam=none; no_claim=browser-event scheduling fixture does not establish cross-origin logout propagation
+async function releaseLogoutEvent(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const state = window as typeof window & {
+      heldLogout?: StorageEvent;
+      holdLogout?: (event: StorageEvent) => void;
+    };
+    if (!state.heldLogout || !state.holdLogout) throw new Error('Missing held logout event');
+    window.removeEventListener('storage', state.holdLogout, true);
+    const event = state.heldLogout;
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: event.key,
+        oldValue: event.oldValue,
+        newValue: event.newValue,
+        url: event.url,
+        storageArea: event.storageArea,
+      }),
+    );
+  });
+}
+
+async function assertOtherProfileIgnoresLogout(target: Page, source: Page): Promise<void> {
+  const notice = await source.evaluate(() => {
+    const event = (window as typeof window & { heldLogout?: StorageEvent }).heldLogout;
+    if (!event) throw new Error('Missing held logout event');
+    return { key: event.key, newValue: event.newValue, url: event.url };
+  });
+  await target.evaluate((notice) => {
+    window.dispatchEvent(new StorageEvent('storage', { ...notice, storageArea: localStorage }));
+  }, notice);
+  await expect(target.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+  await expect(target.getByLabel('Код профиля')).toHaveCount(0);
+}
+
+// Value: protects=newly saved profile and seat credentials plus a newer active profile when a real same-origin logout event arrives late; fails_when=the delayed event signs out or erases profile B or a reload cannot restore its seat; why_new=ordinary cross-tab logout coverage delivers the event before a subsequent login; seam=none; no_claim=browser-event scheduling fixture does not establish cross-origin logout propagation
 test('delayed same-origin logout preserves a newer profile and seat credentials', async ({
   browser,
 }) => {
@@ -708,29 +742,16 @@ test('delayed same-origin logout preserves a newer profile and seat credentials'
     await first.getByRole('button', { name: 'Войти по коду', exact: true }).click();
     await expect(first.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
     expect((await savedProfile(first)).profileId === otherProfile.profileId).toBe(true);
+    const current = await sharedContext.newPage();
+    await current.goto(server.baseUrl);
+    await expect(current.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await assertOtherProfileIgnoresLogout(current, oldTab);
     const saved = await first.evaluate(() => ({
       profile: localStorage.getItem(`geoaissr:profile:${location.origin}`),
       player: localStorage.getItem(`geoaissr:player:${location.origin}`),
     }));
     expect(Boolean(saved.profile && saved.player)).toBe(true);
-    await oldTab.evaluate(() => {
-      const state = window as typeof window & {
-        heldLogout?: StorageEvent;
-        holdLogout?: (event: StorageEvent) => void;
-      };
-      if (!state.heldLogout || !state.holdLogout) throw new Error('Missing held logout event');
-      window.removeEventListener('storage', state.holdLogout, true);
-      const event = state.heldLogout;
-      window.dispatchEvent(
-        new StorageEvent('storage', {
-          key: event.key,
-          oldValue: event.oldValue,
-          newValue: event.newValue,
-          url: event.url,
-          storageArea: event.storageArea,
-        }),
-      );
-    });
+    await releaseLogoutEvent(oldTab);
     await expect(oldTab.getByLabel('Код профиля')).toBeVisible();
     expect(
       await first.evaluate(
@@ -752,6 +773,62 @@ test('delayed same-origin logout preserves a newer profile and seat credentials'
   } finally {
     await sharedContext.close();
     await otherContext.close();
+    await server.stop();
+  }
+});
+
+// Value: protects=explicit logout when a delayed tab reconnects with its old in-memory code before receiving the logout; fails_when=reconnected credentials survive logout and reload restores the signed-out profile; why_new=preserving a newer profile must still remove credentials re-saved by the logged-out profile; seam=none; no_claim=browser-event scheduling does not establish real tunnel behavior
+test('delayed logout clears credentials re-saved by the logged-out profile reconnect', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const context = await browser.newContext();
+  const first = await context.newPage();
+  const oldTab = await context.newPage();
+  try {
+    await join(first, server.hostUrl, 'Профиль А');
+    const original = await savedProfile(first);
+    await holdLogoutEvents(oldTab);
+    await oldTab.goto(server.baseUrl);
+    await expect(oldTab.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
+    await oldTab.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await first.getByRole('button', { name: 'Профиль', exact: true }).click();
+    await first.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await expect(first.getByLabel('Код профиля')).toBeVisible();
+    await expect
+      .poll(() =>
+        oldTab.evaluate(() =>
+          Boolean((window as typeof window & { heldLogout?: StorageEvent }).heldLogout),
+        ),
+      )
+      .toBe(true);
+    expect(await savedProfile(first)).toBeNull();
+    await oldTab.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect
+      .poll(() =>
+        oldTab.evaluate(() =>
+          Boolean(
+            localStorage.getItem(`geoaissr:profile:${location.origin}`) &&
+            localStorage.getItem(`geoaissr:player:${location.origin}`),
+          ),
+        ),
+      )
+      .toBe(true);
+    expect((await savedProfile(oldTab)).profileId === original.profileId).toBe(true);
+    await releaseLogoutEvent(oldTab);
+    await expect(oldTab.getByLabel('Код профиля')).toBeVisible();
+    expect(
+      await first.evaluate(() => ({
+        profileCleared: localStorage.getItem(`geoaissr:profile:${location.origin}`) === null,
+        playerCleared: localStorage.getItem(`geoaissr:player:${location.origin}`) === null,
+      })),
+    ).toEqual({ profileCleared: true, playerCleared: true });
+    await first.reload();
+    await expect(first.getByLabel('Код профиля')).toBeVisible();
+    await expect(first.getByLabel('Ваше имя')).toHaveCount(0);
+    await expect(first.getByText(/ИГРОКИ/)).toHaveCount(0);
+  } finally {
+    await context.close();
     await server.stop();
   }
 });

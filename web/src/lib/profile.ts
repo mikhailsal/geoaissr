@@ -17,6 +17,31 @@ export function profileStorageKey(): string {
 export function logoutStorageKey(): string {
   return `geoaissr:logout:${window.location.origin}`;
 }
+export function publishLogout(profileId: string | null): void {
+  try {
+    window.localStorage.setItem(
+      logoutStorageKey(),
+      JSON.stringify({ profileId, nonce: `${Date.now()}-${Math.random()}` }),
+    );
+  } catch {
+    /* Other tabs cannot be notified when storage is unavailable. */
+  }
+}
+export function isProfileLogout(event: StorageEvent, profileId: string | null): boolean {
+  if (event.key !== logoutStorageKey() || !event.newValue || event.newValue.length > 256)
+    return false;
+  try {
+    const notice: unknown = JSON.parse(event.newValue);
+    return (
+      typeof notice === 'object' &&
+      notice !== null &&
+      'profileId' in notice &&
+      notice.profileId === profileId
+    );
+  } catch {
+    return false;
+  }
+}
 function validProfile(value: unknown): SavedUserProfile | null {
   if (!value || typeof value !== 'object') return null;
   const p = value as {

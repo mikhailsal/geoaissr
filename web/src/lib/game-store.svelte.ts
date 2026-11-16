@@ -7,7 +7,13 @@ import type {
   ServerMessage,
 } from '$shared/protocol';
 import { ServerClock } from './clock';
-import { clearProfile, logoutStorageKey, getOrCreateProfileId } from './profile';
+import {
+  clearProfile,
+  getOrCreateProfileId,
+  isProfileLogout,
+  loadSavedProfile,
+  publishLogout,
+} from './profile';
 import { ProfileSession } from './profile-session.svelte';
 import { subscribeMapsAuthFailure } from './maps-loader';
 import { GeoWsClient, type WsClientCallbacks } from './ws-client';
@@ -316,7 +322,7 @@ export class GameStore extends GameCommands {
   }
 
   private readonly handleStorage = (event: StorageEvent): void => {
-    if (event.key === logoutStorageKey() && event.newValue) this.logout(false);
+    if (isProfileLogout(event, this.profile.saved?.profileId ?? null)) this.logout(false);
   };
 
   login(raw: string): void {
@@ -335,10 +341,11 @@ export class GameStore extends GameCommands {
   }
 
   logout(notify = true): void {
-    this.wsClient.logout(notify);
+    const profileId = this.profile.saved?.profileId ?? null;
+    const clearShared = notify || loadSavedProfile()?.profileId === profileId;
+    this.wsClient.logout(clearShared);
     this.destroy();
-    // The originating tab already cleared shared storage before broadcasting.
-    clearProfile(notify);
+    clearProfile(clearShared);
     this.profile.reset();
     this.resetForHashToken();
     this.authState = 'error';
@@ -356,13 +363,7 @@ export class GameStore extends GameCommands {
     this.offlinePinWarning = false;
     this.visionToastByBot = {};
     this.showCodeNotice = false;
-    if (notify) {
-      try {
-        window.localStorage.setItem(logoutStorageKey(), `${Date.now()}-${Math.random()}`);
-      } catch {
-        /* unavailable */
-      }
-    }
+    if (notify) publishLogout(profileId);
     window.addEventListener('storage', this.handleStorage);
     this.wsClient.useCodeLogin();
   }
