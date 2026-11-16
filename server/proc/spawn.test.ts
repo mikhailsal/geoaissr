@@ -46,9 +46,31 @@ test('spawnManaged stops entire detached process group including forked children
 
 test('cleanupOrphanedChildren verifies 3 fields and ignores mismatched startTime/command', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-proc-orphan-'));
+  const sleeper = Bun.spawn(
+    [process.execPath, '-e', "console.log('ready'); await Bun.sleep(30000)"],
+    {
+      stdout: 'pipe',
+      stderr: 'ignore',
+    },
+  );
   try {
     const childrenFile = path.join(dir, 'children.json');
-    const sleeper = Bun.spawn(['sleep', '30'], { stdout: 'ignore', stderr: 'ignore' });
+    const reader = sleeper.stdout.getReader();
+    let readinessTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        reader.read(),
+        new Promise<never>((_, reject) => {
+          readinessTimer = setTimeout(() => {
+            reject(new Error('Child did not become ready'));
+          }, 3000);
+        }),
+      ]);
+      expect(new TextDecoder().decode(result.value)).toContain('ready');
+    } finally {
+      clearTimeout(readinessTimer);
+      reader.releaseLock();
+    }
     const sleeperStart = getProcessStartTime(sleeper.pid) ?? 'unknown';
 
     // Mismatched command must NOT kill sleeper
@@ -61,13 +83,15 @@ test('cleanupOrphanedChildren verifies 3 fields and ignores mismatched startTime
 
     // Exact match (pid + startTime + command) kills orphan
     writeChildrenRegistry(childrenFile, [
-      { pid: sleeper.pid, startTime: sleeperStart, command: 'sleep', kind: 'fake' },
+      { pid: sleeper.pid, startTime: sleeperStart, command: process.execPath, kind: 'fake' },
     ]);
     const killedMatch = await cleanupOrphanedChildren(childrenFile);
     expect(killedMatch).toHaveLength(1);
     await Bun.sleep(100);
     expect(isProcessAlive(sleeper.pid)).toBe(false);
   } finally {
+    if (sleeper.exitCode === null && sleeper.signalCode === null) sleeper.kill();
+    await sleeper.exited;
     rmSync(dir, { recursive: true, force: true });
   }
 });
