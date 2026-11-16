@@ -44,6 +44,7 @@ interface QueueState {
   failedCalls: number;
   roundStartedPromise: Promise<void> | null;
   finalized: boolean;
+  requireCompleteReasoning: boolean;
 }
 
 function recordQueueFailure(st: QueueState, baseMsg: string): ToolResponsePayload {
@@ -85,9 +86,19 @@ async function executeGuess(
   if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
   const missingReasoning =
     toolName !== 'submit_guess' && !guess.facts && !guess.conclusion && !guess.explanation;
-  const finalized = toolName !== 'draft_guess' && !missingReasoning;
+  const incompleteFinal =
+    toolName === 'final_guess' &&
+    st.requireCompleteReasoning &&
+    (!guess.facts || !guess.conclusion || !guess.rejectedGuesses);
+  const finalized = toolName !== 'draft_guess' && !missingReasoning && !incompleteFinal;
   st.handlers.onGuess(guess, finalized);
   st.finalized = finalized;
+  if (incompleteFinal) {
+    return {
+      text: 'Координаты сохранены как черновик. Повтори final_guess с lat, lng, непустыми facts и conclusion и списком rejected_guesses; если обоснованных исключённых версий нет, укажи [].',
+      isError: true,
+    };
+  }
   if (missingReasoning) {
     return {
       text: 'Координаты сохранены как черновик. Добавь непустое объяснение: facts (до 1000 символов) или conclusion (до 600); повтори вызов с lat и lng.',
@@ -175,6 +186,7 @@ export function createBotToolQueue(opts: {
   moveLimit: number;
   moveEnabled: boolean;
   handlers: BotSessionHandlers;
+  requireCompleteReasoning?: boolean;
 }): BotToolQueue {
   const ac = new AbortController();
   const st: QueueState = {
@@ -186,6 +198,7 @@ export function createBotToolQueue(opts: {
     failedCalls: 0,
     roundStartedPromise: null,
     finalized: false,
+    requireCompleteReasoning: opts.requireCompleteReasoning ?? false,
   };
   let tail: Promise<unknown> = Promise.resolve();
 

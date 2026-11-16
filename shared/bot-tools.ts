@@ -144,7 +144,6 @@ const guessShape = {
         })
         .strict(),
     )
-    .min(1)
     .max(3),
   conclusion: z
     .string()
@@ -159,9 +158,7 @@ const guessShape = {
 export const draftGuessInputSchema = z
   .object({ ...guessShape, rejected_guesses: guessShape.rejected_guesses.optional() })
   .strict();
-export const finalGuessInputSchema = z
-  .object({ ...guessShape, rejected_guesses: guessShape.rejected_guesses.optional() })
-  .strict();
+export const finalGuessInputSchema = z.object(guessShape).strict();
 // Kept for legacy clients that discover the deprecated tool.
 export const submitGuessInputSchema = finalGuessInputSchema;
 export type LookInput = z.infer<typeof lookInputSchema>;
@@ -203,7 +200,7 @@ function parseRejectedGuesses(value: unknown): BotReasoning['rejectedGuesses'] {
     if (guess && reason) result.push({ guess, reason });
     if (result.length === 3) break;
   }
-  return result.length > 0 ? result : undefined;
+  return result.length > 0 || value.length === 0 ? result : undefined;
 }
 
 export function parseGuessInput(raw: unknown): NormalizedGuessInput | undefined {

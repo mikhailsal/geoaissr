@@ -9,14 +9,16 @@
       <h4>Факты и улики</h4>
       <p>{entry.facts}</p>
     </section>{/if}
-  {#if entry.rejectedGuesses?.length}
+  {#if entry.rejectedGuesses}
     <section>
       <h4>Исключённые версии</h4>
-      <ul>
-        {#each entry.rejectedGuesses as rejected, index (`${rejected.guess}-${index}`)}<li>
-            <strong>{rejected.guess}</strong> — {rejected.reason}
-          </li>{/each}
-      </ul>
+      {#if entry.rejectedGuesses.length}
+        <ul>
+          {#each entry.rejectedGuesses as rejected, index (`${rejected.guess}-${index}`)}<li>
+              <strong>{rejected.guess}</strong> — {rejected.reason}
+            </li>{/each}
+        </ul>
+      {:else}<p>Нет обоснованных исключённых версий.</p>{/if}
     </section>
   {/if}
   {#if entry.conclusion || entry.explanation || (entry.lat !== null && entry.lng !== null)}

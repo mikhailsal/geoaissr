@@ -18,14 +18,14 @@ Failed calls do not spend a turn. A final submission remains available after the
 Advertised draft and final schemas are strict. Their field order is `facts`, `rejected_guesses`, `conclusion`, `lat`, `lng`, then optional `quip`:
 
 - `facts`: nonempty text, at most 1,000 characters.
-- `rejected_guesses`: optional; when provided, 1–3 objects with `guess` (1–120 characters) and `reason` (1–300 characters).
+- `rejected_guesses`: required for a final answer, optional for a draft; 0–3 objects with `guess` (1–120 characters) and `reason` (1–300 characters). An empty list explicitly means no alternatives could be ruled out from the visible evidence.
 - `conclusion`: nonempty text, at most 600 characters.
 - `lat`: finite number in `[-90, 90]`; `lng`: finite number, normalized to `[-180, 180]`.
 - `quip`: optional text, at most 120 characters.
 
-Ingress preserves valid coordinates even if reasoning is missing or malformed. Long text is truncated to its field limit, and valid rejected alternatives are retained independently. Legacy `explanation` fills the conclusion slot when no valid conclusion exists, including with partial structured blocks. Modern calls with no nonempty `facts`, `conclusion` or legacy `explanation` save a draft and request an explanation; an empty `final_guess` returns an error without closing the session, allowing correction. The deprecated `submit_guess` retains its previous finalization behavior.
+Ingress preserves valid coordinates even if reasoning is missing or malformed. Long text is truncated to its field limit, and valid rejected alternatives are retained independently. Legacy `explanation` fills the conclusion slot when no valid conclusion exists, including with partial structured blocks. Game finals require nonempty `facts` and `conclusion` and an explicit valid `rejected_guesses` list, which may be empty. An incomplete final saves a draft and returns a correction request without closing the session. Drafts remain tolerant; the vision-check queue and deprecated `submit_guess` retain their previous finalization behavior.
 
-The prompt requests a short evidence-based draft immediately after viewing the initial frames. Explanations must name visible details and connect them to a geographic deduction or a rejected alternative, acknowledging uncertainty rather than inventing clues. Alternatives are optional. File-based harnesses may use `read_file` only for game-provided images. These instructions do not guarantee a model's compliance or geographic accuracy.
+The prompt requests a short evidence-based draft immediately after viewing the initial frames, followed by a complete final explanation. Explanations must name visible details and connect them to a geographic deduction or a rejected alternative, acknowledging uncertainty rather than inventing clues. When no alternative can be ruled out, the bot supplies an empty list and the result card says so explicitly. File-based harnesses may use `read_file` only for game-provided images. These instructions do not guarantee a model's compliance or geographic accuracy.
 
 The advertised time budget is capped by the round duration. Every tool response reports remaining time; at 15 seconds or less it requests a final answer, while the prompt asks the bot to reserve time for submission. An early end to the shared AI waiting window can still end the round before that personal budget.
 
@@ -33,7 +33,9 @@ The advertised time budget is capped by the round duration. Every tool response 
 
 ## Usage and price estimates
 
-Normalized `inputTokens` includes cached reads; `cachedInputTokens` is a subset. `totalTokens` is normalized input plus output. Claude input includes its separately reported cache creation and cache reads. Codex already includes cached reads in its input count. AGY's separate cache-read treatment is inferred from the consecutive examples in its [official headless documentation](https://antigravity.google/docs/cli/headless/#read-the-results). Terminal totals are used without also summing intermediate snapshots. Missing or invalid usage is unavailable. Codex skips unrelated oversized lines and discards accumulated counters when a malformed, truncated or oversized terminal event is identifiable in its bounded prefix.
+Normalized `inputTokens` includes cached reads; `cachedInputTokens` is a subset. `totalTokens` is normalized input plus output. Claude input includes its separately reported cache creation and cache reads. Codex already includes cached reads in its input count. AGY's reported total determines whether its raw input already includes cache reads or reports them separately, so cached input is counted once. Ambiguous or contradictory AGY usage is unavailable. See its [official headless documentation](https://antigravity.google/docs/cli/headless/#read-the-results) for the raw counters. Terminal totals are used without also summing intermediate snapshots. Missing or invalid usage is unavailable. Codex skips unrelated oversized lines and discards accumulated counters when a malformed, truncated or oversized terminal event is identifiable in its bounded prefix.
+
+A paid game turn counts a successful `look` or `move`, not a model request. Observation, draft/final submissions and image-file reads can require further model exchanges and repeated input processing even when only one paid turn is used.
 
 The public [OpenRouter model list](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties) supplies USD-per-token prompt, completion and optional cache-read prices. The estimate is:
 

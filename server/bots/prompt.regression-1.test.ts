@@ -23,10 +23,10 @@ test('file prompt requests a quick evidence-based draft and concrete, honest com
   expect(prompt).toContain('конкретный видимый признак');
   expect(prompt).toContain('не выдумывай');
   expect(prompt).not.toContain('rejected_guesses (2–3 версии)');
-  for (const name of ['draft_guess', 'final_guess']) {
-    const definition = getBotToolDefinitions().find((tool) => tool.name === name);
-    expect(definition?.inputSchema.required).not.toContain('rejected_guesses');
-  }
+  const draft = getBotToolDefinitions().find((tool) => tool.name === 'draft_guess');
+  const final = getBotToolDefinitions().find((tool) => tool.name === 'final_guess');
+  expect(draft?.inputSchema.required).not.toContain('rejected_guesses');
+  expect(final?.inputSchema.required).toContain('rejected_guesses');
 });
 
 // Regression: ISSUE-003, ISSUE-005

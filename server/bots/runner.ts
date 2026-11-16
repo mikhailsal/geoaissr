@@ -29,7 +29,6 @@ import {
 } from './queue.ts';
 import { dispatchObserveThumbs, makeThumb } from './thumbs.ts';
 import { runVisionCheck } from './vision-check.ts';
-
 const REGION_LABELS_RU: Record<RegionId, string> = {
   world: 'Весь мир',
   europe: 'Европа',
@@ -348,6 +347,7 @@ function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
   const queue = createBotToolQueue({
     moveLimit: slot.moveLimit,
     moveEnabled,
+    requireCompleteReasoning: true,
     handlers: buildRoundHandlers(ctx, params, {
       tracker,
       waitObserveRelease: gate.waitObserveRelease,

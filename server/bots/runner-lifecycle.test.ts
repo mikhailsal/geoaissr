@@ -137,7 +137,7 @@ test('runner records paid tool parameters and requests effective fov', async () 
         }
         await call('look', {heading:359.6,pitch:4.6,zoom:3,hypothesis:'Проверяю знак'});
         await call('move', {heading:90.4,hypothesis:'Проверяю дорогу'});
-        await call('final_guess', {lat:1,lng:2,conclusion:'Test'});
+        await call('final_guess', {lat:1,lng:2,facts:'Test clue',conclusion:'Test',rejected_guesses:[]});
       `,
       ],
     }),
