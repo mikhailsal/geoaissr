@@ -17,7 +17,7 @@ test('quotas show usage meters and keep details accessible', async ({ page }) =>
     await page.getByLabel('Ваше имя').or(continueButton).first().waitFor();
     if (await continueButton.isVisible()) await continueButton.click();
     await page.getByLabel('Ваше имя').fill('Оля');
-    await page.getByRole('button', { name: 'Войти' }).click();
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
     await expect(page.getByRole('meter')).toHaveCount(3);
     for (const [name, used, max, percent] of [
       ['Static Street View', 5, 20, 25],

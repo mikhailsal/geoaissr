@@ -36,7 +36,7 @@ test('shows an honest empty alternatives list but hides absent legacy alternativ
     });
     await page.goto(server.hostUrl);
     await page.getByLabel('Ваше имя').fill('Оля');
-    await page.getByRole('button', { name: 'Войти' }).click();
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
     await page.getByRole('button', { name: 'Начать' }).click();
     const map = page.getByTestId('fake-guess-map').locator('canvas');
     await expect(map).toBeVisible({ timeout: 12_000 });

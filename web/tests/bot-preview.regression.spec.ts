@@ -21,7 +21,7 @@ async function openBotCard(page: Page, url: string): Promise<void> {
   });
   await page.goto(url);
   await page.getByLabel('Ваше имя').fill('Оля');
-  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
   await page.getByRole('button', { name: 'Начать' }).click();
   const map = page.getByTestId('fake-guess-map').locator('canvas');
   await expect(map).toBeVisible({ timeout: 12_000 });
