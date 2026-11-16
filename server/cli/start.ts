@@ -16,6 +16,7 @@ import { createFakeLocationService, createLocationService } from '../location.ts
 import { createServerLogger, type ServerLogger } from '../log.ts';
 import { startAppHttpServer } from '../net/http.ts';
 import { createAuthRateLimiter } from '../net/rate-limit.ts';
+import { ProfileStore } from '../storage/profiles.ts';
 import { createWsRoomCoordinator } from '../net/ws.ts';
 import { resolveAppPaths, type AppPaths } from '../paths.ts';
 import { acquireDataDirLock } from '../proc/lock.ts';
@@ -97,6 +98,15 @@ function createNetTransport(opts: {
   );
   const wsCoordinator = createWsRoomCoordinator({
     shell: opts.shell,
+    profiles: new ProfileStore(
+      opts.optsInput.paths.profilesFile,
+      (tokens) => {
+        opts.optsInput.logger.registerSecrets([], tokens);
+      },
+      (message) => {
+        opts.optsInput.logger.log('profiles_unavailable', { message });
+      },
+    ),
     hostToken: opts.optsInput.hostToken,
     guestToken: opts.optsInput.guestToken,
     browserMapsKey: opts.optsInput.browserKey,

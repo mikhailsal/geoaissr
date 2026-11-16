@@ -7,6 +7,7 @@ import {
   saveProfile,
   type SavedUserProfile,
 } from './profile';
+import type { StoredProfile } from '$shared/storage-schemas';
 import type { GeoWsClient } from './ws-client';
 
 /** Coordinates profile persistence with join state and acknowledged profile edits. */
@@ -20,9 +21,28 @@ export class ProfileSession {
 
   constructor(private readonly client: GeoWsClient) {}
 
+  accept(profile: StoredProfile): void {
+    this.saved = {
+      version: 2,
+      profileId: profile.profileId,
+      profileToken: profile.profileToken,
+      nick: profile.nick,
+      color: profile.color,
+    };
+    saveProfile(this.saved);
+    this.pendingJoin = null;
+    this.restoredProfileId = null;
+  }
+
+  reset(): void {
+    this.clearPending();
+    this.saved = null;
+    this.error = null;
+  }
+
   join(nick: string, color: ParticipantColorId): boolean {
     this.pendingJoin = { profileId: getOrCreateProfileId(), nick: nick.trim(), color };
-    if (this.client.sendJoin(nick, color, this.pendingJoin.profileId)) return true;
+    if (this.client.sendJoin(nick, color, loadSavedProfile()?.profileId)) return true;
     this.pendingJoin = null;
     return false;
   }
@@ -40,7 +60,7 @@ export class ProfileSession {
     if (!me) return;
     const profileId = this.restoredProfileId ?? this.pendingJoin?.profileId;
     if (!profileId) return;
-    this.saved = { profileId, nick: me.name, color: me.color };
+    this.saved = { ...this.saved, profileId, nick: me.name, color: me.color };
     saveProfile(this.saved);
     this.pendingJoin = null;
     this.restoredProfileId = null;
@@ -55,6 +75,7 @@ export class ProfileSession {
     }
     this.pending = true;
     this.pendingEdit = {
+      ...this.saved,
       profileId: this.saved?.profileId ?? getOrCreateProfileId(),
       nick: nick.trim(),
       color,
@@ -68,7 +89,7 @@ export class ProfileSession {
     this.pendingEdit = null;
     this.pending = false;
     if (msg.result === 'ok') {
-      this.saved = { profileId: edit.profileId, nick: edit.nick, color: edit.color };
+      this.saved = { ...this.saved, profileId: edit.profileId, nick: edit.nick, color: edit.color };
       saveProfile(this.saved);
     } else this.error = msg.message || 'Не удалось изменить профиль. Проверьте имя и цвет.';
   }

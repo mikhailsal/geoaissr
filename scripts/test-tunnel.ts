@@ -4,6 +4,7 @@ import { createRoomShell } from '../server/engine/shell.ts';
 import { createThumbStore } from '../server/http/thumbs.ts';
 import { startAppHttpServer } from '../server/net/http.ts';
 import { createAuthRateLimiter } from '../server/net/rate-limit.ts';
+import { ProfileStore } from '../server/storage/profiles.ts';
 import { createWsRoomCoordinator } from '../server/net/ws.ts';
 import { createFakeLocationService } from '../server/location.ts';
 import { buildQuotaSummaryForRoom, createQuotaManager } from '../server/storage/quota.ts';
@@ -101,6 +102,7 @@ function createTunnelSmokeServer(dir: string, hostToken: string, guestToken: str
   const rl = createAuthRateLimiter('tunnel');
   const wsCoord = createWsRoomCoordinator({
     shell,
+    profiles: new ProfileStore(path.join(dir, 'profiles.json')),
     hostToken,
     guestToken,
     browserMapsKey: null,

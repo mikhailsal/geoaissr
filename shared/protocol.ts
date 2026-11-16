@@ -10,6 +10,7 @@ import { PARTICIPANT_COLOR_IDS } from './colors.ts';
 import type { BotAccounting, BotReasoning, BotTurnThumbView } from './bot-results.ts';
 export type { BotTurnThumbView } from './bot-results.ts';
 import {
+  type StoredProfile,
   HARNESS_IDS,
   REGION_IDS,
   botSlotConfigSchema,
@@ -33,6 +34,13 @@ export type GamePhase = 'LOBBY' | 'ROUND_LOADING' | 'ROUND_ACTIVE' | 'ROUND_RESU
 
 export type AckResult =
   'ok' | 'round_over' | 'already_confirmed' | 'not_in_round' | 'invalid' | 'forbidden';
+
+export const profileLoginMessageSchema = z
+  .object({
+    type: z.literal('profile_login'),
+    profileToken: z.string().max(64),
+  })
+  .strict();
 
 export const helloMessageSchema = z.object({
   type: z.literal('hello'),
@@ -185,6 +193,7 @@ export const retryRoundMessageSchema = z.object({
 
 export const clientMessageSchema = z.discriminatedUnion('type', [
   helloMessageSchema,
+  profileLoginMessageSchema,
   joinMessageSchema,
   updateProfileMessageSchema,
   resetBotWinsMessageSchema,
@@ -399,9 +408,29 @@ export interface ClientViewState {
   };
 }
 
+export interface ProfileLoginOk {
+  type: 'profile_login_ok';
+  serverNow: number;
+  profile: StoredProfile;
+  playerId: string;
+  playerSecret: string;
+  resumedSeat: boolean;
+  browserMapsKey: string | null;
+  fakeMode: boolean;
+  lobbySummary: LobbySummary;
+}
+export interface ProfileLoginError {
+  type: 'profile_login_error';
+  serverNow: number;
+  code: 'invalid_profile_token' | 'room_full' | 'profile_store_unavailable';
+  message: string;
+}
 export type ServerMessage =
+  | ProfileLoginOk
+  | ProfileLoginError
   | {
       type: 'hello_ok';
+      profile?: StoredProfile;
       serverNow: number;
       role: 'host' | 'guest';
       browserMapsKey: string | null;
@@ -418,6 +447,7 @@ export type ServerMessage =
     }
   | {
       type: 'join_ok';
+      profile: StoredProfile;
       serverNow: number;
       playerId: string;
       playerSecret: string;
@@ -426,7 +456,13 @@ export type ServerMessage =
       type: 'join_error';
       serverNow: number;
       seq: number;
-      code: 'nick_taken' | 'color_taken' | 'room_full' | 'bad_nick';
+      code:
+        | 'nick_taken'
+        | 'color_taken'
+        | 'room_full'
+        | 'bad_nick'
+        | 'profile_token_required'
+        | 'profile_store_unavailable';
       message: string;
       lobbySummary: LobbySummary;
     }

@@ -14,6 +14,7 @@ const RETENTION_DAYS = 14;
 const MS_PER_DAY = 86_400_000;
 
 export type LogEventType =
+  | 'profiles_unavailable'
   | 'server_start'
   | 'round_start'
   | 'round_end'

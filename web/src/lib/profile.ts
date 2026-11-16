@@ -1,39 +1,86 @@
 import { PARTICIPANT_COLOR_IDS, type ParticipantColorId } from '../../../shared/colors';
-
+import { normalizeProfileToken } from '../../../shared/profile-token';
+export { normalizeProfileToken, formatProfileToken } from '../../../shared/profile-token';
 export interface SavedUserProfile {
+  version?: 2;
   profileId: string;
+  profileToken?: string;
   nick: string;
   color: ParticipantColorId;
 }
-const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let temporaryId: string | null = null;
-function key(): string {
+let memoryProfile: SavedUserProfile | null = null;
+let memoryOrigin: string | null = null;
+export function profileStorageKey(): string {
   return `geoaissr:profile:${window.location.origin}`;
 }
-export function loadSavedProfile(): SavedUserProfile | null {
-  try {
-    const raw = window.localStorage.getItem(key());
-    if (!raw) return null;
-    const p = JSON.parse(raw) as Partial<SavedUserProfile> | null;
-    if (
-      p &&
-      typeof p.profileId === 'string' &&
-      uuidV4.test(p.profileId) &&
-      typeof p.nick === 'string' &&
-      p.nick.trim().length > 0 &&
-      p.nick.length <= 20 &&
-      typeof p.color === 'string' &&
-      PARTICIPANT_COLOR_IDS.includes(p.color)
-    )
-      return p as SavedUserProfile;
-  } catch {
-    /* Storage can be unavailable or malformed. */
+export function logoutStorageKey(): string {
+  return `geoaissr:logout:${window.location.origin}`;
+}
+function validProfile(value: unknown): SavedUserProfile | null {
+  if (!value || typeof value !== 'object') return null;
+  const p = value as {
+    profileId?: string;
+    profileToken?: string;
+    version?: number;
+    nick?: string;
+    color?: ParticipantColorId;
+  };
+  if (
+    typeof p.profileId !== 'string' ||
+    !p.profileId.length ||
+    p.profileId.length > 64 ||
+    typeof p.nick !== 'string' ||
+    !p.nick.trim() ||
+    p.nick.length > 20 ||
+    !PARTICIPANT_COLOR_IDS.includes(p.color as ParticipantColorId)
+  )
+    return null;
+  if (p.version !== undefined && p.version !== 2) return null;
+  const color = p.color as ParticipantColorId;
+  if (p.version === 2 || p.profileToken !== undefined) {
+    const profileToken =
+      typeof p.profileToken === 'string' ? normalizeProfileToken(p.profileToken) : null;
+    if (!profileToken) return null;
+    return { version: 2, profileId: p.profileId, profileToken, nick: p.nick.trim(), color };
   }
-  return null;
+  return { profileId: p.profileId, nick: p.nick.trim(), color };
+}
+export function loadSavedProfile(): SavedUserProfile | null {
+  if (memoryOrigin !== window.location.origin) {
+    memoryProfile = null;
+    memoryOrigin = window.location.origin;
+  }
+  let raw: string | null;
+  try {
+    raw = window.localStorage.getItem(profileStorageKey());
+  } catch {
+    return memoryProfile;
+  }
+  if (raw) {
+    try {
+      memoryProfile = validProfile(JSON.parse(raw));
+    } catch {
+      memoryProfile = null;
+    }
+  }
+  return memoryProfile;
 }
 export function saveProfile(profile: SavedUserProfile): void {
+  memoryOrigin = window.location.origin;
+  memoryProfile = validProfile(profile);
+  if (!memoryProfile) return;
   try {
-    window.localStorage.setItem(key(), JSON.stringify(profile));
+    window.localStorage.setItem(profileStorageKey(), JSON.stringify(memoryProfile));
+  } catch {
+    /* Page-session cache remains available. */
+  }
+}
+export function clearProfile(): void {
+  memoryProfile = null;
+  temporaryId = null;
+  try {
+    window.localStorage.removeItem(profileStorageKey());
   } catch {
     /* unavailable */
   }

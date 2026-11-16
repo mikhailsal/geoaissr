@@ -1,11 +1,12 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { PARTICIPANT_COLORS, pickFirstFreeColor, type ParticipantColorId } from '$shared/colors';
+  import { PARTICIPANT_COLORS, type ParticipantColorId } from '$shared/colors';
   import type { LobbySummary } from '$shared/protocol';
   import type { AuthScreenError } from '../lib/game-store.svelte';
   import type { SavedUserProfile } from '../lib/profile';
   import InlineState from '../components/InlineState.svelte';
   import { formatRoundsRu } from '../i18n/format';
+  import { normalizeProfileToken } from '../lib/profile';
   import { RU } from '../i18n/ru';
 
   interface Props {
@@ -17,6 +18,8 @@
     joinError: { code: string; message: string } | null;
     savedProfile: SavedUserProfile | null;
     onRetry: () => void;
+    onLogin: (code: string) => void;
+    onCodeLogin: () => void;
     onJoin: (nick: string, color: ParticipantColorId) => void;
   }
 
@@ -29,6 +32,8 @@
     joinError,
     savedProfile,
     onRetry,
+    onLogin,
+    onCodeLogin,
     onJoin,
   }: Props = $props();
 
@@ -38,17 +43,11 @@
   let viewportNarrow = $state(typeof window !== 'undefined' ? window.innerWidth < 900 : false);
   let nickInput = $state<HTMLInputElement | null>(null);
 
-  const usedColors = $derived(lobbySummary?.usedColors ?? []);
+  let profileCode = $state('');
+  const loginMode = $derived(authState === 'error' && authError !== 'replaced_tab');
   const isMidMatch = $derived(lobbySummary !== null && lobbySummary.phase !== 'LOBBY');
   const disconnectedNames = $derived(lobbySummary?.disconnected ?? []);
   const trimNick = $derived(nick.trim());
-
-  $effect(() => {
-    if (!savedProfile && usedColors.includes(selectedColor)) {
-      const nextFree = pickFirstFreeColor(usedColors);
-      if (nextFree) selectedColor = nextFree;
-    }
-  });
 
   $effect(() => {
     if (authState === 'ready') {
@@ -69,7 +68,11 @@
   const authErrorText = $derived.by(() => {
     switch (authError) {
       case 'no_token':
-        return RU.join.noToken;
+        return '';
+      case 'invalid_profile_token':
+        return 'Неверный код профиля.';
+      case 'profile_store_unavailable':
+        return 'Профили временно недоступны. Попробуйте позже.';
       case 'invalid_token':
         return RU.join.invalidLink;
       case 'replaced_tab':
@@ -106,6 +109,40 @@
       </div>
     {:else if authState === 'checking'}
       <InlineState variant="loading" message={RU.join.checkingLink} />
+    {:else if loginMode}
+      <h2>Войти по коду</h2>
+      {#if joinError}<p role="alert">{joinError.message}</p>{/if}
+      <p>Введите сохранённый код профиля. Для нового профиля нужна ссылка приглашения.</p>
+      {#if authErrorText}<p class="err-msg" role="alert">{authErrorText}</p>{/if}
+      {#if joinError}<p class="notice">{joinError.message}</p>{/if}
+      <form
+        class="join-form"
+        onsubmit={(event) => {
+          event.preventDefault();
+          if (normalizeProfileToken(profileCode)) onLogin(profileCode);
+        }}
+      >
+        <label class="field"
+          ><span class="lbl">Код профиля</span><input
+            class="field-input"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            bind:value={profileCode}
+            required
+          /></label
+        >
+        {#if profileCode && !normalizeProfileToken(profileCode)}<p class="err-msg">
+            Введите 32 шестнадцатеричных символа кода.
+          </p>{/if}
+        <button class="btn btn-primary" disabled={!normalizeProfileToken(profileCode)}
+          >Войти по коду</button
+        >
+      </form>
+      {#if authError === 'unreachable' || authError === 'profile_store_unavailable' || authError === 'room_full'}<button
+          class="btn"
+          onclick={onRetry}>Попробовать снова</button
+        >{/if}
     {:else if authState === 'error'}
       <InlineState
         variant="error"
@@ -131,6 +168,7 @@
         <p class="notice" role="status">{RU.join.reconnectHint(disconnectedNames)}</p>
       {/if}
 
+      <button class="btn" onclick={onCodeLogin}>Войти по коду</button>
       <form class="join-form" onsubmit={handleSubmit}>
         <label class="field">
           <span class="lbl">{RU.join.nameLabel}</span>
@@ -150,7 +188,6 @@
           <legend class="lbl">{RU.join.colorLabel}</legend>
           <div class="swatches" role="radiogroup" aria-label={RU.join.colorLabel}>
             {#each PARTICIPANT_COLORS as c (c.id)}
-              {@const taken = usedColors.includes(c.id)}
               <button
                 type="button"
                 class="swatch"
@@ -159,7 +196,6 @@
                 role="radio"
                 aria-checked={selectedColor === c.id}
                 aria-label={c.labelRu}
-                disabled={taken}
                 onclick={() => (selectedColor = c.id)}
               >
                 {#if selectedColor === c.id}✓{/if}
@@ -175,7 +211,7 @@
         <button
           type="submit"
           class="btn btn-primary submit-btn"
-          disabled={!trimNick || joinPending || usedColors.includes(selectedColor)}
+          disabled={!trimNick || joinPending}
         >
           {#if joinPending}
             {RU.join.submitting}

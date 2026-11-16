@@ -1,18 +1,28 @@
 import type { ParticipantColorId } from '$shared/colors';
 import type { LobbySummary, ClientViewState, ServerMessage } from '$shared/protocol';
-import { getOrCreateProfileId } from './profile';
+import { getOrCreateProfileId, loadSavedProfile, normalizeProfileToken } from './profile';
 import { MapLoadReporter, type MapLoadKind } from './map-load-reports';
 
-const TOKEN_PARAM_RE = /(?:^|&)t=([^&]+)/;
+import {
+  loadSavedCreds,
+  saveCreds,
+  clearCreds,
+  extractAndStripInviteToken,
+  clearStoredSessionToken,
+  hasInviteFragment,
+} from './ws-session-storage';
+export {
+  loadSavedCreds,
+  saveCreds,
+  clearCreds,
+  extractAndStripInviteToken,
+  clearStoredSessionToken,
+} from './ws-session-storage';
+export type { SavedPlayerCreds } from './ws-session-storage';
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 10_000] as const;
 const MAX_OFFLINE_BEFORE_ERROR_MS = 30_000;
 const PING_INTERVAL_MS = 20_000;
 const PIN_THROTTLE_MS = 200;
-
-export interface SavedPlayerCreds {
-  playerId: string;
-  playerSecret: string;
-}
 
 export interface OutgoingMessage {
   type: string;
@@ -21,6 +31,8 @@ export interface OutgoingMessage {
 
 export interface WsClientCallbacks {
   onNoToken: () => void;
+  onProfileLoginOk?: (msg: Extract<ServerMessage, { type: 'profile_login_ok' }>) => void;
+  onProfileLoginError?: (msg: Extract<ServerMessage, { type: 'profile_login_error' }>) => void;
   onHashToken?: () => void;
   onSocketConnecting: () => void;
   onSocketOpen: () => void;
@@ -40,84 +52,10 @@ export interface WsClientCallbacks {
   onPinSendFailed?: () => void;
 }
 
-function playerStorageKey(): string {
-  return `geoaissr:player:${window.location.origin}`;
-}
-
-function tabTokenStorageKey(): string {
-  return `geoaissr:tok:${window.location.origin}`;
-}
-
-export function loadSavedCreds(): SavedPlayerCreds | null {
-  try {
-    const raw = window.localStorage.getItem(playerStorageKey());
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<SavedPlayerCreds>;
-    if (typeof parsed.playerId === 'string' && typeof parsed.playerSecret === 'string') {
-      return { playerId: parsed.playerId, playerSecret: parsed.playerSecret };
-    }
-  } catch {
-    // Ignore invalid storage payload
-  }
-  return null;
-}
-
-export function saveCreds(creds: SavedPlayerCreds): void {
-  try {
-    window.localStorage.setItem(playerStorageKey(), JSON.stringify(creds));
-  } catch {
-    // Ignore storage quota errors
-  }
-}
-
-export function clearCreds(): void {
-  try {
-    window.localStorage.removeItem(playerStorageKey());
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-export function extractAndStripInviteToken(): string | null {
-  const hash = window.location.hash;
-  if (hash.length > 1) {
-    const match = TOKEN_PARAM_RE.exec(hash.slice(1));
-    let token: string | null = null;
-    if (match?.[1]) {
-      try {
-        token = decodeURIComponent(match[1]);
-      } catch {
-        token = null;
-      }
-    }
-    if (token) {
-      try {
-        window.sessionStorage.setItem(tabTokenStorageKey(), token);
-      } catch {
-        // Ignore sessionStorage unavailable
-      }
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      return token;
-    }
-  }
-  try {
-    return window.sessionStorage.getItem(tabTokenStorageKey());
-  } catch {
-    return null;
-  }
-}
-
-export function clearStoredSessionToken(): void {
-  try {
-    window.sessionStorage.removeItem(tabTokenStorageKey());
-  } catch {
-    // Ignore
-  }
-}
-
 export class GeoWsClient {
   private readonly callbacks: WsClientCallbacks;
   private token: string | null = null;
+  private profileToken: string | null = null;
   private ws: WebSocket | null = null;
   private seq = 1;
   private pingTimer: number | null = null;
@@ -142,25 +80,31 @@ export class GeoWsClient {
   private readonly handleOffline = (): void => {
     this.browserOffline = true;
     this.detachSocket();
-    if (!this.intentionallyClosed && !this.fatalStop && this.token) {
+    if (!this.intentionallyClosed && !this.fatalStop && (this.token || this.profileToken)) {
       this.scheduleReconnect();
     }
   };
 
   private readonly handleOnline = (): void => {
     this.browserOffline = false;
-    if (!this.intentionallyClosed && !this.fatalStop && this.token && !this.isOpen()) {
+    if (
+      !this.intentionallyClosed &&
+      !this.fatalStop &&
+      (this.token || this.profileToken) &&
+      !this.isOpen()
+    ) {
       this.clearReconnectTimer();
       this.openSocket();
     }
   };
 
   private readonly handleHashChange = (): void => {
-    if (window.location.hash.length <= 1 || !TOKEN_PARAM_RE.test(window.location.hash.slice(1))) {
+    if (window.location.hash.length <= 1 || !hasInviteFragment()) {
       return;
     }
     const nextToken = extractAndStripInviteToken();
     if (!nextToken) return;
+    if (this.wasAuthenticatedOnce || this.profileToken) return;
     this.token = nextToken;
     this.intentionallyClosed = false;
     this.fatalStop = false;
@@ -218,11 +162,41 @@ export class GeoWsClient {
     if (!this.token) {
       this.token = extractAndStripInviteToken();
     }
-    if (!this.token) {
+    this.profileToken ??= loadSavedProfile()?.profileToken ?? null;
+    if (!this.token && !this.profileToken) {
       this.callbacks.onNoToken();
       return;
     }
     this.openSocket();
+  }
+
+  login(raw: string): void {
+    if (this.wasAuthenticatedOnce) return;
+    this.close();
+    this.token = null;
+    this.profileToken = normalizeProfileToken(raw) ?? raw;
+    this.retry();
+  }
+
+  useCodeLogin(): void {
+    this.close();
+    this.token = null;
+    this.profileToken = null;
+    this.wasAuthenticatedOnce = false;
+    clearStoredSessionToken();
+    this.callbacks.onNoToken();
+  }
+
+  logout(): void {
+    this.close();
+    this.token = null;
+    this.profileToken = null;
+    this.wasAuthenticatedOnce = false;
+    this.pendingPinPayload = null;
+    this.mapLoads.reset();
+    clearCreds();
+    clearStoredSessionToken();
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }
 
   retry(): void {
@@ -275,7 +249,7 @@ export class GeoWsClient {
     this.pendingPinPayload = null;
   }
 
-  sendJoin(nick: string, color: ParticipantColorId, profileId: string): boolean {
+  sendJoin(nick: string, color: ParticipantColorId, profileId?: string): boolean {
     return this.sendSequenced('join', { nick, color, profileId });
   }
 
@@ -310,7 +284,7 @@ export class GeoWsClient {
 
   private openSocket(): void {
     this.clearReconnectTimer();
-    if (!this.token) return;
+    if (!this.token && !this.profileToken) return;
     if (this.browserOffline || !window.navigator.onLine) {
       this.browserOffline = true;
       this.scheduleReconnect();
@@ -328,12 +302,16 @@ export class GeoWsClient {
       this.callbacks.onSocketOpen();
       const saved = loadSavedCreds();
       ws.send(
-        JSON.stringify({
-          type: 'hello',
-          profileId: getOrCreateProfileId(),
-          token: this.token,
-          ...(saved ? { playerId: saved.playerId, playerSecret: saved.playerSecret } : {}),
-        }),
+        JSON.stringify(
+          this.profileToken
+            ? { type: 'profile_login', profileToken: this.profileToken }
+            : {
+                type: 'hello',
+                profileId: getOrCreateProfileId(),
+                token: this.token,
+                ...(saved ? { playerId: saved.playerId, playerSecret: saved.playerSecret } : {}),
+              },
+        ),
       );
       this.startPingLoop();
     });
@@ -351,8 +329,9 @@ export class GeoWsClient {
       this.handleMessage(msg);
     });
 
-    ws.addEventListener('close', () => {
+    ws.addEventListener('close', (event) => {
       if (this.ws !== ws) return;
+      if ([4002, 4003, 4004].includes(event.code)) this.fatalStop = true;
       this.ws = null;
       this.clearPingLoop();
       if (!this.intentionallyClosed && !this.fatalStop) {
@@ -370,6 +349,17 @@ export class GeoWsClient {
       case 'pong':
         this.callbacks.onPong(msg.serverNow, msg.clientNow);
         break;
+      case 'profile_login_ok':
+        if (this.wasAuthenticatedOnce) this.callbacks.onBackOnline();
+        this.wasAuthenticatedOnce = true;
+        this.profileToken = msg.profile.profileToken;
+        saveCreds({ playerId: msg.playerId, playerSecret: msg.playerSecret });
+        this.callbacks.onProfileLoginOk?.(msg);
+        break;
+      case 'profile_login_error':
+        this.fatalStop = true;
+        this.callbacks.onProfileLoginError?.(msg);
+        break;
       case 'hello_ok':
         if (this.wasAuthenticatedOnce) {
           this.callbacks.onBackOnline();
@@ -378,6 +368,7 @@ export class GeoWsClient {
         if (!msg.restoredPlayerId) {
           clearCreds();
         }
+        if (msg.profile) this.profileToken = msg.profile.profileToken;
         this.callbacks.onHelloOk(msg);
         break;
       case 'hello_error':
@@ -391,10 +382,13 @@ export class GeoWsClient {
         this.callbacks.onHelloError(msg);
         break;
       case 'join_ok':
+        this.profileToken = msg.profile.profileToken;
         saveCreds({ playerId: msg.playerId, playerSecret: msg.playerSecret });
         this.callbacks.onJoinOk(msg);
         break;
       case 'join_error':
+        if (msg.code === 'profile_token_required' || msg.code === 'profile_store_unavailable')
+          this.fatalStop = true;
         this.callbacks.onJoinError(msg);
         break;
       case 'ack':
@@ -464,6 +458,7 @@ export class GeoWsClient {
     this.clearPingLoop();
     this.clearReconnectTimer();
     this.clearPinTimer();
+    this.pendingPinPayload = null;
   }
 }
 

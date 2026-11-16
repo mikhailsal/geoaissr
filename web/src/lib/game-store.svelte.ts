@@ -1,4 +1,4 @@
-import type { DifficultyPreset } from '$shared/bot-tools';
+import { GameCommands } from './game-commands';
 import type { ParticipantColorId } from '$shared/colors';
 import type {
   ClientViewState,
@@ -6,16 +6,21 @@ import type {
   RoundResultEntryView,
   ServerMessage,
 } from '$shared/protocol';
-import type { HarnessId, RegionId } from '$shared/storage-schemas';
 import { ServerClock } from './clock';
-import { getOrCreateProfileId } from './profile';
+import { clearProfile, logoutStorageKey, getOrCreateProfileId } from './profile';
 import { ProfileSession } from './profile-session.svelte';
 import { subscribeMapsAuthFailure } from './maps-loader';
 import { GeoWsClient, type WsClientCallbacks } from './ws-client';
 import { RU } from '../i18n/ru';
 
 export type AuthScreenError =
-  'no_token' | 'invalid_token' | 'replaced_tab' | 'room_full' | 'unreachable';
+  | 'no_token'
+  | 'invalid_token'
+  | 'replaced_tab'
+  | 'room_full'
+  | 'unreachable'
+  | 'invalid_profile_token'
+  | 'profile_store_unavailable';
 
 export interface VisionToast {
   passed: boolean;
@@ -23,10 +28,14 @@ export interface VisionToast {
   message: string;
 }
 
-export class GameStore {
+export class GameStore extends GameCommands {
+  protected get client(): GeoWsClient {
+    return this.wsClient;
+  }
   authState = $state<'checking' | 'error' | 'ready'>('checking');
   authError = $state<AuthScreenError | null>(null);
   joined = $state(false);
+  showCodeNotice = $state(false);
   role = $state<'host' | 'guest' | null>(null);
   browserMapsKey = $state<string | null>(null);
   fakeMode = $state(false);
@@ -43,7 +52,6 @@ export class GameStore {
 
   joinPending = $state(false);
   joinError = $state<{ code: string; message: string } | null>(null);
-  private lastJoinNick = '';
   startMatchPending = $state(false);
   submittingGuess = $state(false);
   localPin = $state<{ roundNumber: number; lat: number; lng: number } | null>(null);
@@ -66,6 +74,7 @@ export class GameStore {
   private unsentPanoLoaded: { roundNumber: number; countedLoad: boolean } | null = null;
 
   constructor() {
+    super();
     this.wsClient = new GeoWsClient(this.buildWsCallbacks());
     this.profile = new ProfileSession(this.wsClient);
   }
@@ -73,6 +82,7 @@ export class GameStore {
   private handleHelloOk(msg: Extract<ServerMessage, { type: 'hello_ok' }>): void {
     this.clearTransientPending();
     this.clock.seed(msg.serverNow, Date.now());
+    if (msg.profile) this.profile.accept(msg.profile);
     this.role = msg.role;
     this.browserMapsKey = msg.browserMapsKey;
     this.fakeMode = msg.fakeMode;
@@ -99,6 +109,19 @@ export class GameStore {
       this.startMatchPending = false;
       this.startMatchSeq = null;
     }
+  }
+
+  private handleProfileLoginOk(msg: Extract<ServerMessage, { type: 'profile_login_ok' }>): void {
+    this.profile.accept(msg.profile);
+    this.handleHelloOk({
+      ...msg,
+      type: 'hello_ok',
+      role: msg.profile.role,
+      restoredPlayerId: msg.playerId,
+      restoredProfileId: msg.profile.profileId,
+    });
+    this.joined = true;
+    this.authState = 'ready';
   }
 
   private buildWsCallbacks(): WsClientCallbacks {
@@ -145,7 +168,16 @@ export class GameStore {
         this.clearTransientPending();
         this.applyHelloError(msg.code);
       },
-      onJoinOk: () => {
+      onProfileLoginOk: (msg) => {
+        this.handleProfileLoginOk(msg);
+      },
+      onProfileLoginError: (msg) => {
+        this.authState = 'error';
+        this.authError = msg.code;
+      },
+      onJoinOk: (msg) => {
+        this.profile.accept(msg.profile);
+        this.showCodeNotice = true;
         this.joinPending = false;
         this.joinError = null;
         this.joined = true;
@@ -201,21 +233,12 @@ export class GameStore {
     this.profile.cancelJoin();
     this.authState = 'ready';
     this.lobbySummary = msg.lobbySummary;
-    const msgByCode: Record<typeof msg.code, string> = {
-      nick_taken: RU.join.nickTaken,
-      color_taken: RU.join.colorTaken,
-      room_full: RU.join.roomFull,
-      bad_nick: RU.join.nameHint,
-    };
-    // A disconnected player's nick can be taken back only from their own browser; say so.
-    const nick = this.lastJoinNick.toLowerCase();
-    const ownSeatGone =
-      msg.code === 'nick_taken' &&
-      msg.lobbySummary.disconnected.some((n) => n.toLowerCase() === nick);
-    this.joinError = {
-      code: msg.code,
-      message: ownSeatGone ? RU.join.nickTakenDisconnected : msgByCode[msg.code],
-    };
+    this.joinError = { code: msg.code, message: msg.message };
+    if (msg.code === 'profile_token_required') {
+      this.wsClient.useCodeLogin();
+      this.authState = 'error';
+      this.authError = 'no_token';
+    }
   }
 
   private triggerBackOnline(): void {
@@ -295,7 +318,58 @@ export class GameStore {
     this.offlinePinWarning = !this.wsClient.sendPinThrottled(pin.roundNumber, pin.lat, pin.lng);
   }
 
+  private readonly handleStorage = (event: StorageEvent): void => {
+    if (event.key === logoutStorageKey() && event.newValue) this.logout(false);
+  };
+
+  login(raw: string): void {
+    if (this.joined || raw.length > 64) return;
+    if (this.clockTimer === null) this.connect();
+    this.authState = 'checking';
+    this.authError = null;
+    this.wsClient.login(raw);
+  }
+
+  useCodeLogin(): void {
+    this.wsClient.useCodeLogin();
+    this.authState = 'error';
+    this.authError = 'no_token';
+    this.joinError = null;
+  }
+
+  logout(notify = true): void {
+    this.wsClient.logout();
+    this.destroy();
+    clearProfile();
+    this.profile.reset();
+    this.resetForHashToken();
+    this.authState = 'error';
+    this.authError = 'no_token';
+    this.role = null;
+    this.browserMapsKey = null;
+    this.fakeMode = false;
+    this.lobbySummary = null;
+    this.view = null;
+    this.localPin = null;
+    this.unsentPanoLoaded = null;
+    this.resendPinOnNextState = false;
+    this.activeBotCard = null;
+    this.mapsJsFatalError = null;
+    this.offlinePinWarning = false;
+    this.visionToastByBot = {};
+    this.showCodeNotice = false;
+    if (notify) {
+      try {
+        window.localStorage.setItem(logoutStorageKey(), crypto.randomUUID());
+      } catch {
+        /* unavailable */
+      }
+    }
+    window.addEventListener('storage', this.handleStorage);
+  }
+
   connect(): void {
+    window.addEventListener('storage', this.handleStorage);
     this.unsubMapsAuth?.();
     this.unsubMapsAuth = subscribeMapsAuthFailure((msg) => {
       this.mapsJsFatalError = msg;
@@ -318,10 +392,13 @@ export class GameStore {
   }
 
   destroy(): void {
+    window.removeEventListener('storage', this.handleStorage);
     this.wsClient.close();
     this.unsubMapsAuth?.();
     if (this.backOnlineTimer !== null) window.clearTimeout(this.backOnlineTimer);
     if (this.clockTimer !== null) window.clearInterval(this.clockTimer);
+    this.clockTimer = null;
+    this.backOnlineTimer = null;
   }
 
   serverNow(): number {
@@ -333,7 +410,6 @@ export class GameStore {
   }
 
   join(nick: string, color: ParticipantColorId): void {
-    this.lastJoinNick = nick.trim();
     this.joinError = null;
     this.joinPending = true;
     if (!this.profile.join(nick, color)) {
@@ -347,61 +423,12 @@ export class GameStore {
     this.profile.update(nick, color);
   }
 
-  resetBotWins(botId: string): void {
-    this.wsClient.sendSequenced('reset_bot_wins', { botId });
-  }
-
-  updateLobby(patch: {
-    rounds?: number;
-    roundDurationSec?: number;
-    moveEnabled?: boolean;
-    region?: RegionId;
-    aiWaitWindowSec?: number;
-  }): void {
-    this.wsClient.sendSequenced('update_lobby', { patch });
-  }
-
-  addBot(): void {
-    this.wsClient.sendSequenced('add_bot');
-  }
-
-  removeBot(botId: string): void {
-    this.wsClient.sendSequenced('remove_bot', { botId });
-  }
-
-  updateBot(
-    botId: string,
-    patch: {
-      name?: string;
-      color?: ParticipantColorId;
-      enabled?: boolean;
-      harness?: HarnessId;
-      model?: string;
-      effort?: 'low' | 'medium' | 'high';
-      moveLimit?: number;
-      imageSize?: 256 | 400 | 640;
-      budgetSec?: number;
-      personalityPreset?: 'neutral' | 'braggart' | 'humble' | 'scientist';
-      personalityText?: string;
-    },
-  ): void {
-    this.wsClient.sendSequenced('update_bot', { botId, patch });
-  }
-
-  applyBotPreset(botId: string, preset: Exclude<DifficultyPreset, 'custom'>): void {
-    this.wsClient.sendSequenced('apply_bot_preset', { botId, preset });
-  }
-
   checkBotVision(botId: string): void {
     this.checkingVisionBotId = botId;
     this.visionToastByBot = { ...this.visionToastByBot, [botId]: undefined };
     if (!this.wsClient.sendSequenced('check_bot_vision', { botId })) {
       this.checkingVisionBotId = null;
     }
-  }
-
-  confirmQuotaReset(): void {
-    this.wsClient.sendSequenced('confirm_quota_reset');
   }
 
   startMatch(): void {
@@ -412,22 +439,6 @@ export class GameStore {
       this.startMatchPending = false;
       this.startMatchSeq = null;
     }
-  }
-
-  retryRound(gen: number): void {
-    this.wsClient.sendSequenced('retry_round', { gen });
-  }
-
-  endMatch(): void {
-    this.wsClient.sendSequenced('end_match');
-  }
-
-  nextRound(roundNumber: number): void {
-    this.wsClient.sendSequenced('next_round', { roundNumber });
-  }
-
-  playAgain(): void {
-    this.wsClient.sendSequenced('play_again');
   }
 
   sendPanoLoaded(roundNumber: number, countedLoad: boolean): void {
