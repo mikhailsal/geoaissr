@@ -65,7 +65,6 @@ export class GameStore extends GameCommands {
   visionToastByBot = $state<Record<string, VisionToast | undefined>>({});
   activeBotCard = $state<{ roundNumber: number; entry: RoundResultEntryView } | null>(null);
   clockTick = $state(0);
-
   private readonly clock = new ServerClock();
   private readonly wsClient: GeoWsClient;
   readonly profile: ProfileSession;
@@ -79,7 +78,7 @@ export class GameStore extends GameCommands {
   private resendPinOnNextState = false;
   private unsentPanoLoaded: { roundNumber: number; countedLoad: boolean } | null = null;
 
-  constructor() {
+  constructor(private readonly onGuessAccepted: () => void = () => undefined) {
     super();
     this.wsClient = new GeoWsClient(this.buildWsCallbacks());
     this.profile = new ProfileSession(this.wsClient);
@@ -108,6 +107,7 @@ export class GameStore extends GameCommands {
     const { seq } = msg;
     this.profile.onAck(msg);
     if (seq === this.submitGuessSeq) {
+      if (msg.result === 'ok') this.onGuessAccepted();
       this.submittingGuess = false;
       this.submitGuessSeq = null;
     }
@@ -279,7 +279,8 @@ export class GameStore extends GameCommands {
         this.localPin = null;
         this.pinDirty = false;
         this.submittingGuess = false;
-        this.submitGuessSeq = null;
+        // The final answer may broadcast results before its acknowledgement arrives.
+        if (prevRound !== view.roundNumber) this.submitGuessSeq = null;
         this.wsClient.clearPendingPin();
       } else {
         this.pinDirty = false;

@@ -6,6 +6,8 @@
   import type { RegionId } from '$shared/storage-schemas';
   import ProfileModal from './components/ProfileModal.svelte';
   import StatusBanner from './components/StatusBanner.svelte';
+  import GameAudio from './components/GameAudio.svelte';
+  import { audioPlayer } from './lib/audio-settings.svelte';
   import { GameStore } from './lib/game-store.svelte';
   import Final from './screens/Final.svelte';
   import Join from './screens/Join.svelte';
@@ -13,15 +15,19 @@
   import Round from './screens/Round.svelte';
   import RoundResults from './screens/RoundResults.svelte';
 
-  const store = new GameStore();
+  const store = new GameStore(() => {
+    audioPlayer.cue('locked');
+  });
   let editingProfile = $state(false);
   let profileTrigger: HTMLElement | null = null;
   function openProfile(e: MouseEvent): void {
+    audioPlayer.cue('panel');
     profileTrigger = e.currentTarget as HTMLElement;
     store.profile.error = null;
     editingProfile = true;
   }
   function closeProfile(): void {
+    audioPlayer.cue('panel');
     editingProfile = false;
     void tick().then(() => {
       if (!editingProfile) profileTrigger?.focus();
@@ -62,6 +68,9 @@
     region?: RegionId;
     aiWaitWindowSec?: number;
   }): void => {
+    if (patch.roundDurationSec !== undefined && patch.roundDurationSec !== view?.roundDurationSec) {
+      audioPlayer.cue('tick');
+    }
     store.updateLobby(patch);
   };
   const handleAddBot = (): void => {
@@ -108,6 +117,9 @@
     store.reportClientError(source, code, message);
   };
   const handleSetPin = (roundNumber: number, lat: number, lng: number): void => {
+    if (view?.phase === 'ROUND_ACTIVE' && !view.viewerIsSpectator && !view.active?.myConfirmed) {
+      audioPlayer.cue('pin');
+    }
     store.setPin(roundNumber, lat, lng);
   };
   const handleSubmitGuess = (roundNumber: number, lat: number, lng: number): void => {
@@ -117,18 +129,28 @@
     store.retryRound(gen);
   };
   const handleSelectBotCard = (rn: number, entry: RoundResultEntryView): void => {
+    audioPlayer.cue('panel');
     store.openBotCard(rn, entry);
   };
   const handleCloseBotCard = (): void => {
+    audioPlayer.cue('panel');
     store.closeBotCard();
   };
   const handleNextRound = (rn: number): void => {
+    audioPlayer.cue('click');
     store.nextRound(rn);
   };
   const handlePlayAgain = (): void => {
+    audioPlayer.cue('click');
     store.playAgain();
   };
 </script>
+
+<GameAudio
+  {view}
+  now={store.serverNow()}
+  connected={store.joined && store.authState === 'ready' && store.connectionState === 'connected'}
+/>
 
 <div class="app-shell">
   {#if hasProfile && !inGamePhase}<button type="button" class="btn owner-menu" onclick={openProfile}

@@ -8,6 +8,7 @@
   import { formatDistanceRu, formatNumberRu } from '../i18n/format';
   import { attachGlobalKeys, prefersReducedMotion } from '../lib/keys';
   import { RU } from '../i18n/ru';
+  import { audioPlayer } from '../lib/audio-settings.svelte';
 
   interface Props {
     view: ClientViewState;
@@ -66,6 +67,7 @@
   });
 
   function closeInspect(): void {
+    audioPlayer.cue('panel');
     inspectedCard = null;
     lastTriggerBtn?.focus();
     lastTriggerBtn = null;
@@ -161,6 +163,7 @@
                             title="Открыть мысли бота в этом раунде"
                             onclick={(e) => {
                               lastTriggerBtn = e.currentTarget;
+                              audioPlayer.cue('panel');
                               inspectedCard = cell.botCard
                                 ? { roundNumber: rn, botId: row.id }
                                 : null;

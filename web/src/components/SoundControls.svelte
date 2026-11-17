@@ -1,0 +1,43 @@
+<script lang="ts">
+  import { Music2, Volume2, VolumeX } from '@lucide/svelte';
+  import { audioPreferences, toggleAudio } from '../lib/audio-settings.svelte';
+</script>
+
+<div class="sound-controls" role="group" aria-label="Настройки звука">
+  <button
+    type="button"
+    class="btn sound-toggle"
+    aria-label="Звуковые эффекты"
+    aria-pressed={audioPreferences.effects}
+    title={audioPreferences.effects ? 'Выключить звуковые эффекты' : 'Включить звуковые эффекты'}
+    onclick={() => {
+      toggleAudio('effects');
+    }}
+  >
+    {#if audioPreferences.effects}<Volume2 size={18} />{:else}<VolumeX size={18} />{/if}
+  </button>
+  <button
+    type="button"
+    class="btn sound-toggle"
+    aria-label="Музыка раунда"
+    aria-pressed={audioPreferences.music}
+    title={audioPreferences.music ? 'Выключить музыку раунда' : 'Включить музыку раунда'}
+    onclick={() => {
+      toggleAudio('music');
+    }}><Music2 size={18} /></button
+  >
+</div>
+
+<style>
+  .sound-controls {
+    display: flex;
+    gap: var(--sp-1);
+  }
+  .sound-toggle {
+    width: var(--control-h);
+    padding: 0;
+  }
+  .sound-toggle[aria-pressed='false'] {
+    color: var(--paper-dim);
+  }
+</style>
