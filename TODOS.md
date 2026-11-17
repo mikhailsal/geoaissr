@@ -4,18 +4,6 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 
 ## Game
 
-### Sounds
-
-**What:** Short sounds: the 3-2-1 countdown, the last 10 seconds, markers appearing, victory.
-
-**Why:** Sound strengthens the feeling of a match, especially when everyone is in a voice chat.
-
-**Context:** The first-version plan has only visual animation (section 8 of `PLAN.md`). Needed: a set of free sounds, a volume toggle in the interface, handling of browsers blocking audio until the first click. Start with the results screen.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** milestone M4
-
 ### Match history screen and hall of fame
 
 **What:** A screen with a list of past matches and a summary table of human and AI wins.
@@ -99,3 +87,19 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 **Depends on:** milestone M4
 
 ## Completed
+
+### Sounds
+
+**What:** Short sounds: the 3-2-1 countdown, the last 10 seconds, markers appearing, victory.
+
+**Why:** Sound strengthens the feeling of a match, especially when everyone is in a voice chat.
+
+**Context:** The first-version plan has only visual animation (section 8 of `PLAN.md`). Needed: a set of free sounds, a volume toggle in the interface, handling of browsers blocking audio until the first click. Start with the results screen.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** milestone M4
+
+**Completed:** v0.2.2 (2026-11-17)
+
+**Delivery:** Original CC0 event sounds and seamless round music, with independent persisted toggles, gesture activation and hidden/disconnected-tab silence. The timer warning covers the final 15 seconds. See [the audio reference](docs/audio.md).

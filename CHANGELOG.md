@@ -2,6 +2,13 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.2.2] - 2026-11-17
+
+### Added
+
+- Hear event sounds for round loading, countdowns, map markers, accepted answers, opponents and results, with quiet seamless music during active rounds.
+- Toggle sound effects and round music independently from the header and retain those choices in the browser. Audio pauses in hidden or disconnected tabs and resumes without repeating past events.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added
