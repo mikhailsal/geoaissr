@@ -27,10 +27,14 @@
       visible = document.visibilityState === 'visible';
     };
     document.addEventListener('pointerdown', activate);
+    document.addEventListener('pointerup', activate);
+    document.addEventListener('touchend', activate);
     document.addEventListener('keydown', activate);
     document.addEventListener('visibilitychange', visibility);
     return () => {
       document.removeEventListener('pointerdown', activate);
+      document.removeEventListener('pointerup', activate);
+      document.removeEventListener('touchend', activate);
       document.removeEventListener('keydown', activate);
       document.removeEventListener('visibilitychange', visibility);
       audioPlayer.destroy();

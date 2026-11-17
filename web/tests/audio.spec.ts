@@ -198,3 +198,24 @@ test('hidden and reconnecting games stop audio and resume only current music', a
     await server.stop();
   }
 });
+
+test('touch gestures unlock native audio on release without a keyboard', async ({ browser }) => {
+  const server = await startIsolatedFakeServer({ rounds: 1 });
+  const context = await browser.newContext({ hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await observeAudio(page);
+    await page.goto(server.hostUrl);
+    await page.getByLabel('Ваше имя').fill('Тап');
+    await page.getByRole('button', { name: 'Войти', exact: true }).tap();
+    await page.getByRole('button', { name: 'Начать', exact: true }).tap();
+    await started(page, 'round-loop-suspense');
+    expect(
+      (await trace(page)).resumedOn.some((event) => event === 'pointerup' || event === 'touchend'),
+    ).toBe(true);
+    expect((await trace(page)).errors).toEqual([]);
+  } finally {
+    await context.close();
+    await server.stop();
+  }
+});

@@ -5,6 +5,7 @@ export interface AudioTrace {
   starts: { id: number; url: string; offset: number; loop: boolean }[];
   live: Record<number, string>;
   errors: string[];
+  resumedOn: string[];
 }
 
 declare global {
@@ -15,15 +16,30 @@ declare global {
 
 export async function observeAudio(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const trace: AudioTrace = { decoded: [], starts: [], live: {}, errors: [] };
+    const trace: AudioTrace = { decoded: [], starts: [], live: {}, errors: [], resumedOn: [] };
     window.audioTrace = trace;
     window.addEventListener('unhandledrejection', (event) =>
       trace.errors.push(String(event.reason)),
     );
     const urls = new WeakMap<ArrayBuffer, string>();
     const buffers = new WeakMap<AudioBuffer, string>();
+    let inputEvent = 'none';
+    for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown']) {
+      document.addEventListener(
+        type,
+        () => {
+          inputEvent = type;
+        },
+        { capture: true },
+      );
+    }
     /* Capture native methods before instrumenting their prototypes. */
     /* eslint-disable @typescript-eslint/unbound-method */
+    const resume = AudioContext.prototype.resume;
+    AudioContext.prototype.resume = function () {
+      trace.resumedOn.push(inputEvent);
+      return resume.call(this);
+    };
     const responseBuffer = Response.prototype.arrayBuffer;
     Response.prototype.arrayBuffer = async function () {
       const buffer = await responseBuffer.call(this);

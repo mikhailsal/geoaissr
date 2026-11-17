@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Music2, Volume2, VolumeX } from '@lucide/svelte';
+  import { Music2, Slash, Volume2, VolumeX } from '@lucide/svelte';
   import { audioPreferences, toggleAudio } from '../lib/audio-settings.svelte';
 </script>
 
@@ -24,7 +24,10 @@
     title={audioPreferences.music ? 'Выключить музыку раунда' : 'Включить музыку раунда'}
     onclick={() => {
       toggleAudio('music');
-    }}><Music2 size={18} /></button
+    }}
+    ><Music2 size={18} />{#if !audioPreferences.music}<span class="muted-mark"
+        ><Slash size={22} /></span
+      >{/if}</button
   >
 </div>
 
@@ -34,8 +37,13 @@
     gap: var(--sp-1);
   }
   .sound-toggle {
+    position: relative;
     width: var(--control-h);
     padding: 0;
+  }
+  .muted-mark {
+    position: absolute;
+    display: flex;
   }
   .sound-toggle[aria-pressed='false'] {
     color: var(--paper-dim);
