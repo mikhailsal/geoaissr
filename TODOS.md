@@ -62,7 +62,7 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 
 **What:** A host button "Replay the round without scoring" if a player's panorama has not loaded by the start of the round.
 
-**Why:** Currently the countdown starts after a 5 s wait for everyone, and a player on a slow network loses round time through no fault of their own.
+**Why:** The countdown starts after panorama readiness or timeout and at least 6.8 seconds of round loading. A player on a slow network can still lose round time through no fault of their own.
 
 **Pros:** The score does not depend on connection quality.
 
@@ -100,6 +100,6 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 **Priority:** P3
 **Depends on:** milestone M4
 
-**Completed:** v0.2.2 (2026-11-17)
+**Completed:** v0.2.2 (2026-11-19)
 
-**Delivery:** Original CC0 event sounds and seamless round music, with independent persisted toggles, gesture activation and hidden/disconnected-tab silence. The timer warning covers the final 15 seconds. See [the audio reference](docs/audio.md).
+**Delivery:** Original CC0 event sounds, a Suspense lobby loop and a continuous seven-track gameplay queue, with independent profile-owned volume and mute controls, reset, gesture activation and hidden/disconnected-tab silence. The timer warning covers the final 15 seconds. See [the audio reference](docs/audio.md).

@@ -2,10 +2,10 @@
 
 The header's **Звуковые эффекты** (sound effects) and **Фоновая музыка** (background
 music) buttons open independent volume panels. Each has a 0–100% slider, minus
-and plus buttons in five-percentage-point steps, and a mute button. The adjacent
-**Сбросить** button resets both channels to enabled, with music at 60% and effects
-at 100%. Escape closes
-the panel and returns focus to its button; clicking outside also closes it.
+and plus buttons in five-percentage-point steps, and a mute button.
+**Сбросить** in either panel resets both channels to enabled, with music at 60%
+and effects at 100%. Escape closes the panel and returns focus to its button.
+Clicking outside also closes it.
 
 Both channels default to enabled. Effects start at 100%; music starts at 60%. Choosing a different volume applies it immediately
 to sounding and queued sources without restarting music. Muting retains the
@@ -19,18 +19,21 @@ Only the authenticated profile can change its settings, in any game phase;
 acknowledgement follows the durable registry write.
 
 The browser caches preferences under `geoaissr.audio.v1`, with their profile owner
-and any pending change. Existing boolean preferences keep their mute choices
-and receive the new default volumes. A legacy profile without server settings
-can adopt its unowned or matching local cache once; another profile's cache is
-not reused. Saved server settings take precedence over stale browser values.
-Pending local edits retry for the same profile after reconnecting, and a failed
-write exposes a retry action. Explicitly saved volumes retain their chosen level.
+and keeps pending edits by profile. Existing boolean preferences keep their mute
+choices and receive the new default volumes. A legacy profile without server
+settings can adopt an unowned or matching local cache once. Saved server settings
+take precedence over old browser values, with pending edits for the signed-in
+profile taking precedence until saved. Those edits retry after reconnect or
+signing back in, even after switching profiles. On a failed save, open either
+sound panel and choose **Повторить сохранение** (Retry save). A tab that receives
+logout from another tab discards its in-memory pending edit for that profile.
 When browser storage is unavailable, controls and server saving still work.
 
 Audio activates after a pointer or keyboard interaction. A restored game can
 therefore remain silent until the first interaction. Hidden tabs, disconnected
-sessions and logged-out players are silent. Returning to the game restores the
-paused music and current timed warnings without replaying earlier results or answers.
+sessions and logged-out players are silent. After reconnecting, audio waits for
+a fresh room snapshot. Returning to the game restores the paused music and
+current timed warnings without replaying earlier results or answers.
 Sound failures never block joining, placing a marker or submitting an answer.
 
 ## Event mapping
@@ -54,17 +57,21 @@ each recording's base gain, multiplied by the selected effects volume.
 | `swoosh-short.ogg`                | Host menu, map toggle, profile and AI explanation panels                | 0.07 s   | 0.70 |
 | `effect-count-down-tick.ogg`      | The host changes the round duration                                     | 1.04 s   | 0.50 |
 
-The server reserves at least 6.8 seconds from round loading for the complete
-loading phrase, then schedules the usual three-second countdown once panoramas
-are ready. A slower panorama load adds no further musical wait. The displayed
-3–2–1 and `soft-countdown` share that scheduled timestamp. The go tone does not
-delay gameplay; its tail can overlap the first moments of the active round.
+The server starts the three-second countdown when the connected round participants'
+panoramas are ready or the panorama wait times out, with a minimum of 6.8 seconds
+from round loading so the drum phrase can finish. If a live loading update
+arrives late, the phrase starts at the elapsed loading time. The displayed 3–2–1
+and `soft-countdown` share the scheduled countdown timestamp. The go tone's tail
+can overlap the first moments of the active round.
 
 The warning is omitted for spectators and players who have already answered. If
 the server shortens the deadline, for example while waiting for the remaining
 AIs, its playback seeks to the corresponding remaining second. Repeated room
 snapshots do not announce the same answer twice. Multiple opponent answers in
-one snapshot produce one cue.
+one snapshot produce one cue. Round results carry the server's finish time and
+the IDs of confirmed humans and successfully finished bots. This lets the client
+play a final opponent cue if that answer arrives with the results and stop the
+warning if the round ended before the deadline.
 
 The timer recording is longer than its 15 counted seconds: the final hit is at
 +15.048 seconds, followed by its decay. Reaching zero and entering results let
@@ -134,7 +141,7 @@ The 19 OGG files comprise 12 event sounds and seven music loops. Archived drafts
 duplicate MP3 exports and reference recordings are not included.
 
 The generated audio is dedicated to the public domain under **CC0 1.0**. The
-source project's license is preserved at `web/public/audio/LICENSE`. Its
+source project's [license](../web/public/audio/LICENSE) is included. Its
 `reference-original/` recordings are outside that dedication and are not part
 of this application.
 

@@ -346,7 +346,7 @@ export class GameStore extends GameCommands {
     this.wsClient.logout(clearShared);
     this.destroy();
     clearProfile(clearShared);
-    this.profile.reset();
+    this.profile.reset(notify);
     this.resetForHashToken();
     this.authState = 'error';
     this.authError = 'no_token';

@@ -2,7 +2,7 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
-## [0.2.2] - 2026-11-17
+## [0.2.2] - 2026-11-19
 
 ### Added
 
@@ -13,12 +13,12 @@ Notable changes to this locally run application are recorded here. Releases are 
 
 - Play all seven original background tracks in a continuous sequence, keeping their full endings and preserving the queue through round changes, answers, results and preparation.
 - Repeat the calmer original Suspense track in the lobby at a reduced volume and use one background-music control for both lobby and gameplay.
-- Default music to 60% of its previous volume while preserving explicitly saved levels and existing mute choices.
+- Default music volume to 60% while preserving explicitly saved levels and existing mute choices.
 
 ### Fixed
 
 - Keep audio preferences with the authenticated profile across reconnects and changed tunnel addresses; reset both channels from the button beside mute.
-
+- Retain pending audio edits when switching profiles and prevent a replaced tab from overwriting a newer save when another tab logs out.
 - Let the loading phrase finish before the synchronized three-second countdown begins.
 - Preserve the final timer hit and whistle after zero, and let event tails finish across normal screen transitions.
 - Keep the previous background track audible until the next variant is ready to play.

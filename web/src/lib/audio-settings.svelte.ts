@@ -21,7 +21,20 @@ function loadCache(): AudioCache {
       'pending' in saved &&
       saved.pending === true
     );
-    return { preferences: normalizeAudioPreferences(saved), owner, pending };
+    const outbox =
+      saved && typeof saved === 'object' && 'pendingByProfile' in saved
+        ? saved.pendingByProfile
+        : undefined;
+    const pendingByProfile =
+      outbox && typeof outbox === 'object' && !Array.isArray(outbox)
+        ? Object.fromEntries(
+            Object.entries(outbox).map(([id, preferences]: [string, unknown]) => [
+              id,
+              normalizeAudioPreferences(preferences),
+            ]),
+          )
+        : undefined;
+    return { preferences: normalizeAudioPreferences(saved), owner, pending, pendingByProfile };
   } catch {
     return { preferences: normalizeAudioPreferences(null), owner: null, pending: false };
   }
@@ -40,6 +53,7 @@ const sync = new AudioProfileSync(initial, (state) => {
         ...state.preferences,
         profileId: state.owner,
         pending: state.pending,
+        pendingByProfile: state.pendingByProfile,
       }),
     );
   } catch {
@@ -59,8 +73,9 @@ export function audioProfileAck(ack: { seq: number; result: string; message?: st
 export function disconnectAudioProfile(): void {
   sync.disconnect();
 }
-export function clearAudioProfile(): void {
-  sync.clear();
+export function clearAudioProfile(preservePending: boolean, savedProfileId?: string): void {
+  sync.clear(preservePending, savedProfileId);
+  audioPreferenceSync.error = null;
 }
 export function flushAudioPreferences(): void {
   sync.flush();

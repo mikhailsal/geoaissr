@@ -43,9 +43,9 @@ export class ProfileSession {
     );
   }
 
-  reset(): void {
+  reset(preserveAudioPending: boolean): void {
     this.clearPending();
-    clearAudioProfile();
+    clearAudioProfile(preserveAudioPending, this.saved?.profileId);
     this.saved = null;
     this.error = null;
   }
