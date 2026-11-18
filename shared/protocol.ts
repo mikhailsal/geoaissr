@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { updateAudioPreferencesMessageSchema } from './audio-preferences.ts';
 import {
   BOT_NAME_MAX_LEN,
   DIFFICULTY_PRESETS,
@@ -194,6 +195,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   profileLoginMessageSchema,
   joinMessageSchema,
   updateProfileMessageSchema,
+  updateAudioPreferencesMessageSchema,
   resetBotWinsMessageSchema,
   pingMessageSchema,
   updateLobbyMessageSchema,

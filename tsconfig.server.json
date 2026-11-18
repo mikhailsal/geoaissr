@@ -33,6 +33,7 @@
     "web/src/lib/audio-catalog.ts",
     "web/src/lib/audio-director.ts",
     "web/src/lib/audio-player.ts",
+    "web/src/lib/audio-profile-sync.ts",
     "web/src/lib/audio-preferences.ts",
     "web/src/lib/profile.ts",
     "web/src/lib/map-load-reports.ts",

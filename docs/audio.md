@@ -2,19 +2,30 @@
 
 The header's **Звуковые эффекты** (sound effects) and **Фоновая музыка** (background
 music) buttons open independent volume panels. Each has a 0–100% slider, minus
-and plus buttons in five-percentage-point steps, and a mute button. Escape closes
+and plus buttons in five-percentage-point steps, and a mute button. The adjacent
+**Сбросить** button resets both channels to enabled, with music at 60% and effects
+at 100%. Escape closes
 the panel and returns focus to its button; clicking outside also closes it.
 
-Both channels default to enabled. Effects start at 100%; music starts at 85%,
-15% below its previous level. Choosing a different volume applies it immediately
+Both channels default to enabled. Effects start at 100%; music starts at 60%. Choosing a different volume applies it immediately
 to sounding and queued sources without restarting music. Muting retains the
 selected volume. Setting zero silences the channel; increasing its volume enables
 it, and unmuting from zero restores that channel's default.
 
-Preferences are saved in this browser under `geoaissr.audio.v1`. Existing boolean
-preferences retain their mute choices and receive the new default volumes.
-Explicitly saved volumes are restored as chosen, without another 15% reduction.
-When browser storage is unavailable, controls still work for the current tab.
+Preferences are saved in the server's private user profile. Entering the same
+permanent profile code on another tunnel hostname restores volumes and mute
+choices, including after a server restart. Reset is saved to the same profile.
+Only the authenticated profile can change its settings, in any game phase;
+acknowledgement follows the durable registry write.
+
+The browser caches preferences under `geoaissr.audio.v1`, with their profile owner
+and any pending change. Existing boolean preferences keep their mute choices
+and receive the new default volumes. A legacy profile without server settings
+can adopt its unowned or matching local cache once; another profile's cache is
+not reused. Saved server settings take precedence over stale browser values.
+Pending local edits retry for the same profile after reconnecting, and a failed
+write exposes a retry action. Explicitly saved volumes retain their chosen level.
+When browser storage is unavailable, controls and server saving still work.
 
 Audio activates after a pointer or keyboard interaction. A restored game can
 therefore remain silent until the first interaction. Hidden tabs, disconnected
@@ -71,7 +82,7 @@ produced by the accepted phase change.
 ## Continuous background music
 
 All seven current loops are included in the gameplay queue, at base linear gain
-0.18. The default music volume of 85% gives an effective gain of 0.153:
+0.18. The default music volume of 60% gives an effective gain of 0.108:
 
 | Queue position | File                       | Duration | Character                            |
 | -------------- | -------------------------- | -------- | ------------------------------------ |
@@ -85,7 +96,7 @@ All seven current loops are included in the gameplay queue, at base linear gain
 
 In the lobby, only the original `round-loop-suspense.ogg` repeats as a native
 audio loop. Its drone, heartbeat and quiet ticks use a quieter base gain of 0.117,
-or 0.09945 at the default music volume, while players join and configure the match.
+or 0.0702 at the default music volume, while players join and configure the match.
 The same background-music control
 applies in both lobby and gameplay.
 

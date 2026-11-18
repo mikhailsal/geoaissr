@@ -2,7 +2,14 @@
   import { tick } from 'svelte';
   import { Minus, Music2, Plus, Slash, Volume2, VolumeX } from '@lucide/svelte';
   import type { AudioKind } from '../lib/audio-catalog';
-  import { audioPreferences, setAudioVolume, toggleAudio } from '../lib/audio-settings.svelte';
+  import {
+    audioPreferences,
+    audioPreferenceSync,
+    flushAudioPreferences,
+    resetAudioPreferences,
+    setAudioVolume,
+    toggleAudio,
+  } from '../lib/audio-settings.svelte';
 
   const uid = $props.id();
   let root: HTMLDivElement;
@@ -18,6 +25,7 @@
     kind === 'music' ? 'музыки' : 'звуковых эффектов';
 
   function close(restoreFocus = false): void {
+    if (open) flushAudioPreferences();
     open = null;
     if (restoreFocus) trigger?.focus();
   }
@@ -49,6 +57,7 @@
 
 <svelte:document onpointerdown={outside} onkeydown={keyDown} />
 <svelte:window
+  onpagehide={flushAudioPreferences}
   onscroll={() => {
     close();
   }}
@@ -86,7 +95,11 @@
       style:left={`${left}px`}
       style:top={`${top}px`}
     >
-      <label for={`${uid}-range`}>Громкость {channelName(open)}</label>
+      <div class="volume-heading">
+        <label for={`${uid}-range`}>Громкость {channelName(open)}</label><output
+          for={`${uid}-range`}>{Math.round(channelVolume(open) * 100)}%</output
+        >
+      </div>
       <div class="volume-row">
         <button
           type="button"
@@ -94,12 +107,16 @@
           aria-label={`Уменьшить громкость ${channelName(open)}`}
           onclick={() => {
             if (open) setAudioVolume(open, (Math.round(channelVolume(open) * 100) - 5) / 100);
+            flushAudioPreferences();
           }}><Minus size={18} /></button
         >
         <input
           id={`${uid}-range`}
           bind:this={slider}
           type="range"
+          onchange={flushAudioPreferences}
+          onblur={flushAudioPreferences}
+          onpointerup={flushAudioPreferences}
           min="0"
           max="100"
           step="1"
@@ -114,22 +131,35 @@
           aria-label={`Увеличить громкость ${channelName(open)}`}
           onclick={() => {
             if (open) setAudioVolume(open, (Math.round(channelVolume(open) * 100) + 5) / 100);
+            flushAudioPreferences();
           }}><Plus size={18} /></button
         >
       </div>
       <div class="volume-row">
-        <output for={`${uid}-range`}>{Math.round(channelVolume(open) * 100)}%</output>
         <button
           type="button"
           class="btn mute-button"
+          aria-label={`${muted(open) ? 'Включить' : 'Выключить'} ${open === 'music' ? 'музыку' : 'звуковые эффекты'}`}
           onclick={() => {
             if (open) toggleAudio(open);
           }}
         >
           {muted(open) ? 'Включить' : 'Выключить'}
-          {open === 'music' ? 'музыку' : 'звуковые эффекты'}
         </button>
+        <button
+          type="button"
+          class="btn reset-button"
+          aria-label="Сбросить настройки звука"
+          onclick={resetAudioPreferences}>Сбросить</button
+        >
       </div>
+      {#if audioPreferenceSync.error}<div class="save-error" role="alert">
+          <span>{audioPreferenceSync.error}</span><button
+            type="button"
+            class="btn"
+            onclick={flushAudioPreferences}>Повторить сохранение</button
+          >
+        </div>{/if}
     </div>
   {/if}
 </div>
@@ -162,6 +192,24 @@
     gap: var(--sp-2);
     background: var(--asphalt-800);
     box-shadow: var(--shadow-panel);
+  }
+  .volume-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+  }
+  .volume-heading label {
+    min-width: 0;
+  }
+  .reset-button {
+    padding: var(--sp-1) var(--sp-2);
+  }
+  .save-error {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    color: var(--signal);
   }
   .volume-row {
     display: flex;

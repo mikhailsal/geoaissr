@@ -583,12 +583,12 @@ test('an unavailable successor leaves current music playing and retries before t
   player.destroy();
 });
 
-test('music defaults to 85 percent and explicit saved volumes apply without another reduction', async () => {
+test('music defaults to 60 percent and explicit saved volumes apply without another reduction', async () => {
   expect(DEFAULT_AUDIO_PREFERENCES).toEqual({
     effects: true,
     music: true,
     effectsVolume: 1,
-    musicVolume: 0.85,
+    musicVolume: 0.6,
   });
   const player = new AudioPlayer();
   try {
@@ -597,7 +597,7 @@ test('music defaults to 85 percent and explicit saved volumes apply without anot
     player.music('game:match');
     await settle();
     const context = required(FakeContext.instances[0]);
-    expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.85);
+    expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.6);
     player.configure({ ...enabled, musicVolume: 1 }, true);
     expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1]);
     player.configure({ ...enabled, musicVolume: 0.4 }, true);

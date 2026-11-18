@@ -1,6 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { join as joinPath } from 'node:path';
 import type { ServerMessage } from '../../shared/protocol';
-import { AUDIO, MUSIC_PLAYLIST, type AudioKind } from '../src/lib/audio-catalog';
+import {
+  AUDIO,
+  MUSIC_PLAYLIST,
+  type AudioKind,
+  type AudioPreferences,
+} from '../src/lib/audio-catalog';
 import { observeAudio, trace, type AudioStart, type AudioTrace } from './audio-observer';
 import { assertNoHorizontalOverflow, startIsolatedFakeServer } from './helpers';
 
@@ -19,6 +26,7 @@ function audioControls(page: Page, kind: AudioKind) {
     increase: panel.getByRole('button', { name: `Увеличить громкость ${channel}` }),
     mute: panel.getByRole('button', { name: `Выключить ${action}` }),
     unmute: panel.getByRole('button', { name: `Включить ${action}` }),
+    reset: panel.getByRole('button', { name: 'Сбросить настройки звука', exact: true }),
   };
 }
 
@@ -37,9 +45,9 @@ async function setMuted(page: Page, kind: AudioKind, muted: boolean): Promise<vo
   await controls.trigger.click();
 }
 
-async function join(page: Page, url: string): Promise<void> {
+async function join(page: Page, url: string, name = 'Оля'): Promise<void> {
   await page.goto(url);
-  await page.getByLabel('Ваше имя').fill('Оля');
+  await page.getByLabel('Ваше имя').fill(name);
   await page.getByRole('button', { name: 'Войти', exact: true }).click();
 }
 async function startRound(page: Page): Promise<void> {
@@ -255,7 +263,7 @@ async function expectColdLobbyMusic(page: Page, requests: string[]): Promise<Aud
   const events = await trace(page);
   expect(events.starts.filter((source) => source.loop)).toEqual([lobby]);
   expect(events.live[lobby.id]).toBe(lobby.url);
-  expect(lobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65 * 0.85, 4);
+  expect(lobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65 * 0.6, 4);
   expectNoExplicitStop(events, lobby);
   expect(requests).toEqual(['/audio/round-loop-suspense.ogg']);
   return lobby;
@@ -295,7 +303,7 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
     expect(playback.live[lobby.id]).toBeUndefined();
     const heard = matchMusic(audibleStarts(playback), lobby).slice(0, count);
     expect(heard.map(({ url }) => url.split('/').pop())).toEqual([...order, order[0]]);
-    expect(heard[0]?.gain).toBeCloseTo(AUDIO.music[1] * 0.85, 4);
+    expect(heard[0]?.gain).toBeCloseTo(AUDIO.music[1] * 0.6, 4);
     for (const [index, source] of heard.slice(0, -1).entries()) {
       const next = heard[index + 1];
       if (!next) throw new Error(`Missing successor for ${source.url}`);
@@ -402,7 +410,7 @@ test('volume controls update current and queued Web Audio sources without restar
     await observeAudio(page);
     await join(page, server.hostUrl);
     const lobby = await started(page, 'round-loop-suspense');
-    expect(lobby.gain).toBeCloseTo(0.117 * 0.85, 4);
+    expect(lobby.gain).toBeCloseTo(0.117 * 0.6, 4);
     await page.getByRole('button', { name: 'Начать', exact: true }).click();
     await expect(page.getByText('Загружаем панораму…')).toBeVisible();
     const loading = await started(page, 'loading-round');
@@ -418,14 +426,14 @@ test('volume controls update current and queued Web Audio sources without restar
       })
       .toBe(true);
     if (!queued) throw new Error('Missing scheduled music source');
-    for (const source of [music, queued]) expect(source.gain).toBeCloseTo(0.18 * 0.85, 4);
+    for (const source of [music, queued]) expect(source.gain).toBeCloseTo(0.18 * 0.6, 4);
 
     const musicControls = await openAudioControls(page, 'music');
-    await expect(musicControls.slider).toHaveValue('85');
+    await expect(musicControls.slider).toHaveValue('60');
     await musicControls.decrease.click();
-    await expect(musicControls.slider).toHaveValue('80');
-    await expect(musicControls.panel.getByText('80%', { exact: true })).toBeVisible();
-    for (const source of [music, queued]) await expectGain(page, source, 0.18 * 0.8);
+    await expect(musicControls.slider).toHaveValue('55');
+    await expect(musicControls.panel.getByText('55%', { exact: true })).toBeVisible();
+    for (const source of [music, queued]) await expectGain(page, source, 0.18 * 0.55);
     await expectGain(page, loading, AUDIO.loading[1]);
 
     await musicControls.slider.press('End');
@@ -458,6 +466,18 @@ async function expectFitsHorizontally(control: Locator, width: number): Promise<
   expect(box.x + box.width).toBeLessThanOrEqual(width);
 }
 
+async function expectAdjacentButtons(first: Locator, second: Locator): Promise<void> {
+  await expect(second).toBeVisible();
+  const firstBox = await first.boundingBox();
+  const secondBox = await second.boundingBox();
+  if (!firstBox || !secondBox) throw new Error('Missing mute or reset button bounds');
+  const [left, right] = firstBox.x < secondBox.x ? [firstBox, secondBox] : [secondBox, firstBox];
+  const gap = right.x - (left.x + left.width);
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThanOrEqual(16);
+  expect(Math.abs(left.y + left.height / 2 - (right.y + right.height / 2))).toBeLessThan(2);
+}
+
 test('mute and volume preferences persist and popovers fit the header', async ({ page }) => {
   const server = await startIsolatedFakeServer({ rounds: 1 });
   try {
@@ -470,7 +490,7 @@ test('mute and volume preferences persist and popovers fit the header', async ({
     const music = await openAudioControls(page, 'music');
     await music.decrease.click();
     await music.mute.click();
-    await expect(music.slider).toHaveValue('80');
+    await expect(music.slider).toHaveValue('55');
     await page.reload();
     await expect(effects.trigger).toHaveAttribute('aria-expanded', 'false');
     await expect(music.trigger).toHaveAttribute('aria-expanded', 'false');
@@ -478,7 +498,7 @@ test('mute and volume preferences persist and popovers fit the header', async ({
       await page.setViewportSize({ width, height: 720 });
       for (const [kind, value] of [
         ['effects', '95'],
-        ['music', '80'],
+        ['music', '55'],
       ] as const) {
         const control = await openAudioControls(page, kind);
         await expectFitsHorizontally(control.trigger, width);
@@ -486,6 +506,8 @@ test('mute and volume preferences persist and popovers fit the header', async ({
         await expect(control.slider).toHaveValue(value);
         await expect(control.slider).toBeFocused();
         await expect(control.unmute).toBeVisible();
+        await expectFitsHorizontally(control.reset, width);
+        await expectAdjacentButtons(control.unmute, control.reset);
         if (kind === 'music') {
           await page.screenshot({ path: test.info().outputPath(`music-popover-${width}.png`) });
         }
@@ -501,20 +523,140 @@ test('mute and volume preferences persist and popovers fit the header', async ({
     await expect(music.trigger).toHaveAttribute('aria-expanded', 'false');
     await openAudioControls(page, 'music');
     await music.increase.click();
-    await expect(music.slider).toHaveValue('85');
+    await expect(music.slider).toHaveValue('60');
     await expect(music.mute).toBeVisible();
     await music.slider.press('Home');
     await expect(music.slider).toHaveValue('0');
     await music.unmute.click();
-    await expect(music.slider).toHaveValue('85');
+    await expect(music.slider).toHaveValue('60');
     await expect(music.mute).toBeVisible();
   } finally {
     await server.stop();
   }
 });
 
-// Value: protects=legacy mute flag migration and unattenuated explicit saved music volume; fails_when=legacy settings reset a mute or a saved 100% still gets the 15% default reduction; why_new=existing persistence checks exercised only values saved by the current UI; seam=seeded legacy local storage; no_claim=headless checks measure native graph gain rather than perceived loudness.
-test('legacy preferences default music to 85% and saved 100% restores original gain', async ({
+async function profileCode(page: Page): Promise<string> {
+  await page.getByRole('button', { name: 'Профиль', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const input = dialog.getByLabel('Код профиля');
+  await expect(input).toHaveValue(/^[0-9a-f-]+$/);
+  const code = (await input.inputValue()).replaceAll('-', '');
+  expect(code).toMatch(/^[0-9a-f]{32}$/);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  return code;
+}
+
+async function loginByCode(page: Page, url: string, code: string): Promise<void> {
+  await page.goto(url);
+  await page.getByLabel('Код профиля').fill(code);
+  await page.getByRole('button', { name: 'Войти по коду', exact: true }).click();
+  await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+}
+
+function persistedAudio(dataDir: string, code: string): AudioPreferences | undefined {
+  const registry = JSON.parse(readFileSync(joinPath(dataDir, 'profiles.json'), 'utf8')) as {
+    profiles: { profileToken: string; audioPreferences?: AudioPreferences }[];
+  };
+  return registry.profiles.find(({ profileToken }) => profileToken === code)?.audioPreferences;
+}
+
+async function expectProfileAudio(page: Page, preferences: AudioPreferences): Promise<void> {
+  for (const [kind, volume] of [
+    ['music', preferences.musicVolume],
+    ['effects', preferences.effectsVolume],
+  ] as const) {
+    const control = await openAudioControls(page, kind);
+    await expect(control.slider).toHaveValue(String(Math.round(volume * 100)));
+    await expect(preferences[kind] ? control.mute : control.unmute).toBeVisible();
+    await control.trigger.click();
+  }
+}
+
+// Value: protects=durable per-profile volume and mute recovery across origins, with a reset that stays saved after restart; fails_when=browser cache overrides the permanent profile or resetting one profile changes another; why_new=existing storage checks use the same browser and origin; seam=conflicting audio cache is seeded in the second browser context; no_claim=the alternate localhost origin does not test a real tunnel.
+test('profile code restores audio across origins and reset persists after restart', async ({
+  page,
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const alternate = await browser.newPage();
+  const other = await browser.newPage();
+  const restarted = await browser.newPage();
+  const defaults: AudioPreferences = {
+    music: true,
+    musicVolume: 0.6,
+    effects: true,
+    effectsVolume: 1,
+  };
+  const changed: AudioPreferences = {
+    music: false,
+    musicVolume: 0.59,
+    effects: false,
+    effectsVolume: 0.99,
+  };
+  const otherPrefs = { ...defaults, musicVolume: 0.61 };
+  try {
+    expect(new URL(server.alternateBaseUrl).origin).not.toBe(new URL(server.baseUrl).origin);
+    await page.addInitScript((origin) => {
+      if (location.origin !== origin || localStorage.getItem('geoaissr.audio.v1') !== null) return;
+      localStorage.setItem(
+        'geoaissr.audio.v1',
+        JSON.stringify({ music: true, musicVolume: 0.6, effects: true, effectsVolume: 0.98 }),
+      );
+    }, new URL(server.baseUrl).origin);
+    await join(page, server.hostUrl);
+    const code = await profileCode(page);
+    const music = await openAudioControls(page, 'music');
+    await music.slider.press('ArrowLeft');
+    await music.mute.click();
+    await music.trigger.click();
+    const effects = await openAudioControls(page, 'effects');
+    await expect(effects.slider).toHaveValue('98');
+    await effects.slider.press('ArrowRight');
+    await effects.mute.click();
+    await effects.trigger.click();
+    await expect.poll(() => persistedAudio(server.dataDir, code)).toEqual(changed);
+
+    await join(other, server.guestUrl, 'Лена');
+    const otherCode = await profileCode(other);
+    expect(otherCode).not.toBe(code);
+    await expectProfileAudio(other, defaults);
+    const otherMusic = await openAudioControls(other, 'music');
+    await otherMusic.slider.press('ArrowRight');
+    await otherMusic.trigger.click();
+    await expect.poll(() => persistedAudio(server.dataDir, otherCode)).toEqual(otherPrefs);
+
+    await page.goto('about:blank');
+    await alternate.addInitScript(() => {
+      localStorage.setItem(
+        'geoaissr.audio.v1',
+        JSON.stringify({ music: true, musicVolume: 0.9, effects: true, effectsVolume: 0.2 }),
+      );
+    });
+    await loginByCode(alternate, server.alternateBaseUrl, code);
+    await expectProfileAudio(alternate, changed);
+    const restored = await openAudioControls(alternate, 'music');
+    await restored.reset.click();
+    await expect(restored.slider).toHaveValue('60');
+    await restored.trigger.click();
+    await expectProfileAudio(alternate, defaults);
+    await expect.poll(() => persistedAudio(server.dataDir, code)).toEqual(defaults);
+    expect(persistedAudio(server.dataDir, otherCode)).toEqual(otherPrefs);
+
+    await alternate.close();
+    await other.close();
+    await server.restart();
+    await loginByCode(restarted, server.baseUrl, code);
+    await expectProfileAudio(restarted, defaults);
+    expect(persistedAudio(server.dataDir, otherCode)).toEqual(otherPrefs);
+  } finally {
+    await Promise.all([alternate.close(), other.close(), restarted.close()]);
+    await server.stop();
+  }
+});
+
+// Value: protects=legacy mute flag migration and unattenuated explicit saved music volume; fails_when=legacy settings reset a mute or a saved 100% still gets the 40% default reduction; why_new=existing persistence checks exercised only values saved by the current UI; seam=seeded legacy local storage; no_claim=headless checks measure native graph gain rather than perceived loudness.
+test('legacy preferences default music to 60% and saved 100% restores original gain', async ({
   page,
 }) => {
   const server = await startIsolatedFakeServer({ rounds: 1 });
@@ -532,7 +674,7 @@ test('legacy preferences default music to 85% and saved 100% restores original g
     await expect(effects.unmute).toBeVisible();
     await effects.trigger.click();
     const music = await openAudioControls(page, 'music');
-    await expect(music.slider).toHaveValue('85');
+    await expect(music.slider).toHaveValue('60');
     await expect(music.mute).toBeVisible();
     await music.slider.press('End');
     await expect(music.slider).toHaveValue('100');
@@ -636,7 +778,7 @@ test('hidden and reconnecting games stop audio and resume only current music', a
     await page.getByRole('button', { name: 'Ещё раз' }).click();
     const returnLobby = await started(page, 'round-loop-suspense', lastMatchSourceId);
     expect((await trace(page)).live[returnLobby.id]).toBe(returnLobby.url);
-    expect(returnLobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65 * 0.85, 4);
+    expect(returnLobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65 * 0.6, 4);
     expect((await trace(page)).errors).toEqual([]);
   } finally {
     await server.stop();

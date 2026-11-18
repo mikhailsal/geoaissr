@@ -37,21 +37,11 @@ export function isMusic(id: SoundId): boolean {
   return MUSIC_PLAYLIST.some((music) => music === id);
 }
 
-export type AudioKind = 'effects' | 'music';
-
-export interface AudioPreferences {
-  effects: boolean;
-  music: boolean;
-  effectsVolume: number;
-  musicVolume: number;
-}
-
-export const DEFAULT_AUDIO_PREFERENCES: Readonly<AudioPreferences> = {
-  effects: true,
-  music: true,
-  effectsVolume: 1,
-  musicVolume: 0.85,
-};
+export {
+  DEFAULT_AUDIO_PREFERENCES,
+  type AudioKind,
+  type AudioPreferences,
+} from '../../../shared/audio-preferences';
 
 export interface AudioOutput {
   cue(id: SoundId): void;

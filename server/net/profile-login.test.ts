@@ -587,3 +587,145 @@ test('idle sockets retain the shared unauthenticated timeout', async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 }, 8000);
+
+// Protects owner-bound durable audio settings and code restoration on a fresh server origin.
+test('host and guest audio preferences save before ack and restore through permanent codes', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  let restored: ReturnType<typeof fixture> | undefined;
+  try {
+    const host = await register(f, 'host');
+    const guest = await register(f);
+    const preferences = { effects: false, music: true, effectsVolume: 0.4, musicVolume: 0.6 };
+    const hostPreferences = { effects: true, music: false, effectsVolume: 0.7, musicVolume: 0.2 };
+    host.c.send({ type: 'update_audio_preferences', seq: 2, preferences: hostPreferences });
+    expect((await host.c.next('ack')).result).toBe('ok');
+    guest.c.send({ type: 'update_audio_preferences', seq: 2, preferences });
+    expect((await guest.c.next('ack')).result).toBe('ok');
+    const saved = new ProfileStore(path.join(dir, 'profiles.json'));
+    expect(saved.getById(host.owner.profile.profileId)).toEqual({
+      ...host.owner.profile,
+      audioPreferences: hostPreferences,
+    });
+    expect(saved.getById(guest.owner.profile.profileId)).toEqual({
+      ...guest.owner.profile,
+      audioPreferences: preferences,
+    });
+    guest.c.send({ type: 'update_audio_preferences', seq: 2, preferences: hostPreferences });
+    expect((await guest.c.next('ack')).result).toBe('ok');
+    expect(f.profiles.getById(guest.owner.profile.profileId)?.audioPreferences).toEqual(
+      preferences,
+    );
+    restored = fixture(dir, '-new-origin');
+    const authenticated = await login(restored, guest.owner.profile);
+    expect(authenticated.ok.profile.audioPreferences).toEqual(preferences);
+    expect(authenticated.ok.profile.profileId).toBe(guest.owner.profile.profileId);
+    authenticated.c.socket.close();
+    host.c.socket.close();
+    guest.c.socket.close();
+  } finally {
+    restored?.stop();
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('audio preference updates require authentication and reject forged or invalid payloads', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  try {
+    const preferences = { effects: true, music: true, effectsVolume: 1, musicVolume: 0.6 };
+    const bare = await connect(f.url);
+    bare.send({ type: 'update_audio_preferences', seq: 1, preferences });
+    expect(await bare.closeCode()).toBe(4001);
+    const { c, owner } = await register(f);
+    c.send({
+      type: 'update_audio_preferences',
+      seq: 2,
+      preferences: { ...preferences, musicVolume: 2 },
+    });
+    c.send({ type: 'update_audio_preferences', seq: 3, profileId: 'forged', preferences });
+    c.send({ type: 'ping', clientNow: 1 });
+    await c.next('pong');
+    expect(f.profiles.getById(owner.profile.profileId)).toEqual(owner.profile);
+    c.send({ type: 'update_audio_preferences', seq: 4, preferences });
+    expect((await c.next('ack')).seq).toBe(4);
+    c.socket.close();
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('audio preference storage failure reports a failed ack and preserves the profile', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  try {
+    const { c, owner } = await register(f);
+    const file = path.join(dir, 'profiles.json');
+    const before = readFileSync(file, 'utf8');
+    rmSync(file);
+    mkdirSync(file);
+    writeFileSync(path.join(file, 'original'), before);
+    c.send({
+      type: 'update_audio_preferences',
+      seq: 2,
+      preferences: { effects: false, music: false, effectsVolume: 0, musicVolume: 0 },
+    });
+    const ack = await c.next('ack');
+    expect(ack.result).toBe('invalid');
+    expect(ack.message).toContain('недоступны');
+    expect(f.profiles.getById(owner.profile.profileId)).toEqual(owner.profile);
+    expect(readFileSync(path.join(file, 'original'), 'utf8')).toBe(before);
+    c.socket.close();
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Protects durable-save acknowledgements from inheriting an unrelated later command's success.
+test('a failed older audio save never becomes successful after a later action', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  try {
+    const { c, owner } = await register(f);
+    const file = path.join(dir, 'profiles.json');
+    const before = readFileSync(file, 'utf8');
+    rmSync(file);
+    mkdirSync(file);
+    writeFileSync(path.join(file, 'original'), before);
+    const update = {
+      type: 'update_audio_preferences',
+      seq: 2,
+      preferences: { effects: false, music: false, effectsVolume: 0.2, musicVolume: 0.3 },
+    };
+    c.send(update);
+    expect((await c.next('ack')).result).toBe('invalid');
+    c.send(update);
+    expect((await c.next('ack')).result).toBe('invalid');
+    rmSync(file, { recursive: true });
+    writeFileSync(file, before);
+    c.send({ type: 'update_profile', seq: 3, nick: 'Later name', color: 'p-2' });
+    expect((await c.next('ack')).result).toBe('ok');
+    c.send(update);
+    const replay = await c.next('ack');
+    expect(replay.seq).toBe(2);
+    expect(replay.result).toBe('invalid');
+    expect(f.profiles.getById(owner.profile.profileId)?.audioPreferences).toBeUndefined();
+    expect(
+      new ProfileStore(file).getById(owner.profile.profileId)?.audioPreferences,
+    ).toBeUndefined();
+    c.send({ ...update, seq: 4 });
+    expect((await c.next('ack')).result).toBe('ok');
+    c.send({ ...update, seq: 4 });
+    expect((await c.next('ack')).result).toBe('ok');
+    expect(new ProfileStore(file).getById(owner.profile.profileId)?.audioPreferences).toEqual(
+      update.preferences,
+    );
+    c.socket.close();
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -118,7 +118,6 @@ export class GameStore extends GameCommands {
   }
 
   private handleProfileLoginOk(msg: Extract<ServerMessage, { type: 'profile_login_ok' }>): void {
-    this.profile.accept(msg.profile);
     this.handleHelloOk({
       ...msg,
       type: 'hello_ok',
@@ -397,6 +396,7 @@ export class GameStore extends GameCommands {
   }
 
   destroy(): void {
+    this.profile.clearPending();
     window.removeEventListener('storage', this.handleStorage);
     this.wsClient.close();
     this.unsubMapsAuth?.();
