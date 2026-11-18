@@ -104,6 +104,35 @@ test('logout cancels timers, pending sends and stale acknowledgements for the ol
   h.controller.clear();
 });
 
+// Value: protects=unacknowledged edits remain owned and retry after logout and same-profile login; fails_when=logout marks an offline or in-flight edit saved; why_new=the existing logout case checks only a different profile; seam=none; no_claim=the pure controller test does not verify browser storage or server writes.
+for (const inFlight of [false, true]) {
+  test(`logout retains same-profile pending audio after ${inFlight ? 'an in-flight save' : 'an offline edit'}`, () => {
+    const h = harness();
+    h.controller.bind({ profileId: 'A', audioPreferences: defaults }, h.sender);
+    if (!inFlight) h.controller.disconnect();
+    const pending = { ...defaults, musicVolume: 0.19, effects: false };
+    h.controller.edit(pending);
+    h.controller.flush();
+    expect(h.sends).toHaveLength(inFlight ? 1 : 0);
+
+    h.controller.clear();
+    h.controller.ack({ seq: 1, result: 'ok' });
+    h.controller.flush();
+    expect(h.state().owner).toBe('A');
+    expect(h.state().pending).toBe(true);
+    expect(h.state().preferences).toEqual(pending);
+    expect(h.sends).toHaveLength(inFlight ? 1 : 0);
+
+    const restored = harness(h.state());
+    restored.controller.bind({ profileId: 'A', audioPreferences: defaults }, restored.sender);
+    expect(restored.sends).toEqual([{ seq: 1, preferences: pending }]);
+    expect(restored.state().pending).toBe(true);
+    restored.controller.ack({ seq: 1, result: 'ok' });
+    expect(restored.state().pending).toBe(false);
+    restored.controller.clear();
+  });
+}
+
 test('slider edits coalesce until explicit final flush', () => {
   const h = harness();
   h.controller.bind({ profileId: 'A', audioPreferences: defaults }, h.sender);

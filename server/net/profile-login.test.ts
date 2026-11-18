@@ -729,3 +729,37 @@ test('a failed older audio save never becomes successful after a later action', 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Protects audio acknowledgements from reusing a profile edit result at the same sequence.
+// fails_when: an audio update reports success without saving, or a fresh audio update cannot replay.
+// no_claim: native local WebSocket and isolated profile storage with fake game dependencies.
+// why_new=A profile edit at the current sequence can return success for a different command; seam=none.
+test('audio preferences cannot reuse a profile edit acknowledgment at the same sequence', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  try {
+    const { c, owner } = await register(f);
+    const file = path.join(dir, 'profiles.json');
+    const profileId = owner.profile.profileId;
+    const preferences = { effects: false, music: true, effectsVolume: 0.4, musicVolume: 0.6 };
+    c.send({ type: 'update_profile', seq: 2, nick: 'Edited', color: 'p-2' });
+    expect(await c.next('ack')).toMatchObject({ seq: 2, result: 'ok' });
+    c.send({ type: 'update_audio_preferences', seq: 2, preferences });
+    expect(await c.next('ack')).toMatchObject({ seq: 2, result: 'invalid' });
+    expect(new ProfileStore(file).getById(profileId)).toEqual({
+      ...owner.profile,
+      nick: 'Edited',
+      color: 'p-2',
+    });
+    const update = { type: 'update_audio_preferences', seq: 3, preferences };
+    c.send(update);
+    expect(await c.next('ack')).toMatchObject({ seq: 3, result: 'ok' });
+    expect(new ProfileStore(file).getById(profileId)?.audioPreferences).toEqual(preferences);
+    c.send(update);
+    expect(await c.next('ack')).toMatchObject({ seq: 3, result: 'ok' });
+    c.socket.close();
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -39,7 +39,10 @@ export interface WsClientData {
   authTimer: ReturnType<typeof setTimeout> | null;
   /** When hello succeeded; used to evict sockets that authenticate but never join. */
   authenticatedAt: number | null;
-  lastSeqByPlayer: Map<string, { seq: number; result: AckResult }>;
+  lastSeqByPlayer: Map<
+    string,
+    { seq: number; result: AckResult; commandType?: 'update_audio_preferences' }
+  >;
   countedPanoRounds: Set<number>;
 }
 
@@ -97,8 +100,9 @@ function handleAuthenticatedAction(
 
   const prev = ws.data.lastSeqByPlayer.get(playerId);
   if (prev && msg.seq <= prev.seq) {
+    const sameAudioCommand = msg.seq === prev.seq && prev.commandType === msg.type;
     const result =
-      msg.type === 'update_audio_preferences' && msg.seq < prev.seq ? 'invalid' : prev.result;
+      msg.type === 'update_audio_preferences' && !sameAudioCommand ? 'invalid' : prev.result;
     sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result });
     return;
   }

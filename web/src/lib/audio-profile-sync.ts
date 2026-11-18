@@ -100,8 +100,7 @@ export class AudioProfileSync {
     this.profileId = null;
     this.sender = null;
     this.error = null;
-    // Retain cache ownership so a different legacy profile cannot inherit these choices.
-    this.cache.pending = false;
+    // Only an acknowledgement clears pending edits; ownership prevents another profile inheriting them.
     this.emit();
   }
 

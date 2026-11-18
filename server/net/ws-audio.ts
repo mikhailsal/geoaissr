@@ -21,6 +21,6 @@ export function handleAudioPreferences(
       message = STORE_UNAVAILABLE;
     }
   }
-  ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result });
+  ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result, commandType: msg.type });
   sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result, message });
 }
