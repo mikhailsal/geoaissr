@@ -31,7 +31,7 @@ export const MUSIC_PLAYLIST = [
   'musicCountdown',
 ] as const satisfies readonly SoundId[];
 
-export const LOBBY_MUSIC = ['musicHorizon'] as const satisfies readonly SoundId[];
+export const LOBBY_MUSIC = ['music'] as const satisfies readonly SoundId[];
 
 export function isMusic(id: SoundId): boolean {
   return MUSIC_PLAYLIST.some((music) => music === id);

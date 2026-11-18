@@ -17,16 +17,23 @@ async function startRound(page: Page): Promise<void> {
     timeout: 12_000,
   });
 }
-async function started(page: Page, name: string): Promise<AudioStart> {
+async function started(page: Page, name: string, afterId = 0): Promise<AudioStart> {
   let start: AudioStart | undefined;
   await expect
     .poll(async () => {
-      start = audibleStarts(await trace(page)).find((s) => s.url.endsWith(`/${name}.ogg`));
+      start = audibleStarts(await trace(page)).find(
+        (s) => s.id > afterId && s.url.endsWith(`/${name}.ogg`),
+      );
       return start !== undefined;
     })
     .toBe(true);
   if (!start) throw new Error(`No native start for ${name}`);
   return start;
+}
+async function matchSuspense(page: Page, lobby: AudioStart): Promise<AudioStart> {
+  const suspense = await started(page, 'round-loop-suspense', lobby.id);
+  expect((await trace(page)).live[lobby.id]).toBeUndefined();
+  return suspense;
 }
 function audibleStarts(events: AudioTrace): AudioStart[] {
   return events.starts.filter(
@@ -35,15 +42,25 @@ function audibleStarts(events: AudioTrace): AudioStart[] {
       !events.stops.some(({ id, when }) => id === source.id && when <= source.at),
   );
 }
-function matchMusic(starts: AudioStart[]): AudioStart[] {
-  const first = starts.findIndex((source) => source.url.endsWith('/round-loop-suspense.ogg'));
-  return first === -1 ? [] : starts.slice(first).filter((source) => source.loop);
+function matchMusic(starts: AudioStart[], lobby: AudioStart): AudioStart[] {
+  return starts.filter((source) => source.id > lobby.id && source.loop);
 }
-async function waitForDecodedAudio(page: Page): Promise<void> {
-  await expect.poll(async () => new Set((await trace(page)).decoded).size).toBe(19);
-  expect(new Set((await trace(page)).decoded.map((url) => url.split('/').pop()))).toEqual(
-    new Set(Object.values(AUDIO).map(([file]) => `${file}.ogg`)),
-  );
+async function verifyPackagedAudio(page: Page): Promise<void> {
+  const assets = Object.values(AUDIO).map(([file]) => `/audio/${file}.ogg`);
+  const durations = await page.evaluate(async (urls) => {
+    const context = new OfflineAudioContext(1, 1, 44_100);
+    const durations: number[] = [];
+    for (const url of urls) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Audio HTTP ${response.status} for ${url}`);
+      const decoded = await context.decodeAudioData(await response.arrayBuffer());
+      durations.push(decoded.duration);
+    }
+    return durations;
+  }, assets);
+  expect(new Set(assets).size).toBe(19);
+  expect(durations).toHaveLength(19);
+  expect(durations.every((duration) => duration > 0)).toBe(true);
 }
 function expectNoExplicitStop(events: AudioTrace, source: AudioStart): void {
   expect(events.stops.filter(({ id }) => id === source.id)).toEqual([]);
@@ -79,19 +96,12 @@ test('native audio follows the round and mute controls', async ({ page }) => {
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
     await page.getByRole('button', { name: 'Звуковые эффекты' }).click();
     await page.getByRole('button', { name: 'Звуковые эффекты' }).click();
-    await waitForDecodedAudio(page);
+    const lobby = await started(page, 'round-loop-suspense');
     await startRound(page);
-    for (const sound of [
-      'loading-round',
-      'soft-countdown',
-      'effect-new-round',
-      'round-loop-suspense',
-    ]) {
+    for (const sound of ['loading-round', 'soft-countdown', 'effect-new-round']) {
       await started(page, sound);
     }
-    const music = (await trace(page)).starts.find((s) =>
-      s.url.endsWith('/round-loop-suspense.ogg'),
-    );
+    const music = await matchSuspense(page, lobby);
     expect(music).toMatchObject({ loop: true });
     await page
       .getByTestId('fake-guess-map')
@@ -124,6 +134,7 @@ test('native audio follows the round and mute controls', async ({ page }) => {
       expect(events.filter((s) => s.url.endsWith(`/${name}.ogg`))).toHaveLength(1);
     }
     expect(events.filter((s) => s.url.endsWith('/swoosh.ogg'))).toHaveLength(3);
+    await verifyPackagedAudio(page);
     expect((await trace(page)).errors).toEqual([]);
   } finally {
     await server.stop();
@@ -140,6 +151,7 @@ test('loading finishes before the countdown and music continues into the next ac
     await join(page, server.hostUrl);
     await expect(page.getByRole('button', { name: 'Начать', exact: true })).toBeVisible();
     await page.keyboard.press('Tab');
+    const lobby = await started(page, 'round-loop-suspense');
     await expect
       .poll(
         async () =>
@@ -157,7 +169,7 @@ test('loading finishes before the countdown and music continues into the next ac
     const loading = await started(page, 'loading-round');
     expect(loading.duration).toBeCloseTo(6.77, 1);
     expect(loading.offset).toBeLessThan(0.25);
-    const suspense = await started(page, 'round-loop-suspense');
+    const suspense = await matchSuspense(page, lobby);
     expect(suspense.loop).toBe(true);
     await expect(countdownLabel).toHaveCount(0);
     await expect(countdownLabel).toBeVisible({ timeout: 12_000 });
@@ -178,12 +190,12 @@ test('loading finishes before the countdown and music continues into the next ac
     await expect(countdownLabel).toBeVisible({ timeout: 12_000 });
     const nextLoading = await trace(page);
     expect(nextLoading.live[suspense.id]).toBe(suspense.url);
-    expect(matchMusic(audibleStarts(nextLoading))).toEqual([suspense]);
+    expect(matchMusic(audibleStarts(nextLoading), lobby)).toEqual([suspense]);
 
     await expect(guessMap).toBeVisible({ timeout: 12_000 });
     const active = await trace(page);
     expect(active.live[suspense.id]).toBe(suspense.url);
-    expect(matchMusic(audibleStarts(active))).toEqual([suspense]);
+    expect(matchMusic(audibleStarts(active), lobby)).toEqual([suspense]);
     const explorer = active.starts.find((s) => s.url.endsWith('/round-loop-explorer.ogg'));
     if (!explorer) throw new Error('Missing queued explorer track');
     expect(suspense.duration).toBeCloseTo(43.54, 1);
@@ -197,33 +209,49 @@ test('loading finishes before the countdown and music continues into the next ac
   }
 });
 
-// Value: protects=a continuous lobby track, sample-aligned music handoffs, all seven tracks, wrap, and queued-source cancellation on mute; fails_when=lobby advances, match music skips a track, or a muted queued source can start; why_new=full-length native assets cannot wrap within one browser test; seam=the native decoder reads each packaged OGG in full and music only plays a copied half-second of its decoded samples; no_claim=this accelerated case does not measure full-length playback or perceived sound quality.
+function observeMusicRequests(page: Page): string[] {
+  const requests: string[] = [];
+  page.on('request', (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.startsWith('/audio/round-loop-')) requests.push(pathname);
+  });
+  return requests;
+}
+
+async function expectColdLobbyMusic(page: Page, requests: string[]): Promise<AudioStart> {
+  const lobby = await started(page, 'round-loop-suspense');
+  await expect.poll(async () => (await trace(page)).now).toBeGreaterThan(lobby.at + 1);
+  const events = await trace(page);
+  expect(events.starts.filter((source) => source.loop)).toEqual([lobby]);
+  expect(events.live[lobby.id]).toBe(lobby.url);
+  expect(lobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65, 4);
+  expectNoExplicitStop(events, lobby);
+  expect(requests).toEqual(['/audio/round-loop-suspense.ogg']);
+  return lobby;
+}
+
+// Value: protects=a single quiet lobby track without prefetching alternate music, sample-aligned music handoffs, all seven tracks, wrap, and queued-source cancellation on mute; fails_when=lobby downloads or plays more music, the match skips a track, or a muted queued source can start; why_new=full-length native assets cannot wrap within one browser test; seam=the native decoder reads each packaged OGG in full and music only plays a copied half-second of its decoded samples; no_claim=this accelerated case does not measure full-length playback or perceived sound quality.
 test('native lobby music loops and the match playlist wraps and cancels queued music on mute', async ({
   page,
 }) => {
   const server = await startIsolatedFakeServer({ rounds: 1 });
   try {
+    const requests = observeMusicRequests(page);
     await observeAudio(page, { musicSeconds: 0.5 });
     await join(page, server.hostUrl);
     const start = page.getByRole('button', { name: 'Начать', exact: true });
     await expect(start).toBeVisible();
     await page.keyboard.press('Tab');
-    await waitForDecodedAudio(page);
     const order = MUSIC_PLAYLIST.map((id) => `${AUDIO[id][0]}.ogg`);
     expect(order).toHaveLength(7);
     const count = order.length + 1;
-    const lobby = await started(page, 'round-loop-horizon');
-    await expect.poll(async () => (await trace(page)).now).toBeGreaterThan(lobby.at + 1);
-    const lobbyPlayback = await trace(page);
-    expect(lobbyPlayback.starts.filter((source) => source.loop)).toEqual([lobby]);
-    expect(lobbyPlayback.live[lobby.id]).toBe(lobby.url);
-    expectNoExplicitStop(lobbyPlayback, lobby);
+    const lobby = await expectColdLobbyMusic(page, requests);
 
     await start.click();
     await expect
       .poll(async () => {
         const events = await trace(page);
-        const heard = matchMusic(audibleStarts(events));
+        const heard = matchMusic(audibleStarts(events), lobby);
         return (
           heard.length >= count && heard.slice(0, count - 1).every((s) => s.id in events.ended)
         );
@@ -232,8 +260,9 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
     await expect(page.getByText('Загружаем панораму…')).toBeVisible();
     const playback = await trace(page);
     expect(playback.live[lobby.id]).toBeUndefined();
-    const heard = matchMusic(audibleStarts(playback)).slice(0, count);
+    const heard = matchMusic(audibleStarts(playback), lobby).slice(0, count);
     expect(heard.map(({ url }) => url.split('/').pop())).toEqual([...order, order[0]]);
+    expect(heard[0]?.gain).toBeCloseTo(AUDIO.music[1], 4);
     for (const [index, source] of heard.slice(0, -1).entries()) {
       const next = heard[index + 1];
       if (!next) throw new Error(`Missing successor for ${source.url}`);
@@ -245,7 +274,7 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
 
     await page.getByRole('button', { name: 'Фоновая музыка' }).click();
     const muted = await trace(page);
-    const scheduled = matchMusic(muted.starts);
+    const scheduled = matchMusic(muted.starts, lobby);
     const cancelled = scheduled.filter((source) =>
       muted.stops.some(({ id, when }) => id === source.id && when < source.at),
     );
@@ -255,7 +284,7 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
       .poll(async () => (await trace(page)).now)
       .toBeGreaterThan(lastCancelledStart + 0.1);
     const afterBoundary = await trace(page);
-    expect(matchMusic(afterBoundary.starts)).toEqual(scheduled);
+    expect(matchMusic(afterBoundary.starts, lobby)).toEqual(scheduled);
     expect(Object.values(afterBoundary.live).some((url) => url.includes('/round-loop-'))).toBe(
       false,
     );
@@ -297,8 +326,9 @@ test('timer finale and music continue through client zero and round results', as
     await shortenClientDeadline(page);
     await observeAudio(page);
     await join(page, server.hostUrl);
+    const lobby = await started(page, 'round-loop-suspense');
     await startRound(page);
-    const music = await started(page, 'round-loop-suspense');
+    const music = await matchSuspense(page, lobby);
     const warning = await started(page, 'effect-timer-countdown');
     expect(warning.duration).toBeCloseTo(18, 1);
     expect(warning.offset).toBeLessThan(1);
@@ -400,8 +430,9 @@ test('hidden and reconnecting games stop audio and resume only current music', a
     });
     await observeAudio(page);
     await join(page, server.hostUrl);
+    const lobby = await started(page, 'round-loop-suspense');
     await startRound(page);
-    const music = await started(page, 'round-loop-suspense');
+    const music = await matchSuspense(page, lobby);
     await setVisibility(page, 'hidden');
     await expect.poll(async () => Object.keys((await trace(page)).live).length).toBe(0);
     const halted = await trace(page);
@@ -414,7 +445,7 @@ test('hidden and reconnecting games stop audio and resume only current music', a
       )
       .toBe(true);
     const visible = await trace(page);
-    const resumed = matchMusic(audibleStarts(visible)).find((s) => s.id in visible.live);
+    const resumed = matchMusic(audibleStarts(visible), lobby).find((s) => s.id in visible.live);
     expect(resumed?.url).toBe(music.url);
     expect(resumed?.offset).toBeCloseTo(music.offset + pause.at - music.at, 1);
     if (!disconnect) throw new Error('Missing fixture socket');
@@ -438,10 +469,11 @@ test('hidden and reconnecting games stop audio and resume only current music', a
     expect(
       (await trace(page)).starts.filter((s) => s.url.includes('effect-new-round')),
     ).toHaveLength(1);
+    const lastMatchSourceId = (await trace(page)).starts.at(-1)?.id ?? music.id;
     await page.getByRole('button', { name: 'Ещё раз' }).click();
-    await expect
-      .poll(async () => Object.values((await trace(page)).live).some((u) => u.includes('horizon')))
-      .toBe(true);
+    const returnLobby = await started(page, 'round-loop-suspense', lastMatchSourceId);
+    expect((await trace(page)).live[returnLobby.id]).toBe(returnLobby.url);
+    expect(returnLobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65, 4);
     expect((await trace(page)).errors).toEqual([]);
   } finally {
     await server.stop();
@@ -457,8 +489,9 @@ test('touch gestures unlock native audio on release without a keyboard', async (
     await page.goto(server.hostUrl);
     await page.getByLabel('Ваше имя').fill('Тап');
     await page.getByRole('button', { name: 'Войти', exact: true }).tap();
+    const lobby = await started(page, 'round-loop-suspense');
     await page.getByRole('button', { name: 'Начать', exact: true }).tap();
-    await started(page, 'round-loop-suspense');
+    await matchSuspense(page, lobby);
     expect(
       (await trace(page)).resumedOn.some((event) => event === 'pointerup' || event === 'touchend'),
     ).toBe(true);

@@ -27,15 +27,15 @@ export class AudioPlayer implements AudioOutput {
   private active = false;
   private destroyed = false;
   private sequence: MusicSequence | null = null;
+  private effectsWarmup: ReturnType<typeof setTimeout> | null = null;
 
   async unlock(): Promise<void> {
     if (this.destroyed || typeof AudioContext === 'undefined') return;
     try {
       this.context ??= new AudioContext({ sampleRate: 44_100 });
       await this.context.resume();
-      for (const id of Object.keys(AUDIO) as SoundId[]) {
-        if (this.allowed(id)) void this.load(id).catch(() => undefined);
-      }
+      if (this.allowed('music')) void this.loadMusic(LOBBY_MUSIC[0]).catch(() => undefined);
+      else this.preloadEffects();
     } catch {
       // Audio is optional when a browser blocks playback or has no output device.
     }
@@ -57,7 +57,7 @@ export class AudioPlayer implements AudioOutput {
   music(key: string, lobby = false): void {
     const context = this.context;
     if (!this.allowed('music') || context?.state !== 'running') return;
-    this.sequence ??= new MusicSequence(context, (id) => this.load(id));
+    this.sequence ??= new MusicSequence(context, (id) => this.loadMusic(id));
     this.sequence.play(key, lobby);
   }
 
@@ -90,6 +90,8 @@ export class AudioPlayer implements AudioOutput {
     this.active = false;
     this.stopAll();
     this.sequence?.stop();
+    if (this.effectsWarmup !== null) clearTimeout(this.effectsWarmup);
+    this.effectsWarmup = null;
     this.abort.abort();
     this.buffers.clear();
     void this.context?.close().catch(() => undefined);
@@ -97,6 +99,23 @@ export class AudioPlayer implements AudioOutput {
 
   private allowed(id: SoundId): boolean {
     return this.active && (isMusic(id) ? this.preferences.music : this.preferences.effects);
+  }
+
+  private loadMusic(id: SoundId): Promise<AudioBuffer> {
+    this.effectsWarmup ??= setTimeout(() => {
+      this.preloadEffects();
+    }, 1000);
+    return this.load(id).finally(() => {
+      this.preloadEffects();
+    });
+  }
+
+  private preloadEffects(): void {
+    if (this.effectsWarmup !== null) clearTimeout(this.effectsWarmup);
+    this.effectsWarmup = null;
+    for (const id of Object.keys(AUDIO) as SoundId[]) {
+      if (!isMusic(id) && this.allowed(id)) void this.load(id).catch(() => undefined);
+    }
   }
 
   private load(id: SoundId): Promise<AudioBuffer> {

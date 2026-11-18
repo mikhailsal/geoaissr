@@ -60,7 +60,7 @@ produced by the accepted phase change.
 
 ## Continuous background music
 
-All seven current loops are included, at linear gain 0.18:
+All seven current loops are included in the gameplay queue, at linear gain 0.18:
 
 | Queue position | File                       | Duration | Character                            |
 | -------------- | -------------------------- | -------- | ------------------------------------ |
@@ -72,9 +72,10 @@ All seven current loops are included, at linear gain 0.18:
 | 6              | `round-loop-pulse.ogg`     | 43.54 s  | Driving electronic rhythm            |
 | 7              | `round-loop-countdown.ogg` | 45.71 s  | Bass ticks and growing timer tension |
 
-In the lobby, only `round-loop-horizon.ogg` repeats. Its gain is reduced to 0.117
-for a quieter background while players join and configure the match. The same
-background-music control applies in both lobby and gameplay.
+In the lobby, only the original `round-loop-suspense.ogg` repeats as a native
+audio loop. Its drone, heartbeat and quiet ticks play at a reduced gain of 0.117
+while players join and configure the match. The same background-music control
+applies in both lobby and gameplay.
 
 A match starts the queue with suspense during the first round's loading. Every
 track plays in full, then the next starts; countdown is followed by suspense
@@ -89,14 +90,18 @@ next complete loop boundary instead of cutting the audible iteration.
 
 Muting music, hiding the tab or losing the connection pauses the queue and saves
 the audible track and its position. Resuming continues that position. Match
-final stops the queue; returning to the lobby restores its single Horizon loop.
+final stops the queue; returning to the lobby restores its single Suspense loop.
 Each new match starts its own queue from suspense.
 
 ## Playback and assets
 
-`audio-player.ts` loads and decodes the OGG files through Web Audio after browser
-activation. The playlist schedules decoded `AudioBuffer` sources on the native
-audio clock, with sample-exact OGG loops as the fallback. `audio-director.ts`
+`audio-player.ts` fetches and decodes the OGG files through Web Audio only after
+browser activation. With music enabled, the initial Suspense load gets priority: enabled effects
+are preloaded when it settles or after one second, whichever comes first. The playlist loads its current and next tracks;
+later tracks load as needed, rather than fetching all seven at activation. If a
+successor loads slowly, the current track keeps looping as described above.
+The playlist schedules decoded `AudioBuffer` sources on the native audio clock,
+with sample-exact OGG loops as the fallback. `audio-director.ts`
 selects live transitions and timed effects using the same synchronized server
 clock as the visible timer; background progression follows its own audio clock.
 Outstanding loads lose permission to start when their source is stopped or

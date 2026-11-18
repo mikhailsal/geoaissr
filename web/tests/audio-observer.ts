@@ -7,6 +7,7 @@ export interface AudioStart {
   loop: boolean;
   at: number;
   duration: number;
+  gain: number | undefined;
 }
 
 interface DecodeTrace {
@@ -99,16 +100,14 @@ function installSourceObserver(): void {
   const stops: SourceTrace['stops'] = [];
   const lastStop = new Map<number, number>();
   const ids = new WeakMap<AudioBufferSourceNode, number>();
+  const gains = new WeakMap<AudioBufferSourceNode, GainNode>();
   let context: BaseAudioContext | undefined;
   window.audioSourceTrace = () => {
     const now = context?.currentTime ?? 0;
     const live: SourceTrace['live'] = {};
     for (const source of starts) {
-      if (
-        source.at <= now &&
-        !(source.id in ended) &&
-        now < (lastStop.get(source.id) ?? Infinity)
-      ) {
+      const scheduledStop = lastStop.get(source.id) ?? Infinity;
+      if (source.at <= now && !(source.id in ended) && now < scheduledStop) {
         live[source.id] = source.url;
       }
     }
@@ -117,7 +116,15 @@ function installSourceObserver(): void {
   /* eslint-disable @typescript-eslint/unbound-method */
   const start = AudioBufferSourceNode.prototype.start;
   const stop = AudioBufferSourceNode.prototype.stop;
+  const connect = AudioBufferSourceNode.prototype.connect;
   /* eslint-enable @typescript-eslint/unbound-method */
+  AudioBufferSourceNode.prototype.connect = new Proxy(connect, {
+    apply(target, source: AudioBufferSourceNode, args: unknown[]) {
+      const [destination] = args;
+      if (destination instanceof GainNode) gains.set(source, destination);
+      return Reflect.apply(target, source, args) as AudioNode | undefined;
+    },
+  });
   AudioBufferSourceNode.prototype.start = function (when, offset, duration) {
     const id = starts.length + 1;
     const url = this.buffer ? (window.audioBufferUrls.get(this.buffer) ?? '') : '';
@@ -132,6 +139,7 @@ function installSourceObserver(): void {
       loop: this.loop,
       at,
       duration: this.buffer?.duration ?? 0,
+      gain: gains.get(this)?.gain.value,
     });
     this.addEventListener('ended', () => {
       ended[id] = this.context.currentTime;

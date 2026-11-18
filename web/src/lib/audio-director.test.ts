@@ -10,12 +10,14 @@ class FakeOutput implements AudioOutput {
   cues: SoundId[] = [];
   tracks = new Map<string, Track>();
   starts: Track[] = [];
+  musicRequests: { key: string; lobby: boolean }[] = [];
 
   cue(id: SoundId): void {
     this.cues.push(id);
   }
   music(key: string, lobby = false): void {
-    this.track('music', lobby ? 'musicHorizon' : 'music', key, 0, true);
+    this.musicRequests.push({ key, lobby });
+    this.track('music', 'music', key, 0, true);
   }
   track(channel: string, id: SoundId, key: string, offset: number, loop?: boolean): void {
     if (this.tracks.get(channel)?.key === key) return;
@@ -160,15 +162,17 @@ test('lobby requests one calm loop and a new game gets a separate playlist sessi
   const lobby = view({ phase: 'LOBBY', active: undefined });
   director.update(lobby, 0, true);
   director.update(lobby, 90_000, true);
-  expect(output.tracks.get('music')).toMatchObject({ id: 'musicHorizon', key: 'lobby:match' });
+  expect(output.tracks.get('music')).toMatchObject({ id: 'music', key: 'lobby:match' });
+  expect(output.musicRequests.at(-1)).toEqual({ key: 'lobby:match', lobby: true });
   expect(output.starts).toHaveLength(1);
   director.update(loading(null), 91_000, true);
   director.update(view({ roundNumber: 3 }), 250_000, true);
   expect(output.tracks.get('music')).toMatchObject({ id: 'music', key: 'game:match' });
+  expect(output.musicRequests.at(-1)).toEqual({ key: 'game:match', lobby: false });
   director.update(view({ phase: 'FINAL', active: undefined }), 251_000, true);
   expect(output.tracks.has('music')).toBe(false);
   director.update(lobby, 252_000, true);
-  expect(output.tracks.get('music')).toMatchObject({ id: 'musicHorizon', key: 'lobby:match' });
+  expect(output.tracks.get('music')).toMatchObject({ id: 'music', key: 'lobby:match' });
 });
 
 test('expired warning keeps its final hit and tail across zero and results without restarting', () => {

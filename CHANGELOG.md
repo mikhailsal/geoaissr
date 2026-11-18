@@ -12,13 +12,14 @@ Notable changes to this locally run application are recorded here. Releases are 
 ### Changed
 
 - Play all seven original background tracks in a continuous sequence, keeping their full endings and preserving the queue through round changes, answers, results and preparation.
-- Repeat a quieter Horizon track in the lobby and use one background-music control for both lobby and gameplay.
+- Repeat the calmer original Suspense track in the lobby at a reduced volume and use one background-music control for both lobby and gameplay.
 
 ### Fixed
 
 - Let the loading phrase finish before the synchronized three-second countdown begins.
 - Preserve the final timer hit and whistle after zero, and let event tails finish across normal screen transitions.
 - Keep the previous background track audible until the next variant is ready to play.
+- Reduce audio loading contention on a fresh lobby visit by prioritizing Suspense before effects preloading and loading playlist tracks as needed.
 - Play the full swoosh at screen transitions and reserve the short swoosh for menus and panels.
 
 ## [0.2.1] - 2026-11-16

@@ -154,6 +154,81 @@ test('does not construct a context or fetch before unlock; missing AudioContext 
   expect(requests).toBe(0);
 });
 
+test('cold lobby prioritizes its music over effects and leaves other music on demand', async () => {
+  const pending = deferred<Response>();
+  const requests: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = requestUrl(input);
+    requests.push(url);
+    return url === audioUrl('music') ? pending.promise : response(url);
+  }) as typeof fetch;
+  const player = new AudioPlayer();
+  try {
+    player.configure(enabled, true);
+    await player.unlock();
+    player.music('lobby:match', true);
+    await settle();
+    expect(requests).toEqual([audioUrl('music')]);
+    pending.resolve(response(audioUrl('music')));
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('music'));
+    expect(requests).toHaveLength(13);
+    expect(requests.filter((url) => url.includes('/round-loop-'))).toEqual([audioUrl('music')]);
+    player.music('game:match');
+    await settle();
+    expect(requests.filter((url) => url.includes('/round-loop-'))).toEqual([
+      audioUrl('music'),
+      audioUrl('musicExplorer'),
+    ]);
+  } finally {
+    player.destroy();
+  }
+});
+
+test('effects preload without waiting for music when background music is disabled', async () => {
+  const requests: string[] = [];
+  globalThis.fetch = ((input: string | URL | Request) => {
+    const url = requestUrl(input);
+    requests.push(url);
+    return Promise.resolve(response(url));
+  }) as typeof fetch;
+  const player = new AudioPlayer();
+  try {
+    player.configure({ effects: true, music: false }, true);
+    await player.unlock();
+    await settle();
+    expect(requests).toHaveLength(12);
+    expect(requests.some((url) => url.includes('/round-loop-'))).toBe(false);
+  } finally {
+    player.destroy();
+  }
+});
+
+test('a stalled music fetch cannot indefinitely prevent effects from warming', async () => {
+  const pending = deferred<Response>();
+  const requests: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = requestUrl(input);
+    requests.push(url);
+    return url === audioUrl('music') ? pending.promise : response(url);
+  }) as typeof fetch;
+  const player = new AudioPlayer();
+  try {
+    player.configure(enabled, true);
+    await player.unlock();
+    expect(requests).toEqual([audioUrl('music')]);
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    expect(requests).toHaveLength(13);
+    player.cue('click');
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('click'));
+  } finally {
+    player.destroy();
+  }
+});
+
 for (const action of ['stop', 'mute', 'inactive', 'destroy'] as const) {
   test(`does not start a pending fetch after ${action}`, async () => {
     const pending = deferred<Response>();
@@ -278,9 +353,12 @@ test('all seven variants use the independent music preference', async () => {
   player.cue('click');
   await settle();
   expect(context.sources).toHaveLength(8);
+  const music = context.sources.filter((source) => source.loop);
+  const click = required(context.sources.find((source) => !source.loop));
+  expect(music).toHaveLength(7);
   player.configure({ effects: false, music: true }, true);
-  expect(context.sources.slice(0, 7).every((source) => !source.stopped)).toBe(true);
-  expect(required(context.sources[7]).stopped).toBe(true);
+  expect(music.every((source) => !source.stopped)).toBe(true);
+  expect(click.stopped).toBe(true);
   player.configure({ effects: true, music: false }, true);
   expect(context.sources.every((source) => source.stopped)).toBe(true);
   player.destroy();
@@ -345,7 +423,7 @@ test('music schedules all seven complete tracks in order, wraps, and ignores rep
   player.destroy();
 });
 
-test('lobby loops only quiet Horizon and a new match starts the first playlist track', async () => {
+test('lobby loops only quiet original Suspense and a new match starts the first playlist track', async () => {
   const player = new AudioPlayer();
   player.configure(enabled, true);
   await player.unlock();
@@ -354,8 +432,8 @@ test('lobby loops only quiet Horizon and a new match starts the first playlist t
   player.music('lobby:match', true);
   await settle();
   expect(context.sources).toHaveLength(1);
-  expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('musicHorizon'));
-  expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.musicHorizon[1] * 0.65);
+  expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('music'));
+  expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.65);
   context.advance(50);
   player.music('lobby:match', true);
   expect(context.sources).toHaveLength(1);
@@ -367,7 +445,7 @@ test('lobby loops only quiet Horizon and a new match starts the first playlist t
   player.stop('music');
   player.music('lobby:match', true);
   await settle();
-  expect(sourceName(context, required(context.sources.at(-1)))).toBe(audioUrl('musicHorizon'));
+  expect(sourceName(context, required(context.sources.at(-1)))).toBe(audioUrl('music'));
   player.destroy();
 });
 
@@ -444,7 +522,7 @@ test('a pending old playlist cannot replace the lobby after its fetch finishes',
   pending.resolve(response(audioUrl('music')));
   await settle();
   expect(context.sources).toHaveLength(1);
-  expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('musicHorizon'));
+  expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('music'));
   player.destroy();
 });
 
