@@ -91,6 +91,13 @@ async function playRound(host: TestClient, guest: TestClient): Promise<void> {
     client.ws.send(
       JSON.stringify({ type: 'pano_loaded', seq: 10, roundNumber: 1, countedLoad: true }),
     );
+  const scheduled = await waitFor(
+    host,
+    (m) => m.type === 'state' && m.view.loading?.countdownStartsAt != null,
+  );
+  if (scheduled.type !== 'state') throw new Error('Missing scheduled countdown');
+  // Keep the existing countdown deadline; wait for the added loading phrase separately.
+  await Bun.sleep(Math.max(0, (scheduled.view.loading?.countdownStartsAt ?? 0) - Date.now()));
   await waitFor(host, (m) => m.type === 'state' && m.view.phase === 'ROUND_ACTIVE');
   for (const client of [host, guest])
     client.ws.send(

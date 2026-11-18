@@ -1,5 +1,5 @@
 import { COUNTDOWN_MS, type ClientViewState } from '../../../shared/protocol';
-import type { AudioOutput } from './audio-catalog';
+import { roundMusic, type AudioOutput } from './audio-catalog';
 
 function roundKey(view: ClientViewState): string {
   return `${view.matchId}:${view.roundNumber}`;
@@ -16,7 +16,8 @@ function opponents(view: ClientViewState): Set<string> {
 export class AudioDirector {
   private previous: ClientViewState | null = null;
   private wasLive = false;
-  private musicStartedAt = 0;
+  private music: { matchId: string; round: number; startedAt: number } | null = null;
+  private warningDeadline: number | null = null;
 
   constructor(private readonly output: AudioOutput) {}
 
@@ -27,30 +28,61 @@ export class AudioDirector {
     this.wasLive = live && view !== null;
     if (!live || !view) {
       this.output.stopAll();
+      this.warningDeadline = null;
       return;
     }
     const sameRound = previous !== null && roundKey(previous) === roundKey(view);
     const phaseChanged = !sameRound || previous.phase !== view.phase;
+    if (previous?.matchId !== view.matchId || (phaseChanged && view.phase === 'LOBBY')) {
+      this.output.stopAll();
+      this.music = null;
+      this.warningDeadline = null;
+    }
     if (phaseChanged) {
-      for (const id of ['newRound', 'opponent', 'pin', 'roundEnd', 'gameEnd']) {
-        this.output.stop(`cue:${id}`);
-      }
       this.output.stop('loading');
-      this.output.stop('warning');
-      this.output.stop('music');
-      // The countdown's go tone and tail belong to the immediately following active round.
-      if (!sameRound || view.phase !== 'ROUND_ACTIVE') this.output.stop('countdown');
+      // Expired warnings and short event cues own their natural tails, including in results.
+      if (this.warningDeadline === null || now < this.warningDeadline) this.stopWarning();
+      if (!sameRound || (previous.phase === 'ROUND_LOADING' && view.phase === 'ROUND_RESULTS')) {
+        this.output.stop('countdown');
+      }
       if (announce) this.announcePhase(view);
     }
+    this.background(view, now);
     if (view.phase === 'ROUND_LOADING') this.loading(view, now, announce && phaseChanged);
     if (view.phase === 'ROUND_ACTIVE' && view.active) {
-      if (phaseChanged) this.musicStartedAt = view.active.endsAt - view.roundDurationSec * 1000;
       this.active(view, now);
       if (announce && sameRound && previous.phase === 'ROUND_ACTIVE') {
         const old = opponents(previous);
         if ([...opponents(view)].some((id) => !old.has(id))) this.output.cue('opponent');
       }
     }
+  }
+
+  private background(view: ClientViewState, now: number): void {
+    if (view.phase === 'LOBBY' || view.phase === 'FINAL') {
+      this.output.stop('music');
+      this.music = null;
+      return;
+    }
+    if (!this.music || (view.phase === 'ROUND_ACTIVE' && this.music.round !== view.roundNumber)) {
+      this.music = {
+        matchId: view.matchId,
+        round: view.roundNumber,
+        startedAt: view.active ? view.active.endsAt - view.roundDurationSec * 1000 : now,
+      };
+    }
+    this.output.track(
+      'music',
+      roundMusic(this.music.round),
+      `${this.music.matchId}:${this.music.round}`,
+      Math.max(0, now - this.music.startedAt) / 1000,
+      true,
+    );
+  }
+
+  private stopWarning(): void {
+    this.output.stop('warning');
+    this.warningDeadline = null;
   }
 
   private announcePhase(view: ClientViewState): void {
@@ -67,7 +99,10 @@ export class AudioDirector {
       this.output.stop('loading');
       this.output.stop('countdown');
     } else if (startsAt !== null && startsAt !== undefined) {
-      this.output.stop('loading');
+      if (now < startsAt) {
+        if (announce) this.loadingPhrase(view, now);
+        return;
+      }
       if (now < startsAt + COUNTDOWN_MS) {
         this.output.track(
           'countdown',
@@ -77,27 +112,26 @@ export class AudioDirector {
         );
       }
     } else if (announce) {
-      this.output.track('loading', 'loading', `${roundKey(view)}:${view.gen}`, 0);
+      this.loadingPhrase(view, now);
     }
+  }
+
+  private loadingPhrase(view: ClientViewState, now: number): void {
+    this.output.track(
+      'loading',
+      'loading',
+      `${roundKey(view)}:${view.gen}`,
+      Math.max(0, now - (view.loading?.startedLoadingAt ?? now)) / 1000,
+    );
   }
 
   private active(view: ClientViewState, now: number): void {
     const active = view.active;
     if (!active) return;
     const remaining = active.endsAt - now;
-    if (remaining <= 0) {
-      this.output.stop('music');
-      this.output.stop('warning');
-      return;
-    }
-    this.output.track(
-      'music',
-      'music',
-      roundKey(view),
-      Math.max(0, now - this.musicStartedAt) / 1000,
-      true,
-    );
+    if (remaining <= 0) return;
     if (remaining <= 15_000 && !active.myConfirmed && !view.viewerIsSpectator) {
+      this.warningDeadline = active.endsAt;
       this.output.track(
         'warning',
         'warning',
@@ -105,7 +139,7 @@ export class AudioDirector {
         (15_000 - remaining) / 1000,
       );
     } else {
-      this.output.stop('warning');
+      this.stopWarning();
     }
   }
 }

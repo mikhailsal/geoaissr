@@ -97,7 +97,7 @@ Browser storage remains origin-specific. On a new hostname, browser, or cleared 
 
 ## Keyboard controls and accessibility
 
-- The header's **Звуковые эффекты** and **Музыка раунда** buttons independently toggle event sounds and round music, and remember the choice in this browser. Audio starts after an interaction and pauses in hidden or disconnected tabs. See the [audio reference](docs/audio.md) for the event mapping and asset license.
+- The header's **Звуковые эффекты** and **Музыка раунда** buttons independently toggle event sounds and round music, and remember the choice in this browser. Seven seamless background tracks rotate by round and continue through answers, round results and preparation of the next round. Loading and timer recordings keep their complete endings. Audio starts after an interaction and pauses in hidden or disconnected tabs. See the [audio reference](docs/audio.md) for every file's role, timing and license.
 - **Enter** in an active round — submit the placed marker («Угадать», "Guess").
 - **M** — expand/collapse the minimap in a round (or open the map sheet on a narrow screen `< 900px`).
 - **Space** on the round results screen — instantly show all arcs and pins without waiting for the animation.

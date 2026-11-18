@@ -23,12 +23,10 @@ export const MAX_WS_MESSAGE_BYTES = 16 * 1024;
 export const MAX_NICK_LEN = 20;
 export const MAX_HUMANS = 8;
 export const MAX_BOTS = 3;
-/** Pre-round countdown length; the client renders the live remainder from countdownStartsAt. */
-export const COUNTDOWN_MS = 3_000;
+export { ROUND_INTRO_MS, COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS } from './round-timing.ts';
 export const MAX_WS_CONNECTIONS = 32;
 export const MAX_PENDING_AUTH_CONNECTIONS = 8;
 export const UNAUTH_TIMEOUT_MS = 5_000;
-export const PANO_LOAD_TIMEOUT_MS = 5_000;
 
 export type GamePhase = 'LOBBY' | 'ROUND_LOADING' | 'ROUND_ACTIVE' | 'ROUND_RESULTS' | 'FINAL';
 
@@ -370,6 +368,9 @@ export interface ClientViewState {
   availableHarnesses: HarnessCatalogEntry[];
   loading?: {
     waitingFor: string[];
+    /** Server timestamp at which round loading began. */
+    startedLoadingAt: number;
+    /** Server timestamp at which the countdown begins, which can be in the future. */
     countdownStartsAt: number | null;
     countdownSeconds: number | null;
     prepError?: string;

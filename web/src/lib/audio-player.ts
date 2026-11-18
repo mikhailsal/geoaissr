@@ -1,6 +1,7 @@
 import {
   AUDIO,
   audioUrl,
+  isMusic,
   type AudioOutput,
   type AudioPreferences,
   type SoundId,
@@ -11,6 +12,7 @@ interface Playing {
   key: string;
   source?: AudioBufferSourceNode;
   gain?: GainNode;
+  previous?: Playing;
 }
 
 /** Owns native sources; invalidated loads never get permission to start later. */
@@ -56,9 +58,14 @@ export class AudioPlayer implements AudioOutput {
   stop(channel: string): void {
     const playing = this.playing.get(channel);
     this.playing.delete(channel);
-    playing?.source?.stop();
-    playing?.source?.disconnect();
-    playing?.gain?.disconnect();
+    if (playing) this.disconnect(playing);
+  }
+
+  private disconnect(playing: Playing): void {
+    if (playing.previous) this.disconnect(playing.previous);
+    playing.source?.stop();
+    playing.source?.disconnect();
+    playing.gain?.disconnect();
   }
 
   stopAll(): void {
@@ -74,7 +81,7 @@ export class AudioPlayer implements AudioOutput {
   }
 
   private allowed(id: SoundId): boolean {
-    return this.active && (id === 'music' ? this.preferences.music : this.preferences.effects);
+    return this.active && (isMusic(id) ? this.preferences.music : this.preferences.effects);
   }
 
   private load(id: SoundId): Promise<AudioBuffer> {
@@ -103,9 +110,11 @@ export class AudioPlayer implements AudioOutput {
     loop: boolean,
     synchronized: boolean,
   ): void {
-    this.stop(channel);
+    const current = this.playing.get(channel);
+    const previous = loop && isMusic(id) ? (current?.previous ?? current) : undefined;
+    if (!previous) this.stop(channel);
     if (!this.allowed(id) || this.context?.state !== 'running') return;
-    const playing: Playing = { id, key };
+    const playing: Playing = { id, key, previous };
     this.playing.set(channel, playing);
     const requestedAt = performance.now();
     void this.load(id)
@@ -115,7 +124,9 @@ export class AudioPlayer implements AudioOutput {
         this.connectSource(channel, playing, buffer, offset + (synchronized ? elapsed : 0), loop);
       })
       .catch(() => {
-        if (this.playing.get(channel) === playing) this.stop(channel);
+        if (this.playing.get(channel) !== playing) return;
+        if (playing.previous) this.playing.set(channel, playing.previous);
+        else this.stop(channel);
       });
   }
 
@@ -141,8 +152,14 @@ export class AudioPlayer implements AudioOutput {
     playing.source = source;
     playing.gain = gain;
     source.onended = () => {
-      if (this.playing.get(channel) === playing) this.stop(channel);
+      source.disconnect();
+      gain.disconnect();
+      if (this.playing.get(channel) === playing) this.playing.delete(channel);
     };
     source.start(0, loop ? offset % buffer.duration : Math.max(0, offset));
+    if (playing.previous) {
+      this.disconnect(playing.previous);
+      playing.previous = undefined;
+    }
   }
 }

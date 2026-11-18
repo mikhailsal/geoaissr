@@ -12,9 +12,33 @@ export const AUDIO = {
   click: ['swoosh-short', 0.7],
   tick: ['effect-count-down-tick', 0.5],
   music: ['round-loop-suspense', 0.18],
+  musicExplorer: ['round-loop-explorer', 0.18],
+  musicVoyage: ['round-loop-voyage', 0.18],
+  musicRadar: ['round-loop-radar', 0.18],
+  musicHorizon: ['round-loop-horizon', 0.18],
+  musicPulse: ['round-loop-pulse', 0.18],
+  musicCountdown: ['round-loop-countdown', 0.18],
 } as const;
 
 export type SoundId = keyof typeof AUDIO;
+export const ROUND_MUSIC = [
+  'music',
+  'musicExplorer',
+  'musicVoyage',
+  'musicRadar',
+  'musicHorizon',
+  'musicPulse',
+  'musicCountdown',
+] as const satisfies readonly SoundId[];
+
+export function roundMusic(roundNumber: number): SoundId {
+  return ROUND_MUSIC[Math.max(0, roundNumber - 1) % ROUND_MUSIC.length] ?? 'music';
+}
+
+export function isMusic(id: SoundId): boolean {
+  return ROUND_MUSIC.some((music) => music === id);
+}
+
 export interface AudioPreferences {
   effects: boolean;
   music: boolean;

@@ -64,6 +64,7 @@ function projectLoading(state: RoomState): ClientViewState['loading'] {
     .map((p) => p.name);
   return {
     waitingFor,
+    startedLoadingAt: active.startedLoadingAt,
     countdownStartsAt: active.countdownStartsAt,
     countdownSeconds: active.countdownStartsAt !== null ? COUNTDOWN_MS / 1000 : null,
     prepError: active.prepError,

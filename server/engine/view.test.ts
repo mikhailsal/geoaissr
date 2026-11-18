@@ -56,6 +56,24 @@ const TARGET: RoundTarget = {
   fakeSceneIndex: 0,
 };
 
+test('loading view preserves the server timestamp when panorama preparation completes', () => {
+  const lobby = reduce(
+    makeBaseRoom(),
+    { type: 'player_join', playerId: 'h', secret: 's1', name: 'Хост', color: 'p-1', isHost: true },
+    100,
+  ).state;
+  const startedLoadingAt = 1000;
+  const loading = reduce(lobby, { type: 'start_match', playerId: 'h' }, startedLoadingAt).state;
+  expect(projectView(loading, 'h').loading?.startedLoadingAt).toBe(startedLoadingAt);
+
+  const prepared = reduce(
+    loading,
+    { type: 'round_prepared', matchId: 'm-view', gen: loading.gen, roundNumber: 1, target: TARGET },
+    1100,
+  ).state;
+  expect(projectView(prepared, 'h').loading?.startedLoadingAt).toBe(startedLoadingAt);
+});
+
 test('active view leaks neither target coordinates nor other players pins or bot guesses', () => {
   let s = makeBaseRoom();
   s = reduce(

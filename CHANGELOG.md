@@ -9,6 +9,16 @@ Notable changes to this locally run application are recorded here. Releases are 
 - Hear event sounds for round loading, countdowns, map markers, accepted answers, opponents and results, with quiet seamless music during active rounds.
 - Toggle sound effects and round music independently from the header and retain those choices in the browser. Audio pauses in hidden or disconnected tabs and resumes without repeating past events.
 
+### Changed
+
+- Rotate all seven original background loops by round, keeping music playing through answers, timer zero, round results and the next round's preparation.
+
+### Fixed
+
+- Let the loading phrase finish before the synchronized three-second countdown begins.
+- Preserve the final timer hit and whistle after zero, and let event tails finish across normal screen transitions.
+- Keep the previous background track audible until the next variant is ready to play.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

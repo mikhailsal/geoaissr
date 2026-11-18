@@ -2,8 +2,8 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
-import { expect, test } from 'bun:test';
-import type { ClientViewState, ServerMessage } from '../shared/protocol.ts';
+import { expect, spyOn, test } from 'bun:test';
+import { ROUND_INTRO_MS, type ClientViewState, type ServerMessage } from '../shared/protocol.ts';
 import { createDefaultSettings } from '../shared/storage-schemas.ts';
 import { parseStartArgs } from '../server/cli/preflight.ts';
 import { startGeoServer } from '../server/cli/start.ts';
@@ -245,11 +245,14 @@ async function driveMatchRound(
   guest: WsHarnessClient,
   baseUrl: string,
   round: number,
+  advanceClock: (elapsedMs: number) => void,
 ): Promise<string> {
   const baseSeq = round * 100;
   await host.waitFor(
     (m) => m.type === 'state' && m.view.phase === 'ROUND_LOADING' && m.view.roundNumber === round,
   );
+  // Elapse the intro before signaling readiness. The server still runs its real countdown timer.
+  advanceClock(ROUND_INTRO_MS);
   host.ws.send(
     JSON.stringify({
       type: 'pano_loaded',
@@ -445,6 +448,12 @@ test('full 2-round fake match via WebSocket writes redacted logs, serves/clears 
   const wsUrl = srv.baseUrl.replace('http://', 'ws://') + '/ws';
   const host = await openWsClient(wsUrl);
   const guest = await openWsClient(wsUrl);
+  const realNow = Date.now.bind(Date);
+  let elapsedIntroMs = 0;
+  const clock = spyOn(Date, 'now').mockImplementation(() => realNow() + elapsedIntroMs);
+  const advanceClock = (elapsedMs: number): void => {
+    elapsedIntroMs += elapsedMs;
+  };
 
   try {
     host.ws.send(JSON.stringify({ type: 'hello', token: srv.hostToken }));
@@ -459,7 +468,8 @@ test('full 2-round fake match via WebSocket writes redacted logs, serves/clears 
 
     let savedThumbUrl = '';
     for (let r = 1; r <= 2; r += 1) {
-      savedThumbUrl = (await driveMatchRound(host, guest, srv.baseUrl, r)) || savedThumbUrl;
+      savedThumbUrl =
+        (await driveMatchRound(host, guest, srv.baseUrl, r, advanceClock)) || savedThumbUrl;
     }
 
     const finalMsg = await host.waitFor((m) => m.type === 'state' && m.view.phase === 'FINAL');
@@ -480,6 +490,7 @@ test('full 2-round fake match via WebSocket writes redacted logs, serves/clears 
       expect(logText).not.toContain(srv.guestToken);
     }
   } finally {
+    clock.mockRestore();
     host.close();
     guest.close();
     await srv.stop();

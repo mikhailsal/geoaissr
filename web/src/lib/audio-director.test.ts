@@ -70,6 +70,7 @@ function loading(startsAt: number | null, prepError?: string): ClientViewState {
     phase: 'ROUND_LOADING',
     active: undefined,
     loading: {
+      startedLoadingAt: 1_000,
       waitingFor: [],
       countdownStartsAt: startsAt,
       countdownSeconds: null,
@@ -124,22 +125,68 @@ test('initial and restored snapshots do not announce historical events', () => {
   expect(output.cues).toEqual(['roundEnd']);
 });
 
-test('music stops on deadline and on result', () => {
+test('music continues through zero, results and the next intro, stopping at the match final', () => {
   const output = new FakeOutput();
   const director = new AudioDirector(output);
   director.update(view(), 10_000, true);
   expect(output.tracks.get('music')).toMatchObject({ offset: 10, loop: true });
   director.update(view(), 60_000, true);
-  expect(output.tracks.has('music')).toBe(false);
-  expect(output.tracks.has('warning')).toBe(false);
-  director.update(view({ roundNumber: 2 }), 10_000, true);
   expect(output.tracks.has('music')).toBe(true);
-  director.update(
-    view({ roundNumber: 2, phase: 'ROUND_RESULTS', active: undefined }),
-    11_000,
-    true,
-  );
+  expect(output.tracks.has('warning')).toBe(false);
+  director.update(view({ phase: 'ROUND_RESULTS', active: undefined }), 61_000, true);
+  expect(output.tracks.get('music')).toMatchObject({ key: 'match:1', loop: true });
+  director.update({ ...loading(null), roundNumber: 2 }, 62_000, true);
+  expect(output.tracks.get('music')).toMatchObject({ key: 'match:1', loop: true });
+  director.update(view({ roundNumber: 2 }), 72_000, true);
+  expect(output.tracks.get('music')).toMatchObject({ id: 'musicExplorer', key: 'match:2' });
+  director.update(view({ phase: 'FINAL', active: undefined }), 80_000, true);
   expect(output.tracks.has('music')).toBe(false);
+});
+
+test('expired warning keeps its final hit and tail across zero and results without restarting', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view(), 55_000, true);
+  director.update(view(), 60_000, true);
+  director.update(view({ phase: 'ROUND_RESULTS', active: undefined }), 60_050, true);
+  director.update(view({ phase: 'FINAL', active: undefined }), 61_000, true);
+  expect(output.tracks.get('warning')).toMatchObject({ key: 'match:1:60000' });
+  expect(output.starts.filter((track) => track.id === 'warning')).toHaveLength(1);
+  director.update(null, 61_100, false);
+  expect(output.tracks.size).toBe(0);
+});
+
+test('early results cancel an unexpired personal warning', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view(), 55_000, true);
+  director.update(view({ phase: 'ROUND_RESULTS', active: undefined }), 56_000, true);
+  expect(output.tracks.has('warning')).toBe(false);
+  expect(output.tracks.has('music')).toBe(true);
+});
+
+test('a scheduled countdown lets the loading phrase finish and keeps its go tail', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view({ phase: 'LOBBY', active: undefined }), 0, true);
+  director.update(loading(null), 1_000, true);
+  director.update(loading(7_800), 1_500, true);
+  expect(output.tracks.has('loading')).toBe(true);
+  expect(output.tracks.has('countdown')).toBe(false);
+  director.update(loading(7_800), 7_800, true);
+  expect(output.tracks.has('loading')).toBe(true);
+  expect(output.tracks.get('countdown')).toMatchObject({ offset: 0 });
+  director.update(view(), 10_800, true);
+  expect(output.tracks.has('countdown')).toBe(true);
+});
+
+test('a coalesced first loading snapshot starts the phrase at the server-aligned offset', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view({ phase: 'LOBBY', active: undefined }), 0, true);
+  director.update(loading(7_800), 1_500, true);
+  expect(output.tracks.get('loading')).toMatchObject({ offset: 0.5 });
+  expect(output.tracks.has('countdown')).toBe(false);
 });
 
 test('warning seeks into final 15 seconds and restarts for a shortened deadline', () => {

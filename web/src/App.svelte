@@ -49,11 +49,12 @@
   const inGamePhase = $derived(hasProfile && store.authState !== 'error');
   const roundRemainingMs = $derived(view?.active ? store.remainingMs(view.active.endsAt) : 0);
   const countdownStartsAt = $derived(view?.loading?.countdownStartsAt ?? null);
-  const countdownSeconds = $derived(
-    countdownStartsAt === null
-      ? null
-      : Math.max(1, Math.ceil(store.remainingMs(countdownStartsAt + COUNTDOWN_MS) / 1000)),
-  );
+  const countdownSeconds = $derived.by(() => {
+    if (countdownStartsAt === null) return null;
+    const elapsedMs = store.serverNow() - countdownStartsAt;
+    if (elapsedMs < 0 || elapsedMs >= COUNTDOWN_MS) return null;
+    return Math.ceil((COUNTDOWN_MS - elapsedMs) / 1000);
+  });
 
   const handleRetryConnect = (): void => {
     store.retryConnect();

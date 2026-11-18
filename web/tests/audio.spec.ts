@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { ServerMessage } from '../../shared/protocol';
 import { AUDIO } from '../src/lib/audio-catalog';
-import { observeAudio, trace } from './audio-observer';
+import { observeAudio, trace, type AudioStart, type AudioTrace } from './audio-observer';
 import { assertNoHorizontalOverflow, startIsolatedFakeServer } from './helpers';
 
 // Value: protects=packaged audio decodes and follows actual game and browser lifecycle; fails_when=files fail to decode or events/mutes/reconnect route incorrect sources; why_new=existing browser tests had no audio assertions; seam=none; no_claim=native headless graphs cannot judge subjective loudness; visibility events are synthetic boundary events.
@@ -16,18 +17,45 @@ async function startRound(page: Page): Promise<void> {
     timeout: 12_000,
   });
 }
-async function started(page: Page, name: string): Promise<void> {
+async function started(page: Page, name: string): Promise<AudioStart> {
+  let start: AudioStart | undefined;
   await expect
-    .poll(async () => (await trace(page)).starts.some((s) => s.url.endsWith(`/${name}.ogg`)))
+    .poll(async () => {
+      start = (await trace(page)).starts.find((s) => s.url.endsWith(`/${name}.ogg`));
+      return start !== undefined;
+    })
     .toBe(true);
+  if (!start) throw new Error(`No native start for ${name}`);
+  return start;
 }
-async function submit(page: Page): Promise<void> {
+async function waitForDecodedAudio(page: Page): Promise<void> {
+  await expect.poll(async () => new Set((await trace(page)).decoded).size).toBe(19);
+  expect(new Set((await trace(page)).decoded.map((url) => url.split('/').pop()))).toEqual(
+    new Set(Object.values(AUDIO).map(([file]) => `${file}.ogg`)),
+  );
+}
+function expectNoExplicitStop(events: AudioTrace, source: AudioStart): void {
+  expect(events.stops.filter(({ id }) => id === source.id)).toEqual([]);
+}
+async function finishedNaturally(page: Page, source: AudioStart): Promise<void> {
+  let endedAt: number | undefined;
+  await expect
+    .poll(async () => {
+      endedAt = (await trace(page)).ended[source.id];
+      return endedAt !== undefined;
+    })
+    .toBe(true);
+  if (endedAt === undefined) throw new Error(`No native end for ${source.url}`);
+  expect(endedAt - source.at).toBeGreaterThanOrEqual(source.duration - source.offset - 0.1);
+  expectNoExplicitStop(await trace(page), source);
+}
+async function submit(page: Page, resultsButton = 'К итогам'): Promise<void> {
   await page
     .getByTestId('fake-guess-map')
     .locator('canvas')
     .click({ position: { x: 100, y: 100 } });
   await page.getByRole('button', { name: 'Угадать' }).click();
-  await expect(page.getByRole('button', { name: 'К итогам' })).toBeVisible({ timeout: 12_000 });
+  await expect(page.getByRole('button', { name: resultsButton })).toBeVisible({ timeout: 12_000 });
 }
 
 test('native audio follows the round and mute controls', async ({ page }) => {
@@ -40,10 +68,7 @@ test('native audio follows the round and mute controls', async ({ page }) => {
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
     await page.getByRole('button', { name: 'Звуковые эффекты' }).click();
     await page.getByRole('button', { name: 'Звуковые эффекты' }).click();
-    await expect.poll(async () => new Set((await trace(page)).decoded).size).toBe(13);
-    expect(new Set((await trace(page)).decoded.map((url) => url.split('/').pop()))).toEqual(
-      new Set(Object.values(AUDIO).map(([file]) => `${file}.ogg`)),
-    );
+    await waitForDecodedAudio(page);
     await startRound(page);
     for (const sound of [
       'loading-round',
@@ -87,6 +112,130 @@ test('native audio follows the round and mute controls', async ({ page }) => {
     for (const name of ['effect-new-round', 'effect-guess-locked', 'round-end', 'game_end']) {
       expect(events.filter((s) => s.url.endsWith(`/${name}.ogg`))).toHaveLength(1);
     }
+    expect((await trace(page)).errors).toEqual([]);
+  } finally {
+    await server.stop();
+  }
+});
+
+// Value: protects=full loading phrase before visible countdown and continuous music across round boundaries; fails_when=loading is cut short or music restarts or stops before the next active round; why_new=prior checks observed filenames without tracking source identity or natural completion; seam=none; no_claim=headless native sources do not measure perceived volume.
+test('loading finishes before the countdown and music changes at the next active round', async ({
+  page,
+}) => {
+  const server = await startIsolatedFakeServer({ rounds: 2 });
+  try {
+    await observeAudio(page);
+    await join(page, server.hostUrl);
+    await expect(page.getByRole('button', { name: 'Начать', exact: true })).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect
+      .poll(
+        async () =>
+          (await trace(page)).decoded.filter((url) =>
+            /\/(loading-round|soft-countdown)\.ogg$/.test(url),
+          ).length,
+      )
+      .toBe(2);
+    const countdownLabel = page.locator('.loading-veil .countdown');
+    const guessMap = page.getByTestId('fake-guess-map').locator('canvas');
+
+    await page.getByRole('button', { name: 'Начать', exact: true }).click();
+    await expect(page.getByText('Загружаем панораму…')).toBeVisible();
+    const loading = await started(page, 'loading-round');
+    expect(loading.duration).toBeCloseTo(6.77, 1);
+    expect(loading.offset).toBeLessThan(0.25);
+    const suspense = await started(page, 'round-loop-suspense');
+    expect(suspense.loop).toBe(true);
+    await expect(countdownLabel).toHaveCount(0);
+    await expect(countdownLabel).toBeVisible({ timeout: 12_000 });
+    const countdown = await started(page, 'soft-countdown');
+    await finishedNaturally(page, loading);
+    expect(countdown.at - loading.at).toBeGreaterThanOrEqual(loading.duration - loading.offset);
+
+    await expect(guessMap).toBeVisible({ timeout: 12_000 });
+    expect((await trace(page)).live[suspense.id]).toBe(suspense.url);
+    await submit(page, 'Дальше');
+    await started(page, 'round-end');
+    expect((await trace(page)).live[suspense.id]).toBe(suspense.url);
+
+    await page.getByRole('button', { name: 'Дальше', exact: true }).click();
+    await expect(page.locator('.loading-veil')).toContainText('раунд 2 из 2');
+    await expect(countdownLabel).toBeVisible({ timeout: 12_000 });
+    const nextLoading = await trace(page);
+    expect(nextLoading.live[suspense.id]).toBe(suspense.url);
+    expect(nextLoading.starts.filter((s) => s.loop)).toEqual([suspense]);
+
+    await expect(guessMap).toBeVisible({ timeout: 12_000 });
+    const explorer = await started(page, 'round-loop-explorer');
+    const active = await trace(page);
+    expect(explorer.loop).toBe(true);
+    expect(active.live[suspense.id]).toBeUndefined();
+    expect(active.live[explorer.id]).toBe(explorer.url);
+    expect(active.stops.find(({ id }) => id === suspense.id)?.at).toBeGreaterThanOrEqual(
+      explorer.at,
+    );
+    expect(active.starts.filter((s) => s.loop)).toEqual([suspense, explorer]);
+    expect(active.errors).toEqual([]);
+  } finally {
+    await server.stop();
+  }
+});
+
+async function shortenClientDeadline(page: Page): Promise<void> {
+  let endsAt: number | undefined;
+  await page.routeWebSocket('**/*', (socket) => {
+    const upstream = socket.connectToServer();
+    upstream.onMessage((message) => {
+      if (typeof message !== 'string') {
+        socket.send(message);
+        return;
+      }
+      const snapshot = JSON.parse(message) as ServerMessage;
+      if (
+        snapshot.type === 'state' &&
+        snapshot.view.phase === 'ROUND_ACTIVE' &&
+        snapshot.view.active
+      ) {
+        endsAt ??= snapshot.serverNow + 15_400;
+        snapshot.view.active.endsAt = endsAt;
+        socket.send(JSON.stringify(snapshot));
+      } else {
+        socket.send(message);
+      }
+    });
+  });
+}
+
+// Value: protects=timer finale plays through zero and the results screen, while the same music source remains live; fails_when=the timer cue or music is stopped at zero or results; why_new=prior tests never crossed a clock deadline; seam=only the active deadline displayed to the client is shortened; no_claim=results come from a real answer and do not test server expiry.
+test('timer finale and music continue through client zero and round results', async ({ page }) => {
+  const server = await startIsolatedFakeServer({ rounds: 1 });
+  try {
+    await shortenClientDeadline(page);
+    await observeAudio(page);
+    await join(page, server.hostUrl);
+    await startRound(page);
+    const music = await started(page, 'round-loop-suspense');
+    const warning = await started(page, 'effect-timer-countdown');
+    expect(warning.duration).toBeCloseTo(18, 1);
+    expect(warning.offset).toBeLessThan(1);
+    await page
+      .getByTestId('fake-guess-map')
+      .locator('canvas')
+      .click({ position: { x: 100, y: 100 } });
+
+    await expect(page.locator('.timer-pill .digits')).toHaveText('0:00', { timeout: 20_000 });
+    const atZero = await trace(page);
+    expect(atZero.live[warning.id]).toBe(warning.url);
+    expect(atZero.live[music.id]).toBe(music.url);
+    await page.getByRole('button', { name: 'Угадать' }).click();
+    await expect(page.getByRole('button', { name: 'К итогам' })).toBeVisible();
+    await started(page, 'round-end');
+    const results = await trace(page);
+    expect(results.live[warning.id]).toBe(warning.url);
+    expectNoExplicitStop(results, warning);
+    expect(results.live[music.id]).toBe(music.url);
+    await finishedNaturally(page, warning);
+    expect((await trace(page)).starts.filter((s) => s.url === warning.url)).toEqual([warning]);
     expect((await trace(page)).errors).toEqual([]);
   } finally {
     await server.stop();
@@ -187,6 +336,11 @@ test('hidden and reconnecting games stop audio and resume only current music', a
       .toBe(true);
     await submit(page);
     await started(page, 'round-end');
+    expect(Object.values((await trace(page)).live).some((u) => u.includes('round-loop'))).toBe(
+      true,
+    );
+    await page.getByRole('button', { name: 'К итогам' }).click();
+    await started(page, 'game_end');
     expect(Object.values((await trace(page)).live).some((u) => u.includes('round-loop'))).toBe(
       false,
     );

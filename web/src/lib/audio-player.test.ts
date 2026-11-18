@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { AUDIO, audioUrl } from './audio-catalog';
+import { AUDIO, audioUrl, ROUND_MUSIC, roundMusic } from './audio-catalog';
 import { AudioPlayer } from './audio-player';
 
 // Value: protects=muting and invalidation cancel pending playback; fails_when=an invalidated load starts a native source or failures block retries; why_new=no prior audio engine existed; seam=none; no_claim=fake audio objects do not prove browser decoding or speaker output.
@@ -240,3 +240,56 @@ test('loops with wrapped offset and gain, deduplicates keys, and plays one-shots
   expect(required(context.gains[2]).gain.value).toBe(AUDIO.click[1]);
   player.destroy();
 });
+
+test('all seven round variants use the independent music preference and cycle in order', async () => {
+  expect(Array.from({ length: 14 }, (_, index) => roundMusic(index + 1))).toEqual([
+    ...ROUND_MUSIC,
+    ...ROUND_MUSIC,
+  ]);
+  const player = new AudioPlayer();
+  player.configure(enabled, true);
+  await player.unlock();
+  await settle();
+  const context = required(FakeContext.instances[0]);
+  for (const id of ROUND_MUSIC) player.track(id, id, id, 0, true);
+  player.cue('click');
+  await settle();
+  expect(context.sources).toHaveLength(8);
+  player.configure({ effects: false, music: true }, true);
+  expect(context.sources.slice(0, 7).every((source) => !source.stopped)).toBe(true);
+  expect(required(context.sources[7]).stopped).toBe(true);
+  player.configure({ effects: true, music: false }, true);
+  expect(context.sources.every((source) => source.stopped)).toBe(true);
+  player.destroy();
+});
+
+for (const outcome of ['ready', 'failed', 'muted'] as const) {
+  test(`keeps current music while the next variant loads; handles ${outcome}`, async () => {
+    const pending = deferred<Response>();
+    globalThis.fetch = (async (url: string | URL | Request) =>
+      (typeof url === 'string' ? url : url instanceof URL ? url.href : url.url) ===
+      audioUrl('musicExplorer')
+        ? pending.promise
+        : response()) as typeof fetch;
+    const player = new AudioPlayer();
+    player.configure(enabled, true);
+    await player.unlock();
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    player.track('music', 'music', 'round:1', 0, true);
+    await settle();
+    const previous = required(context.sources[0]);
+    player.track('music', 'musicExplorer', 'round:2', 0, true);
+    await settle();
+    expect(previous.stopped).toBe(false);
+    expect(context.sources).toHaveLength(1);
+    if (outcome === 'muted') player.configure({ effects: true, music: false }, true);
+    if (outcome === 'failed') pending.reject(new Error('Next track unavailable'));
+    else pending.resolve(response());
+    await settle();
+    expect(previous.stopped).toBe(outcome !== 'failed');
+    expect(context.sources).toHaveLength(outcome === 'ready' ? 2 : 1);
+    player.destroy();
+    expect(previous.stopped).toBe(true);
+  });
+}
