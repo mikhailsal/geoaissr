@@ -21,13 +21,13 @@
   let editingProfile = $state(false);
   let profileTrigger: HTMLElement | null = null;
   function openProfile(e: MouseEvent): void {
-    audioPlayer.cue('panel');
+    audioPlayer.cue('click');
     profileTrigger = e.currentTarget as HTMLElement;
     store.profile.error = null;
     editingProfile = true;
   }
   function closeProfile(): void {
-    audioPlayer.cue('panel');
+    audioPlayer.cue('click');
     editingProfile = false;
     void tick().then(() => {
       if (!editingProfile) profileTrigger?.focus();
@@ -130,19 +130,17 @@
     store.retryRound(gen);
   };
   const handleSelectBotCard = (rn: number, entry: RoundResultEntryView): void => {
-    audioPlayer.cue('panel');
+    audioPlayer.cue('click');
     store.openBotCard(rn, entry);
   };
   const handleCloseBotCard = (): void => {
-    audioPlayer.cue('panel');
+    audioPlayer.cue('click');
     store.closeBotCard();
   };
   const handleNextRound = (rn: number): void => {
-    audioPlayer.cue('click');
     store.nextRound(rn);
   };
   const handlePlayAgain = (): void => {
-    audioPlayer.cue('click');
     store.playAgain();
   };
 </script>

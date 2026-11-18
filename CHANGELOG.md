@@ -18,6 +18,7 @@ Notable changes to this locally run application are recorded here. Releases are 
 - Let the loading phrase finish before the synchronized three-second countdown begins.
 - Preserve the final timer hit and whistle after zero, and let event tails finish across normal screen transitions.
 - Keep the previous background track audible until the next variant is ready to play.
+- Play the full swoosh at screen transitions and reserve the short swoosh for menus and panels.
 
 ## [0.2.1] - 2026-11-16
 

@@ -107,7 +107,14 @@ test('announces live transitions and coalesces new opponents without duplicates'
     62_000,
     true,
   );
-  expect(output.cues).toEqual(['newRound', 'opponent', 'roundEnd', 'gameEnd']);
+  expect(output.cues).toEqual([
+    'newRound',
+    'opponent',
+    'transition',
+    'roundEnd',
+    'transition',
+    'gameEnd',
+  ]);
 });
 
 test('initial and restored snapshots do not announce historical events', () => {
@@ -122,7 +129,7 @@ test('initial and restored snapshots do not announce historical events', () => {
   director.update(done, 14_000, true);
   expect(output.cues).toEqual([]);
   director.update(view({ phase: 'ROUND_RESULTS', active: undefined }), 15_000, true);
-  expect(output.cues).toEqual(['roundEnd']);
+  expect(output.cues).toEqual(['transition', 'roundEnd']);
 });
 
 test('music continues through zero, results and the next intro, stopping at the match final', () => {
@@ -233,7 +240,41 @@ test('next round announces its active phase once', () => {
   director.update({ ...loading(null), roundNumber: 2 }, 1_000, true);
   director.update({ ...view(), roundNumber: 2 }, 2_000, true);
   director.update({ ...view(), roundNumber: 2 }, 3_000, true);
-  expect(output.cues).toEqual(['newRound']);
+  expect(output.cues).toEqual(['transition', 'newRound']);
+});
+
+test('screen changes swoosh once, while revealing an active round keeps only its start cue', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  const lobby = view({ phase: 'LOBBY', active: undefined });
+  const results = view({ phase: 'ROUND_RESULTS', active: undefined });
+  director.update(lobby, 0, true);
+  expect(output.cues).toEqual([]);
+  for (const [index, snapshot] of [
+    loading(1_000),
+    view(),
+    results,
+    { ...loading(10_000), roundNumber: 2 },
+    view({ roundNumber: 2 }),
+    { ...results, roundNumber: 2 },
+    view({ phase: 'FINAL', active: undefined }),
+    lobby,
+  ].entries()) {
+    director.update(snapshot, (index + 1) * 1_000, true);
+    director.update(snapshot, (index + 1) * 1_000 + 100, true);
+  }
+  expect(output.cues).toEqual([
+    'transition',
+    'newRound',
+    'transition',
+    'roundEnd',
+    'transition',
+    'newRound',
+    'transition',
+    'roundEnd',
+    'transition',
+    'transition',
+  ]);
 });
 
 for (const kind of ['human', 'bot'] as const) {

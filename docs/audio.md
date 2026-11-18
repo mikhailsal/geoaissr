@@ -29,8 +29,8 @@ applied independently to each source.
 | `effect-timer-countdown.ogg`      | Your final 15 seconds, the hit/whistle at zero, then its natural tail   | 18.00 s  | 0.40 |
 | `round-end.ogg`                   | Round results arrive; its drum/rumble may finish during the next screen | 6.93 s   | 0.32 |
 | `game_end.ogg`                    | Match results arrive after at least one completed round                 | 0.40 s   | 0.40 |
-| `swoosh.ogg`                      | A profile or AI explanation panel opens or closes                       | 0.91 s   | 0.50 |
-| `swoosh-short.ogg`                | Host menu, map toggle and results navigation                            | 0.07 s   | 0.70 |
+| `swoosh.ogg`                      | A live transition between lobby, round, round results and match results | 0.91 s   | 0.50 |
+| `swoosh-short.ogg`                | Host menu, map toggle, profile and AI explanation panels                | 0.07 s   | 0.70 |
 | `effect-count-down-tick.ogg`      | The host changes the round duration                                     | 1.04 s   | 0.50 |
 
 The server reserves at least 6.8 seconds from round loading for the complete
@@ -51,6 +51,12 @@ that source finish naturally; they do not restart it. Answering or ending a
 round before expiry cancels its now-inapplicable personal warning. Short event
 tails also finish across normal screen transitions. Muting, leaving the game,
 disconnecting or hiding the tab still stops playback immediately.
+
+The full swoosh is requested before the screen DOM updates. Loading and active
+play share the round screen, so revealing the panorama after 3–2–1 uses only its
+start cue. Initial snapshots, repeated snapshots and reconnect restoration do
+not replay a screen transition. Local button clicks do not duplicate the swoosh
+produced by the accepted phase change.
 
 ## Continuous background music
 
@@ -74,6 +80,9 @@ The current source remains audible until the next variant has decoded and
 started, including while a failed load is retried. Music stops at match final or
 lobby, when its control is disabled, and at the browser lifecycle boundaries
 described above.
+
+A five-round match reaches the first five variants. The pulse and countdown
+variants are heard in matches with at least six and seven rounds respectively.
 
 ## Playback and assets
 

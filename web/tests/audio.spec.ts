@@ -112,6 +112,7 @@ test('native audio follows the round and mute controls', async ({ page }) => {
     for (const name of ['effect-new-round', 'effect-guess-locked', 'round-end', 'game_end']) {
       expect(events.filter((s) => s.url.endsWith(`/${name}.ogg`))).toHaveLength(1);
     }
+    expect(events.filter((s) => s.url.endsWith('/swoosh.ogg'))).toHaveLength(3);
     expect((await trace(page)).errors).toEqual([]);
   } finally {
     await server.stop();
@@ -138,6 +139,7 @@ test('loading finishes before the countdown and music changes at the next active
       .toBe(2);
     const countdownLabel = page.locator('.loading-veil .countdown');
     const guessMap = page.getByTestId('fake-guess-map').locator('canvas');
+    expect((await trace(page)).starts.filter((s) => s.url.endsWith('/swoosh.ogg'))).toEqual([]);
 
     await page.getByRole('button', { name: 'Начать', exact: true }).click();
     await expect(page.getByText('Загружаем панораму…')).toBeVisible();
@@ -153,9 +155,11 @@ test('loading finishes before the countdown and music changes at the next active
     expect(countdown.at - loading.at).toBeGreaterThanOrEqual(loading.duration - loading.offset);
 
     await expect(guessMap).toBeVisible({ timeout: 12_000 });
+    expect((await trace(page)).starts.filter((s) => s.url.endsWith('/swoosh.ogg'))).toHaveLength(1);
     expect((await trace(page)).live[suspense.id]).toBe(suspense.url);
     await submit(page, 'Дальше');
     await started(page, 'round-end');
+    expect((await trace(page)).starts.filter((s) => s.url.endsWith('/swoosh.ogg'))).toHaveLength(2);
     expect((await trace(page)).live[suspense.id]).toBe(suspense.url);
 
     await page.getByRole('button', { name: 'Дальше', exact: true }).click();
@@ -175,6 +179,7 @@ test('loading finishes before the countdown and music changes at the next active
       explorer.at,
     );
     expect(active.starts.filter((s) => s.loop)).toEqual([suspense, explorer]);
+    expect(active.starts.filter((s) => s.url.endsWith('/swoosh.ogg'))).toHaveLength(3);
     expect(active.errors).toEqual([]);
   } finally {
     await server.stop();

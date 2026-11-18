@@ -5,6 +5,10 @@ function roundKey(view: ClientViewState): string {
   return `${view.matchId}:${view.roundNumber}`;
 }
 
+function screen(phase: ClientViewState['phase']): string {
+  return phase === 'ROUND_LOADING' || phase === 'ROUND_ACTIVE' ? 'ROUND' : phase;
+}
+
 function opponents(view: ClientViewState): Set<string> {
   return new Set([
     ...view.players.filter((p) => p.id !== view.viewerId && p.confirmed).map((p) => p.id),
@@ -45,7 +49,12 @@ export class AudioDirector {
       if (!sameRound || (previous.phase === 'ROUND_LOADING' && view.phase === 'ROUND_RESULTS')) {
         this.output.stop('countdown');
       }
-      if (announce) this.announcePhase(view);
+      if (announce) {
+        if (screen(previous.phase) !== screen(view.phase)) {
+          this.output.cue('transition');
+        }
+        this.announcePhase(view);
+      }
     }
     this.background(view, now);
     if (view.phase === 'ROUND_LOADING') this.loading(view, now, announce && phaseChanged);

@@ -8,7 +8,7 @@ export const AUDIO = {
   warning: ['effect-timer-countdown', 0.4],
   roundEnd: ['round-end', 0.32],
   gameEnd: ['game_end', 0.4],
-  panel: ['swoosh', 0.5],
+  transition: ['swoosh', 0.5],
   click: ['swoosh-short', 0.7],
   tick: ['effect-count-down-tick', 0.5],
   music: ['round-loop-suspense', 0.18],

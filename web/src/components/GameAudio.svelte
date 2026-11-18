@@ -9,7 +9,7 @@
   let visible = $state(true);
   const director = new AudioDirector(audioPlayer);
 
-  $effect(() => {
+  $effect.pre(() => {
     const live = connected && visible;
     audioPlayer.configure(
       { effects: audioPreferences.effects, music: audioPreferences.music },

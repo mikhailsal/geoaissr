@@ -67,7 +67,7 @@
   });
 
   function closeInspect(): void {
-    audioPlayer.cue('panel');
+    audioPlayer.cue('click');
     inspectedCard = null;
     lastTriggerBtn?.focus();
     lastTriggerBtn = null;
@@ -163,7 +163,7 @@
                             title="Открыть мысли бота в этом раунде"
                             onclick={(e) => {
                               lastTriggerBtn = e.currentTarget;
-                              audioPlayer.cue('panel');
+                              audioPlayer.cue('click');
                               inspectedCard = cell.botCard
                                 ? { roundNumber: rn, botId: row.id }
                                 : null;
