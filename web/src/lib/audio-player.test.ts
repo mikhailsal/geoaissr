@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { AUDIO, audioUrl, ROUND_MUSIC, roundMusic } from './audio-catalog';
+import { AUDIO, audioUrl, MUSIC_PLAYLIST } from './audio-catalog';
 import { AudioPlayer } from './audio-player';
 
 // Value: protects=muting and invalidation cancel pending playback; fails_when=an invalidated load starts a native source or failures block retries; why_new=no prior audio engine existed; seam=none; no_claim=fake audio objects do not prove browser decoding or speaker output.
@@ -31,15 +31,21 @@ class FakeSource {
   onended: (() => void) | null = null;
   starts: number[] = [];
   stopped = false;
+  startsAt = 0;
+  stopAt = Number.POSITIVE_INFINITY;
+  stops: number[] = [];
   connect(gain: FakeGain): FakeGain {
     return gain;
   }
   disconnect(): void {}
   start(_when: number, offset: number): void {
+    this.startsAt = _when;
     this.starts.push(offset);
   }
-  stop(): void {
-    this.stopped = true;
+  stop(when = 0): void {
+    this.stopAt = when;
+    this.stops.push(when);
+    if (when === 0) this.stopped = true;
   }
 }
 
@@ -55,6 +61,8 @@ class FakeContext {
   destination = {};
   sources: FakeSource[] = [];
   gains: FakeGain[] = [];
+  currentTime = 0;
+  names = new WeakMap<AudioBuffer, string>();
   decode: () => Promise<AudioBuffer> = () => Promise.resolve({ duration: 10 } as AudioBuffer);
   constructor() {
     FakeContext.instances.push(this);
@@ -64,8 +72,10 @@ class FakeContext {
     this.state = 'closed';
     return Promise.resolve();
   }
-  decodeAudioData(): Promise<AudioBuffer> {
-    return this.decode();
+  async decodeAudioData(data: ArrayBuffer): Promise<AudioBuffer> {
+    const buffer = await this.decode();
+    this.names.set(buffer, new TextDecoder().decode(data));
+    return buffer;
   }
   createBufferSource(): FakeSource {
     const source = new FakeSource();
@@ -77,12 +87,26 @@ class FakeContext {
     this.gains.push(gain);
     return gain;
   }
+  advance(seconds: number, notify = true): void {
+    this.currentTime = seconds;
+    if (!notify) return;
+    for (const source of this.sources) {
+      if (!source.stopped && source.stopAt <= seconds) {
+        source.stopped = true;
+        source.onended?.();
+      }
+    }
+  }
 }
 
 const originalContext = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext');
 const originalFetch = globalThis.fetch;
 const enabled = { effects: true, music: true };
-const response = (): Response => new Response(new Uint8Array([1]));
+function requestUrl(input: string | URL | Request): string {
+  return typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+}
+const response = (body: string | Uint8Array<ArrayBuffer> = new Uint8Array([1])): Response =>
+  new Response(body);
 const settle = async (): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 };
@@ -94,9 +118,12 @@ beforeEach(() => {
     writable: true,
     value: FakeContext,
   });
-  globalThis.fetch = Object.assign(() => Promise.resolve(response()), {
-    preconnect: originalFetch.preconnect,
-  });
+  globalThis.fetch = Object.assign(
+    (input: string | URL | Request) => Promise.resolve(response(requestUrl(input))),
+    {
+      preconnect: originalFetch.preconnect,
+    },
+  );
 });
 
 afterEach(() => {
@@ -241,17 +268,13 @@ test('loops with wrapped offset and gain, deduplicates keys, and plays one-shots
   player.destroy();
 });
 
-test('all seven round variants use the independent music preference and cycle in order', async () => {
-  expect(Array.from({ length: 14 }, (_, index) => roundMusic(index + 1))).toEqual([
-    ...ROUND_MUSIC,
-    ...ROUND_MUSIC,
-  ]);
+test('all seven variants use the independent music preference', async () => {
   const player = new AudioPlayer();
   player.configure(enabled, true);
   await player.unlock();
   await settle();
   const context = required(FakeContext.instances[0]);
-  for (const id of ROUND_MUSIC) player.track(id, id, id, 0, true);
+  for (const id of MUSIC_PLAYLIST) player.track(id, id, id, 0, true);
   player.cue('click');
   await settle();
   expect(context.sources).toHaveLength(8);
@@ -293,3 +316,189 @@ for (const outcome of ['ready', 'failed', 'muted'] as const) {
     expect(previous.stopped).toBe(true);
   });
 }
+
+function sourceName(context: FakeContext, source: FakeSource): string {
+  if (!source.buffer) throw new Error('Source has no decoded buffer');
+  return context.names.get(source.buffer) ?? '';
+}
+
+test('music schedules all seven complete tracks in order, wraps, and ignores repeated requests', async () => {
+  const player = new AudioPlayer();
+  player.configure(enabled, true);
+  await player.unlock();
+  await settle();
+  const context = required(FakeContext.instances[0]);
+  player.music('game:match');
+  await settle();
+  for (let index = 0; index < 8; index++) {
+    const current = required(context.sources[index]);
+    const next = required(context.sources[index + 1]);
+    expect(sourceName(context, current)).toBe(audioUrl(required(MUSIC_PLAYLIST[index % 7])));
+    expect(current.loop).toBe(true);
+    expect(next.startsAt).toBeCloseTo(current.startsAt + 10);
+    expect(current.stopAt).toBe(next.startsAt);
+    player.music('game:match');
+    expect(context.sources).toHaveLength(index + 2);
+    context.advance(next.startsAt);
+    await settle();
+  }
+  player.destroy();
+});
+
+test('lobby loops only quiet Horizon and a new match starts the first playlist track', async () => {
+  const player = new AudioPlayer();
+  player.configure(enabled, true);
+  await player.unlock();
+  await settle();
+  const context = required(FakeContext.instances[0]);
+  player.music('lobby:match', true);
+  await settle();
+  expect(context.sources).toHaveLength(1);
+  expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('musicHorizon'));
+  expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.musicHorizon[1] * 0.65);
+  context.advance(50);
+  player.music('lobby:match', true);
+  expect(context.sources).toHaveLength(1);
+  player.music('game:match');
+  await settle();
+  expect(required(context.sources[0]).stopped).toBe(true);
+  expect(sourceName(context, required(context.sources[1]))).toBe(audioUrl('music'));
+  expect(required(context.sources[1]).starts).toEqual([0]);
+  player.stop('music');
+  player.music('lobby:match', true);
+  await settle();
+  expect(sourceName(context, required(context.sources.at(-1)))).toBe(audioUrl('musicHorizon'));
+  player.destroy();
+});
+
+for (const pause of ['mute', 'inactive', 'stopAll'] as const) {
+  test(`music ${pause} cancels future nodes and resumes the first saved playhead`, async () => {
+    const player = new AudioPlayer();
+    player.configure(enabled, true);
+    await player.unlock();
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    player.music('game:match');
+    await settle();
+    const current = required(context.sources[0]);
+    const next = required(context.sources[1]);
+    context.advance(current.startsAt + 3);
+    if (pause === 'mute') player.configure({ effects: true, music: false }, true);
+    if (pause === 'inactive') player.configure(enabled, false);
+    if (pause === 'stopAll') player.stopAll();
+    expect(current.stopped).toBe(true);
+    expect(next.stopped).toBe(true);
+    context.advance(100, false);
+    player.stopAll();
+    current.onended?.();
+    await settle();
+    expect(context.sources).toHaveLength(2);
+    player.configure(enabled, true);
+    player.music('game:match');
+    await settle();
+    const resumed = required(context.sources[2]);
+    expect(sourceName(context, resumed)).toBe(audioUrl('music'));
+    expect(resumed.starts[0]).toBeCloseTo(3);
+    expect(required(context.sources[3]).startsAt - resumed.startsAt).toBeCloseTo(7);
+    player.destroy();
+  });
+}
+
+test('pausing after a scheduled handoff uses the audible successor before its callback runs', async () => {
+  const player = new AudioPlayer();
+  player.configure(enabled, true);
+  await player.unlock();
+  await settle();
+  const context = required(FakeContext.instances[0]);
+  player.music('game:match');
+  await settle();
+  const old = required(context.sources[0]);
+  const successor = required(context.sources[1]);
+  context.advance(successor.startsAt + 2, false);
+  player.stopAll();
+  old.onended?.();
+  context.advance(100, false);
+  player.music('game:match');
+  await settle();
+  const resumed = required(context.sources[2]);
+  expect(sourceName(context, resumed)).toBe(audioUrl('musicExplorer'));
+  expect(resumed.starts[0]).toBeCloseTo(2);
+  expect(required(context.sources[3]).startsAt - resumed.startsAt).toBeCloseTo(8);
+  player.destroy();
+});
+
+test('a pending old playlist cannot replace the lobby after its fetch finishes', async () => {
+  const pending = deferred<Response>();
+  globalThis.fetch = (async (url: string | URL | Request) =>
+    requestUrl(url) === audioUrl('music')
+      ? pending.promise
+      : response(requestUrl(url))) as typeof fetch;
+  const player = new AudioPlayer();
+  player.configure(enabled, true);
+  await player.unlock();
+  await settle();
+  const context = required(FakeContext.instances[0]);
+  player.music('old-game');
+  player.music('lobby', true);
+  await settle();
+  pending.resolve(response(audioUrl('music')));
+  await settle();
+  expect(context.sources).toHaveLength(1);
+  expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('musicHorizon'));
+  player.destroy();
+});
+
+for (const readyAt of [10.05, 12]) {
+  test(`a successor decoded at ${readyAt}s waits for a complete fallback loop`, async () => {
+    const pending = deferred<Response>();
+    globalThis.fetch = (async (url: string | URL | Request) =>
+      requestUrl(url) === audioUrl('musicExplorer')
+        ? pending.promise
+        : response(requestUrl(url))) as typeof fetch;
+    const player = new AudioPlayer();
+    player.configure(enabled, true);
+    await player.unlock();
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    player.music('game:match');
+    await settle();
+    const current = required(context.sources[0]);
+    expect(current.stopAt).toBe(Number.POSITIVE_INFINITY);
+    context.advance(readyAt, false);
+    pending.resolve(response(audioUrl('musicExplorer')));
+    await settle();
+    expect(current.stopped).toBe(false);
+    expect(current.stopAt).toBeCloseTo(20.05);
+    expect(required(context.sources[1]).startsAt).toBe(current.stopAt);
+    player.destroy();
+  });
+}
+
+test('an unavailable successor leaves current music playing and retries before the handoff', async () => {
+  const pending = deferred<Response>();
+  let attempts = 0;
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    if (requestUrl(url) === audioUrl('musicExplorer') && ++attempts === 1) return pending.promise;
+    return response(requestUrl(url));
+  }) as typeof fetch;
+  const player = new AudioPlayer();
+  player.configure(enabled, true);
+  await player.unlock();
+  await settle();
+  const context = required(FakeContext.instances[0]);
+  player.music('game:match');
+  await settle();
+  const current = required(context.sources[0]);
+  pending.reject(new Error('Temporary asset failure'));
+  await settle();
+  expect(context.sources).toHaveLength(1);
+  expect(current.stopped).toBe(false);
+  expect(current.stopAt).toBe(Number.POSITIVE_INFINITY);
+  await new Promise((resolve) => setTimeout(resolve, 2_100));
+  await settle();
+  expect(attempts).toBe(2);
+  expect(context.sources).toHaveLength(2);
+  expect(current.stopped).toBe(false);
+  expect(current.stopAt).toBe(required(context.sources[1]).startsAt);
+  player.destroy();
+});

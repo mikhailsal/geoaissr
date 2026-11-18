@@ -11,7 +11,8 @@ Notable changes to this locally run application are recorded here. Releases are 
 
 ### Changed
 
-- Rotate all seven original background loops by round, keeping music playing through answers, timer zero, round results and the next round's preparation.
+- Play all seven original background tracks in a continuous sequence, keeping their full endings and preserving the queue through round changes, answers, results and preparation.
+- Repeat a quieter Horizon track in the lobby and use one background-music control for both lobby and gameplay.
 
 ### Fixed
 

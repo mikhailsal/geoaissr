@@ -14,6 +14,9 @@ class FakeOutput implements AudioOutput {
   cue(id: SoundId): void {
     this.cues.push(id);
   }
+  music(key: string, lobby = false): void {
+    this.track('music', lobby ? 'musicHorizon' : 'music', key, 0, true);
+  }
   track(channel: string, id: SoundId, key: string, offset: number, loop?: boolean): void {
     if (this.tracks.get(channel)?.key === key) return;
     const track = { id, key, offset, loop };
@@ -136,18 +139,36 @@ test('music continues through zero, results and the next intro, stopping at the 
   const output = new FakeOutput();
   const director = new AudioDirector(output);
   director.update(view(), 10_000, true);
-  expect(output.tracks.get('music')).toMatchObject({ offset: 10, loop: true });
+  expect(output.tracks.get('music')).toMatchObject({ key: 'game:match', loop: true });
   director.update(view(), 60_000, true);
   expect(output.tracks.has('music')).toBe(true);
   expect(output.tracks.has('warning')).toBe(false);
   director.update(view({ phase: 'ROUND_RESULTS', active: undefined }), 61_000, true);
-  expect(output.tracks.get('music')).toMatchObject({ key: 'match:1', loop: true });
+  expect(output.tracks.get('music')).toMatchObject({ key: 'game:match', loop: true });
   director.update({ ...loading(null), roundNumber: 2 }, 62_000, true);
-  expect(output.tracks.get('music')).toMatchObject({ key: 'match:1', loop: true });
+  expect(output.tracks.get('music')).toMatchObject({ key: 'game:match', loop: true });
   director.update(view({ roundNumber: 2 }), 72_000, true);
-  expect(output.tracks.get('music')).toMatchObject({ id: 'musicExplorer', key: 'match:2' });
+  expect(output.tracks.get('music')).toMatchObject({ id: 'music', key: 'game:match' });
+  expect(output.starts.filter((track) => track.key === 'game:match')).toHaveLength(1);
   director.update(view({ phase: 'FINAL', active: undefined }), 80_000, true);
   expect(output.tracks.has('music')).toBe(false);
+});
+
+test('lobby requests one calm loop and a new game gets a separate playlist session', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  const lobby = view({ phase: 'LOBBY', active: undefined });
+  director.update(lobby, 0, true);
+  director.update(lobby, 90_000, true);
+  expect(output.tracks.get('music')).toMatchObject({ id: 'musicHorizon', key: 'lobby:match' });
+  expect(output.starts).toHaveLength(1);
+  director.update(loading(null), 91_000, true);
+  director.update(view({ roundNumber: 3 }), 250_000, true);
+  expect(output.tracks.get('music')).toMatchObject({ id: 'music', key: 'game:match' });
+  director.update(view({ phase: 'FINAL', active: undefined }), 251_000, true);
+  expect(output.tracks.has('music')).toBe(false);
+  director.update(lobby, 252_000, true);
+  expect(output.tracks.get('music')).toMatchObject({ id: 'musicHorizon', key: 'lobby:match' });
 });
 
 test('expired warning keeps its final hit and tail across zero and results without restarting', () => {

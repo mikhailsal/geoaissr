@@ -1,7 +1,7 @@
 # Game audio
 
 The header has two independent toggle buttons: **Звуковые эффекты** (sound effects)
-and **Музыка раунда** (round music). Both default to enabled. Their pressed state
+and **Фоновая музыка** (background music). Both default to enabled. Their pressed state
 indicates whether the channel is enabled; the tooltip describes the next action.
 Preferences are saved in this browser under `geoaissr.audio.v1`. When browser
 storage is unavailable, the buttons still work for the current tab.
@@ -9,7 +9,7 @@ storage is unavailable, the buttons still work for the current tab.
 Audio activates after a pointer or keyboard interaction. A restored game can
 therefore remain silent until the first interaction. Hidden tabs, disconnected
 sessions and logged-out players are silent. Returning to the game restores the
-current music and timed warnings without replaying earlier results or answers.
+paused music and current timed warnings without replaying earlier results or answers.
 Sound failures never block joining, placing a marker or submitting an answer.
 
 ## Event mapping
@@ -62,7 +62,7 @@ produced by the accepted phase change.
 
 All seven current loops are included, at linear gain 0.18:
 
-| Round in cycle | File                       | Duration | Character                            |
+| Queue position | File                       | Duration | Character                            |
 | -------------- | -------------------------- | -------- | ------------------------------------ |
 | 1              | `round-loop-suspense.ogg`  | 43.54 s  | Drone, heartbeat and quiet ticking   |
 | 2              | `round-loop-explorer.ogg`  | 52.24 s  | Playful bass and marimba figures     |
@@ -72,24 +72,33 @@ All seven current loops are included, at linear gain 0.18:
 | 6              | `round-loop-pulse.ogg`     | 43.54 s  | Driving electronic rhythm            |
 | 7              | `round-loop-countdown.ogg` | 45.71 s  | Bass ticks and growing timer tension |
 
-The order repeats from round eight and restarts at each new match. The first
-track starts during the first round's loading. A track loops continuously after
-your answer, after displayed zero, on round results, and during preparation of
-the next round. When that next round becomes active, its new variant takes over.
-The current source remains audible until the next variant has decoded and
-started, including while a failed load is retried. Music stops at match final or
-lobby, when its control is disabled, and at the browser lifecycle boundaries
-described above.
+In the lobby, only `round-loop-horizon.ogg` repeats. Its gain is reduced to 0.117
+for a quieter background while players join and configure the match. The same
+background-music control applies in both lobby and gameplay.
 
-A five-round match reaches the first five variants. The pulse and countdown
-variants are heard in matches with at least six and seven rounds respectively.
+A match starts the queue with suspense during the first round's loading. Every
+track plays in full, then the next starts; countdown is followed by suspense
+again. The queue is independent of round numbers, deadlines, answers, round
+results and preparation of the next round. A new round never restarts or skips
+the currently playing track.
+
+Successor starts and current-source stops are scheduled at the same exact
+`AudioContext` timestamp. If the next file is unavailable, the current track
+repeats complete loops while the next load is retried. A late load waits for the
+next complete loop boundary instead of cutting the audible iteration.
+
+Muting music, hiding the tab or losing the connection pauses the queue and saves
+the audible track and its position. Resuming continues that position. Match
+final stops the queue; returning to the lobby restores its single Horizon loop.
+Each new match starts its own queue from suspense.
 
 ## Playback and assets
 
 `audio-player.ts` loads and decodes the OGG files through Web Audio after browser
-activation. Music repeats as a decoded `AudioBuffer`, using the source pack's
-sample-exact OGG seam. `audio-director.ts` selects live transitions and timed
-tracks using the same synchronized server clock as the visible timer.
+activation. The playlist schedules decoded `AudioBuffer` sources on the native
+audio clock, with sample-exact OGG loops as the fallback. `audio-director.ts`
+selects live transitions and timed effects using the same synchronized server
+clock as the visible timer; background progression follows its own audio clock.
 Outstanding loads lose permission to start when their source is stopped or
 their channel is muted. `GameAudio.svelte` owns browser visibility and cleanup.
 
@@ -106,8 +115,12 @@ of this application.
 `web/src/lib/audio-director.test.ts` checks event selection, deduplication,
 reconnect baselines, countdown offsets, natural tails and deadline changes.
 `web/src/lib/audio-player.test.ts` checks asynchronous cancellation, muting and
-optional-audio failures, all seven music preferences and delayed track handoffs.
+optional-audio failures, all seven music preferences, sequential handoffs,
+fallback loops and saved playheads across pauses.
 `web/tests/audio.spec.ts` exercises the built client
 with Chromium's real OGG decoder and audio graph; it observes native source
 starts and stops without replacing playback. Headless graph checks verify
 timing and routing, but do not judge the subjective speaker mix.
+The seven-track wrap regression uses half-second excerpts copied from the real
+decoded music buffers. Separate cases use the full recordings and verify the
+first handoff at the original 43.54-second boundary.

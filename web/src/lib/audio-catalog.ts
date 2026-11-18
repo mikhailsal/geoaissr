@@ -21,7 +21,7 @@ export const AUDIO = {
 } as const;
 
 export type SoundId = keyof typeof AUDIO;
-export const ROUND_MUSIC = [
+export const MUSIC_PLAYLIST = [
   'music',
   'musicExplorer',
   'musicVoyage',
@@ -31,12 +31,10 @@ export const ROUND_MUSIC = [
   'musicCountdown',
 ] as const satisfies readonly SoundId[];
 
-export function roundMusic(roundNumber: number): SoundId {
-  return ROUND_MUSIC[Math.max(0, roundNumber - 1) % ROUND_MUSIC.length] ?? 'music';
-}
+export const LOBBY_MUSIC = ['musicHorizon'] as const satisfies readonly SoundId[];
 
 export function isMusic(id: SoundId): boolean {
-  return ROUND_MUSIC.some((music) => music === id);
+  return MUSIC_PLAYLIST.some((music) => music === id);
 }
 
 export interface AudioPreferences {
@@ -46,6 +44,7 @@ export interface AudioPreferences {
 
 export interface AudioOutput {
   cue(id: SoundId): void;
+  music(key: string, lobby?: boolean): void;
   track(channel: string, id: SoundId, key: string, offset: number, loop?: boolean): void;
   stop(channel: string): void;
   stopAll(): void;

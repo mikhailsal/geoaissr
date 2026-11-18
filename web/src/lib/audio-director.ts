@@ -1,5 +1,5 @@
 import { COUNTDOWN_MS, type ClientViewState } from '../../../shared/protocol';
-import { roundMusic, type AudioOutput } from './audio-catalog';
+import type { AudioOutput } from './audio-catalog';
 
 function roundKey(view: ClientViewState): string {
   return `${view.matchId}:${view.roundNumber}`;
@@ -20,7 +20,6 @@ function opponents(view: ClientViewState): Set<string> {
 export class AudioDirector {
   private previous: ClientViewState | null = null;
   private wasLive = false;
-  private music: { matchId: string; round: number; startedAt: number } | null = null;
   private warningDeadline: number | null = null;
 
   constructor(private readonly output: AudioOutput) {}
@@ -39,7 +38,6 @@ export class AudioDirector {
     const phaseChanged = !sameRound || previous.phase !== view.phase;
     if (previous?.matchId !== view.matchId || (phaseChanged && view.phase === 'LOBBY')) {
       this.output.stopAll();
-      this.music = null;
       this.warningDeadline = null;
     }
     if (phaseChanged) {
@@ -56,7 +54,7 @@ export class AudioDirector {
         this.announcePhase(view);
       }
     }
-    this.background(view, now);
+    this.background(view);
     if (view.phase === 'ROUND_LOADING') this.loading(view, now, announce && phaseChanged);
     if (view.phase === 'ROUND_ACTIVE' && view.active) {
       this.active(view, now);
@@ -67,26 +65,13 @@ export class AudioDirector {
     }
   }
 
-  private background(view: ClientViewState, now: number): void {
-    if (view.phase === 'LOBBY' || view.phase === 'FINAL') {
+  private background(view: ClientViewState): void {
+    if (view.phase === 'FINAL') {
       this.output.stop('music');
-      this.music = null;
       return;
     }
-    if (!this.music || (view.phase === 'ROUND_ACTIVE' && this.music.round !== view.roundNumber)) {
-      this.music = {
-        matchId: view.matchId,
-        round: view.roundNumber,
-        startedAt: view.active ? view.active.endsAt - view.roundDurationSec * 1000 : now,
-      };
-    }
-    this.output.track(
-      'music',
-      roundMusic(this.music.round),
-      `${this.music.matchId}:${this.music.round}`,
-      Math.max(0, now - this.music.startedAt) / 1000,
-      true,
-    );
+    const lobby = view.phase === 'LOBBY';
+    this.output.music(`${lobby ? 'lobby' : 'game'}:${view.matchId}`, lobby);
   }
 
   private stopWarning(): void {

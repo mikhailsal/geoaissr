@@ -19,9 +19,9 @@
   <button
     type="button"
     class="btn sound-toggle"
-    aria-label="Музыка раунда"
+    aria-label="Фоновая музыка"
     aria-pressed={audioPreferences.music}
-    title={audioPreferences.music ? 'Выключить музыку раунда' : 'Включить музыку раунда'}
+    title={audioPreferences.music ? 'Выключить фоновую музыку' : 'Включить фоновую музыку'}
     onclick={() => {
       toggleAudio('music');
     }}
