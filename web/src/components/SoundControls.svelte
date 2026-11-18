@@ -13,6 +13,7 @@
 
   const uid = $props.id();
   let root: HTMLDivElement;
+  let panel = $state<HTMLDivElement>();
   let slider = $state<HTMLInputElement>();
   let trigger: HTMLButtonElement | null = null;
   let open = $state<AudioKind | null>(null);
@@ -40,7 +41,9 @@
     top = rect.bottom + 4;
     open = kind;
     void tick().then(() => {
-      if (open === kind) slider?.focus();
+      if (open !== kind || !panel?.isConnected) return;
+      panel.showPopover();
+      slider?.focus();
     });
   }
   function outside(event: PointerEvent): void {
@@ -90,6 +93,8 @@
     <div
       id={`${uid}-volume`}
       class="volume-panel panel"
+      popover="manual"
+      bind:this={panel}
       role="region"
       aria-label={`Громкость ${channelName(open)}`}
       style:left={`${left}px`}
@@ -184,12 +189,15 @@
   .volume-panel {
     position: fixed;
     z-index: 100;
+    inset: auto;
+    margin: 0;
     box-sizing: border-box;
     width: min(260px, calc(100vw - 24px));
     padding: var(--sp-3);
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    color: inherit;
     background: var(--asphalt-800);
     box-shadow: var(--shadow-panel);
   }
@@ -224,7 +232,7 @@
     min-width: 0;
     width: 100%;
     min-height: var(--control-h);
-    accent-color: var(--paint);
+    accent-color: var(--paper);
   }
   output {
     min-width: 3ch;

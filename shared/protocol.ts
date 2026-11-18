@@ -19,18 +19,19 @@ import {
   type HarnessId,
   type RegionId,
 } from './storage-schemas.ts';
+import type { RoundCompletion } from './round-timing.ts';
 
+export { DIFFICULTY_PRESETS, HARNESS_IDS, botSlotConfigSchema };
+export { ROUND_INTRO_MS, COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS } from './round-timing.ts';
 export const MAX_WS_MESSAGE_BYTES = 16 * 1024;
 export const MAX_NICK_LEN = 20;
 export const MAX_HUMANS = 8;
 export const MAX_BOTS = 3;
-export { ROUND_INTRO_MS, COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS } from './round-timing.ts';
 export const MAX_WS_CONNECTIONS = 32;
 export const MAX_PENDING_AUTH_CONNECTIONS = 8;
 export const UNAUTH_TIMEOUT_MS = 5_000;
 
 export type GamePhase = 'LOBBY' | 'ROUND_LOADING' | 'ROUND_ACTIVE' | 'ROUND_RESULTS' | 'FINAL';
-
 export type AckResult =
   'ok' | 'round_over' | 'already_confirmed' | 'not_in_round' | 'invalid' | 'forbidden';
 
@@ -391,6 +392,7 @@ export interface ClientViewState {
     botProgress: BotRoundProgressView[];
   };
   results?: {
+    completion?: RoundCompletion;
     targetLat: number;
     targetLng: number;
     countryNameRu: string;
@@ -495,5 +497,3 @@ export type ServerMessage =
       version: number;
       view: ClientViewState;
     };
-
-export { DIFFICULTY_PRESETS, HARNESS_IDS, botSlotConfigSchema };

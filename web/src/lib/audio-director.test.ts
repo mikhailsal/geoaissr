@@ -84,6 +84,18 @@ function loading(startsAt: number | null, prepError?: string): ClientViewState {
   });
 }
 
+function resultsAt(finishedAt: number, confirmedIds: string[] = []): ClientViewState {
+  const results = {
+    targetLat: 48.8566,
+    targetLng: 2.3522,
+    countryNameRu: 'Франция',
+    entries: [],
+    completion: { finishedAt, confirmedIds },
+    humanVsAi: { visible: false, humansRound: 0, aiRound: 0, humansTotal: 0, aiTotal: 0 },
+  };
+  return view({ phase: 'ROUND_RESULTS', gen: 2, active: undefined, results });
+}
+
 test('announces live transitions and coalesces new opponents without duplicates', () => {
   const output = new FakeOutput();
   const director = new AudioDirector(output);
@@ -319,3 +331,107 @@ for (const kind of ['human', 'bot'] as const) {
     expect(output.cues).toEqual(['opponent']);
   });
 }
+
+// Value: protects=one live loading phrase per attempt; fails_when=a same-round retry is silent or repeats; why_new=phase changes alone do not identify retries; seam=none; no_claim=the output fake does not exercise browser decoding.
+test('live loading retries play one new phrase without a screen transition', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view({ phase: 'LOBBY', active: undefined }), 0, true);
+  director.update(loading(null), 1_000, true);
+  director.update(loading(null, 'failed'), 2_000, true);
+  const retry = loading(9_800);
+  if (!retry.loading) throw new Error('Missing loading fixture');
+  retry.gen = 2;
+  retry.loading.startedLoadingAt = 3_000;
+  director.update(retry, 3_500, true);
+  director.update(retry, 4_000, true);
+  output.tracks.delete('loading');
+  director.update(retry, 9_799, true);
+  expect(output.starts.filter((track) => track.id === 'loading')).toEqual([
+    { id: 'loading', key: 'match:1:1', offset: 0, loop: undefined },
+    { id: 'loading', key: 'match:1:2', offset: 0.5, loop: undefined },
+  ]);
+  expect(output.cues).toEqual(['transition']);
+});
+
+test('initial and restored loading generations leave the intro phrase silent', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(loading(null), 1_000, true);
+  director.update(loading(null), 1_500, true);
+  director.update(null, 2_000, false);
+  const restored = { ...loading(null), gen: 2 };
+  director.update(restored, 2_500, true);
+  director.update(restored, 2_600, true);
+  expect(output.starts.filter((track) => track.id === 'loading')).toEqual([]);
+  expect(output.cues).toEqual([]);
+});
+
+// Value: protects=countdown cancellation when a host ends the match; fails_when=the countdown continues over the final screen; why_new=the existing loading exit test covers results; seam=none; no_claim=the output fake does not exercise native audio playback.
+test('ending the match during loading cancels its running countdown', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(loading(10_000), 10_500, true);
+  expect(output.tracks.get('countdown')?.offset).toBe(0.5);
+  director.update(view({ phase: 'FINAL', gen: 2, active: undefined }), 11_000, true);
+  expect(output.tracks.has('countdown')).toBe(false);
+});
+
+// Value: protects=warning tails at the authoritative deadline; fails_when=clock skew changes cutoff; why_new=legacy results fixtures compare only estimated time; seam=none; no_claim=the output fake does not exercise sample-level playback.
+test('server timeout lets the warning finish when the client estimate is behind', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view(), 55_000, true);
+  director.update(resultsAt(60_000), 59_500, true);
+  expect(output.tracks.get('warning')?.key).toBe('match:1:60000');
+  director.update(view({ phase: 'FINAL', active: undefined }), 59_800, true);
+  expect(output.tracks.get('warning')?.key).toBe('match:1:60000');
+  expect(output.starts.filter((track) => track.id === 'warning')).toHaveLength(1);
+});
+
+test('early completion cuts the warning when the client estimate is ahead', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view(), 55_000, true);
+  expect(output.tracks.has('warning')).toBe(true);
+  director.update(resultsAt(59_500, ['me']), 60_100, true);
+  expect(output.tracks.has('warning')).toBe(false);
+  expect(output.tracks.has('music')).toBe(true);
+});
+
+// Value: protects=last live human and bot confirmation cues; fails_when=the reducer skips the final active snapshot or results replay prior confirmations; why_new=active-to-active tests miss the boundary; seam=none; no_claim=the output fake does not exercise WebSocket readiness.
+for (const kind of ['human', 'bot'] as const) {
+  test(`announces the last ${kind} once when the round completes directly`, () => {
+    const output = new FakeOutput();
+    const director = new AudioDirector(output);
+    const lastOpponent = kind === 'human' ? 'last-human' : 'last-bot';
+    const initial = activeWith({
+      myConfirmed: true,
+      botProgress: kind === 'bot' ? [bot(lastOpponent, 'thinking')] : [],
+    });
+    initial.players = [player('me', true), player('heard', true)];
+    if (kind === 'human') initial.players.push(player(lastOpponent, false));
+    director.update(initial, 55_000, true);
+    const results = resultsAt(56_000, ['me', 'heard', lastOpponent]);
+    director.update(results, 56_000, true);
+    director.update(results, 56_100, true);
+    expect(output.cues).toEqual(['transition', 'roundEnd', 'opponent']);
+  });
+}
+
+test('results do not replay the viewer, heard confirmations or restored confirmations', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view(), 1_000, true);
+  director.update(view({ players: [player('heard', true)] }), 2_000, true);
+  director.update(resultsAt(3_000, ['me', 'heard']), 3_000, true);
+  expect(output.cues).toEqual(['opponent', 'transition', 'roundEnd']);
+
+  director.update(view({ roundNumber: 2, gen: 3 }), 4_000, true);
+  const restored = { ...resultsAt(5_000, ['missed']), roundNumber: 2, gen: 4 };
+  const beforeDisconnect = [...output.cues];
+  director.update(null, 4_500, false);
+  director.update(restored, 5_000, true);
+  director.update(restored, 5_100, true);
+  expect(output.cues).toEqual(beforeDisconnect);
+});

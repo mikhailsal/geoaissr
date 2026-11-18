@@ -52,8 +52,8 @@
   const countdownSeconds = $derived.by(() => {
     if (countdownStartsAt === null) return null;
     const elapsedMs = store.serverNow() - countdownStartsAt;
-    if (elapsedMs < 0 || elapsedMs >= COUNTDOWN_MS) return null;
-    return Math.ceil((COUNTDOWN_MS - elapsedMs) / 1000);
+    if (elapsedMs < 0) return null;
+    return Math.max(1, Math.ceil((COUNTDOWN_MS - elapsedMs) / 1000));
   });
 
   const handleRetryConnect = (): void => {

@@ -1,6 +1,6 @@
 import { buildQuotaMetric } from '../storage/quota.ts';
 import { expect, test } from 'bun:test';
-import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
+import { COUNTDOWN_MS, ROUND_INTRO_MS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
 import { reduce } from './reduce.ts';
 import { createInitialRoomState, type RoomState, type RoundTarget } from './types.ts';
@@ -217,6 +217,9 @@ test('round results and final screen reveal scores and perRound botCards', () =>
 
   const resView = projectView(s, 'h');
   expect(resView.results?.countryNameRu).toBe('Франция');
+  expect(resView.results).toMatchObject({
+    completion: { finishedAt: 5000, confirmedIds: ['h', botId] },
+  });
   expect(resView.results?.entries.find((e) => e.isAi)?.roundScore).toBe(5000);
 
   s = reduce(s, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 6000).state;
@@ -224,6 +227,70 @@ test('round results and final screen reveal scores and perRound botCards', () =>
   expect(finalView.phase).toBe('FINAL');
   expect(finalView.final?.standings[0]?.isAi).toBe(true);
   expect(finalView.final?.standings[0]?.perRound[0]?.botCard?.explanation).toBe('Эйфелева башня');
+});
+
+// Value: protects=authoritative result completion time and participants; fails_when=scored pins, drafts or failed bots enter confirmation metadata; why_new=score rows do not distinguish confirmations; seam=none; no_claim=client audio playback.
+test('timeout results carry only confirmed humans and done bots despite scoring other guesses', () => {
+  let s = makeBaseRoom();
+  const players = [
+    { playerId: 'h', secret: 's1', name: 'Хост', color: 'p-1', isHost: true },
+    { playerId: 'g', secret: 's2', name: 'Гость', color: 'p-2', isHost: false },
+  ] as const;
+  for (const player of players) s = reduce(s, { type: 'player_join', ...player }, 100).state;
+  for (let i = 0; i < 3; i++) s = reduce(s, { type: 'add_bot', playerId: 'h' }, 102).state;
+  const startedLoadingAt = 1_000;
+  s = reduce(s, { type: 'start_match', playerId: 'h' }, startedLoadingAt).state;
+  const round = { matchId: s.matchId, gen: s.gen, roundNumber: 1 };
+  s = reduce(s, { type: 'round_prepared', ...round, target: TARGET }, 1_100).state;
+  for (const { playerId } of players) {
+    s = reduce(s, { type: 'pano_loaded', playerId, roundNumber: 1 }, 1_200).state;
+  }
+  const startedAt = startedLoadingAt + ROUND_INTRO_MS + COUNTDOWN_MS;
+  s = reduce(s, { type: 'countdown_done', ...round }, startedAt).state;
+  s = reduce(
+    s,
+    { type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 48, lng: 2 },
+    startedAt + 400,
+  ).state;
+  s = reduce(
+    s,
+    { type: 'set_pin', playerId: 'g', roundNumber: 1, lat: 47, lng: 3 },
+    startedAt + 500,
+  ).state;
+  const [done, aborted, draft] = s.settings.bots;
+  if (!done || !aborted || !draft) throw new Error('Missing bot fixtures');
+  for (const { id } of s.settings.bots) {
+    s = reduce(
+      s,
+      {
+        type: 'bot_guess_recorded',
+        ...round,
+        botId: id,
+        finalized: id !== draft.id,
+        guess: { lat: 48, lng: 2, explanation: 'Эйфелева башня' },
+      },
+      startedAt + 600,
+    ).state;
+  }
+  s = reduce(
+    s,
+    { type: 'bot_finished', ...round, botId: done.id, aborted: false, reason: 'завершил ход' },
+    startedAt + 700,
+  ).state;
+  s = reduce(
+    s,
+    { type: 'bot_finished', ...round, botId: aborted.id, aborted: true, reason: 'сбой' },
+    startedAt + 800,
+  ).state;
+  const deadline = startedAt + s.settings.roundDurationSec * 1_000;
+  s = reduce(s, { type: 'deadline_tick', ...round, kind: 'round' }, deadline + 20).state;
+  const view = projectView(s, 'g');
+  expect(view.phase).toBe('ROUND_RESULTS');
+  expect(view.results?.entries.filter((entry) => entry.distanceKm !== null)).toHaveLength(5);
+  expect(view.results?.entries.find((entry) => entry.id === draft.id)?.usedDraft).toBe(true);
+  expect(view.results).toMatchObject({
+    completion: { finishedAt: deadline + 20, confirmedIds: ['h', done.id] },
+  });
 });
 
 const BOT_ABORT_REASON = 'ошибка процесса (код 1)';

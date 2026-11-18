@@ -144,8 +144,6 @@ export class GameStore extends GameCommands {
         if (this.connectionState !== 'reconnecting') this.connectionState = 'connecting';
       },
       onSocketOpen: () => {
-        this.connectionState = 'connected';
-        this.reconnectAttempt = 0;
         this.offlinePinWarning = false;
       },
       onBackOnline: () => {
@@ -266,6 +264,8 @@ export class GameStore extends GameCommands {
     const prevRound = this.view?.roundNumber;
     const prevPhase = this.view?.phase;
     this.view = view;
+    this.connectionState = 'connected';
+    this.reconnectAttempt = 0;
     this.profile.onState(view);
     this.joined = view.viewerId !== '__unjoined__';
     if (view.phase !== 'LOBBY') {

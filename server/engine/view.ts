@@ -119,6 +119,7 @@ function projectResults(state: RoomState, viewerIsHost: boolean): ClientViewStat
   const res = state.results;
   if (state.phase !== 'ROUND_RESULTS' || !res) return undefined;
   return {
+    completion: res.completion,
     targetLat: res.target.lat,
     targetLng: res.target.lng,
     countryNameRu: res.target.countryNameRu,

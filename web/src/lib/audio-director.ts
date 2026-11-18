@@ -9,11 +9,15 @@ function screen(phase: ClientViewState['phase']): string {
   return phase === 'ROUND_LOADING' || phase === 'ROUND_ACTIVE' ? 'ROUND' : phase;
 }
 
-function opponents(view: ClientViewState): Set<string> {
-  return new Set([
-    ...view.players.filter((p) => p.id !== view.viewerId && p.confirmed).map((p) => p.id),
-    ...(view.active?.botProgress.filter((b) => b.status === 'done').map((b) => b.id) ?? []),
-  ]);
+function confirmedOpponentIds(view: ClientViewState): string[] {
+  const confirmedIds =
+    view.phase === 'ROUND_RESULTS'
+      ? (view.results?.completion?.confirmedIds ?? [])
+      : [
+          ...view.players.filter((p) => p.confirmed).map((p) => p.id),
+          ...(view.active?.botProgress.filter((b) => b.status === 'done').map((b) => b.id) ?? []),
+        ];
+  return confirmedIds.filter((id) => id !== view.viewerId);
 }
 
 /** Separates current timed audio from announcements that only belong to live transitions. */
@@ -36,15 +40,25 @@ export class AudioDirector {
     }
     const sameRound = previous !== null && roundKey(previous) === roundKey(view);
     const phaseChanged = !sameRound || previous.phase !== view.phase;
+    const wasRoundActive = sameRound && previous.phase === 'ROUND_ACTIVE';
+    const roundCompleted = wasRoundActive && view.phase === 'ROUND_RESULTS';
     if (previous?.matchId !== view.matchId || (phaseChanged && view.phase === 'LOBBY')) {
       this.output.stopAll();
       this.warningDeadline = null;
     }
     if (phaseChanged) {
       this.output.stop('loading');
-      // Expired warnings and short event cues own their natural tails, including in results.
-      if (this.warningDeadline === null || now < this.warningDeadline) this.stopWarning();
-      if (!sameRound || (previous.phase === 'ROUND_LOADING' && view.phase === 'ROUND_RESULTS')) {
+      const finishedAt = roundCompleted ? (view.results?.completion?.finishedAt ?? now) : now;
+      if (this.warningDeadline !== null && finishedAt < this.warningDeadline) {
+        this.output.stop('warning');
+      }
+      // Once the deadline has passed, leave the natural tail alone on further phase changes.
+      this.warningDeadline = null;
+      if (
+        !sameRound ||
+        view.phase === 'FINAL' ||
+        (previous.phase === 'ROUND_LOADING' && view.phase === 'ROUND_RESULTS')
+      ) {
         this.output.stop('countdown');
       }
       if (announce) {
@@ -55,13 +69,17 @@ export class AudioDirector {
       }
     }
     this.background(view);
-    if (view.phase === 'ROUND_LOADING') this.loading(view, now, announce && phaseChanged);
-    if (view.phase === 'ROUND_ACTIVE' && view.active) {
-      this.active(view, now);
-      if (announce && sameRound && previous.phase === 'ROUND_ACTIVE') {
-        const old = opponents(previous);
-        if ([...opponents(view)].some((id) => !old.has(id))) this.output.cue('opponent');
-      }
+    if (view.phase === 'ROUND_LOADING') {
+      this.loading(view, now, announce && (phaseChanged || previous.gen !== view.gen));
+    }
+    if (view.phase === 'ROUND_ACTIVE') this.active(view, now);
+    if (
+      announce &&
+      wasRoundActive &&
+      (roundCompleted || (view.phase === 'ROUND_ACTIVE' && view.active))
+    ) {
+      const old = new Set(confirmedOpponentIds(previous));
+      if (confirmedOpponentIds(view).some((id) => !old.has(id))) this.output.cue('opponent');
     }
   }
 

@@ -92,6 +92,8 @@ async function verifyPackagedAudio(page: Page): Promise<void> {
     for (const url of urls) {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Audio HTTP ${response.status} for ${url}`);
+      if (response.headers.get('content-type') !== 'audio/ogg')
+        throw new Error(`Audio MIME for ${url}`);
       const decoded = await context.decodeAudioData(await response.arrayBuffer());
       durations.push(decoded.duration);
     }
