@@ -22,6 +22,7 @@ interface SourceTrace {
   ended: Record<number, number>;
   stops: { id: number; at: number; when: number }[];
   live: Record<number, string>;
+  gains: Record<number, number>;
 }
 
 export type AudioTrace = DecodeTrace & SourceTrace;
@@ -100,7 +101,8 @@ function installSourceObserver(): void {
   const stops: SourceTrace['stops'] = [];
   const lastStop = new Map<number, number>();
   const ids = new WeakMap<AudioBufferSourceNode, number>();
-  const gains = new WeakMap<AudioBufferSourceNode, GainNode>();
+  const connectedGains = new WeakMap<AudioBufferSourceNode, GainNode>();
+  const activeGains = new Map<number, GainNode>();
   let context: BaseAudioContext | undefined;
   window.audioSourceTrace = () => {
     const now = context?.currentTime ?? 0;
@@ -111,7 +113,10 @@ function installSourceObserver(): void {
         live[source.id] = source.url;
       }
     }
-    return { now, starts, ended, stops, live };
+    const gains = Object.fromEntries(
+      Array.from(activeGains, ([id, node]) => [id, node.gain.value]),
+    );
+    return { now, starts, ended, stops, live, gains };
   };
   /* eslint-disable @typescript-eslint/unbound-method */
   const start = AudioBufferSourceNode.prototype.start;
@@ -121,7 +126,7 @@ function installSourceObserver(): void {
   AudioBufferSourceNode.prototype.connect = new Proxy(connect, {
     apply(target, source: AudioBufferSourceNode, args: unknown[]) {
       const [destination] = args;
-      if (destination instanceof GainNode) gains.set(source, destination);
+      if (destination instanceof GainNode) connectedGains.set(source, destination);
       return Reflect.apply(target, source, args) as AudioNode | undefined;
     },
   });
@@ -132,6 +137,8 @@ function installSourceObserver(): void {
     start.call(this, when, offset, duration);
     context = this.context;
     ids.set(this, id);
+    const gain = connectedGains.get(this);
+    if (gain) activeGains.set(id, gain);
     starts.push({
       id,
       url,
@@ -139,10 +146,11 @@ function installSourceObserver(): void {
       loop: this.loop,
       at,
       duration: this.buffer?.duration ?? 0,
-      gain: gains.get(this)?.gain.value,
+      gain: gain?.gain.value,
     });
     this.addEventListener('ended', () => {
       ended[id] = this.context.currentTime;
+      activeGains.delete(id);
     });
   };
   AudioBufferSourceNode.prototype.stop = function (when) {

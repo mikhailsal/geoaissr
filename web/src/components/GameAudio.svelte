@@ -12,7 +12,12 @@
   $effect.pre(() => {
     const live = connected && visible;
     audioPlayer.configure(
-      { effects: audioPreferences.effects, music: audioPreferences.music },
+      {
+        effects: audioPreferences.effects,
+        music: audioPreferences.music,
+        effectsVolume: audioPreferences.effectsVolume,
+        musicVolume: audioPreferences.musicVolume,
+      },
       live,
     );
     director.update(view, now, live);

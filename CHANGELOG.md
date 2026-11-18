@@ -7,12 +7,13 @@ Notable changes to this locally run application are recorded here. Releases are 
 ### Added
 
 - Hear event sounds for round loading, countdowns, map markers, accepted answers, opponents and results, with quiet seamless music during active rounds.
-- Toggle sound effects and round music independently from the header and retain those choices in the browser. Audio pauses in hidden or disconnected tabs and resumes without repeating past events.
+- Adjust effects and music independently through header volume panels with sliders, minus/plus buttons and mute. Retain both levels and mute choices in the browser, and apply volume changes without restarting music. Audio pauses in hidden or disconnected tabs and resumes without repeating past events.
 
 ### Changed
 
 - Play all seven original background tracks in a continuous sequence, keeping their full endings and preserving the queue through round changes, answers, results and preparation.
 - Repeat the calmer original Suspense track in the lobby at a reduced volume and use one background-music control for both lobby and gameplay.
+- Default music to 85% of its previous volume while preserving explicitly saved levels and existing mute choices.
 
 ### Fixed
 

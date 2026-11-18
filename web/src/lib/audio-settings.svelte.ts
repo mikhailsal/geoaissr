@@ -1,30 +1,34 @@
-import type { AudioPreferences } from './audio-catalog';
+import type { AudioKind, AudioPreferences } from './audio-catalog';
+import { normalizeAudioPreferences, withAudioToggled, withAudioVolume } from './audio-preferences';
 import { AudioPlayer } from './audio-player';
 
 const STORAGE_KEY = 'geoaissr.audio.v1';
 
 function loadPreferences(): AudioPreferences {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (parsed && typeof parsed === 'object' && 'effects' in parsed && 'music' in parsed) {
-      if (typeof parsed.effects === 'boolean' && typeof parsed.music === 'boolean') {
-        return { effects: parsed.effects, music: parsed.music };
-      }
-    }
+    return normalizeAudioPreferences(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null'));
   } catch {
     // Private browsing or a damaged preference must not prevent joining a game.
+    return normalizeAudioPreferences(null);
   }
-  return { effects: true, music: true };
 }
 
 export const audioPreferences = $state(loadPreferences());
 export const audioPlayer = new AudioPlayer();
 
-export function toggleAudio(kind: keyof AudioPreferences): void {
-  audioPreferences[kind] = !audioPreferences[kind];
+function savePreferences(preferences: AudioPreferences): void {
+  Object.assign(audioPreferences, preferences);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(audioPreferences));
   } catch {
     // The setting still applies for this tab if persistence is unavailable.
   }
+}
+
+export function toggleAudio(kind: AudioKind): void {
+  savePreferences(withAudioToggled(audioPreferences, kind));
+}
+
+export function setAudioVolume(kind: AudioKind, volume: number): void {
+  savePreferences(withAudioVolume(audioPreferences, kind, volume));
 }

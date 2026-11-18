@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { AUDIO, audioUrl, MUSIC_PLAYLIST } from './audio-catalog';
+import { AUDIO, audioUrl, DEFAULT_AUDIO_PREFERENCES, MUSIC_PLAYLIST } from './audio-catalog';
 import { AudioPlayer } from './audio-player';
 
 // Value: protects=muting and invalidation cancel pending playback; fails_when=an invalidated load starts a native source or failures block retries; why_new=no prior audio engine existed; seam=none; no_claim=fake audio objects do not prove browser decoding or speaker output.
@@ -101,7 +101,7 @@ class FakeContext {
 
 const originalContext = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext');
 const originalFetch = globalThis.fetch;
-const enabled = { effects: true, music: true };
+const enabled = { ...DEFAULT_AUDIO_PREFERENCES };
 function requestUrl(input: string | URL | Request): string {
   return typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
 }
@@ -195,7 +195,7 @@ test('effects preload without waiting for music when background music is disable
   }) as typeof fetch;
   const player = new AudioPlayer();
   try {
-    player.configure({ effects: true, music: false }, true);
+    player.configure({ ...enabled, music: false }, true);
     await player.unlock();
     await settle();
     expect(requests).toHaveLength(12);
@@ -243,7 +243,7 @@ for (const action of ['stop', 'mute', 'inactive', 'destroy'] as const) {
     const context = required(FakeContext.instances[0]);
     player.track('music', 'music', 'round', 0, true);
     if (action === 'stop') player.stop('music');
-    if (action === 'mute') player.configure({ effects: true, music: false }, true);
+    if (action === 'mute') player.configure({ ...enabled, music: false }, true);
     if (action === 'inactive') player.configure(enabled, false);
     if (action === 'destroy') player.destroy();
     pending.resolve(response());
@@ -327,7 +327,7 @@ test('loops with wrapped offset and gain, deduplicates keys, and plays one-shots
   expect(required(context.sources[0]).loop).toBe(true);
   expect(required(context.sources[0]).starts[0] ?? -1).toBeGreaterThanOrEqual(2);
   expect(required(context.sources[0]).starts[0] ?? -1).toBeLessThan(3);
-  expect(required(context.gains[0]).gain.value).toBe(AUDIO.music[1]);
+  expect(required(context.gains[0]).gain.value).toBe(AUDIO.music[1] * enabled.musicVolume);
   player.track('music', 'music', 'round', 12, true);
   await settle();
   expect(context.sources).toHaveLength(1);
@@ -356,10 +356,10 @@ test('all seven variants use the independent music preference', async () => {
   const music = context.sources.filter((source) => source.loop);
   const click = required(context.sources.find((source) => !source.loop));
   expect(music).toHaveLength(7);
-  player.configure({ effects: false, music: true }, true);
+  player.configure({ ...enabled, effects: false }, true);
   expect(music.every((source) => !source.stopped)).toBe(true);
   expect(click.stopped).toBe(true);
-  player.configure({ effects: true, music: false }, true);
+  player.configure({ ...enabled, music: false }, true);
   expect(context.sources.every((source) => source.stopped)).toBe(true);
   player.destroy();
 });
@@ -384,7 +384,7 @@ for (const outcome of ['ready', 'failed', 'muted'] as const) {
     await settle();
     expect(previous.stopped).toBe(false);
     expect(context.sources).toHaveLength(1);
-    if (outcome === 'muted') player.configure({ effects: true, music: false }, true);
+    if (outcome === 'muted') player.configure({ ...enabled, music: false }, true);
     if (outcome === 'failed') pending.reject(new Error('Next track unavailable'));
     else pending.resolve(response());
     await settle();
@@ -433,7 +433,9 @@ test('lobby loops only quiet original Suspense and a new match starts the first 
   await settle();
   expect(context.sources).toHaveLength(1);
   expect(sourceName(context, required(context.sources[0]))).toBe(audioUrl('music'));
-  expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.65);
+  expect(required(context.gains[0]).gain.value).toBeCloseTo(
+    AUDIO.music[1] * 0.65 * enabled.musicVolume,
+  );
   context.advance(50);
   player.music('lobby:match', true);
   expect(context.sources).toHaveLength(1);
@@ -461,7 +463,7 @@ for (const pause of ['mute', 'inactive', 'stopAll'] as const) {
     const current = required(context.sources[0]);
     const next = required(context.sources[1]);
     context.advance(current.startsAt + 3);
-    if (pause === 'mute') player.configure({ effects: true, music: false }, true);
+    if (pause === 'mute') player.configure({ ...enabled, music: false }, true);
     if (pause === 'inactive') player.configure(enabled, false);
     if (pause === 'stopAll') player.stopAll();
     expect(current.stopped).toBe(true);
@@ -579,4 +581,120 @@ test('an unavailable successor leaves current music playing and retries before t
   expect(current.stopped).toBe(false);
   expect(current.stopAt).toBe(required(context.sources[1]).startsAt);
   player.destroy();
+});
+
+test('music defaults to 85 percent and explicit saved volumes apply without another reduction', async () => {
+  expect(DEFAULT_AUDIO_PREFERENCES).toEqual({
+    effects: true,
+    music: true,
+    effectsVolume: 1,
+    musicVolume: 0.85,
+  });
+  const player = new AudioPlayer();
+  try {
+    player.configure(enabled, true);
+    await player.unlock();
+    player.music('game:match');
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.85);
+    player.configure({ ...enabled, musicVolume: 1 }, true);
+    expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1]);
+    player.configure({ ...enabled, musicVolume: 0.4 }, true);
+    expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.4);
+  } finally {
+    player.destroy();
+  }
+});
+
+test('volume edits update sounding effects and both music nodes without restarting sources', async () => {
+  const player = new AudioPlayer();
+  try {
+    player.configure(enabled, true);
+    await player.unlock();
+    player.music('game:match');
+    await settle();
+    player.cue('opponent');
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    const current = required(context.sources[0]);
+    const successor = required(context.sources[1]);
+    const effect = required(context.sources[2]);
+    const initialStops = context.sources.map((source) => [...source.stops]);
+    const initialStarts = context.sources.map((source) => [...source.starts]);
+    player.configure({ ...enabled, effectsVolume: 0.3, musicVolume: 0.5 }, true);
+    expect(context.sources).toEqual([current, successor, effect]);
+    expect(context.sources.map((source) => source.starts)).toEqual(initialStarts);
+    expect(context.sources.map((source) => source.stops)).toEqual(initialStops);
+    expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.5);
+    expect(required(context.gains[1]).gain.value).toBeCloseTo(AUDIO.musicExplorer[1] * 0.5);
+    expect(required(context.gains[2]).gain.value).toBeCloseTo(AUDIO.opponent[1] * 0.3);
+    context.advance(successor.startsAt);
+    await settle();
+    expect(required(context.gains[3]).gain.value).toBeCloseTo(AUDIO.musicVoyage[1] * 0.5);
+    player.cue('click');
+    await settle();
+    expect(required(context.gains[4]).gain.value).toBeCloseTo(AUDIO.click[1] * 0.3);
+  } finally {
+    player.destroy();
+  }
+});
+
+test('lobby volume edits retain its quieter mix without resetting its playhead', async () => {
+  const player = new AudioPlayer();
+  try {
+    player.configure(enabled, true);
+    await player.unlock();
+    player.music('lobby:match', true);
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    const source = required(context.sources[0]);
+    context.advance(source.startsAt + 3);
+    player.configure({ ...enabled, musicVolume: 1 }, true);
+    player.music('lobby:match', true);
+    expect(context.sources).toEqual([source]);
+    expect(source.stops).toEqual([]);
+    expect(required(context.gains[0]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.65);
+  } finally {
+    player.destroy();
+  }
+});
+
+test('zero volume cancels audible and queued music and resumes the saved playhead', async () => {
+  const player = new AudioPlayer();
+  try {
+    player.configure(enabled, true);
+    await player.unlock();
+    player.music('game:match');
+    await settle();
+    player.cue('opponent');
+    await settle();
+    const context = required(FakeContext.instances[0]);
+    const current = required(context.sources[0]);
+    const next = required(context.sources[1]);
+    const effect = required(context.sources[2]);
+    context.advance(current.startsAt + 3);
+    player.configure({ ...enabled, musicVolume: 0, effectsVolume: 0 }, true);
+    expect([current, next, effect].every((source) => source.stopped)).toBe(true);
+    player.music('game:match');
+    player.cue('click');
+    await settle();
+    expect(context.sources).toHaveLength(3);
+    context.advance(100, false);
+    player.configure({ ...enabled, musicVolume: 0, effectsVolume: 0 }, true);
+    player.configure({ ...enabled, musicVolume: 0.6, effectsVolume: 0.2 }, true);
+    player.music('game:match');
+    await settle();
+    const resumed = required(context.sources[3]);
+    expect(sourceName(context, resumed)).toBe(audioUrl('music'));
+    expect(resumed.starts[0]).toBeCloseTo(3);
+    expect(required(context.sources[4]).startsAt - resumed.startsAt).toBeCloseTo(7);
+    expect(required(context.gains[3]).gain.value).toBeCloseTo(AUDIO.music[1] * 0.6);
+    expect(required(context.gains[4]).gain.value).toBeCloseTo(AUDIO.musicExplorer[1] * 0.6);
+    player.cue('click');
+    await settle();
+    expect(required(context.gains[5]).gain.value).toBeCloseTo(AUDIO.click[1] * 0.2);
+  } finally {
+    player.destroy();
+  }
 });

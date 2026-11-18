@@ -1,10 +1,20 @@
 # Game audio
 
-The header has two independent toggle buttons: **Звуковые эффекты** (sound effects)
-and **Фоновая музыка** (background music). Both default to enabled. Their pressed state
-indicates whether the channel is enabled; the tooltip describes the next action.
-Preferences are saved in this browser under `geoaissr.audio.v1`. When browser
-storage is unavailable, the buttons still work for the current tab.
+The header's **Звуковые эффекты** (sound effects) and **Фоновая музыка** (background
+music) buttons open independent volume panels. Each has a 0–100% slider, minus
+and plus buttons in five-percentage-point steps, and a mute button. Escape closes
+the panel and returns focus to its button; clicking outside also closes it.
+
+Both channels default to enabled. Effects start at 100%; music starts at 85%,
+15% below its previous level. Choosing a different volume applies it immediately
+to sounding and queued sources without restarting music. Muting retains the
+selected volume. Setting zero silences the channel; increasing its volume enables
+it, and unmuting from zero restores that channel's default.
+
+Preferences are saved in this browser under `geoaissr.audio.v1`. Existing boolean
+preferences retain their mute choices and receive the new default volumes.
+Explicitly saved volumes are restored as chosen, without another 15% reduction.
+When browser storage is unavailable, controls still work for the current tab.
 
 Audio activates after a pointer or keyboard interaction. A restored game can
 therefore remain silent until the first interaction. Hidden tabs, disconnected
@@ -15,8 +25,8 @@ Sound failures never block joining, placing a marker or submitting an answer.
 ## Event mapping
 
 The files in `web/public/audio/` are copied unchanged from the owner's
-`sound-llm` project. Event names below are exact OGG basenames. Linear gain is
-applied independently to each source.
+`sound-llm` project. Event names below are exact OGG basenames. The table lists
+each recording's base gain, multiplied by the selected effects volume.
 
 | File                              | Event                                                                   | Duration | Gain |
 | --------------------------------- | ----------------------------------------------------------------------- | -------- | ---- |
@@ -60,7 +70,8 @@ produced by the accepted phase change.
 
 ## Continuous background music
 
-All seven current loops are included in the gameplay queue, at linear gain 0.18:
+All seven current loops are included in the gameplay queue, at base linear gain
+0.18. The default music volume of 85% gives an effective gain of 0.153:
 
 | Queue position | File                       | Duration | Character                            |
 | -------------- | -------------------------- | -------- | ------------------------------------ |
@@ -73,8 +84,9 @@ All seven current loops are included in the gameplay queue, at linear gain 0.18:
 | 7              | `round-loop-countdown.ogg` | 45.71 s  | Bass ticks and growing timer tension |
 
 In the lobby, only the original `round-loop-suspense.ogg` repeats as a native
-audio loop. Its drone, heartbeat and quiet ticks play at a reduced gain of 0.117
-while players join and configure the match. The same background-music control
+audio loop. Its drone, heartbeat and quiet ticks use a quieter base gain of 0.117,
+or 0.09945 at the default music volume, while players join and configure the match.
+The same background-music control
 applies in both lobby and gameplay.
 
 A match starts the queue with suspense during the first round's loading. Every

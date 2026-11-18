@@ -1,10 +1,41 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { ServerMessage } from '../../shared/protocol';
-import { AUDIO, MUSIC_PLAYLIST } from '../src/lib/audio-catalog';
+import { AUDIO, MUSIC_PLAYLIST, type AudioKind } from '../src/lib/audio-catalog';
 import { observeAudio, trace, type AudioStart, type AudioTrace } from './audio-observer';
 import { assertNoHorizontalOverflow, startIsolatedFakeServer } from './helpers';
 
 // Value: protects=packaged audio decodes and follows actual game and browser lifecycle; fails_when=files fail to decode or events/mutes/reconnect route incorrect sources; why_new=existing browser tests had no audio assertions; seam=none; no_claim=native headless graphs cannot judge subjective loudness; visibility events are synthetic boundary events.
+
+function audioControls(page: Page, kind: AudioKind) {
+  const title = kind === 'music' ? 'Фоновая музыка' : 'Звуковые эффекты';
+  const channel = kind === 'music' ? 'музыки' : 'звуковых эффектов';
+  const action = kind === 'music' ? 'музыку' : 'звуковые эффекты';
+  const panel = page.getByRole('region', { name: `Громкость ${channel}` });
+  return {
+    trigger: page.getByRole('button', { name: title, exact: true }),
+    panel,
+    slider: panel.getByRole('slider', { name: `Громкость ${channel}` }),
+    decrease: panel.getByRole('button', { name: `Уменьшить громкость ${channel}` }),
+    increase: panel.getByRole('button', { name: `Увеличить громкость ${channel}` }),
+    mute: panel.getByRole('button', { name: `Выключить ${action}` }),
+    unmute: panel.getByRole('button', { name: `Включить ${action}` }),
+  };
+}
+
+async function openAudioControls(page: Page, kind: AudioKind) {
+  const controls = audioControls(page, kind);
+  await controls.trigger.click();
+  await expect(controls.trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(controls.slider).toBeVisible();
+  return controls;
+}
+
+async function setMuted(page: Page, kind: AudioKind, muted: boolean): Promise<void> {
+  const controls = await openAudioControls(page, kind);
+  await (muted ? controls.mute : controls.unmute).click();
+  await expect(muted ? controls.unmute : controls.mute).toBeVisible();
+  await controls.trigger.click();
+}
 
 async function join(page: Page, url: string): Promise<void> {
   await page.goto(url);
@@ -94,8 +125,8 @@ test('native audio follows the round and mute controls', async ({ page }) => {
     expect((await trace(page)).starts).toEqual([]);
     await page.getByLabel('Ваше имя').fill('Оля');
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
-    await page.getByRole('button', { name: 'Звуковые эффекты' }).click();
-    await page.getByRole('button', { name: 'Звуковые эффекты' }).click();
+    await setMuted(page, 'effects', true);
+    await setMuted(page, 'effects', false);
     const lobby = await started(page, 'round-loop-suspense');
     await startRound(page);
     for (const sound of ['loading-round', 'soft-countdown', 'effect-new-round']) {
@@ -108,7 +139,7 @@ test('native audio follows the round and mute controls', async ({ page }) => {
       .locator('canvas')
       .click({ position: { x: 100, y: 100 } });
     await started(page, 'place-guess-land');
-    await page.getByRole('button', { name: 'Звуковые эффекты' }).click();
+    await setMuted(page, 'effects', true);
     await expect
       .poll(async () =>
         Object.values((await trace(page)).live).every((url) =>
@@ -119,9 +150,9 @@ test('native audio follows the round and mute controls', async ({ page }) => {
     expect(Object.values((await trace(page)).live)).toContainEqual(
       expect.stringContaining('round-loop-suspense'),
     );
-    await page.getByRole('button', { name: 'Фоновая музыка' }).click();
+    await setMuted(page, 'music', true);
     await expect.poll(async () => Object.keys((await trace(page)).live).length).toBe(0);
-    await page.getByRole('button', { name: 'Звуковые эффекты' }).click();
+    await setMuted(page, 'effects', false);
     await page.getByRole('button', { name: 'Угадать' }).click();
     await expect(page.getByRole('button', { name: 'К итогам' })).toBeVisible({ timeout: 12_000 });
     await started(page, 'effect-guess-locked');
@@ -224,7 +255,7 @@ async function expectColdLobbyMusic(page: Page, requests: string[]): Promise<Aud
   const events = await trace(page);
   expect(events.starts.filter((source) => source.loop)).toEqual([lobby]);
   expect(events.live[lobby.id]).toBe(lobby.url);
-  expect(lobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65, 4);
+  expect(lobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65 * 0.85, 4);
   expectNoExplicitStop(events, lobby);
   expect(requests).toEqual(['/audio/round-loop-suspense.ogg']);
   return lobby;
@@ -248,6 +279,8 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
     const lobby = await expectColdLobbyMusic(page, requests);
 
     await start.click();
+    await expect(page.getByText('Загружаем панораму…')).toBeVisible();
+    const musicControls = await openAudioControls(page, 'music');
     await expect
       .poll(async () => {
         const events = await trace(page);
@@ -262,7 +295,7 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
     expect(playback.live[lobby.id]).toBeUndefined();
     const heard = matchMusic(audibleStarts(playback), lobby).slice(0, count);
     expect(heard.map(({ url }) => url.split('/').pop())).toEqual([...order, order[0]]);
-    expect(heard[0]?.gain).toBeCloseTo(AUDIO.music[1], 4);
+    expect(heard[0]?.gain).toBeCloseTo(AUDIO.music[1] * 0.85, 4);
     for (const [index, source] of heard.slice(0, -1).entries()) {
       const next = heard[index + 1];
       if (!next) throw new Error(`Missing successor for ${source.url}`);
@@ -272,7 +305,7 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
       expect(playback.ended[source.id]).toBeGreaterThanOrEqual(next.at);
     }
 
-    await page.getByRole('button', { name: 'Фоновая музыка' }).click();
+    await musicControls.mute.click();
     const muted = await trace(page);
     const scheduled = matchMusic(muted.starts, lobby);
     const cancelled = scheduled.filter((source) =>
@@ -356,28 +389,158 @@ test('timer finale and music continue through client zero and round results', as
   }
 });
 
-test('mute preferences persist and controls fit the header', async ({ page }) => {
+async function expectGain(page: Page, source: AudioStart, gain: number): Promise<void> {
+  await expect.poll(async () => (await trace(page)).gains[source.id]).toBeCloseTo(gain, 4);
+}
+
+// Value: protects=per-channel live gain changes including scheduled music, with source identity preserved; fails_when=volume is delayed until playback restarts, queued music keeps old gain, or a control changes the other channel; why_new=earlier tests covered mute only; seam=none; no_claim=headless checks measure native graph gain rather than perceived loudness.
+test('volume controls update current and queued Web Audio sources without restarting', async ({
+  page,
+}) => {
+  const server = await startIsolatedFakeServer({ rounds: 1 });
+  try {
+    await observeAudio(page);
+    await join(page, server.hostUrl);
+    const lobby = await started(page, 'round-loop-suspense');
+    expect(lobby.gain).toBeCloseTo(0.117 * 0.85, 4);
+    await page.getByRole('button', { name: 'Начать', exact: true }).click();
+    await expect(page.getByText('Загружаем панораму…')).toBeVisible();
+    const loading = await started(page, 'loading-round');
+    const music = await matchSuspense(page, lobby);
+    let queued: AudioStart | undefined;
+    await expect
+      .poll(async () => {
+        const events = await trace(page);
+        queued = events.starts.find(
+          (source) => source.url.endsWith('/round-loop-explorer.ogg') && source.at > events.now,
+        );
+        return queued !== undefined;
+      })
+      .toBe(true);
+    if (!queued) throw new Error('Missing scheduled music source');
+    for (const source of [music, queued]) expect(source.gain).toBeCloseTo(0.18 * 0.85, 4);
+
+    const musicControls = await openAudioControls(page, 'music');
+    await expect(musicControls.slider).toHaveValue('85');
+    await musicControls.decrease.click();
+    await expect(musicControls.slider).toHaveValue('80');
+    await expect(musicControls.panel.getByText('80%', { exact: true })).toBeVisible();
+    for (const source of [music, queued]) await expectGain(page, source, 0.18 * 0.8);
+    await expectGain(page, loading, AUDIO.loading[1]);
+
+    await musicControls.slider.press('End');
+    await expect(musicControls.slider).toHaveValue('100');
+    for (const source of [music, queued]) await expectGain(page, source, 0.18);
+    await musicControls.trigger.click();
+
+    const effects = await openAudioControls(page, 'effects');
+    await expect(effects.slider).toHaveValue('100');
+    await effects.decrease.click();
+    await expect(effects.slider).toHaveValue('95');
+    await expectGain(page, loading, AUDIO.loading[1] * 0.95);
+    for (const source of [music, queued]) await expectGain(page, source, 0.18);
+    const result = await trace(page);
+    expect(result.live[loading.id]).toBe(loading.url);
+    expect(result.live[music.id]).toBe(music.url);
+    expect(matchMusic(result.starts, lobby)).toEqual([music, queued]);
+    expect(result.starts.filter((source) => source.url === loading.url)).toEqual([loading]);
+    expect(result.errors).toEqual([]);
+  } finally {
+    await server.stop();
+  }
+});
+
+async function expectFitsHorizontally(control: Locator, width: number): Promise<void> {
+  await expect(control).toBeVisible();
+  const box = await control.boundingBox();
+  if (!box) throw new Error('Missing sound control bounds');
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(width);
+}
+
+test('mute and volume preferences persist and popovers fit the header', async ({ page }) => {
   const server = await startIsolatedFakeServer({ rounds: 1 });
   try {
     await join(page, server.hostUrl);
-    const effects = page.getByRole('button', { name: 'Звуковые эффекты' });
-    const music = page.getByRole('button', { name: 'Фоновая музыка' });
-    await effects.click();
-    await music.click();
+    const effects = await openAudioControls(page, 'effects');
+    await effects.decrease.click();
+    await effects.mute.click();
+    await expect(effects.slider).toHaveValue('95');
+    await effects.trigger.click();
+    const music = await openAudioControls(page, 'music');
+    await music.decrease.click();
+    await music.mute.click();
+    await expect(music.slider).toHaveValue('80');
     await page.reload();
-    await expect(effects).toHaveAttribute('aria-pressed', 'false');
-    await expect(music).toHaveAttribute('aria-pressed', 'false');
+    await expect(effects.trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(music.trigger).toHaveAttribute('aria-expanded', 'false');
     for (const width of [375, 1280]) {
       await page.setViewportSize({ width, height: 720 });
-      for (const control of [effects, music]) {
-        await expect(control).toBeVisible();
-        const box = await control.boundingBox();
-        if (!box) throw new Error('Missing sound control bounds');
-        expect(box.x).toBeGreaterThanOrEqual(0);
-        expect(box.x + box.width).toBeLessThanOrEqual(width);
+      for (const [kind, value] of [
+        ['effects', '95'],
+        ['music', '80'],
+      ] as const) {
+        const control = await openAudioControls(page, kind);
+        await expectFitsHorizontally(control.trigger, width);
+        await expectFitsHorizontally(control.panel, width);
+        await expect(control.slider).toHaveValue(value);
+        await expect(control.slider).toBeFocused();
+        await expect(control.unmute).toBeVisible();
+        if (kind === 'music') {
+          await page.screenshot({ path: test.info().outputPath(`music-popover-${width}.png`) });
+        }
+        await page.keyboard.press('Escape');
+        await expect(control.trigger).toBeFocused();
+        await expect(control.trigger).toHaveAttribute('aria-expanded', 'false');
+        await expect(control.panel).toHaveCount(0);
       }
       await assertNoHorizontalOverflow(page);
     }
+    await openAudioControls(page, 'music');
+    await page.mouse.click(1, 1);
+    await expect(music.trigger).toHaveAttribute('aria-expanded', 'false');
+    await openAudioControls(page, 'music');
+    await music.increase.click();
+    await expect(music.slider).toHaveValue('85');
+    await expect(music.mute).toBeVisible();
+    await music.slider.press('Home');
+    await expect(music.slider).toHaveValue('0');
+    await music.unmute.click();
+    await expect(music.slider).toHaveValue('85');
+    await expect(music.mute).toBeVisible();
+  } finally {
+    await server.stop();
+  }
+});
+
+// Value: protects=legacy mute flag migration and unattenuated explicit saved music volume; fails_when=legacy settings reset a mute or a saved 100% still gets the 15% default reduction; why_new=existing persistence checks exercised only values saved by the current UI; seam=seeded legacy local storage; no_claim=headless checks measure native graph gain rather than perceived loudness.
+test('legacy preferences default music to 85% and saved 100% restores original gain', async ({
+  page,
+}) => {
+  const server = await startIsolatedFakeServer({ rounds: 1 });
+  try {
+    await page.addInitScript(() => {
+      const key = 'geoaissr.audio.v1';
+      if (localStorage.getItem(key) === null) {
+        localStorage.setItem(key, JSON.stringify({ music: true, effects: false }));
+      }
+    });
+    await observeAudio(page);
+    await join(page, server.hostUrl);
+    const effects = await openAudioControls(page, 'effects');
+    await expect(effects.slider).toHaveValue('100');
+    await expect(effects.unmute).toBeVisible();
+    await effects.trigger.click();
+    const music = await openAudioControls(page, 'music');
+    await expect(music.slider).toHaveValue('85');
+    await expect(music.mute).toBeVisible();
+    await music.slider.press('End');
+    await expect(music.slider).toHaveValue('100');
+    await page.reload();
+    await openAudioControls(page, 'music');
+    await expect(music.slider).toHaveValue('100');
+    const lobby = await started(page, 'round-loop-suspense');
+    expect(lobby.gain).toBeCloseTo(0.117, 4);
   } finally {
     await server.stop();
   }
@@ -473,7 +636,7 @@ test('hidden and reconnecting games stop audio and resume only current music', a
     await page.getByRole('button', { name: 'Ещё раз' }).click();
     const returnLobby = await started(page, 'round-loop-suspense', lastMatchSourceId);
     expect((await trace(page)).live[returnLobby.id]).toBe(returnLobby.url);
-    expect(returnLobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65, 4);
+    expect(returnLobby.gain).toBeCloseTo(AUDIO.music[1] * 0.65 * 0.85, 4);
     expect((await trace(page)).errors).toEqual([]);
   } finally {
     await server.stop();

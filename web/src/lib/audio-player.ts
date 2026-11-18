@@ -1,6 +1,7 @@
 import {
   AUDIO,
   audioUrl,
+  DEFAULT_AUDIO_PREFERENCES,
   isMusic,
   LOBBY_MUSIC,
   MUSIC_PLAYLIST,
@@ -23,7 +24,7 @@ export class AudioPlayer implements AudioOutput {
   private readonly buffers = new Map<SoundId, Promise<AudioBuffer>>();
   private readonly playing = new Map<string, Playing>();
   private readonly abort = new AbortController();
-  private preferences: AudioPreferences = { effects: true, music: true };
+  private preferences: AudioPreferences = { ...DEFAULT_AUDIO_PREFERENCES };
   private active = false;
   private destroyed = false;
   private sequence: MusicSequence | null = null;
@@ -44,9 +45,11 @@ export class AudioPlayer implements AudioOutput {
   configure(preferences: AudioPreferences, active: boolean): void {
     this.preferences = preferences;
     this.active = active && !this.destroyed;
-    if (!this.active || !preferences.music) this.sequence?.pause();
+    this.sequence?.setVolume(preferences.musicVolume);
+    if (!this.allowed('music')) this.sequence?.pause();
     for (const [channel, playing] of this.playing) {
       if (!this.allowed(playing.id)) this.stop(channel);
+      else this.updateGain(playing);
     }
   }
 
@@ -58,6 +61,7 @@ export class AudioPlayer implements AudioOutput {
     const context = this.context;
     if (!this.allowed('music') || context?.state !== 'running') return;
     this.sequence ??= new MusicSequence(context, (id) => this.loadMusic(id));
+    this.sequence.setVolume(this.preferences.musicVolume);
     this.sequence.play(key, lobby);
   }
 
@@ -98,7 +102,19 @@ export class AudioPlayer implements AudioOutput {
   }
 
   private allowed(id: SoundId): boolean {
-    return this.active && (isMusic(id) ? this.preferences.music : this.preferences.effects);
+    const kind = isMusic(id) ? 'music' : 'effects';
+    return this.active && this.preferences[kind] && this.preferences[`${kind}Volume`] > 0;
+  }
+
+  private updateGain(playing: Playing): void {
+    if (playing.previous) this.updateGain(playing.previous);
+    if (playing.gain) playing.gain.gain.value = this.gainFor(playing.id);
+  }
+
+  private gainFor(id: SoundId): number {
+    return (
+      AUDIO[id][1] * (isMusic(id) ? this.preferences.musicVolume : this.preferences.effectsVolume)
+    );
   }
 
   private loadMusic(id: SoundId): Promise<AudioBuffer> {
@@ -181,7 +197,7 @@ export class AudioPlayer implements AudioOutput {
     const gain = context.createGain();
     source.buffer = buffer;
     source.loop = loop;
-    gain.gain.value = AUDIO[playing.id][1];
+    gain.gain.value = this.gainFor(playing.id);
     source.connect(gain).connect(context.destination);
     playing.source = source;
     playing.gain = gain;
@@ -212,6 +228,7 @@ class MusicSequence {
   private key: string | null = null;
   private ids: readonly SoundId[] = MUSIC_PLAYLIST;
   private scale = 1;
+  private volume = DEFAULT_AUDIO_PREFERENCES.musicVolume;
   private running = false;
   private generation = 0;
   private index = 0;
@@ -224,6 +241,14 @@ class MusicSequence {
     private readonly context: AudioContext,
     private readonly load: (id: SoundId) => Promise<AudioBuffer>,
   ) {}
+
+  setVolume(volume: number): void {
+    if (this.volume === volume) return;
+    this.volume = volume;
+    for (const track of [this.current, this.next]) {
+      if (track) track.gain.gain.value = AUDIO[this.id(track.index)][1] * this.scale * volume;
+    }
+  }
 
   play(key: string, lobby: boolean): void {
     if (key !== this.key) {
@@ -335,7 +360,7 @@ class MusicSequence {
     const gain = this.context.createGain();
     source.buffer = buffer;
     source.loop = true;
-    gain.gain.value = AUDIO[this.id(index)][1] * this.scale;
+    gain.gain.value = AUDIO[this.id(index)][1] * this.scale * this.volume;
     source.connect(gain).connect(this.context.destination);
     source.start(startsAt, offset);
     return { index, source, gain, startsAt, offset, duration: buffer.duration };
