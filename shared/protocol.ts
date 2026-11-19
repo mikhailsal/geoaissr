@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { updateAudioPreferencesMessageSchema } from './audio-preferences.ts';
 import {
   BOT_NAME_MAX_LEN,
   DIFFICULTY_PRESETS,
@@ -18,20 +19,19 @@ import {
   type HarnessId,
   type RegionId,
 } from './storage-schemas.ts';
+import type { RoundCompletion } from './round-timing.ts';
 
+export { DIFFICULTY_PRESETS, HARNESS_IDS, botSlotConfigSchema };
+export { ROUND_INTRO_MS, COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS } from './round-timing.ts';
 export const MAX_WS_MESSAGE_BYTES = 16 * 1024;
 export const MAX_NICK_LEN = 20;
 export const MAX_HUMANS = 8;
 export const MAX_BOTS = 3;
-/** Pre-round countdown length; the client renders the live remainder from countdownStartsAt. */
-export const COUNTDOWN_MS = 3_000;
 export const MAX_WS_CONNECTIONS = 32;
 export const MAX_PENDING_AUTH_CONNECTIONS = 8;
 export const UNAUTH_TIMEOUT_MS = 5_000;
-export const PANO_LOAD_TIMEOUT_MS = 5_000;
 
 export type GamePhase = 'LOBBY' | 'ROUND_LOADING' | 'ROUND_ACTIVE' | 'ROUND_RESULTS' | 'FINAL';
-
 export type AckResult =
   'ok' | 'round_over' | 'already_confirmed' | 'not_in_round' | 'invalid' | 'forbidden';
 
@@ -196,6 +196,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   profileLoginMessageSchema,
   joinMessageSchema,
   updateProfileMessageSchema,
+  updateAudioPreferencesMessageSchema,
   resetBotWinsMessageSchema,
   pingMessageSchema,
   updateLobbyMessageSchema,
@@ -370,6 +371,9 @@ export interface ClientViewState {
   availableHarnesses: HarnessCatalogEntry[];
   loading?: {
     waitingFor: string[];
+    /** Server timestamp at which round loading began. */
+    startedLoadingAt: number;
+    /** Server timestamp at which the countdown begins, which can be in the future. */
     countdownStartsAt: number | null;
     countdownSeconds: number | null;
     prepError?: string;
@@ -388,6 +392,7 @@ export interface ClientViewState {
     botProgress: BotRoundProgressView[];
   };
   results?: {
+    completion?: RoundCompletion;
     targetLat: number;
     targetLng: number;
     countryNameRu: string;
@@ -492,5 +497,3 @@ export type ServerMessage =
       version: number;
       view: ClientViewState;
     };
-
-export { DIFFICULTY_PRESETS, HARNESS_IDS, botSlotConfigSchema };

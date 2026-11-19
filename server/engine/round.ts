@@ -1,5 +1,5 @@
 import { normalizeLongitude } from '../../shared/bot-tools.ts';
-import { COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS } from '../../shared/protocol.ts';
+import { COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS, ROUND_INTRO_MS } from '../../shared/protocol.ts';
 import { finishActiveRoundToResults } from './results.ts';
 import type {
   ActiveRoundState,
@@ -138,9 +138,10 @@ function maybeStartCountdown(state: RoomState, now: number, forceTimeout: boolea
   if (!areAllPlayingHumansPanoReady(state) && !timedOut) {
     return { state, effects: [] };
   }
+  const countdownStartsAt = Math.max(now, active.startedLoadingAt + ROUND_INTRO_MS);
   const nextActive: ActiveRoundState = {
     ...active,
-    countdownStartsAt: now,
+    countdownStartsAt,
   };
   return {
     state: { ...state, loadingOrActive: nextActive },
@@ -149,7 +150,7 @@ function maybeStartCountdown(state: RoomState, now: number, forceTimeout: boolea
         type: 'schedule_countdown',
         matchId: state.matchId,
         gen: state.gen,
-        atMs: now + COUNTDOWN_MS,
+        atMs: countdownStartsAt + COUNTDOWN_MS,
       },
     ],
   };

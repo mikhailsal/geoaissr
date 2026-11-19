@@ -2,6 +2,8 @@
   import { Check, Copy, MoreVertical } from '@lucide/svelte';
   import type { GamePhase } from '$shared/protocol';
   import { RU } from '../i18n/ru';
+  import SoundControls from './SoundControls.svelte';
+  import { audioPlayer } from '../lib/audio-settings.svelte';
 
   interface Props {
     fakeMode: boolean;
@@ -59,6 +61,7 @@
 <svelte:window onkeydown={handleWindowKeyDown} />
 
 <div class="host-menu-bar">
+  <SoundControls />
   {#if onOpenProfile}<button type="button" class="btn" onclick={onOpenProfile}>Профиль</button>{/if}
   {#if fakeMode}
     <span class="fake-pill">{RU.fakeModeBadge}</span>
@@ -84,6 +87,7 @@
         aria-label="Меню хоста"
         aria-expanded={menuOpen}
         onclick={() => {
+          audioPlayer.cue('click');
           menuOpen = !menuOpen;
           confirmEnd = false;
         }}
@@ -147,6 +151,7 @@
     align-items: center;
     gap: var(--sp-2);
     position: relative;
+    flex-wrap: wrap;
   }
 
   .fake-pill {
