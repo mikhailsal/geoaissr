@@ -93,7 +93,7 @@ function startWorker(): WorkerSlot {
         // Hardware WebGL shares one context. CPU rasterizers work independently by avatar.
         workerLimit =
           data.ready === 'software'
-            ? Math.max(1, Math.min(5, (navigator.hardwareConcurrency || 2) - 2))
+            ? Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 2) - 2))
             : 1;
         for (const [id, view] of views) send(id, view);
       }
