@@ -38,6 +38,7 @@ function projectPlayers(state: RoomState): PlayerView[] {
       id: p.id,
       name: p.name,
       color: p.color,
+      avatar: p.avatar,
       isHost: p.isHost,
       connected: p.connected,
       isSpectator: p.isSpectator,

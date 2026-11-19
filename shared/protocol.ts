@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import { avatarAppearanceSchema, type AvatarGesture, type AvatarAppearance } from './avatar.ts';
+import {
+  joinMessageSchema,
+  updateProfileMessageSchema,
+  avatarGestureMessageSchema,
+} from './profile-messages.ts';
+export { joinMessageSchema, updateProfileMessageSchema, MAX_NICK_LEN } from './profile-messages.ts';
 import {
   BOT_NAME_MAX_LEN,
   DIFFICULTY_PRESETS,
@@ -20,7 +27,7 @@ import {
 } from './storage-schemas.ts';
 
 export const MAX_WS_MESSAGE_BYTES = 16 * 1024;
-export const MAX_NICK_LEN = 20;
+
 export const MAX_HUMANS = 8;
 export const MAX_BOTS = 3;
 /** Pre-round countdown length; the client renders the live remainder from countdownStartsAt. */
@@ -50,17 +57,6 @@ export const helloMessageSchema = z.object({
   profileId: z.string().min(1).max(64).optional(),
 });
 
-export const joinMessageSchema = z.object({
-  type: z.literal('join'),
-  seq: z.number().int().nonnegative(),
-  nick: z.string().trim().min(1).max(MAX_NICK_LEN),
-  color: z.enum(PARTICIPANT_COLOR_IDS),
-  profileId: z.string().min(1).max(64).optional(),
-});
-
-export const updateProfileMessageSchema = joinMessageSchema
-  .omit({ profileId: true })
-  .extend({ type: z.literal('update_profile') });
 export const resetBotWinsMessageSchema = z.object({
   type: z.literal('reset_bot_wins'),
   seq: z.number().int().nonnegative(),
@@ -87,6 +83,7 @@ export const updateLobbyMessageSchema = z.object({
 });
 
 export const botSlotPatchSchema = z.object({
+  avatar: avatarAppearanceSchema.optional(),
   // Empty means "name the bot after its model".
   name: z
     .string()
@@ -196,6 +193,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   profileLoginMessageSchema,
   joinMessageSchema,
   updateProfileMessageSchema,
+  avatarGestureMessageSchema,
   resetBotWinsMessageSchema,
   pingMessageSchema,
   updateLobbyMessageSchema,
@@ -237,6 +235,7 @@ export interface LobbySummary {
 }
 
 export interface PlayerView {
+  avatar?: AvatarAppearance;
   wins6h: number;
   id: string;
   name: string;
@@ -428,6 +427,7 @@ export interface ProfileLoginError {
 export type ServerMessage =
   | ProfileLoginOk
   | ProfileLoginError
+  | { type: 'avatar_gesture'; serverNow: number; participantId: string; gesture: AvatarGesture }
   | {
       type: 'hello_ok';
       profile?: StoredProfile;

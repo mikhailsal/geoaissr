@@ -184,6 +184,8 @@
   {:else if view.phase === 'LOBBY'}
     <Lobby
       {view}
+      avatars={store.avatars}
+      connected={store.connectionState === 'connected'}
       onEditProfile={openProfile}
       onResetBotWins={(id: string) => {
         store.resetBotWins(id);
@@ -260,7 +262,7 @@
       pending={store.profile.pending}
       error={store.profile.error}
       onSave={(nick: string, color: ParticipantColorId) => {
-        store.updateProfile(nick, color);
+        store.profile.update(nick, color);
       }}
       onClose={closeProfile}
     />{/if}

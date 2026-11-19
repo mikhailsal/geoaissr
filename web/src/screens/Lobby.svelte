@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { ChevronDown, ChevronUp } from '@lucide/svelte';
+  import { tick } from 'svelte';
+  import { Settings2, Shirt } from '@lucide/svelte';
+  import { defaultAvatar, type AvatarAppearance } from '$shared/avatar';
+  import type { LobbyAvatars } from '../lib/lobby-avatars.svelte';
+  import AvatarWardrobe from '../components/AvatarWardrobe.svelte';
+  import BotSettingsDialog from '../components/BotSettingsDialog.svelte';
+  import LobbyStage from '../components/LobbyStage.svelte';
   import type { DifficultyPreset } from '$shared/bot-tools';
   import type { ParticipantColorId } from '$shared/colors';
   import type { ClientViewState } from '$shared/protocol';
@@ -13,6 +19,8 @@
 
   interface Props {
     view: ClientViewState;
+    avatars: LobbyAvatars;
+    connected: boolean;
     onEditProfile: (e: MouseEvent) => void;
     onResetBotWins: (id: string) => void;
     starting: boolean;
@@ -37,6 +45,8 @@
 
   let {
     view,
+    avatars,
+    connected,
     onEditProfile,
     onResetBotWins,
     starting,
@@ -55,6 +65,37 @@
 
   let expandedBotId = $state<string | null>(null);
 
+  let editing = $state<{ id: string; name: string; appearance: AvatarAppearance } | null>(null);
+  let savePending = $state(false);
+  let saveError = $state<string | null>(null);
+
+  let wardrobeTrigger: HTMLElement | null = null;
+  function closeWardrobe(): void {
+    editing = null;
+    void tick().then(() => {
+      if (!editing && wardrobeTrigger?.isConnected) wardrobeTrigger.focus();
+    });
+  }
+  function openWardrobe(id: string, event: MouseEvent): void {
+    const bot = view.bots.find((b) => b.id === id);
+    const person = bot ?? view.players.find((p) => p.id === id);
+    if (!person || (id !== view.viewerId && !(bot && view.viewerIsHost))) return;
+    wardrobeTrigger = event.currentTarget as HTMLElement;
+    saveError = null;
+    editing = { id, name: person.name, appearance: person.avatar ?? defaultAvatar(Boolean(bot)) };
+  }
+
+  async function saveWardrobe(appearance: AvatarAppearance): Promise<void> {
+    const participant = editing;
+    if (!participant || savePending) return;
+    savePending = true;
+    const error = await avatars.save(view, participant.id, appearance);
+    savePending = false;
+    if (editing !== participant) return;
+    saveError = error;
+    if (!error) closeWardrobe();
+  }
+
   const usedColors = $derived<ParticipantColorId[]>([
     ...view.players.map((p) => p.color),
     ...view.bots.map((b) => b.color),
@@ -65,19 +106,27 @@
 </script>
 
 <main class="lobby-page">
-  <header class="top-bar">
-    <h1 class="display-title brand">{RU.appName}</h1>
-    <HostMenu
-      onOpenProfile={onEditProfile}
-      fakeMode={view.fakeMode}
-      viewerIsHost={view.viewerIsHost}
-      phase={view.phase}
-      inviteUrl={view.tunnel.inviteUrl}
-      roundNumber={view.roundNumber}
-      totalRounds={view.totalRounds}
-      {onEndMatch}
-    />
-  </header>
+  <LobbyStage
+    {view}
+    {avatars}
+    {connected}
+    onEdit={(event: MouseEvent) => {
+      openWardrobe(view.viewerId, event);
+    }}
+  >
+    {#snippet menu()}
+      <HostMenu
+        onOpenProfile={onEditProfile}
+        fakeMode={view.fakeMode}
+        viewerIsHost={view.viewerIsHost}
+        phase={view.phase}
+        inviteUrl={view.tunnel.inviteUrl}
+        roundNumber={view.roundNumber}
+        totalRounds={view.totalRounds}
+        {onEndMatch}
+      />
+    {/snippet}
+  </LobbyStage>
 
   {#if view.tunnel.mode === 'local'}
     <!-- Inline, not in the fixed banner: a permanent notice must not cover header controls. -->
@@ -140,14 +189,7 @@
           {#each view.bots as bot (bot.id)}
             {@const open = expandedBotId === bot.id}
             <div class="bot-accordion" class:disabled-bot={!bot.enabled}>
-              <button
-                type="button"
-                class="bot-summary"
-                aria-expanded={open}
-                onclick={() => {
-                  expandedBotId = open ? null : bot.id;
-                }}
-              >
+              <div class="bot-summary">
                 <Avatar
                   wins6h={bot.wins6h}
                   name={bot.name}
@@ -159,44 +201,75 @@
                 <div class="bot-meta">
                   <span class="bot-title">{bot.name}</span>
                   <span class="bot-sub">
-                    {bot.harness} · {bot.model} · {PRESET_LABELS[bot.difficultyPreset]}
-                    {#if !bot.enabled}
-                      · выключен{/if}
+                    {bot.harness} · {bot.model} · {PRESET_LABELS[bot.difficultyPreset]}{bot.enabled
+                      ? ''
+                      : ' · выключен'}
                   </span>
                 </div>
-                {#if open}<ChevronUp size={18} />{:else}<ChevronDown size={18} />{/if}
-              </button>
+                {#if view.viewerIsHost}
+                  <button
+                    type="button"
+                    class="btn bot-action"
+                    aria-label={`Изменить аватар ${bot.name}`}
+                    title="Изменить аватар"
+                    disabled={!connected}
+                    onclick={(event) => {
+                      openWardrobe(bot.id, event);
+                    }}><Shirt size={18} /></button
+                  >
+                {/if}
+                <button
+                  type="button"
+                  class="btn bot-action"
+                  aria-label={`Настройки ${bot.name}`}
+                  title="Настройки ИИ"
+                  aria-haspopup="dialog"
+                  aria-expanded={open}
+                  onclick={() => {
+                    expandedBotId = open ? null : bot.id;
+                  }}
+                >
+                  <Settings2 size={18} />
+                </button>
+              </div>
 
               {#if open}
-                {#if view.viewerIsHost}<button
-                    type="button"
-                    class="btn"
-                    aria-label={`Сбросить победы ${bot.name}`}
-                    onclick={() => {
-                      onResetBotWins(bot.id);
-                    }}>Сбросить победы</button
-                  >{/if}
-                <BotSlotEditor
-                  slot={bot}
-                  availableHarnesses={view.availableHarnesses}
-                  {usedColors}
-                  isCheckingVision={checkingVisionBotId === bot.id}
-                  visionToast={visionToastByBot[bot.id]}
-                  isHost={view.viewerIsHost}
-                  onUpdate={(patch: Record<string, unknown>) => {
-                    onUpdateBot(bot.id, patch);
+                <BotSettingsDialog
+                  name={bot.name}
+                  onClose={() => {
+                    expandedBotId = null;
                   }}
-                  onApplyPreset={(preset: Exclude<DifficultyPreset, 'custom'>) => {
-                    onApplyBotPreset(bot.id, preset);
-                  }}
-                  onCheckVision={() => {
-                    onCheckBotVision(bot.id);
-                  }}
-                  onRemove={() => {
-                    if (expandedBotId === bot.id) expandedBotId = null;
-                    onRemoveBot(bot.id);
-                  }}
-                />
+                >
+                  {#if view.viewerIsHost}<button
+                      type="button"
+                      class="btn"
+                      aria-label={`Сбросить победы ${bot.name}`}
+                      onclick={() => {
+                        onResetBotWins(bot.id);
+                      }}>Сбросить победы</button
+                    >{/if}
+                  <BotSlotEditor
+                    config={bot}
+                    availableHarnesses={view.availableHarnesses}
+                    {usedColors}
+                    isCheckingVision={checkingVisionBotId === bot.id}
+                    visionToast={visionToastByBot[bot.id]}
+                    isHost={view.viewerIsHost}
+                    onUpdate={(patch: Record<string, unknown>) => {
+                      onUpdateBot(bot.id, patch);
+                    }}
+                    onApplyPreset={(preset: Exclude<DifficultyPreset, 'custom'>) => {
+                      onApplyBotPreset(bot.id, preset);
+                    }}
+                    onCheckVision={() => {
+                      onCheckBotVision(bot.id);
+                    }}
+                    onRemove={() => {
+                      if (expandedBotId === bot.id) expandedBotId = null;
+                      onRemoveBot(bot.id);
+                    }}
+                  />
+                </BotSettingsDialog>
               {/if}
             </div>
           {/each}
@@ -216,6 +289,19 @@
   </div>
 </main>
 
+{#if editing}
+  <AvatarWardrobe
+    appearance={editing.appearance}
+    name={editing.name}
+    pending={savePending}
+    error={saveError}
+    onSave={(appearance: AvatarAppearance) => {
+      void saveWardrobe(appearance);
+    }}
+    onClose={closeWardrobe}
+  />
+{/if}
+
 <style>
   .lobby-page {
     max-width: 1120px;
@@ -224,19 +310,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-  }
-
-  .top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    flex-wrap: wrap;
-  }
-
-  .brand {
-    font-size: 1.75rem;
-    color: var(--paint);
   }
 
   .columns {
@@ -351,10 +424,18 @@
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    cursor: pointer;
     text-align: left;
   }
 
+  .bot-action {
+    width: 44px;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .bot-title,
+  .bot-sub {
+    overflow-wrap: anywhere;
+  }
   .bot-meta {
     flex: 1;
     display: flex;

@@ -91,6 +91,8 @@ The [bot tool and accounting reference](docs/bot-tools.md) describes draft/final
 
 Your browser remembers your profile and permanent code and automatically signs you in on later visits. Names and colors may coincide with other participants. Use **«Профиль»** in the lobby or final results to edit your name and color; editing is unavailable during a match.
 
+In the lobby, choose a character and adjust its clothing, face, hair, accessories, and colors. Saving updates the shared stage and keeps the appearance with your permanent profile code, including when you sign in on another device. The host can dress each AI slot using the same wardrobe. Use the gesture controls to emote or spin in front of the other participants.
+
 The trophy beside each avatar counts wins from the last six hours. Only complete matches with exactly one first-place finisher count; ties and early finishes do not. Human wins follow the profile UUID, and AI wins follow the bot slot even after a rename. The host can reset an individual bot's count in the lobby or final results. Matches and reset timestamps persist on the server; a storage error is reported in the room.
 
 Browser storage remains origin-specific. On a new hostname, browser, or cleared site storage, enter your permanent profile code on the homepage to restore the same identity. See [Permanent profile codes](#permanent-profile-codes) for login, logout, and recovery details.

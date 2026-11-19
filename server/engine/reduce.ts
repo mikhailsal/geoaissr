@@ -186,17 +186,10 @@ function handleNextRound(
 
 function handlePlayerReconnectWithWake(
   state: RoomState,
-  playerId: string,
-  isHost: boolean,
+  event: Extract<EngineEvent, { type: 'player_reconnect' }>,
   now: number,
-  profileId?: string,
 ): ReduceOutput {
-  const joined = handlePlayerJoinOrReclaim(state, {
-    kind: 'reconnect',
-    playerId,
-    isHost,
-    profileId,
-  });
+  const joined = handlePlayerJoinOrReclaim(state, { kind: 'reconnect', ...event });
   if (joined.state.phase === 'ROUND_LOADING') {
     return maybeStartCountdown(joined.state, now, false);
   }
@@ -325,13 +318,7 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
     case 'player_join':
       return handlePlayerJoinOrReclaim(state, { kind: 'join', ...event });
     case 'player_reconnect':
-      return handlePlayerReconnectWithWake(
-        state,
-        event.playerId,
-        event.isHost,
-        now,
-        event.profileId,
-      );
+      return handlePlayerReconnectWithWake(state, event, now);
     case 'player_reclaim_nick':
       return handlePlayerJoinOrReclaim(state, { kind: 'reclaim', ...event });
     case 'player_disconnect':

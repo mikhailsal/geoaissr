@@ -1,3 +1,4 @@
+import { LobbyAvatars } from './lobby-avatars.svelte';
 import { GameCommands } from './game-commands';
 import type { ParticipantColorId } from '$shared/colors';
 import type {
@@ -69,6 +70,7 @@ export class GameStore extends GameCommands {
   private readonly clock = new ServerClock();
   private readonly wsClient: GeoWsClient;
   readonly profile: ProfileSession;
+  readonly avatars: LobbyAvatars;
   private backOnlineTimer: number | null = null;
   private clockTimer: number | null = null;
   private unsubMapsAuth: (() => void) | null = null;
@@ -82,6 +84,7 @@ export class GameStore extends GameCommands {
   constructor() {
     super();
     this.wsClient = new GeoWsClient(this.buildWsCallbacks());
+    this.avatars = new LobbyAvatars(this.wsClient);
     this.profile = new ProfileSession(this.wsClient);
   }
 
@@ -106,6 +109,7 @@ export class GameStore extends GameCommands {
 
   private handleAck(msg: Extract<ServerMessage, { type: 'ack' }>): void {
     const { seq } = msg;
+    this.avatars.onAck(msg);
     this.profile.onAck(msg);
     if (seq === this.submitGuessSeq) {
       this.submittingGuess = false;
@@ -186,11 +190,10 @@ export class GameStore extends GameCommands {
         this.joined = true;
         this.authState = 'ready';
       },
-      onJoinError: (msg) => {
-        this.applyJoinError(msg);
-      },
-      onAck: (msg) => {
-        this.handleAck(msg);
+      onJoinError: this.applyJoinError.bind(this),
+      onAck: this.handleAck.bind(this),
+      onAvatarGesture: (msg) => {
+        this.avatars.receive(msg);
       },
       onVisionCheckResult: (msg) => {
         if (this.checkingVisionBotId === msg.botId) this.checkingVisionBotId = null;
@@ -209,6 +212,7 @@ export class GameStore extends GameCommands {
   }
 
   private clearTransientPending(): void {
+    this.avatars.reset();
     this.profile.clearPending();
     this.joinPending = false;
     this.checkingVisionBotId = null;
@@ -273,6 +277,7 @@ export class GameStore extends GameCommands {
       this.startMatchPending = false;
       this.startMatchSeq = null;
     }
+    if (prevPhase === 'LOBBY' && prevPhase !== view.phase) this.avatars.reset();
     if (prevRound !== view.roundNumber || prevPhase !== view.phase) {
       if (view.phase !== 'ROUND_RESULTS') this.activeBotCard = null;
       if (view.phase !== 'ROUND_ACTIVE') {
@@ -421,10 +426,6 @@ export class GameStore extends GameCommands {
       this.joinPending = false;
       this.joinError = { code: 'offline', message: RU.join.serverUnreachable };
     }
-  }
-
-  updateProfile(nick: string, color: ParticipantColorId): void {
-    this.profile.update(nick, color);
   }
 
   checkBotVision(botId: string): void {

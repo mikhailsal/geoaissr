@@ -20,6 +20,11 @@
       "$shared/*": ["./shared/*"]
     }
   },
-  "include": ["web/src/**/*.ts", "web/src/**/*.svelte", "shared/**/*.ts"],
+  "include": [
+    "web/src/**/*.ts",
+    "web/src/**/*.svelte",
+    "shared/**/*.ts",
+    "vendor/orbit-rig/*.d.ts"
+  ],
   "exclude": ["**/*.test.ts"]
 }

@@ -8,3 +8,4 @@ TODOS.md
 shared/regions.data.json
 playwright-report/
 test-results/
+vendor/orbit-rig/*.js

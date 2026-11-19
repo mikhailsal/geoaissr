@@ -133,6 +133,7 @@ export function handleProfileLogin(
   if (seat)
     ctx.shell.dispatch({
       type: 'player_reconnect',
+      avatar: profile.avatar,
       playerId,
       isHost: profile.role === 'host',
       profileId: profile.profileId,
@@ -145,6 +146,7 @@ export function handleProfileLogin(
       profileId: profile.profileId,
       name: profile.nick,
       color: profile.color,
+      avatar: profile.avatar,
       isHost: profile.role === 'host',
     });
   finishAuthentication(ctx, ws, profile);
@@ -221,6 +223,7 @@ export function handleHelloMsg(
           profileId: authoritativeId,
           nick: existing.name,
           color: existing.color,
+          avatar: existing.avatar,
           role: ws.data.role,
         });
       } catch {
@@ -234,6 +237,7 @@ export function handleHelloMsg(
     closePreviousTabForPlayer(ctx, existing.id, ws);
     ctx.shell.dispatch({
       type: 'player_reconnect',
+      avatar: profile.avatar,
       playerId: existing.id,
       isHost: profile.role === 'host',
       profileId: profile.profileId,
@@ -299,6 +303,7 @@ export function handleJoinMsg(
       profileId: msg.profileId,
       nick,
       color: msg.color,
+      avatar: msg.avatar,
       role: ws.data.role ?? 'guest',
     });
   } catch {
@@ -317,6 +322,7 @@ export function handleJoinMsg(
     name: nick,
     profileId: profile.profileId,
     color: profile.color,
+    avatar: profile.avatar,
     isHost: profile.role === 'host',
   });
   ws.data.authenticated = true;
@@ -330,13 +336,19 @@ export function handleProfileEdit(
   msg: Extract<ClientMessage, { type: 'update_profile' }>,
   playerId: string,
 ): void {
-  const event = { type: 'update_profile' as const, playerId, nick: msg.nick, color: msg.color };
+  const event = {
+    type: 'update_profile' as const,
+    playerId,
+    nick: msg.nick,
+    color: msg.color,
+    avatar: msg.avatar,
+  };
   let result = handleProfileAction(ctx.shell.getState(), event, Date.now()).ack ?? 'ok';
   let message: string | undefined;
   if (result === 'ok') {
     try {
       if (!ws.data.profileId) throw new Error('Unavailable');
-      ctx.profiles.edit(ws.data.profileId, msg.nick.trim(), msg.color);
+      ctx.profiles.edit(ws.data.profileId, msg.nick.trim(), msg.color, msg.avatar);
       result = ctx.shell.dispatch(event) ?? 'ok';
     } catch {
       result = 'invalid';

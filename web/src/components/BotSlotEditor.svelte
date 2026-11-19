@@ -8,7 +8,7 @@
   import { EFFORT_LABELS, PERSONALITY_LABELS, PRESET_LABELS, RU } from '../i18n/ru';
 
   interface Props {
-    slot: BotSlotConfig;
+    config: BotSlotConfig;
     availableHarnesses: readonly HarnessCatalogEntry[];
     usedColors: readonly ParticipantColorId[];
     isCheckingVision: boolean;
@@ -21,7 +21,7 @@
   }
 
   let {
-    slot,
+    config: slot,
     availableHarnesses,
     usedColors,
     isCheckingVision,

@@ -1,3 +1,4 @@
+import { avatarAppearanceSchema } from './avatar.ts';
 import { z } from 'zod';
 import {
   BOT_NAME_MAX_LEN,
@@ -39,6 +40,7 @@ export type VisionCheckRecord = z.infer<typeof visionCheckRecordSchema>;
 export const botSlotIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
 export const botSlotConfigSchema = z.object({
+  avatar: avatarAppearanceSchema.optional(),
   id: botSlotIdSchema,
   name: z.string().trim().min(1).max(BOT_NAME_MAX_LEN),
   color: z.enum(PARTICIPANT_COLOR_IDS),
@@ -191,6 +193,7 @@ export function isValidImageSize(val: number): val is (typeof IMAGE_SIZES)[numbe
 }
 
 export const storedProfileSchema = z.object({
+  avatar: avatarAppearanceSchema.optional(),
   profileId: z.string().min(1).max(64),
   profileToken: z.string().regex(/^[0-9a-f]{32}$/),
   nick: z.string().trim().min(1).max(20),

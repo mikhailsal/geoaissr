@@ -7,6 +7,7 @@ import {
   handleProfileEdit,
 } from './ws-auth.ts';
 import type { ServerWebSocket } from 'bun';
+import { relayAvatarGesture } from './avatar-gestures.ts';
 import {
   MAX_WS_MESSAGE_BYTES,
   clientMessageSchema,
@@ -30,6 +31,7 @@ import {
 
 export interface WsClientData {
   connId: string;
+  lastGestureAt?: number;
   ip: string;
   authenticated: boolean;
   role: 'host' | 'guest' | null;
@@ -143,7 +145,10 @@ function handleAuthenticatedAction(
     return;
   }
 
-  const mappedResult = dispatchEngineClientMessage(ctx.shell, playerId, msg);
+  const mappedResult =
+    msg.type === 'avatar_gesture'
+      ? relayAvatarGesture(ctx, ws, playerId, msg)
+      : dispatchEngineClientMessage(ctx.shell, playerId, msg);
   ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result: mappedResult });
   sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result: mappedResult });
 }

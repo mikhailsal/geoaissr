@@ -19,7 +19,15 @@ export function handleProfileAction(
     return {
       state: {
         ...state,
-        players: { ...state.players, [player.id]: { ...player, name, color: event.color } },
+        players: {
+          ...state.players,
+          [player.id]: {
+            ...player,
+            name,
+            color: event.color,
+            avatar: event.avatar ?? player.avatar,
+          },
+        },
       },
       effects: [],
       ack: 'ok',

@@ -7,6 +7,7 @@ import type {
   RoundResultEntryView,
   TunnelStatusView,
 } from '../../shared/protocol.ts';
+import type { AvatarAppearance } from '../../shared/avatar.ts';
 import type { LatLng } from '../../shared/score.ts';
 import type { BotAccounting, BotReasoning } from '../../shared/bot-results.ts';
 import type {
@@ -18,6 +19,7 @@ import type {
 } from '../../shared/storage-schemas.ts';
 
 export interface PlayerState {
+  avatar?: AvatarAppearance;
   profileId?: string;
   id: string;
   secret: string;
@@ -145,6 +147,7 @@ export interface RoomState {
 export type EngineEvent =
   | {
       type: 'player_join';
+      avatar?: AvatarAppearance;
       profileId?: string;
       playerId: string;
       secret: string;
@@ -152,7 +155,13 @@ export type EngineEvent =
       color: BotSlotConfig['color'];
       isHost: boolean;
     }
-  | { type: 'player_reconnect'; playerId: string; isHost: boolean; profileId?: string }
+  | {
+      type: 'player_reconnect';
+      playerId: string;
+      isHost: boolean;
+      profileId?: string;
+      avatar?: AvatarAppearance;
+    }
   | {
       type: 'player_reclaim_nick';
       profileId?: string;
@@ -162,7 +171,13 @@ export type EngineEvent =
       isHost?: boolean;
     }
   | { type: 'player_disconnect'; playerId: string }
-  | { type: 'update_profile'; playerId: string; nick: string; color: BotSlotConfig['color'] }
+  | {
+      type: 'update_profile';
+      playerId: string;
+      nick: string;
+      color: BotSlotConfig['color'];
+      avatar?: AvatarAppearance;
+    }
   | { type: 'reset_bot_wins'; playerId: string; botId: string }
   | {
       type: 'client_error';
