@@ -94,6 +94,9 @@
     background: var(--asphalt-800);
     color: var(--paper);
   }
+  button:focus-visible {
+    outline-offset: -3px;
+  }
   button span {
     min-width: 0;
   }

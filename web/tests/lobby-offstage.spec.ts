@@ -82,7 +82,17 @@ test('an off-page actor leaves a gesture notice until the viewer chooses to see 
       'laugh',
     );
     await expect(pager).toContainText('1 / 2');
-    await cue('Смеяться').focus();
+    const reveal = cue('Смеяться');
+    await reveal.focus();
+    await guest.keyboard.press('Shift+Tab');
+    await guest.keyboard.press('Tab');
+    await expect(reveal).toBeFocused();
+    const strip = guest.locator('[aria-live="polite"]').filter({ has: reveal });
+    const focused = await strip.screenshot();
+    const withoutRing = await strip.screenshot({
+      style: ':focus-visible { outline-color: transparent !important; }',
+    });
+    expect(focused.equals(withoutRing), 'The gesture notice must show keyboard focus').toBe(false);
     await guest.keyboard.press('Enter');
     await expect(pager).toContainText('2 / 2');
     await expect(card).toBeVisible();
