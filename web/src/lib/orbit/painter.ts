@@ -2,7 +2,6 @@ import { createAvatar, type OrbitRig } from '@geoaissr/orbit-rig';
 import { Rasterizer } from '@geoaissr/orbit-rig/raster';
 import {
   ACESFilmicToneMapping,
-  Box3,
   DirectionalLight,
   HemisphereLight,
   OrthographicCamera,
@@ -11,8 +10,9 @@ import {
 } from 'three';
 import { addRobotDetails } from './robot';
 import { IdleFrames } from './idle-frames';
-import { spinDuration, spinMotion } from './spin';
-import { gestureDuration, type StageState, type Surface } from './types';
+import { poseRig } from './pose';
+import { frameCamera, measureRig } from './framing';
+import type { StageState, Surface } from './types';
 
 export function buildRig(state: StageState) {
   const look = state.appearance;
@@ -24,37 +24,7 @@ export function buildRig(state: StageState) {
         }
       : undefined,
   );
-  const bounds = new Box3().setFromObject(rig.root);
-  return { rig, height: bounds.max.y - bounds.min.y, bottom: bounds.min.y };
-}
-
-function poseRig(rig: OrbitRig, state: StageState, now: number, seconds: number): void {
-  const gesture = state.gesture;
-  const duration =
-    gesture?.kind === 'spin' ? spinDuration(gesture) : gesture ? gestureDuration[gesture.kind] : 1;
-  const progress = gesture && Math.max(0, (now - gesture.at) / duration);
-  const active = gesture !== null && progress !== null && progress < 1;
-  const pose = active && state.reduced ? 0.45 : (progress ?? 0);
-  const spin = active && gesture.kind === 'spin' ? spinMotion(gesture, now) : undefined;
-  rig.root.rotation.y = state.yaw + (state.reduced ? 0 : (spin?.angle ?? 0));
-  const expression = {
-    gazeX: state.gazeX,
-    gazeY: state.gazeY,
-    ...(active
-      ? {
-          gesture: gesture.kind,
-          progress: pose,
-          spinDrive: state.reduced ? 0.6 : spin?.drive,
-          spinWindup: state.reduced ? 0 : spin?.windup,
-        }
-      : {}),
-  };
-  // A still pose has no subsequent frames for the Studio animator to ease toward it.
-  if (state.reduced) {
-    seconds = 1.9 + (active ? (pose * duration) / 1000 : 0);
-    rig.update(seconds - 1, expression);
-  }
-  rig.update(seconds, expression);
+  return { rig, ...measureRig(rig) };
 }
 
 function lighting(scene: Scene): void {
@@ -142,16 +112,7 @@ export class Painter {
     const w = Math.max(1, Math.round(state.width * scale));
     const h = Math.max(1, Math.round(state.height * scale));
     const aspect = w / h;
-    const span = Math.max(model.height * 1.13, 2.6 / aspect);
-    // Anchor feet to the CSS plinth, even in narrow cards and for petite builds.
-    const focus = model.bottom + span * 0.45;
-    this.camera.left = -span * aspect * 0.5;
-    this.camera.right = -this.camera.left;
-    this.camera.top = span * 0.5;
-    this.camera.bottom = -this.camera.top;
-    this.camera.position.set(0, focus + 1.03, 9.3);
-    this.camera.lookAt(0, focus, 0);
-    this.camera.updateProjectionMatrix();
+    frameCamera(this.camera, model, aspect);
     if (this.renderer) {
       poseRig(model.rig, state, now, seconds);
       if (this.surface.width !== w || this.surface.height !== h) this.renderer.setSize(w, h, false);

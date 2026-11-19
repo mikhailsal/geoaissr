@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+
+  let { onCover }: { onCover: (covered: boolean) => void } = $props();
 
   let anchor: HTMLSpanElement;
   let ready = $state(0);
@@ -8,6 +10,26 @@
   let slow = $state(false);
   let dismissed = $state(false);
   const message = $derived(loading && !dismissed);
+
+  function isolate(cover: HTMLElement) {
+    const scene = cover.closest('section');
+    const previous = document.activeElement;
+    onCover(true);
+    if (!document.querySelector('dialog:modal')) cover.focus({ preventScroll: true });
+    return {
+      destroy() {
+        onCover(false);
+        void tick().then(() => {
+          if (!scene?.isConnected || document.activeElement !== document.body) return;
+          const target =
+            previous instanceof HTMLElement && previous !== document.body && previous.isConnected
+              ? previous
+              : scene.querySelector<HTMLElement>('button:enabled');
+          target?.focus({ preventScroll: true });
+        });
+      },
+    };
+  }
 
   onMount(() => {
     const lineup = anchor.parentElement;
@@ -52,7 +74,13 @@
 
 <span hidden bind:this={anchor}></span>
 {#if message}
-  <div class="loading-screen">
+  <div
+    class="loading-screen"
+    use:isolate
+    tabindex="-1"
+    role="group"
+    aria-label="Загрузка персонажей"
+  >
     <div role="status">
       <span class="orbit" aria-hidden="true"></span>
       <strong>Загружаем персонажей</strong>

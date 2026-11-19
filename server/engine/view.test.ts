@@ -487,7 +487,7 @@ test('completed match wins wait for persistence and failures leave counts unchan
       onStateChange: (state) => {
         if (state.matchWriteError || state.wins6h.byProfileId.stable) resultReady();
       },
-      saveSettings: () => Promise.resolve(),
+      saveSettings: () => {},
       confirmQuotaReset: () => Promise.resolve(s.quotaSummary),
       prepareRound: () => Promise.reject(new Error('unused')),
       startBotProcesses: () => {},

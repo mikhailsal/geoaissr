@@ -4,10 +4,20 @@ import { PARTICIPANT_COLOR_IDS } from './colors.ts';
 
 export const MAX_NICK_LEN = 20;
 
+export const helloMessageSchema = z.object({
+  type: z.literal('hello'),
+  expectedRole: z.literal('host').optional(),
+  token: z.string().min(1).max(128),
+  playerId: z.string().min(1).max(64).optional(),
+  playerSecret: z.string().min(1).max(128).optional(),
+  profileId: z.string().min(1).max(64).optional(),
+});
+
 export const profileLoginMessageSchema = z
   .object({
     type: z.literal('profile_login'),
     profileToken: z.string().max(64),
+    expectedRole: z.literal('host').optional(),
   })
   .strict();
 

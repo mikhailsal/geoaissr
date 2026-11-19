@@ -110,7 +110,7 @@ function makePortTestShell() {
       availableHarnesses: [],
     }),
     {
-      saveSettings: () => Promise.resolve(),
+      saveSettings: () => {},
       confirmQuotaReset: () => Promise.resolve(quotaSummary),
       prepareRound: () => Promise.reject(new Error('unused')),
       startBotProcesses: () => undefined,

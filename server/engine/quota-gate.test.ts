@@ -63,7 +63,7 @@ test('confirm_quota_reset keeps the start gate closed until the reset is persist
 test('start_match re-reads live quota instead of the cached lobby summary', () => {
   let live = makeSummary();
   const shell = createRoomShell(makeLobby(makeSummary()), {
-    saveSettings: () => Promise.resolve(),
+    saveSettings: () => {},
     confirmQuotaReset: () => Promise.resolve(live),
     recalculateQuotaSummary: () => live,
     prepareRound: () => new Promise(() => undefined),

@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { Settings2, Play, ChevronLeft, ChevronRight, Shirt, UsersRound } from '@lucide/svelte';
+  import { Settings2, Play, Shirt, UsersRound } from '@lucide/svelte';
   import type { Snippet } from 'svelte';
   import { defaultAvatar, type AvatarGesture } from '$shared/avatar';
   import type { ClientViewState } from '$shared/protocol';
   import { RU } from '../i18n/ru';
   import type { LobbyAvatars } from '../lib/lobby-avatars.svelte';
+  import OffstageGestures from './OffstageGestures.svelte';
+  import StagePager from './StagePager.svelte';
   import StageLoading from './StageLoading.svelte';
   import LobbyGestures from './LobbyGestures.svelte';
   import LobbyPerformer from './LobbyPerformer.svelte';
@@ -34,6 +36,9 @@
   } = $props();
 
   let page = $state(0);
+  let covered = $state(false);
+  let scene: HTMLElement;
+  let revealId = $state<string | null>(null);
   let actingBot = $state('');
   const human = defaultAvatar(false);
   const robot = defaultAvatar(true);
@@ -70,6 +75,18 @@
   const partySize = $derived(view.players.length + view.bots.filter((b) => b.enabled).length);
   const actor = $derived(view.viewerIsHost ? view.bots.find((b) => b.id === actingBot) : undefined);
 
+  function reveal(index: number): void {
+    revealId = others[index]?.id ?? null;
+    page = Math.floor(index / othersPerPage);
+  }
+  $effect(() => {
+    if (!revealId || covered) return;
+    const index = visible.findIndex((member) => member.id === revealId);
+    const performer = scene.querySelectorAll('article')[index];
+    performer?.querySelector('button')?.focus({ preventScroll: true });
+    revealId = null;
+  });
+
   function selectActor(id: string): void {
     actingBot = id;
     const index = others.findIndex((p) => p.id === id);
@@ -77,8 +94,8 @@
   }
 </script>
 
-<section class="scene" aria-label="Сцена лобби">
-  <header>
+<section bind:this={scene} class="scene" aria-label="Сцена лобби">
+  <header inert={covered}>
     <div class="room">
       <span class="eyebrow">Лобби</span>
       <h1>{RU.appName}</h1>
@@ -108,51 +125,45 @@
     <div class="menu">{@render menu()}</div>
   </header>
   <div class="lineup">
-    {#each visible as p, i (p.id)}
-      <LobbyPerformer
-        member={p}
-        position={i}
-        count={visible.length}
-        self={p.id === view.viewerId}
-        gesture={avatars.playing[p.id]}
-        onSpin={() => {
-          avatars.spin(p.id);
-        }}
-        manualYaw={avatars.yawById[p.id] ?? 0}
-        onTurn={(yaw: number, final: boolean) => {
-          avatars.turn(p.id, yaw, final);
-        }}
-        canSpin={connected}
-        onEdit={(event: MouseEvent) => {
-          onEdit(event, p.id, p.ai);
-        }}
-        editable={p.ai ? view.viewerIsHost : p.id === view.viewerId}
-      />
-    {/each}
-    <StageLoading />
-    <div class="profile-notice">{@render profileNotice()}</div>
+    <div inert={covered}>
+      {#each visible as p, i (p.id)}
+        <LobbyPerformer
+          member={p}
+          position={i}
+          count={visible.length}
+          self={p.id === view.viewerId}
+          gesture={avatars.playing[p.id]}
+          onSpin={() => {
+            avatars.spin(p.id);
+          }}
+          manualYaw={avatars.yawById[p.id] ?? 0}
+          onTurn={(yaw: number, final: boolean) => {
+            avatars.turn(p.id, yaw, final);
+          }}
+          canSpin={connected}
+          onEdit={(event: MouseEvent) => {
+            onEdit(event, p.id, p.ai);
+          }}
+          editable={p.ai ? view.viewerIsHost : p.id === view.viewerId}
+        />
+      {/each}
+    </div>
+    <StageLoading onCover={(value: boolean) => (covered = value)} />
+    <div class="profile-notice" inert={covered}>
+      {@render profileNotice()}
+    </div>
   </div>
-  <div class="deck">
+  <div class="deck" class:paged={pages > 1} inert={covered}>
     {#if pages > 1}
-      <nav class="paging" aria-label="Страницы сцены">
-        <button
-          class="page-btn"
-          aria-label="Предыдущие участники"
-          disabled={current === 0}
-          onclick={() => {
-            page = current - 1;
-          }}><ChevronLeft /></button
-        >
-        <span>{current + 1} / {pages}</span>
-        <button
-          class="page-btn"
-          aria-label="Следующие участники"
-          disabled={current + 1 === pages}
-          onclick={() => {
-            page = current + 1;
-          }}><ChevronRight /></button
-        >
-      </nav>
+      <StagePager {current} {pages} onChange={(next: number) => (page = next)} />
+      <OffstageGestures
+        members={others}
+        playing={avatars.playing}
+        page={current}
+        size={othersPerPage}
+        hasActorPicker={view.viewerIsHost && view.bots.length > 0}
+        onShow={reveal}
+      />
     {/if}
 
     <button
@@ -273,18 +284,6 @@
     position: relative;
     flex: 1 0 min(26dvh, 240px);
   }
-  .paging {
-    border: 1px solid var(--orbit-edge);
-    border-radius: var(--radius-sm);
-    color: var(--paper);
-    background: var(--orbit-plate);
-    display: flex;
-    width: fit-content;
-    align-items: center;
-    gap: 2px;
-    font-size: 0.85rem;
-  }
-  .page-btn,
   .actor,
   .wardrobe {
     background: var(--orbit-plate);
@@ -292,12 +291,6 @@
     color: var(--paper);
     cursor: pointer;
     border-radius: var(--radius-md);
-  }
-  .page-btn {
-    display: grid;
-    place-content: center;
-    width: 44px;
-    border: 0;
   }
   .deck {
     align-items: center;
@@ -310,7 +303,6 @@
     flex-wrap: wrap;
     align-items: center;
   }
-  .page-btn:hover:enabled,
   .wardrobe:hover:enabled {
     background: var(--orbit-hover);
   }
@@ -332,6 +324,14 @@
       grid-template-columns: auto minmax(0, 1fr);
       grid-template-areas: 'wardrobe launch' 'paging actor' 'gestures gestures';
     }
+    .deck:has(.actor):has(:global(.cues > button)) {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-areas: 'wardrobe wardrobe actor actor launch launch' 'paging paging paging cue cue cue' 'gestures gestures gestures gestures gestures gestures';
+    }
+    .deck:has(:global(.cues > button)) .actor {
+      min-width: 0;
+      max-width: 100%;
+    }
     .wardrobe {
       grid-area: wardrobe;
       justify-self: start;
@@ -343,9 +343,6 @@
     .actor {
       grid-area: actor;
       justify-self: end;
-    }
-    .paging {
-      grid-area: paging;
     }
     .performance {
       display: contents;
@@ -361,7 +358,7 @@
     .room-actions {
       flex-wrap: nowrap;
     }
-    .deck:not(:has(.paging)) {
+    .deck:not(.paged) {
       grid-template-columns: minmax(0, 1fr) auto auto;
       grid-template-areas: 'wardrobe actor launch' 'gestures gestures gestures';
     }
@@ -483,15 +480,6 @@
     .actor {
       width: 100%;
       min-width: 0;
-    }
-    .paging {
-      gap: 0;
-      max-width: 100%;
-      font-size: 0.75rem;
-      white-space: nowrap;
-    }
-    .page-btn {
-      flex-shrink: 0;
     }
   }
 </style>

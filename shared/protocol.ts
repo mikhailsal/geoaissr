@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { updateAudioPreferencesMessageSchema } from './audio-preferences.ts';
 import { avatarAppearanceSchema, type AvatarGesture, type AvatarAppearance } from './avatar.ts';
 import {
+  helloMessageSchema,
   joinMessageSchema,
   profileLoginMessageSchema,
   updateProfileMessageSchema,
@@ -31,7 +32,12 @@ import {
 import type { RoundCompletion } from './round-timing.ts';
 
 export { DIFFICULTY_PRESETS, HARNESS_IDS, botSlotConfigSchema };
-export { joinMessageSchema, profileLoginMessageSchema, updateProfileMessageSchema };
+export {
+  helloMessageSchema,
+  joinMessageSchema,
+  profileLoginMessageSchema,
+  updateProfileMessageSchema,
+};
 export { MAX_NICK_LEN } from './profile-messages.ts';
 export { ROUND_INTRO_MS, COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS } from './round-timing.ts';
 export const MAX_WS_MESSAGE_BYTES = 16 * 1024;
@@ -45,14 +51,6 @@ export const UNAUTH_TIMEOUT_MS = 5_000;
 export type GamePhase = 'LOBBY' | 'ROUND_LOADING' | 'ROUND_ACTIVE' | 'ROUND_RESULTS' | 'FINAL';
 export type AckResult =
   'ok' | 'round_over' | 'already_confirmed' | 'not_in_round' | 'invalid' | 'forbidden';
-
-export const helloMessageSchema = z.object({
-  type: z.literal('hello'),
-  token: z.string().min(1).max(128),
-  playerId: z.string().min(1).max(64).optional(),
-  playerSecret: z.string().min(1).max(128).optional(),
-  profileId: z.string().min(1).max(64).optional(),
-});
 
 export const resetBotWinsMessageSchema = z.object({
   type: z.literal('reset_bot_wins'),
@@ -425,7 +423,7 @@ export interface ProfileLoginOk {
 export interface ProfileLoginError {
   type: 'profile_login_error';
   serverNow: number;
-  code: 'invalid_profile_token' | 'room_full' | 'profile_store_unavailable';
+  code: 'invalid_profile_token' | 'room_full' | 'profile_store_unavailable' | 'host_required';
   message: string;
 }
 export type ServerMessage =

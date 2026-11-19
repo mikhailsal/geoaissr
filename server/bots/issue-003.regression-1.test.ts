@@ -86,7 +86,7 @@ test('runner receives the effective round deadline budget without mutating setti
   state = reduce(state, { type: 'start_match', playerId: 'host' }, 3).state;
   let received = 0;
   const shell = createRoomShell(state, {
-    saveSettings: async () => {},
+    saveSettings: () => {},
     confirmQuotaReset: () => Promise.resolve(quota),
     prepareRound: () => new Promise(() => {}),
     startBotProcesses: ({ bots }) => {

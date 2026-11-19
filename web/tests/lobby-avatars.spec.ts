@@ -185,6 +185,37 @@ test('host and guest can retry their open personal wardrobe after the server res
   }
 });
 
+/** Observe pixels while the room gesture is active, including its first frame transition. */
+async function observeGestureFrames(page: Page, name: string, gesture: string) {
+  return card(page, name).evaluateHandle((element, kind) => {
+    const source = element.querySelector('canvas');
+    if (!source) throw new Error('Missing performer canvas');
+    const sample = document.createElement('canvas');
+    sample.width = 24;
+    sample.height = 36;
+    const context = sample.getContext('2d');
+    if (!context) throw new Error('Missing canvas context');
+    context.globalCompositeOperation = 'copy';
+    const snapshot = () => {
+      context.drawImage(source, 0, 0, sample.width, sample.height);
+      return sample.toDataURL();
+    };
+    const frames = new Set([snapshot()]);
+    let frame = 0;
+    function sampleFrame() {
+      if (element.getAttribute('data-gesture') !== kind) return;
+      frames.add(snapshot());
+      frame = requestAnimationFrame(sampleFrame);
+    }
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      if (element.getAttribute('data-gesture') === kind) sampleFrame();
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ['data-gesture'] });
+    return { frames, observer };
+  }, gesture);
+}
+
 test('a full turn reaches the other participant and clears after playback', async ({ browser }) => {
   const server = await startIsolatedFakeServer();
   const host = await browser.newPage();
@@ -195,12 +226,27 @@ test('a full turn reaches the other participant and clears after playback', asyn
     await expect(avatar(host, guestName).locator('canvas[data-avatar-renderer]')).toBeVisible();
     await guest.getByRole('button', { name: 'Помахать', exact: true }).click();
     await expect(avatar(host, guestName)).toHaveAttribute('data-avatar-gesture', 'wave');
+    const [normal, reduced] = await Promise.all([
+      observeGestureFrames(host, hostName, 'spin'),
+      observeGestureFrames(guest, hostName, 'spin'),
+    ]);
     await host.getByRole('button', { name: 'Поворот на 360°', exact: true }).click();
     await expect(card(guest, hostName)).toHaveAttribute('data-gesture', 'spin');
     await expect(card(guest, hostName).getByRole('status')).toContainText('Поворот на 360°');
-    await expect(avatar(guest, hostName).locator('canvas')).toHaveCSS('animation-name', 'none');
     await expect(card(guest, guestName)).not.toHaveAttribute('data-gesture', 'spin');
     await expect(card(guest, hostName)).not.toHaveAttribute('data-gesture', 'spin');
+    for (const [recording, moving] of [
+      [normal, true],
+      [reduced, false],
+    ] as const) {
+      const differentFrames = await recording.evaluate(({ frames, observer }) => {
+        observer.disconnect();
+        return frames.size;
+      });
+      await recording.dispose();
+      if (moving) expect(differentFrames).toBeGreaterThan(2);
+      else expect(differentFrames).toBe(2); // Idle plus the single held spin pose.
+    }
     await guest.getByRole('button', { name: 'Поворот на 360°', exact: true }).click();
     await expect(avatar(host, guestName)).toHaveAttribute('data-avatar-gesture', 'spin');
   } finally {

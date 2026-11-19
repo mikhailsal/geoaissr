@@ -319,12 +319,14 @@ export class GeoWsClient {
       this.disconnectedSince = null;
       this.callbacks.onSocketOpen();
       const saved = this.registeringNew ? null : loadSavedCreds();
+      const expectedRole = isOwnerEntry() ? 'host' : undefined;
       ws.send(
         JSON.stringify(
           this.profileToken
-            ? { type: 'profile_login', profileToken: this.profileToken }
+            ? { type: 'profile_login', profileToken: this.profileToken, expectedRole }
             : {
                 type: 'hello',
+                expectedRole,
                 profileId: this.registeringNew ? undefined : getOrCreateProfileId(),
                 token: this.token,
                 ...(saved ? { playerId: saved.playerId, playerSecret: saved.playerSecret } : {}),
@@ -363,12 +365,8 @@ export class GeoWsClient {
   }
 
   private handleMessage(msg: ServerMessage): void {
-    if (
-      ((msg.type === 'hello_ok' && msg.role === 'guest') ||
-        (msg.type === 'profile_login_ok' && msg.profile.role === 'guest')) &&
-      isOwnerEntry()
-    ) {
-      if (msg.type === 'hello_ok') {
+    if (msg.type === 'profile_login_error' && msg.code === 'host_required') {
+      if (!this.profileToken) {
         this.token = null;
         clearStoredSessionToken();
       }

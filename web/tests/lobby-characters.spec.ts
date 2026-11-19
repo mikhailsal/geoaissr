@@ -8,33 +8,37 @@ async function join(page: Page, url: string, nick: string): Promise<void> {
   await page.getByRole('button', { name: 'Понятно', exact: true }).click();
 }
 
+async function pauseFirstFrames(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const queued: (() => void)[] = [];
+    let blocked = true;
+    window.Worker = class extends Worker {
+      override postMessage(data: unknown): void {
+        const deliver = () => {
+          super.postMessage(data);
+        };
+        if (blocked && data && typeof data === 'object' && 'id' in data && 'state' in data)
+          queued.push(deliver);
+        else deliver();
+      }
+    };
+    window.addEventListener(
+      'resume-avatar-workers',
+      () => {
+        blocked = false;
+        for (const deliver of queued.splice(0)) deliver();
+      },
+      { once: true },
+    );
+  });
+}
+
 test('the stage reveals its lineup only after all visible characters have a painted frame', async ({
   page,
 }) => {
   const server = await startIsolatedFakeServer({ seedBot: true });
   try {
-    await page.addInitScript(() => {
-      const queued: (() => void)[] = [];
-      let blocked = true;
-      window.Worker = class extends Worker {
-        override postMessage(data: unknown): void {
-          const deliver = () => {
-            super.postMessage(data);
-          };
-          if (blocked && data && typeof data === 'object' && 'id' in data && 'state' in data)
-            queued.push(deliver);
-          else deliver();
-        }
-      };
-      window.addEventListener(
-        'resume-avatar-workers',
-        () => {
-          blocked = false;
-          for (const deliver of queued.splice(0)) deliver();
-        },
-        { once: true },
-      );
-    });
+    await pauseFirstFrames(page);
     await page.goto(server.hostUrl);
     await page.getByLabel('Ваше имя').fill('Луна');
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
@@ -43,9 +47,41 @@ test('the stage reveals its lineup only after all visible characters have a pain
     await expect(loading).toBeVisible();
     await expect(stage.locator('article canvas[data-avatar-renderer]')).toHaveCount(0);
     await expect(stage.getByRole('progressbar')).toHaveAttribute('max', '2');
+    await expect(stage.getByRole('group', { name: 'Загрузка персонажей' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const coveredRoster = stage.locator('button[aria-label="Участники"]');
+    await coveredRoster.focus();
+    await expect(coveredRoster).not.toBeFocused();
     await page.evaluate(() => window.dispatchEvent(new Event('resume-avatar-workers')));
     await expect(loading).toHaveCount(0);
     await expect(stage.locator('article canvas[data-avatar-renderer]')).toHaveCount(2);
+    await expect(stage.getByRole('button', { name: 'Участники' })).toBeFocused();
+  } finally {
+    await server.stop();
+  }
+});
+
+test('keyboard users can dismiss a stalled first frame and open the lobby roster', async ({
+  page,
+}) => {
+  const server = await startIsolatedFakeServer();
+  try {
+    await pauseFirstFrames(page);
+    await page.goto(server.hostUrl);
+    await page.getByLabel('Ваше имя').fill('Луна');
+    await page.getByRole('button', { name: 'Войти', exact: true }).click();
+    const bypass = page.getByRole('button', { name: 'Открыть лобби' });
+    await expect(bypass).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('Tab');
+    await expect(bypass).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Загружаем персонажей')).toHaveCount(0);
+    const roster = page.getByRole('button', { name: 'Участники', exact: true });
+    await expect(roster).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'Участники' })).toBeVisible();
   } finally {
     await server.stop();
   }
@@ -147,27 +183,56 @@ test('rapid avatar clicks boost both renderers and stop arriving when the guest 
   }
 });
 
+async function observeBotTurns(pages: Page[]) {
+  let delayTurns = false;
+  const delayed: Array<() => void> = [];
+  let deliveredTurns = 0;
+  for (const page of pages) {
+    await page.routeWebSocket('**/ws', (client) => {
+      const room = client.connectToServer();
+      room.onMessage((message) => {
+        const { type } = JSON.parse(message.toString()) as { type: string };
+        if (delayTurns && (type === 'avatar_turn' || type === 'ack')) {
+          if (type === 'avatar_turn') deliveredTurns++;
+          delayed.push(() => {
+            client.send(message);
+          });
+        } else client.send(message);
+      });
+    });
+    await page.addInitScript(() => {
+      window.Worker = class extends Worker {
+        override postMessage(data: unknown): void {
+          if (typeof data === 'object' && data !== null && 'state' in data) {
+            const state = data.state as { appearance: { base: string }; yaw: number } | null;
+            if (state?.appearance.base === 'robot')
+              document.documentElement.dataset.botYaw = String(state.yaw);
+          }
+          super.postMessage(data);
+        }
+      };
+    });
+  }
+  return {
+    pause() {
+      delayTurns = true;
+    },
+    async releaseAfterBothTurns() {
+      await expect.poll(() => deliveredTurns).toBe(4);
+      delayTurns = false;
+      for (const send of delayed) send();
+    },
+  };
+}
+
 test('dragging an avatar sends its angle to the other player and releases without spinning', async ({
   browser,
 }) => {
   const server = await startIsolatedFakeServer({ seedBot: true });
   const host = await browser.newPage();
   const guest = await browser.newPage();
+  const turns = await observeBotTurns([host, guest]);
   try {
-    for (const page of [host, guest]) {
-      await page.addInitScript(() => {
-        window.Worker = class extends Worker {
-          override postMessage(data: unknown): void {
-            if (typeof data === 'object' && data !== null && 'state' in data) {
-              const state = data.state as { appearance: { base: string }; yaw: number } | null;
-              if (state?.appearance.base === 'robot')
-                document.documentElement.dataset.botYaw = String(state.yaw);
-            }
-            super.postMessage(data);
-          }
-        };
-      });
-    }
     await join(host, server.hostUrl, 'Луна');
     await join(guest, server.guestUrl, 'Гость');
     const button = guest.getByRole('button', { name: 'Повернуть на 360°: Клод', exact: true });
@@ -202,6 +267,21 @@ test('dragging an avatar sends its angle to the other player and releases withou
         'spin',
       );
     }
+    // Both players finish an independent turn before either sees the other's input.
+    turns.pause();
+    const hostButton = host.getByRole('button', { name: 'Повернуть на 360°: Клод', exact: true });
+    await Promise.all([hostButton.press('ArrowRight'), button.press('ArrowLeft')]);
+    await turns.releaseAfterBothTurns();
+    await expect
+      .poll(async () => {
+        const hostAngle = unwrap((await yaw(host)) - remoteBase);
+        const guestAngle = unwrap((await yaw(guest)) - localBase);
+        return (
+          Math.abs(unwrap(hostAngle - guestAngle)) < 0.001 &&
+          Math.abs(Math.abs(unwrap(hostAngle - localDelta)) - Math.PI / 18) < 0.001
+        );
+      })
+      .toBe(true);
   } finally {
     await guest.close();
     await host.close();

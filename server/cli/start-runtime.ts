@@ -17,7 +17,7 @@ import { spawnManaged } from '../proc/spawn.ts';
 import { loadHarnessVerified } from '../storage/harness-verified.ts';
 import { appendMatchRecord } from '../storage/matches.ts';
 import { loadWinsHistory } from './wins-history.ts';
-import { writeNormalSettings, writeResetSettings } from './settings-writer.ts';
+import { createSettingsWriter, writeResetSettings } from './settings-writer.ts';
 import type { LoadOutcome } from '../storage/migrate.ts';
 import { buildQuotaSummaryForRoom, type QuotaManager } from '../storage/quota.ts';
 import { loadSettings } from '../storage/settings.ts';
@@ -243,8 +243,7 @@ export function buildConfiguredShell(opts: {
         message: err instanceof Error ? err.message : String(err),
       });
     },
-    saveSettings: (nextSettings) =>
-      writeNormalSettings(opts.paths.settingsFile, nextSettings, opts.settingsOutcomeStatus),
+    saveSettings: createSettingsWriter(opts.paths.settingsFile, opts.settingsOutcomeStatus),
     saveSettingsForReset: (nextSettings) =>
       writeResetSettings(opts.paths.settingsFile, nextSettings, opts.settingsOutcomeStatus),
     confirmQuotaReset: () => {

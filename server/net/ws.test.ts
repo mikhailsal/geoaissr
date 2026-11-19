@@ -43,7 +43,7 @@ function connectWsAndCollect(
   });
 }
 
-function setupTestServer(dir: string) {
+function setupTestServer(dir: string, staticDir = path.join(dir, 'missing-dist')) {
   const quota = createQuotaManager(path.join(dir, 'quota.json'));
   const thumbs = createThumbStore();
   const initial = createInitialRoomState({
@@ -67,7 +67,7 @@ function setupTestServer(dir: string) {
     onStateChange: () => {
       coordinatorRef?.broadcastState();
     },
-    saveSettings: () => Promise.resolve(),
+    saveSettings: () => {},
     confirmQuotaReset: () => Promise.resolve(initial.quotaSummary),
     prepareRound: () =>
       Promise.resolve({
@@ -104,7 +104,7 @@ function setupTestServer(dir: string) {
   coordinatorRef = coordinator;
   const srv = startAppHttpServer({
     port: 0,
-    staticDir: path.join(dir, 'missing-dist'),
+    staticDir,
     shell,
     thumbStore: thumbs,
     wsCoordinator: coordinator,
@@ -128,6 +128,31 @@ test('rate limiter respects CF-Connecting-IP only in tunnel mode and bans after 
   }
   expect(rlTunnel.isBlocked('198.51.100.42', 10_500)).toBe(true);
   expect(rlTunnel.isBlocked('198.51.100.42', 75_000)).toBe(false);
+});
+
+// Value: protects=avatar image delivery; fails_when=WebP or cache rules change; why_new=health tests load no assets; seam=none; no_claim=local HTTP does not exercise a public CDN.
+test('Orbit wardrobe and stage assets serve real WebP images with revalidation', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-orbit-http-'));
+  const { shell, srv } = setupTestServer(dir, path.resolve(import.meta.dir, '../../web/public'));
+  try {
+    for (const asset of ['/orbit/look.webp', '/orbit-stage/lunar-drift.webp']) {
+      const response = await fetch(new URL(asset, srv.baseUrl));
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('image/webp');
+      expect(response.headers.get('cache-control')).toBe('no-cache');
+      const bytes = Buffer.from(await response.arrayBuffer());
+      expect(bytes.toString('ascii', 0, 4)).toBe('RIFF');
+      expect(bytes.toString('ascii', 8, 12)).toBe('WEBP');
+    }
+    const sound = await fetch(new URL('/audio/swoosh.ogg', srv.baseUrl));
+    expect(sound.status).toBe(200);
+    expect(sound.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    await sound.body?.cancel();
+  } finally {
+    srv.stop();
+    shell.dispose();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('WS auth rejects bad tokens, supports host join and healthz', async () => {

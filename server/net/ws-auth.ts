@@ -77,20 +77,30 @@ function sendState(ctx: CoordCtx, ws: ServerWebSocket<WsClientData>): void {
 }
 export function profileError(
   ws: ServerWebSocket<WsClientData>,
-  code: 'invalid_profile_token' | 'room_full' | 'profile_store_unavailable',
+  code: Extract<ServerMessage, { type: 'profile_login_error' }>['code'],
 ): void {
   sendJson(ws, {
     type: 'profile_login_error',
     serverNow: Date.now(),
     code,
-    message:
-      code === 'profile_store_unavailable'
-        ? STORE_UNAVAILABLE
-        : code === 'room_full'
-          ? 'Комната заполнена (максимум 8 игроков).'
-          : 'Неверный код профиля.',
+    message: {
+      profile_store_unavailable: STORE_UNAVAILABLE,
+      room_full: 'Комната заполнена (максимум 8 игроков).',
+      host_required:
+        'Для входа хоста нужен код профиля хоста или личная ссылка из терминала сервера.',
+      invalid_profile_token: 'Неверный код профиля.',
+    }[code],
   });
   ws.close(4003, code);
+}
+function rejectRoleMismatch(
+  ws: ServerWebSocket<WsClientData>,
+  expected: 'host' | undefined,
+  role: StoredProfile['role'],
+): boolean {
+  if (!expected || expected === role) return false;
+  profileError(ws, 'host_required');
+  return true;
 }
 function checkNewJoinEligibility(state: RoomState, role: 'host' | 'guest' | null): boolean {
   const hasHost = state.playerOrder.some((id) => state.players[id]?.isHost);
@@ -99,7 +109,7 @@ function checkNewJoinEligibility(state: RoomState, role: 'host' | 'guest' | null
 export function handleProfileLogin(
   ctx: CoordCtx,
   ws: ServerWebSocket<WsClientData>,
-  raw: string,
+  msg: Extract<ClientMessage, { type: 'profile_login' }>,
 ): void {
   if (ws.data.authenticated) {
     ws.close(4004, 'already_authenticated');
@@ -109,7 +119,7 @@ export function handleProfileLogin(
     profileError(ws, 'profile_store_unavailable');
     return;
   }
-  const profile = ctx.profiles.getByToken(raw);
+  const profile = ctx.profiles.getByToken(msg.profileToken);
   if (!profile) {
     ctx.rateLimiter.recordAuthFailure(ws.data.ip);
     if (ctx.rateLimiter.isBlocked(ws.data.ip)) {
@@ -119,6 +129,7 @@ export function handleProfileLogin(
     profileError(ws, 'invalid_profile_token');
     return;
   }
+  if (rejectRoleMismatch(ws, msg.expectedRole, profile.role)) return;
   const state = ctx.shell.getState();
   const seats = Object.values(state.players).filter((p) => p.profileId === profile.profileId);
   if (seats.length > 1 || (seats[0]?.isHost && profile.role !== 'host')) {
@@ -209,6 +220,7 @@ export function handleHelloMsg(
       return;
     }
     profile = authoritativeId ? ctx.profiles.getById(authoritativeId) : undefined;
+    if (rejectRoleMismatch(ws, msg.expectedRole, profile?.role ?? ws.data.role)) return;
     if (existing.isHost && (profile?.role ?? ws.data.role) !== 'host') {
       profileError(ws, 'profile_store_unavailable');
       return;
@@ -246,7 +258,7 @@ export function handleHelloMsg(
       isHost: profile.role === 'host',
       profileId: profile.profileId,
     });
-  }
+  } else if (rejectRoleMismatch(ws, msg.expectedRole, ws.data.role)) return;
   finishAuthentication(ctx, ws, profile);
   sendJson(ws, {
     type: 'hello_ok',

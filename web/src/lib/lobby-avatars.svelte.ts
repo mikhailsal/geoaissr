@@ -22,6 +22,8 @@ export class LobbyAvatars {
   playing = $state<Record<string, OrbitGesture | undefined>>({});
   yawById = $state<Record<string, number | undefined>>({});
   private lastTurnAt = -Infinity;
+  private readonly confirmedYaw = new SvelteMap<string, number>();
+  private readonly pendingTurns = new SvelteMap<string, number>();
   private readonly timers = new SvelteMap<string, number>();
   private saveRequest: { seq: number; finish: (error: string | null) => void } | null = null;
 
@@ -54,11 +56,14 @@ export class LobbyAvatars {
 
   turn(participantId: string, angle: number, final: boolean): void {
     const yaw = Math.atan2(Math.sin(angle), Math.cos(angle));
-    this.applyTurn(participantId, yaw);
     const now = performance.now();
     if (!final && now - this.lastTurnAt < 40) return;
     this.lastTurnAt = now;
-    this.client.sendSequenced('avatar_turn', { participantId, yaw });
+    const request = this.client.sendSequencedWithSeq('avatar_turn', { participantId, yaw });
+    if (request.sent) {
+      this.pendingTurns.set(participantId, request.seq);
+      this.applyTurn(participantId, yaw);
+    }
   }
 
   private applyTurn(participantId: string, yaw: number): void {
@@ -79,8 +84,10 @@ export class LobbyAvatars {
   }
 
   receive(msg: Extract<ServerMessage, { type: 'avatar_turn' | 'avatar_gesture' }>): void {
-    if (msg.type === 'avatar_turn') this.applyTurn(msg.participantId, msg.yaw);
-    else this.play(msg.participantId, msg.gesture);
+    if (msg.type === 'avatar_turn') {
+      this.confirmedYaw.set(msg.participantId, msg.yaw);
+      if (!this.pendingTurns.has(msg.participantId)) this.applyTurn(msg.participantId, msg.yaw);
+    } else this.play(msg.participantId, msg.gesture);
   }
 
   private play(participantId: string, gesture: AvatarGesture): void {
@@ -118,6 +125,12 @@ export class LobbyAvatars {
   }
 
   onAck(msg: Extract<ServerMessage, { type: 'ack' }>): void {
+    for (const [id, seq] of this.pendingTurns) {
+      if (seq !== msg.seq) continue;
+      this.pendingTurns.delete(id);
+      this.yawById[id] = this.confirmedYaw.get(id) ?? 0;
+      return;
+    }
     if (this.gestureSeq === msg.seq) {
       this.gestureSeq = null;
       // Pace subsequent clicks from the acknowledgement so jitter cannot trip the room's limit.
@@ -145,6 +158,8 @@ export class LobbyAvatars {
     this.timers.clear();
     this.playing = {};
     this.yawById = {};
+    this.confirmedYaw.clear();
+    this.pendingTurns.clear();
     this.lastTurnAt = -Infinity;
   }
 }

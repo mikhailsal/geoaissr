@@ -45,8 +45,8 @@ export function relayAvatarGesture(
     event = { type: 'avatar_gesture', serverNow: now, participantId, gesture };
   }
   for (const peer of ctx.sockets) {
-    // Direct manipulation is already visible to the sender.
-    if (peer === ws && msg.type !== 'avatar_gesture') continue;
+    // Spins are impulses already applied on click. Everyone needs the ordered turn angles.
+    if (peer === ws && msg.type === 'avatar_spin') continue;
     if (peer.data.authenticated && peer.data.playerId) sendJson(peer, event);
   }
   return 'ok';
@@ -55,13 +55,13 @@ export function relayAvatarGesture(
 /** Allow several coalesced pointer events while bounding sustained room broadcasts. */
 function allowBurst(
   data: WsClientData,
-  key: 'turnBudgetAt' | 'spinBudgetAt',
+  budgetField: 'turnBudgetAt' | 'spinBudgetAt',
   now: number,
   interval: number,
 ) {
-  const next = Math.max(data[key] ?? now, now);
+  const next = Math.max(data[budgetField] ?? now, now);
   if (next - now >= interval * 6) return false;
-  data[key] = next + interval;
+  data[budgetField] = next + interval;
   return true;
 }
 

@@ -37,6 +37,14 @@ test('a signed-in guest opens the owner invitation on the same origin and keeps 
     await expect(offline).toHaveCount(0);
     const guestCode = await profileCode(page);
     const remoteOwner = ownerEntry(server.hostUrl, server.baseUrl);
+    const ownerTab = await context.newPage();
+    await ownerTab.goto(remoteOwner);
+    await ownerTab.getByRole('button', { name: 'Войти по коду' }).click();
+    await ownerTab.getByLabel('Код профиля').fill(guestCode);
+    await ownerTab.getByRole('button', { name: 'Войти по коду' }).click();
+    await expect(ownerTab.getByRole('alert')).toContainText('нужен код профиля хоста');
+    await expectLobbyPlayers(page, 1);
+    await ownerTab.close();
     await page.goto(remoteOwner);
     await expect(page.getByRole('heading', { name: 'Вход для хоста' })).toBeVisible();
     await expect(page.getByLabel('Ваше имя')).toHaveValue('');
