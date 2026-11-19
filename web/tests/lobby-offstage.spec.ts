@@ -59,6 +59,7 @@ test('an off-page actor leaves a gesture notice until the viewer chooses to see 
     await add.click();
     await host.keyboard.press('Escape');
     const picker = host.getByLabel('Жесты персонажа');
+    await expect(picker.getByRole('option')).toHaveCount(4);
     const name = await picker.getByRole('option').last().innerText();
     const card = guest.getByRole('article', { name, exact: true });
     const pager = guest.getByRole('navigation', { name: 'Страницы сцены' });
