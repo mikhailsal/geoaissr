@@ -171,6 +171,7 @@
         reconnectAttempt={store.reconnectAttempt}
         backOnline={store.backOnline}
         hostConnected={view.hostConnected}
+        hostHasJoined={view.players.some((player) => player.isHost)}
         tunnelChanged={view.tunnel.changedSinceStart}
         onRetryConnect={handleRetryConnect}
       />
@@ -182,6 +183,7 @@
 
   {#if !inGamePhase || !view}
     <Join
+      role={store.role}
       authState={store.authState}
       authError={store.authError}
       fakeMode={store.fakeMode}

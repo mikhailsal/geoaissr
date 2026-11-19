@@ -24,7 +24,7 @@ function present(id: number, image: Surface | ImageBitmap, renderer: string): vo
   }
   view.context.clearRect(0, 0, canvas.width, canvas.height);
   view.context.drawImage(image, 0, 0);
-  canvas.dataset.avatarRenderer = renderer;
+  if (canvas.dataset.avatarRenderer !== renderer) canvas.dataset.avatarRenderer = renderer;
 }
 
 async function fallback(): Promise<void> {

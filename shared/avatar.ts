@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { avatarChoices } from './avatar-catalog.ts';
 
+export const GESTURE_INTERVAL_MS = 250;
+
 export const AVATAR_GESTURES = [
   'gg',
   'laugh',

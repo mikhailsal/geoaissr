@@ -10,6 +10,7 @@
   import { RU } from '../i18n/ru';
 
   interface Props {
+    role: 'host' | 'guest' | null;
     authState: 'checking' | 'error' | 'ready';
     authError: AuthScreenError | null;
     fakeMode: boolean;
@@ -26,6 +27,7 @@
   }
 
   let {
+    role,
     authState,
     authError,
     fakeMode,
@@ -73,6 +75,8 @@
 
   const authErrorText = $derived.by(() => {
     switch (authError) {
+      case 'host_required':
+        return 'Для входа хоста нужен код профиля хоста или личная ссылка из терминала сервера.';
       case 'no_token':
         return '';
       case 'invalid_profile_token':
@@ -161,6 +165,10 @@
         onAction={onRetry}
       />
     {:else}
+      {#if role === 'host'}
+        <h2>Вход для хоста</h2>
+        <p>Введите имя для нового профиля хоста или войдите по коду своего профиля.</p>
+      {/if}
       {#if lobbySummary}
         <p class="context-line">
           Людей: {lobbySummary.humans.length} · ИИ: {lobbySummary.aiCount} ·

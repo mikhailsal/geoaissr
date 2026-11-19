@@ -23,7 +23,7 @@ A multiplayer geography guessing game for 1–8 people and up to 3 AI opponents 
    ```bash
    bun run start
    ```
-   The terminal prints two `#t=...` links: **Ссылка хоста** (Host link, for you) and **Приглашение гостям** (Invitation for guests, send it to your friends).
+   Use **Ссылка хоста** on the server computer. When the tunnel is ready, the terminal also prints **Удалённый вход хоста** for the owner to open on another device. Send friends the separate **Приглашение гостям** link. A returning owner can enter their permanent host profile code.
 
 ---
 
@@ -91,7 +91,7 @@ The [bot tool and accounting reference](docs/bot-tools.md) describes draft/final
 
 Your browser remembers your profile and permanent code and automatically signs you in on later visits. Names and colors may coincide with other participants. Use **«Профиль»** in the lobby or final results to edit your name and color; editing is unavailable during a match.
 
-In the lobby, choose a character and adjust its clothing, face, hair, accessories, and colors. Saving updates the shared stage and keeps the appearance with your permanent profile code, including when you sign in on another device. The host can dress each AI slot using the same wardrobe. Use the gesture controls to emote or spin in front of the other participants.
+In the lobby, choose a character and adjust its clothing, face, hair, accessories, and colors. Saving updates the shared stage and keeps the appearance with your permanent profile code, including when you sign in on another device. The host can open a robot’s wardrobe from its nameplate on the stage or the AI slot in the roster. Use **Участники и настройки** to reach the room settings. Gesture buttons play for everyone in the lobby. Click or tap any character on stage to turn it for the whole room. The wardrobe preview turns locally.
 
 The trophy beside each avatar counts wins from the last six hours. Only complete matches with exactly one first-place finisher count; ties and early finishes do not. Human wins follow the profile UUID, and AI wins follow the bot slot even after a rename. The host can reset an individual bot's count in the lobby or final results. Matches and reset timestamps persist on the server; a storage error is reported in the room.
 

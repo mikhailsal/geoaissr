@@ -11,7 +11,7 @@
     thumbnail,
     slotNames,
   } from '../lib/wardrobe/catalog';
-  import OrbitAvatar from './OrbitAvatar.svelte';
+  import TurnableAvatar from './TurnableAvatar.svelte';
   import WardrobeOptions from './WardrobeOptions.svelte';
 
   interface Props {
@@ -61,7 +61,7 @@
   </header>
   <div class="studio">
     <div class="preview">
-      <div class="stage"><OrbitAvatar appearance={draft} label={'Предпросмотр: ' + name} /></div>
+      <div class="stage"><TurnableAvatar appearance={draft} {name} preview /></div>
       <div class="preview-tools">
         <button type="button" class="btn" onclick={() => (draft = shuffle(draft))}
           ><Dices size={18} aria-hidden="true" /> Случайный образ</button

@@ -4,6 +4,13 @@ import { PARTICIPANT_COLOR_IDS } from './colors.ts';
 
 export const MAX_NICK_LEN = 20;
 
+export const profileLoginMessageSchema = z
+  .object({
+    type: z.literal('profile_login'),
+    profileToken: z.string().max(64),
+  })
+  .strict();
+
 export const joinMessageSchema = z.object({
   type: z.literal('join'),
   seq: z.number().int().nonnegative(),
@@ -23,5 +30,13 @@ export const avatarGestureMessageSchema = z
     seq: z.number().int().nonnegative(),
     gesture: z.enum(AVATAR_GESTURES),
     botId: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+export const avatarSpinMessageSchema = z
+  .object({
+    type: z.literal('avatar_spin'),
+    seq: z.number().int().nonnegative(),
+    participantId: z.string().min(1).max(64),
   })
   .strict();

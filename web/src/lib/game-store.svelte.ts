@@ -27,6 +27,7 @@ export type AuthScreenError =
   | 'room_full'
   | 'unreachable'
   | 'invalid_profile_token'
+  | 'host_required'
   | 'profile_store_unavailable';
 
 export interface VisionToast {
@@ -135,10 +136,10 @@ export class GameStore extends GameCommands {
 
   private buildWsCallbacks(): WsClientCallbacks {
     return {
-      onNoToken: () => {
+      onNoToken: (reason) => {
         this.clearTransientPending();
         this.authState = 'error';
-        this.authError = 'no_token';
+        this.authError = reason ?? 'no_token';
       },
       onHashToken: () => {
         this.resetForHashToken();

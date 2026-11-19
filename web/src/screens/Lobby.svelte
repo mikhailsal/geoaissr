@@ -64,6 +64,7 @@
   }: Props = $props();
 
   let expandedBotId = $state<string | null>(null);
+  let roomDetails: HTMLDivElement;
 
   let editing = $state<{ botId?: string; name: string; appearance: AvatarAppearance } | null>(null);
   let savePending = $state(false);
@@ -112,7 +113,16 @@
 </script>
 
 <main class="lobby-page">
-  <LobbyStage {view} {avatars} {connected} onEdit={openWardrobe}>
+  <LobbyStage
+    {view}
+    {avatars}
+    {connected}
+    onEdit={openWardrobe}
+    onOpenSettings={() => {
+      roomDetails.focus({ preventScroll: true });
+      roomDetails.scrollIntoView({ block: 'start' });
+    }}
+  >
     {#snippet menu()}
       <HostMenu
         onOpenProfile={onEditProfile}
@@ -132,7 +142,7 @@
     <p class="muted" role="note">{RU.connection.localOnly}</p>
   {/if}
 
-  <div class="columns">
+  <div class="columns" bind:this={roomDetails} tabindex="-1">
     <section class="panel card" aria-label="Участники и ИИ">
       <h2 class="sec-head">{RU.lobby.playersHeading(view.players.length)}</h2>
       <ul class="participant-list">
@@ -208,13 +218,13 @@
                 {#if view.viewerIsHost}
                   <button
                     type="button"
-                    class="btn bot-action"
+                    class="btn"
                     aria-label={`Изменить аватар ${bot.name}`}
                     title="Изменить аватар"
                     disabled={!connected}
                     onclick={(event) => {
                       openWardrobe(event, bot.id);
-                    }}><Shirt size={18} /></button
+                    }}><Shirt size={18} aria-hidden="true" /> Гардероб</button
                   >
                 {/if}
                 <button
@@ -303,12 +313,16 @@
 
 <style>
   .lobby-page {
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: var(--sp-4);
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
+    padding-bottom: var(--sp-4);
+  }
+
+  .lobby-page > .muted,
+  .columns {
+    width: min(calc(100% - 2 * var(--sp-4)), 1120px);
+    margin-inline: auto;
   }
 
   .columns {

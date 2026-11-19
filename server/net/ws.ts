@@ -163,7 +163,7 @@ function handleAuthenticatedAction(
   }
 
   const mappedResult =
-    msg.type === 'avatar_gesture'
+    msg.type === 'avatar_gesture' || msg.type === 'avatar_spin'
       ? relayAvatarGesture(ctx, ws, playerId, msg)
       : dispatchEngineClientMessage(ctx.shell, playerId, msg);
   acknowledgeAction(ws, playerId, msg.seq, mappedResult);

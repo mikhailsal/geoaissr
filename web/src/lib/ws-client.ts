@@ -1,6 +1,11 @@
 import type { ParticipantColorId } from '$shared/colors';
 import type { LobbySummary, ClientViewState, ServerMessage } from '$shared/protocol';
-import { getOrCreateProfileId, loadSavedProfile, normalizeProfileToken } from './profile';
+import {
+  getOrCreateProfileId,
+  isOwnerEntry,
+  loadSavedProfile,
+  normalizeProfileToken,
+} from './profile';
 import { MapLoadReporter, type MapLoadKind } from './map-load-reports';
 
 import {
@@ -30,7 +35,7 @@ export interface OutgoingMessage {
 }
 
 export interface WsClientCallbacks {
-  onNoToken: () => void;
+  onNoToken: (reason?: 'host_required') => void;
   onProfileLoginOk?: (msg: Extract<ServerMessage, { type: 'profile_login_ok' }>) => void;
   onProfileLoginError?: (msg: Extract<ServerMessage, { type: 'profile_login_error' }>) => void;
   onHashToken?: () => void;
@@ -180,14 +185,14 @@ export class GeoWsClient {
     this.retry();
   }
 
-  useCodeLogin(): void {
+  useCodeLogin(reason?: 'host_required'): void {
     this.close();
     this.token = null;
     this.profileToken = null;
     this.wasAuthenticatedOnce = false;
     clearStoredSessionToken();
     this.attachBrowserListeners();
-    this.callbacks.onNoToken();
+    this.callbacks.onNoToken(reason);
   }
 
   logout(clearShared = true): void {
@@ -348,6 +353,14 @@ export class GeoWsClient {
   }
 
   private handleMessage(msg: ServerMessage): void {
+    if (
+      ((msg.type === 'hello_ok' && msg.role === 'guest') ||
+        (msg.type === 'profile_login_ok' && msg.profile.role === 'guest')) &&
+      isOwnerEntry()
+    ) {
+      this.useCodeLogin('host_required');
+      return;
+    }
     switch (msg.type) {
       case 'pong':
         this.callbacks.onPong(msg.serverNow, msg.clientNow);

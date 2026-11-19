@@ -66,7 +66,7 @@ test('a guest can select an avatar, share it with the room and restore it by pro
   browser,
 }) => {
   const server = await startIsolatedFakeServer();
-  const host = await browser.newPage();
+  const host = await browser.newPage({ reducedMotion: 'reduce' });
   const guestContext = await browser.newContext({ viewport: { width: 390, height: 740 } });
   const guest = await guestContext.newPage();
   try {
@@ -269,6 +269,124 @@ test('bots with the same name have matching slot labels in the gesture picker an
     await host.getByRole('button', { name: 'Помахать', exact: true }).click();
     await expect(card(guest, slotLabel(2))).toHaveAttribute('data-gesture', 'wave');
     await expect(card(guest, slotLabel(1))).not.toHaveAttribute('data-gesture', 'wave');
+  } finally {
+    await guest.close();
+    await host.close();
+    await server.stop();
+  }
+});
+
+test('clicking a stage avatar turns the same person or bot for both players', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer({ seedBot: true });
+  const host = await browser.newPage();
+  const guest = await browser.newPage();
+  try {
+    await join(host, server.hostUrl, hostName);
+    await join(guest, server.guestUrl, guestName);
+    const turn = (page: Page, name: string) =>
+      card(page, name).getByRole('button', { name: `Повернуть на 360°: ${name}`, exact: true });
+    await turn(guest, hostName).click();
+    await expect(avatar(guest, hostName)).toHaveAttribute('data-avatar-gesture', 'spin');
+    await expect(avatar(host, hostName)).toHaveAttribute('data-avatar-gesture', 'spin');
+    await turn(guest, guestName).press('Enter');
+    await expect(avatar(host, guestName)).toHaveAttribute('data-avatar-gesture', 'spin');
+    await turn(guest, botName).click();
+    await expect(avatar(host, botName)).toHaveAttribute('data-avatar-gesture', 'spin');
+  } finally {
+    await guest.close();
+    await host.close();
+    await server.stop();
+  }
+});
+
+test('a host opens the robot wardrobe from its stage button and the selected actor', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer({ seedBot: true });
+  const host = await browser.newPage();
+  const guest = await browser.newPage();
+  try {
+    await join(host, server.hostUrl, hostName);
+    await join(guest, server.guestUrl, guestName);
+    const wardrobe = `Открыть гардероб: ${botName}`;
+    const edit = card(host, botName).getByRole('button', { name: wardrobe });
+    await expect(card(guest, botName).getByRole('button', { name: wardrobe })).toHaveCount(0);
+    await edit.click();
+    const dialog = host.getByRole('dialog', { name: `Гардероб: ${botName}` });
+    await dialog.getByRole('button', { name: `Повернуть на 360°: ${botName}` }).click();
+    await expect(dialog.getByRole('img', { name: `Предпросмотр: ${botName}` })).toHaveAttribute(
+      'data-avatar-gesture',
+      'spin',
+    );
+    await dialog.getByRole('button', { name: 'Человек', exact: true }).click();
+    await chooseLook(host, botName, 'Лунный пилот');
+    await expect(avatar(guest, botName)).toHaveAttribute('data-avatar-base', 'human');
+    await expect(avatar(guest, botName)).toHaveAttribute('data-avatar-outfit', 'spacesuit');
+    await expect(edit).toBeFocused();
+    await host.getByLabel('Жесты персонажа').selectOption({ label: `ИИ · ${botName}` });
+    await host.getByRole('button', { name: 'Гардероб ИИ', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Робот', exact: true }).click();
+    await chooseLook(host, botName, 'Неоновый гонщик');
+    await expect(avatar(guest, botName)).toHaveAttribute('data-avatar-base', 'robot');
+    await expect(avatar(guest, botName)).toHaveAttribute('data-avatar-outfit', 'moto');
+  } finally {
+    await guest.close();
+    await host.close();
+    await server.stop();
+  }
+});
+
+async function checkGestureSequence(sender: Page, observer: Page, actor: string): Promise<void> {
+  const emotes = [
+    ['Отличная игра', 'gg'],
+    ['Смеяться', 'laugh'],
+    ['Праздновать', 'cheer'],
+    ['Помахать', 'wave'],
+    ['Задуматься', 'think'],
+    ['Слёзы радости', 'joy'],
+    ['Показать класс', 'cool'],
+    ['Поворот на 360°', 'spin'],
+  ] as const;
+  const observed = await card(observer, actor).evaluateHandle((element) => {
+    const received: string[] = [];
+    const watcher = new MutationObserver(() => {
+      const kind = element.getAttribute('data-gesture');
+      if (kind) received.push(kind);
+    });
+    watcher.observe(element, { attributes: true, attributeFilter: ['data-gesture'] });
+    return { received, watcher };
+  });
+  try {
+    const buttons = sender.getByRole('group', { name: 'Жесты', exact: true });
+    for (const [label] of emotes) {
+      await buttons.getByRole('button', { name: label, exact: true }).click();
+    }
+    await expect
+      .poll(() => observed.evaluate((r) => r.received), { timeout: 10_000 })
+      .toEqual(emotes.map(([, gesture]) => gesture));
+  } finally {
+    await observed.evaluate((r) => {
+      r.watcher.disconnect();
+    });
+    await observed.dispose();
+  }
+}
+
+test('quick successive clicks on all eight gestures reach the other player in order', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer({ seedBot: true });
+  const host = await browser.newPage();
+  const guest = await browser.newPage();
+  try {
+    await join(host, server.hostUrl, hostName);
+    await join(guest, server.guestUrl, guestName);
+    await checkGestureSequence(host, guest, hostName);
+    await checkGestureSequence(guest, host, guestName);
+    await host.getByLabel('Жесты персонажа').selectOption({ label: `ИИ · ${botName}` });
+    await checkGestureSequence(host, guest, botName);
   } finally {
     await guest.close();
     await host.close();

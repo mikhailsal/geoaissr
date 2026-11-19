@@ -112,11 +112,6 @@
     width: 100%;
     height: 100%;
     display: block;
-    transform-origin: 50% 94%;
-    animation: breathe 4.4s ease-in-out infinite alternate;
-  }
-  .orbit-avatar[data-avatar-gesture] canvas {
-    animation: none;
   }
   .pedestal {
     position: absolute;
@@ -139,18 +134,5 @@
       0 4px 0 var(--orbit-aqua),
       0 6px 0 var(--orbit-platform-shade),
       0 7px 14px color-mix(in srgb, var(--rim) 35%, transparent);
-  }
-  @keyframes breathe {
-    from {
-      transform: scale(1);
-    }
-    to {
-      transform: scale(1.002, 1.007);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    canvas {
-      animation: none;
-    }
   }
 </style>

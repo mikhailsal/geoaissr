@@ -26,17 +26,19 @@ export function buildRig(state: StageState) {
   return { rig, height: bounds.max.y - bounds.min.y, bottom: bounds.min.y };
 }
 
-function poseRig(rig: OrbitRig, state: StageState, now: number): void {
+function poseRig(rig: OrbitRig, state: StageState, now: number, seconds: number): void {
   const gesture = state.gesture;
   const progress = gesture && Math.max(0, (now - gesture.at) / gestureDuration[gesture.kind]);
   const active = gesture !== null && progress !== null && progress < 1;
   const pose = active && state.reduced ? 0.45 : (progress ?? 0);
   const turning = active && gesture.kind === 'spin' && !state.reduced;
   rig.root.rotation.y = -0.23 + (turning ? Math.PI * 2 * pose * pose * (3 - 2 * pose) : 0);
-  const seconds = active ? (pose * gestureDuration[gesture.kind]) / 1000 + 1.9 : 1.9;
   const expression = active ? { gesture: gesture.kind, progress: pose } : {};
   // A still pose has no subsequent frames for the Studio animator to ease toward it.
-  if (state.reduced) rig.update(seconds - 1, expression);
+  if (state.reduced) {
+    seconds = 1.9 + (active ? (pose * gestureDuration[gesture.kind]) / 1000 : 0);
+    rig.update(seconds - 1, expression);
+  }
   rig.update(seconds, expression);
 }
 
@@ -94,7 +96,8 @@ type Context2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 export class Painter {
   private readonly scene = new Scene();
   private readonly camera = new OrthographicCamera(-2, 2, 2, -2, 0.1, 30);
-  private readonly raster = new Rasterizer();
+  // Switching between differently sized canvases preserves each rig's projected vertex cache.
+  private readonly rasters = new WeakMap<OrbitRig, Rasterizer>();
   private readonly surface: Surface;
   private readonly renderer;
   private readonly ctx: Context2D | null;
@@ -110,7 +113,12 @@ export class Painter {
     lighting(this.scene);
   }
 
-  paint(model: ReturnType<typeof buildRig>, state: StageState, now: number): Surface {
+  paint(
+    model: ReturnType<typeof buildRig>,
+    state: StageState,
+    now: number,
+    seconds: number,
+  ): Surface {
     const scale = Math.min(1, (this.renderer ? 960 : 320) / Math.max(state.width, state.height));
     const w = Math.max(1, Math.round(state.width * scale));
     const h = Math.max(1, Math.round(state.height * scale));
@@ -125,7 +133,7 @@ export class Painter {
     this.camera.position.set(0, focus + 1.03, 9.3);
     this.camera.lookAt(0, focus, 0);
     this.camera.updateProjectionMatrix();
-    poseRig(model.rig, state, now);
+    poseRig(model.rig, state, now, seconds);
     if (this.renderer) {
       if (this.surface.width !== w || this.surface.height !== h) this.renderer.setSize(w, h, false);
       this.scene.add(model.rig.root);
@@ -136,8 +144,13 @@ export class Painter {
         this.surface.width = w;
         this.surface.height = h;
       }
-      this.raster.setSize(w, h);
-      const rgba = this.raster.render(model.rig.root, this.camera);
+      let raster = this.rasters.get(model.rig);
+      if (!raster) {
+        raster = new Rasterizer();
+        this.rasters.set(model.rig, raster);
+      }
+      raster.setSize(w, h);
+      const rgba = raster.render(model.rig.root, this.camera);
       this.ctx.putImageData(new ImageData(rgba, w, h), 0, 0);
     }
     return this.surface;

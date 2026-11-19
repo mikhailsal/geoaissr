@@ -76,6 +76,7 @@
     <button
       type="button"
       class="btn copy-btn"
+      title={RU.lobby.copyInvite}
       bind:this={inviteButton}
       onclick={() => void copyInvite()}
     >

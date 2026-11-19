@@ -39,13 +39,13 @@ import {
   collectHarnessVersionWarnings,
   computeInitialTunnelView,
   openUrlInBrowser,
-  printStartupBanner,
   registerCrashHandlers,
   registerSignalHandlers,
   runShutdownSequence,
   runViteBuild,
   startTunnelPhase,
 } from './start-runtime.ts';
+import { printStartupBanner } from './start-banner.ts';
 
 export interface StartGeoServerDeps {
   skipClientBuild?: boolean;
@@ -232,6 +232,7 @@ async function runStartupAwaiters(opts: {
       ? opts.deps.buildClientFn()
       : runViteBuild(opts.paths.childrenFile);
   const tunnelPhase = startTunnelPhase({
+    hostUrl: opts.hostUrl,
     cli: opts.cli,
     boundPort,
     guestToken: opts.guestToken,

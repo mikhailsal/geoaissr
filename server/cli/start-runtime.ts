@@ -29,6 +29,7 @@ import {
 } from '../tunnel/cloudflared.ts';
 import { type StartCliOptions } from './preflight.ts';
 import { formatCliError } from './report-error.ts';
+import { printRemoteOwnerInvite } from './start-banner.ts';
 
 export function buildInitialSettings(opts: {
   settingsFile: string;
@@ -186,36 +187,6 @@ export async function waitPublicUrlReady(opts: {
   return errView;
 }
 
-export function printStartupBanner(opts: {
-  hostUrl: string;
-  tunnel: TunnelStatusView;
-  elapsedMs: number;
-  quotaLine: string;
-  harnesses: readonly HarnessCatalogEntry[];
-  fakeMode: boolean;
-}): void {
-  const sec = Math.max(1, Math.round(opts.elapsedMs / 1000));
-  const readyLabel =
-    opts.tunnel.mode === 'local'
-      ? `Сервер готов за ${sec} с (локальный режим --no-tunnel)`
-      : opts.tunnel.status === 'ready'
-        ? `Ссылка готова за ${sec} с`
-        : `Внимание: ${opts.tunnel.errorReason ?? 'ссылка ещё проверяется'}`;
-  const availableNames = opts.harnesses.filter((h) => h.available).map((h) => h.id);
-  console.log('\n=== geoaissr ===');
-  if (opts.fakeMode) console.log('Режим: ТЕСТОВЫЙ (--fake, без ключей Google и туннеля)');
-  console.log(`Ссылка хоста:       ${opts.hostUrl}`);
-  if (opts.tunnel.inviteUrl) {
-    console.log(`Приглашение гостям: ${opts.tunnel.inviteUrl}`);
-  }
-  console.log(`Статус:             ${readyLabel}`);
-  console.log(`Квота за месяц:     ${opts.quotaLine}`);
-  console.log(
-    `Харнессы ИИ:        ${availableNames.length > 0 ? availableNames.join(', ') : 'нет доступных'}`,
-  );
-  console.log('================\n');
-}
-
 export function buildQuotaSummaryForState(quotaManager: QuotaManager, state?: RoomState) {
   const botMoveLimits = (state?.settings.bots ?? [])
     .filter((b) => b.enabled)
@@ -328,6 +299,7 @@ export function buildConfiguredShell(opts: {
 }
 
 export function startTunnelPhase(opts: {
+  hostUrl: string;
   cli: StartCliOptions;
   boundPort: number;
   guestToken: string;
@@ -382,8 +354,9 @@ export function startTunnelPhase(opts: {
       onStatus: (tv) => {
         opts.logger.log('tunnel_event', { ...tv });
         opts.shell.dispatch({ type: 'tunnel_updated', tunnel: tv });
-        if (tv.changedSinceStart && tv.status === 'ready' && tv.inviteUrl) {
-          console.log(`\nНовый адрес приглашения: ${tv.inviteUrl}\n`);
+        if (resolved && tv.status === 'ready' && tv.inviteUrl) {
+          console.log(`\nНовый адрес приглашения: ${tv.inviteUrl}`);
+          printRemoteOwnerInvite(tv.inviteUrl, opts.hostUrl);
         }
         if (tv.status === 'ready' || tv.status === 'error') {
           finish(tv);

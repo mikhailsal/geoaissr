@@ -237,6 +237,10 @@ test('startGeoServer rejects concurrent second server on same dataDir and writes
 test('startGeoServer --public-url validates DNS + /healthz readiness and masks tokens', async () => {
   await withTempAppEnv(async () => {
     let buildRan = false;
+    const terminal: string[] = [];
+    const output = spyOn(console, 'log').mockImplementation((line: unknown) => {
+      terminal.push(String(line));
+    });
     const srv = await startGeoServer(
       {
         ...parseStartArgs(['--fake', '--public-url', 'https://play.geo-test.example', '--no-open']),
@@ -254,11 +258,18 @@ test('startGeoServer --public-url validates DNS + /healthz readiness and masks t
           return Promise.resolve(Response.json({ ok: true }));
         },
       },
-    );
+    ).finally(() => {
+      output.mockRestore();
+    });
     try {
       expect(buildRan).toBe(true);
       expect(srv.inviteUrl).toBe(`https://play.geo-test.example/#t=${srv.guestToken}`);
-      expect(srv.shell.getState().tunnel.status).toBe('ready');
+      const expectedOwner = `https://play.geo-test.example/?entry=owner#t=${srv.hostToken}`;
+      expect(terminal.some((line) => line.endsWith(expectedOwner))).toBe(true);
+      const tunnel = srv.shell.getState().tunnel;
+      expect(tunnel.status).toBe('ready');
+      expect(tunnel.inviteUrl === srv.inviteUrl).toBe(true);
+      expect(JSON.stringify(tunnel).includes(srv.hostToken)).toBe(false);
     } finally {
       await srv.stop();
     }

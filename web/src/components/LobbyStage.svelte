@@ -1,24 +1,33 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight, Rotate3d, Shirt, UsersRound } from '@lucide/svelte';
+  import {
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Rotate3d,
+    Shirt,
+    UsersRound,
+  } from '@lucide/svelte';
   import { onMount, type Snippet } from 'svelte';
   import { AVATAR_GESTURES, defaultAvatar } from '$shared/avatar';
   import type { ClientViewState } from '$shared/protocol';
   import { formatRoundsRu, pluralizeRu } from '../i18n/format';
   import { REGION_LABELS, RU } from '../i18n/ru';
   import { gestureLabels, type LobbyAvatars } from '../lib/lobby-avatars.svelte';
-  import OrbitAvatar from './OrbitAvatar.svelte';
+  import LobbyPerformer from './LobbyPerformer.svelte';
 
   let {
     view,
     avatars,
     connected,
     onEdit,
+    onOpenSettings,
     menu,
   }: {
     view: ClientViewState;
     avatars: LobbyAvatars;
     connected: boolean;
-    onEdit: (event: MouseEvent) => void;
+    onEdit: (event: MouseEvent, botId?: string) => void;
+    onOpenSettings: () => void;
     menu: Snippet;
   } = $props();
 
@@ -67,7 +76,9 @@
   }
 
   onMount(() => {
-    const media = window.matchMedia('(max-width: 600px)');
+    const media = window.matchMedia(
+      '(max-width: 600px), (orientation: landscape) and (max-height: 480px) and (max-width: 899px)',
+    );
     const resize = (): void => {
       narrow = media.matches;
     };
@@ -97,61 +108,57 @@
     </div>
     <div class="menu">{@render menu()}</div>
   </header>
-  <div class="lineup" class:pair={visible.length === 2}>
+  <div class="lineup">
     {#each visible as p, i (p.id)}
-      {@const gesture = avatars.playing[p.id]}
-      {@const name = p.slotLabel ?? p.name}
-      <article
-        aria-label={name}
-        class="performer pos-{i}"
-        class:away={!p.available}
-        data-gesture={gesture?.kind}
-        data-base={p.appearance.base}
-      >
-        <div class="figure">
-          <OrbitAvatar appearance={p.appearance} label={'Аватар ' + name} {gesture} />
-        </div>
-        <div class="nameplate" style:--participant-color={'var(--' + p.color + ')'}>
-          {p.slotLabel ?? `${p.name} · ${p.id === view.viewerId ? 'Вы' : p.ai ? 'ИИ' : 'Игрок'}`}
-        </div>
-        <div class="action-cue" role="status" aria-atomic="true">
-          {#if gesture}
-            <span class="sr-only">{name} — {gestureLabels[gesture.kind]}</span>
-            {#if gesture.kind === 'spin'}
-              <Rotate3d aria-hidden="true" />
-            {:else}
-              <img alt="" src={'/orbit-stage/emote-' + gesture.kind + '.png'} />
-            {/if}
-          {/if}
-        </div>
-      </article>
+      <LobbyPerformer
+        member={p}
+        position={i}
+        pair={visible.length === 2}
+        self={p.id === view.viewerId}
+        gesture={avatars.playing[p.id]}
+        onSpin={() => {
+          avatars.spin(p.id);
+        }}
+        canSpin={connected && avatars.canAnimate}
+        onEdit={p.ai && view.viewerIsHost
+          ? (event: MouseEvent) => {
+              onEdit(event, p.id);
+            }
+          : undefined}
+        {connected}
+      />
     {/each}
   </div>
-  {#if pages > 1}
-    <nav class="paging" aria-label="Страницы сцены">
-      <button
-        class="page-btn"
-        aria-label="Предыдущие участники"
-        disabled={current === 0}
-        onclick={() => {
-          page = current - 1;
-        }}><ChevronLeft /></button
-      >
-      <span>{current + 1} / {pages}</span>
-      <button
-        class="page-btn"
-        aria-label="Следующие участники"
-        disabled={current + 1 === pages}
-        onclick={() => {
-          page = current + 1;
-        }}><ChevronRight /></button
-      >
-    </nav>
-  {/if}
-
   <div class="deck">
-    <button class="wardrobe btn" onclick={onEdit} disabled={!me || !connected}
-      ><Shirt size={19} aria-hidden="true" />Изменить аватар</button
+    {#if pages > 1}
+      <nav class="paging" aria-label="Страницы сцены">
+        <button
+          class="page-btn"
+          aria-label="Предыдущие участники"
+          disabled={current === 0}
+          onclick={() => {
+            page = current - 1;
+          }}><ChevronLeft /></button
+        >
+        <span>{current + 1} / {pages}</span>
+        <button
+          class="page-btn"
+          aria-label="Следующие участники"
+          disabled={current + 1 === pages}
+          onclick={() => {
+            page = current + 1;
+          }}><ChevronRight /></button
+        >
+      </nav>
+    {/if}
+
+    <button
+      class="wardrobe btn"
+      onclick={(event) => {
+        onEdit(event, actor?.id);
+      }}
+      disabled={!me || !connected}
+      ><Shirt size={19} aria-hidden="true" />{actor ? 'Гардероб ИИ' : 'Изменить аватар'}</button
     >
     <div class="performance">
       {#if view.viewerIsHost && view.bots.length}
@@ -174,7 +181,7 @@
           <button
             class="gesture"
             type="button"
-            disabled={!connected}
+            disabled={!connected || !avatars.canAnimate}
             aria-label={gestureLabels[g]}
             title={gestureLabels[g]}
             onclick={() => {
@@ -189,18 +196,20 @@
         {/each}
       </div>
     </div>
+    <button type="button" class="details-link btn" onclick={onOpenSettings}>
+      Участники и настройки <ChevronDown size={18} aria-hidden="true" />
+    </button>
   </div>
 </section>
 
 <style>
   .scene {
     isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
     color: var(--paper);
-    overflow: hidden;
-    border: 1px solid var(--orbit-edge);
-    border-radius: var(--sp-4);
     background: var(--orbit-night) url('/orbit-stage/lunar-drift.webp') center 55% / cover no-repeat;
-    box-shadow: var(--shadow-panel);
   }
   header,
   .deck {
@@ -234,9 +243,7 @@
     flex-wrap: wrap;
   }
   .stats span,
-  .nameplate,
-  .paging,
-  .action-cue:not(:empty) {
+  .paging {
     border: 1px solid var(--orbit-edge);
     border-radius: var(--radius-sm);
     color: var(--paper);
@@ -254,82 +261,8 @@
   }
   .lineup {
     position: relative;
-    height: clamp(280px, 30vw, 378px);
+    flex: 1 0 min(26dvh, 240px);
   }
-  .performer {
-    position: absolute;
-    width: 26%;
-    left: 50%;
-    bottom: 0;
-    height: 100%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    z-index: 3;
-    pointer-events: none;
-  }
-  .performer.pos-1,
-  .performer.pos-2 {
-    width: 22%;
-    height: 85%;
-    bottom: 6%;
-    z-index: 2;
-  }
-  .performer.pos-1 {
-    left: 16%;
-  }
-  .performer.pos-2 {
-    left: 84%;
-  }
-  .performer.pos-3,
-  .performer.pos-4 {
-    width: 17%;
-    height: 70%;
-    bottom: 24%;
-    z-index: 1;
-  }
-  .performer.pos-3 {
-    left: 32%;
-  }
-  .performer.pos-4 {
-    left: 68%;
-  }
-  .pair .pos-0 {
-    left: 38%;
-  }
-  .pair .pos-1 {
-    left: 65%;
-  }
-  .figure {
-    width: 100%;
-    flex: 1;
-    min-height: 0;
-  }
-  .away .figure {
-    opacity: 0.65;
-  }
-  .nameplate {
-    flex: 0 0 auto;
-    max-width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    padding: 0.12rem 0.55rem;
-    font-size: 0.82rem;
-    font-weight: 650;
-    border-bottom: 2px solid var(--participant-color);
-  }
-  .action-cue:not(:empty) {
-    position: absolute;
-    right: 5%;
-    top: 3%;
-    padding: 5px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-  }
-  .action-cue img,
   .gesture img {
     width: 28px;
     height: 28px;
@@ -338,7 +271,6 @@
   .paging {
     display: flex;
     width: fit-content;
-    margin: var(--sp-2) var(--sp-3) 0 auto;
     align-items: center;
     gap: 2px;
     font-size: 0.85rem;
@@ -360,7 +292,8 @@
     border: 0;
   }
   .deck {
-    align-items: flex-end;
+    align-items: center;
+    gap: var(--sp-2);
     background: linear-gradient(transparent, var(--orbit-scrim));
   }
   .performance {
@@ -402,58 +335,151 @@
   .actor option {
     background: var(--orbit-night);
   }
-  @media (max-width: 600px) {
-    header,
-    .deck {
-      padding: var(--sp-3);
-    }
-    .lineup {
-      height: clamp(224px, 57vw, 300px);
-    }
-    .performer {
-      width: 41%;
-    }
-    .performer.pos-1,
-    .performer.pos-2 {
-      width: 30%;
-      height: 79%;
-      bottom: 12%;
-    }
-    .nameplate {
-      font-size: 0.72rem;
-      padding-inline: 0.35rem;
-    }
+  @media (max-width: 899px) {
     .deck {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: end;
+      align-items: center;
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas: 'wardrobe details' 'paging actor' 'gestures gestures';
+    }
+    .wardrobe {
+      grid-area: wardrobe;
+      justify-self: start;
+    }
+    .details-link {
+      grid-area: details;
+      justify-self: end;
+    }
+    .actor {
+      grid-area: actor;
+      justify-self: end;
+    }
+    .paging {
+      grid-area: paging;
     }
     .performance {
       display: contents;
     }
-    .wardrobe {
-      justify-self: start;
+    .gestures {
+      grid-area: gestures;
+      display: grid;
+      grid-template-columns: repeat(8, minmax(44px, 1fr));
+    }
+  }
+  @media (max-width: 600px) {
+    header,
+    .deck {
+      padding: var(--sp-2);
+    }
+    header,
+    .stats,
+    .menu :global(.host-menu-bar) {
+      gap: var(--sp-1);
+    }
+    .room h1 {
+      display: inline;
+    }
+    .stats span {
+      padding: 0.1rem var(--sp-1);
+      font-size: 0.75rem;
+    }
+    .menu :global(.fake-pill) {
       padding-inline: var(--sp-2);
     }
-    .gesture {
-      min-width: 44px;
+    .wardrobe,
+    .details-link {
+      padding-inline: var(--sp-2);
+      font-size: var(--text-xs);
     }
     .menu {
       width: 100%;
     }
     .menu :global(.btn) {
       padding-inline: var(--sp-2);
-    }
-    .gestures {
-      grid-column: 1 / -1;
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
+      font-size: var(--text-xs);
     }
     .actor {
       max-width: min(32vw, 11rem);
     }
   }
   @media (max-width: 445px) {
+    .gestures {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  @media (orientation: landscape) and (max-height: 480px) and (max-width: 899px) {
+    .scene {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(246px, 40%);
+      grid-template-rows: auto 1fr;
+    }
+    header {
+      grid-column: 1 / -1;
+      flex-wrap: nowrap;
+    }
+    header,
+    .deck {
+      gap: var(--sp-1);
+      padding: var(--sp-1) var(--sp-2);
+    }
+    .room h1 {
+      display: inline;
+      font-size: 1.4rem;
+    }
+    .stats,
+    .menu :global(.host-menu-bar) {
+      gap: var(--sp-1);
+    }
+    .stats span {
+      padding: 0 var(--sp-1);
+    }
+    .menu :global(.btn) {
+      padding-inline: var(--sp-2);
+      font-size: var(--text-xs);
+    }
+    .menu {
+      width: auto;
+    }
+    .menu :global(.host-menu-bar) {
+      flex-wrap: nowrap;
+    }
+    .menu :global(.fake-pill) {
+      padding-inline: var(--sp-1);
+      white-space: nowrap;
+    }
+    .menu :global(.copy-btn) {
+      width: var(--control-h);
+    }
+    .menu :global(.copy-btn span) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    .deck {
+      align-content: end;
+      grid-template-columns: minmax(116px, 1fr) minmax(0, 1fr);
+    }
+    .wardrobe,
+    .details-link {
+      width: 100%;
+      padding-inline: var(--sp-1);
+      font-size: var(--text-xs);
+    }
+    .actor {
+      width: 100%;
+      min-width: 0;
+    }
+    .paging {
+      gap: 0;
+      max-width: 100%;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+    .page-btn {
+      flex-shrink: 0;
+    }
     .gestures {
       grid-template-columns: repeat(4, 1fr);
     }
