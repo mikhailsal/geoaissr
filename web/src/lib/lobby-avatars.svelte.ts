@@ -2,7 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import { GESTURE_INTERVAL_MS, type AvatarAppearance, type AvatarGesture } from '$shared/avatar';
 import type { ClientViewState, ServerMessage } from '$shared/protocol';
 import { RU } from '../i18n/ru';
-import { nextSpin } from './avatar-spin';
+import { nextSpin, spinDuration } from './orbit/spin';
 import type { GeoWsClient } from './ws-client';
 
 import { gestureDuration, type OrbitGesture } from './orbit/types';
@@ -20,15 +20,12 @@ export const gestureLabels: Record<AvatarGesture, string> = {
 
 export class LobbyAvatars {
   playing = $state<Record<string, OrbitGesture | undefined>>({});
+  yawById = $state<Record<string, number | undefined>>({});
+  private lastTurnAt = -Infinity;
   private readonly timers = new SvelteMap<string, number>();
   private saveRequest: { seq: number; finish: (error: string | null) => void } | null = null;
 
-  private readonly pendingGestures = $state<
-    (
-      | { type: 'avatar_gesture'; gesture: AvatarGesture; botId?: string }
-      | { type: 'avatar_spin'; participantId: string }
-    )[]
-  >([]);
+  private readonly pendingGestures = $state<{ gesture: AvatarGesture; botId?: string }[]>([]);
   private gestureSeq: number | null = null;
   private cooldown: number | undefined;
 
@@ -39,38 +36,68 @@ export class LobbyAvatars {
   constructor(private readonly client: GeoWsClient) {}
 
   animate(gesture: AvatarGesture, botId?: string): void {
+    if (gesture === 'spin' && this.pendingGestures.length === 0) {
+      this.client.sendSequenced('avatar_gesture', { gesture, botId });
+      return;
+    }
     if (!this.canAnimate) return;
-    this.pendingGestures.push({ type: 'avatar_gesture', gesture, botId });
+    const last = this.pendingGestures.at(-1);
+    if (gesture === 'spin' && last?.gesture === gesture && last.botId === botId) return;
+    this.pendingGestures.push({ gesture, botId });
     this.sendNext();
   }
 
   spin(participantId: string): void {
-    if (!this.canAnimate) return;
-    this.pendingGestures.push({ type: 'avatar_spin', participantId });
-    this.sendNext();
+    if (this.client.sendSequenced('avatar_spin', { participantId }))
+      this.play(participantId, 'spin');
+  }
+
+  turn(participantId: string, angle: number, final: boolean): void {
+    const yaw = Math.atan2(Math.sin(angle), Math.cos(angle));
+    this.applyTurn(participantId, yaw);
+    const now = performance.now();
+    if (!final && now - this.lastTurnAt < 40) return;
+    this.lastTurnAt = now;
+    this.client.sendSequenced('avatar_turn', { participantId, yaw });
+  }
+
+  private applyTurn(participantId: string, yaw: number): void {
+    this.yawById[participantId] = yaw;
+    if (this.playing[participantId]?.kind !== 'spin') return;
+    window.clearTimeout(this.timers.get(participantId));
+    this.timers.delete(participantId);
+    this.playing[participantId] = undefined;
   }
 
   private sendNext(): void {
     if (this.gestureSeq !== null || this.cooldown !== undefined) return;
     const command = this.pendingGestures.shift();
     if (!command) return;
-    const { type, ...fields } = command;
-    const result = this.client.sendSequencedWithSeq(type, fields);
+    const result = this.client.sendSequencedWithSeq('avatar_gesture', command);
     if (result.sent) this.gestureSeq = result.seq;
     else this.pendingGestures.length = 0;
   }
 
-  receive({ participantId, gesture }: Extract<ServerMessage, { type: 'avatar_gesture' }>): void {
+  receive(msg: Extract<ServerMessage, { type: 'avatar_turn' | 'avatar_gesture' }>): void {
+    if (msg.type === 'avatar_turn') this.applyTurn(msg.participantId, msg.yaw);
+    else this.play(msg.participantId, msg.gesture);
+  }
+
+  private play(participantId: string, gesture: AvatarGesture): void {
     window.clearTimeout(this.timers.get(participantId));
     const at = Date.now();
-    this.playing[participantId] =
+    const motion =
       gesture === 'spin' ? nextSpin(this.playing[participantId], at) : { kind: gesture, at };
+    this.playing[participantId] = motion;
     this.timers.set(
       participantId,
-      window.setTimeout(() => {
-        this.playing[participantId] = undefined;
-        this.timers.delete(participantId);
-      }, gestureDuration[gesture]),
+      window.setTimeout(
+        () => {
+          this.playing[participantId] = undefined;
+          this.timers.delete(participantId);
+        },
+        gesture === 'spin' ? spinDuration(motion) : gestureDuration[gesture],
+      ),
     );
   }
 
@@ -117,5 +144,7 @@ export class LobbyAvatars {
     for (const timer of this.timers.values()) window.clearTimeout(timer);
     this.timers.clear();
     this.playing = {};
+    this.yawById = {};
+    this.lastTurnAt = -Infinity;
   }
 }

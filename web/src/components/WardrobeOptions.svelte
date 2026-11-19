@@ -6,10 +6,11 @@
 
   interface Props {
     field: AvatarSlot;
+    disabled?: boolean;
     look: AvatarAppearance;
     onChange: (look: AvatarAppearance) => void;
   }
-  let { field: slot, look, onChange }: Props = $props();
+  let { field: slot, look, disabled = false, onChange }: Props = $props();
   const color = $derived(colorControl(slot, look));
   const actualColor = $derived(
     color && (look[color.key] === 'match' ? look.hairColor : look[color.key]),
@@ -21,6 +22,7 @@
   {#each choices as item (item.id)}
     <button
       type="button"
+      {disabled}
       class="tile"
       aria-pressed={look[slot] === item.id}
       onclick={() => {
@@ -46,6 +48,7 @@
       {#each color.palette as swatch (swatch.id)}
         <button
           type="button"
+          {disabled}
           class="swatch"
           aria-label={swatch.label}
           title={swatch.label}
@@ -60,6 +63,7 @@
       <label class="custom">
         <input
           type="color"
+          {disabled}
           value={actualColor}
           aria-label="Свой цвет"
           onchange={(e) => {
@@ -73,6 +77,7 @@
       <label class="link"
         ><input
           type="checkbox"
+          {disabled}
           checked={look[color.key] === 'match'}
           onchange={(e) => {
             onChange({

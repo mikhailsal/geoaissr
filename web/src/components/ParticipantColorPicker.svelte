@@ -22,7 +22,7 @@
   }: Props = $props();
 </script>
 
-<fieldset class:compact>
+<fieldset class:compact {disabled}>
   <legend>{legend}</legend>
   <div class="swatches" role="radiogroup" aria-label={label ?? legend}>
     {#each PARTICIPANT_COLORS as color (color.id)}
@@ -66,6 +66,9 @@
   button:disabled {
     opacity: 0.28;
     cursor: not-allowed;
+  }
+  fieldset:disabled button.selected {
+    opacity: 1;
   }
   .compact {
     margin: 0;

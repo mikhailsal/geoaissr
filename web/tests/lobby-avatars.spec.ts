@@ -216,14 +216,33 @@ test('mobile stage paging keeps the right-hand gesture visible and the viewer on
   const server = await startIsolatedFakeServer({ seedBot: true });
   const host = await browser.newPage();
   const guest = await browser.newPage({ viewport: { width: 390, height: 740 } });
+  const extras = await Promise.all(
+    ['Марс', 'Вега'].map(async (name) => ({
+      page: await browser.newPage({ reducedMotion: 'reduce' }),
+      name,
+    })),
+  );
   try {
     await join(host, server.hostUrl, hostName);
     await join(guest, server.guestUrl, guestName);
+    await Promise.all(extras.map(({ page, name }) => join(page, server.guestUrl, name)));
     await host.getByRole('button', { name: 'Участники', exact: true }).click();
-    await host.getByRole('button', { name: '+ Добавить ИИ', exact: true }).click();
+    const roster = host.getByRole('dialog', { name: 'Участники', exact: true });
+    const add = roster.getByRole('button', { name: '+ Добавить ИИ', exact: true });
+    await add.click();
+    await expect(roster.getByRole('button', { name: /^Настройки /u })).toHaveCount(2);
+    await add.click();
     await host.keyboard.press('Escape');
     const pager = guest.getByRole('navigation', { name: 'Страницы сцены' });
     await expect(pager).toBeVisible();
+    await expect(guest.getByRole('article')).toHaveCount(6);
+    await host.setViewportSize({ width: 320, height: 568 });
+    const spinTargets = host.getByRole('button', { name: /^Повернуть на 360°:/u });
+    await expect(spinTargets).toHaveCount(6);
+    const heights = await spinTargets.evaluateAll((buttons) =>
+      buttons.map((button) => button.getBoundingClientRect().height),
+    );
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
     await host.getByLabel('Жесты персонажа').selectOption({ label: `ИИ · ${botName}` });
     await host.getByRole('button', { name: 'Помахать', exact: true }).click();
     const cue = card(guest, botName).getByRole('status');
@@ -240,9 +259,17 @@ test('mobile stage paging keeps the right-hand gesture visible and the viewer on
     await pager.getByRole('button', { name: 'Следующие участники' }).click();
     await expect(card(guest, guestName)).toBeVisible();
     await expect(card(guest, botName)).toHaveCount(0);
+    await expect(guest.getByRole('article')).toHaveCount(2);
+    const lastBot = await guest.getByRole('article').last().getAttribute('aria-label');
+    if (!lastBot) throw new Error('Missing the last bot on the second page');
+    await host.getByLabel('Жесты персонажа').selectOption({ label: lastBot });
+    await expect(card(host, lastBot)).toBeVisible();
+    await host.getByRole('button', { name: 'Помахать', exact: true }).click();
+    await expect(card(guest, lastBot).getByRole('status')).toContainText('Помахать');
     await pager.getByRole('button', { name: 'Предыдущие участники' }).click();
     await expect(card(guest, botName)).toBeVisible();
   } finally {
+    await Promise.all(extras.map(({ page }) => page.close()));
     await guest.close();
     await host.close();
     await server.stop();
@@ -324,8 +351,8 @@ test('a host opens the robot wardrobe from its stage button and the selected act
     const wardrobe = `Открыть гардероб: ${botName}`;
     const edit = card(host, botName).getByRole('button', { name: wardrobe });
     await card(guest, botName).getByRole('button', { name: wardrobe }).click();
-    await expect(guest.getByRole('heading', { name: 'Образ персонажа' })).toBeVisible();
-    await expect(guest.getByRole('button', { name: 'Сохранить образ' })).toHaveCount(0);
+    await expect(guest.getByRole('group', { name: 'Разделы гардероба' })).toBeVisible();
+    await expect(guest.getByRole('button', { name: 'Сохранить образ' })).toBeDisabled();
     await guest.keyboard.press('Escape');
     await edit.click();
     const dialog = host.getByRole('dialog', { name: `Гардероб: ${botName}` });

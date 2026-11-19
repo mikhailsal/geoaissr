@@ -2,16 +2,22 @@
   import { onMount } from 'svelte';
   import type { AvatarAppearance } from '$shared/avatar';
   import { mountStage } from '../lib/orbit/client';
+  import { trackPointerGaze } from '../lib/orbit/pointer-gaze';
+  import { spinDuration } from '../lib/orbit/spin';
   import { gestureDuration, type OrbitGesture } from '../lib/orbit/types';
 
   let {
     appearance,
     label,
     gesture = null,
+    yaw = 0,
+    followPointer = false,
   }: {
     appearance: AvatarAppearance;
     label: string;
     gesture?: OrbitGesture | null;
+    yaw?: number;
+    followPointer?: boolean;
   } = $props();
 
   let canvas: HTMLCanvasElement;
@@ -20,6 +26,8 @@
   let height = $state(0);
   let visible = $state(false);
   let reduced = $state(false);
+  let gazeX = $state(0);
+  let gazeY = $state(0);
   let active = $state<OrbitGesture | null>(null);
 
   onMount(() => {
@@ -58,7 +66,13 @@
   });
 
   $effect(() => {
-    const remaining = gesture ? gesture.at + gestureDuration[gesture.kind] - Date.now() : 0;
+    if (!gesture) {
+      active = null;
+      return;
+    }
+    const duration =
+      gesture.kind === 'spin' ? spinDuration(gesture) : gestureDuration[gesture.kind];
+    const remaining = gesture.at + duration - Date.now();
     active = remaining > 0 ? gesture : null;
     if (remaining > 0) {
       const timer = setTimeout(() => {
@@ -71,11 +85,21 @@
   });
 
   $effect(() => {
+    if (followPointer && visible && !reduced) {
+      return trackPointerGaze(canvas, (x, y) => {
+        gazeX = x;
+        gazeY = y;
+      });
+    }
+  });
+
+  $effect(() => {
     stage?.update({
       appearance: { ...appearance },
-      gesture: active
-        ? { ...active, spinTimes: active.spinTimes ? [...active.spinTimes] : undefined }
-        : null,
+      gesture: active ? { ...active } : null,
+      yaw,
+      gazeX,
+      gazeY,
       width,
       height,
       reduced,

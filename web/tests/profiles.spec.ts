@@ -467,7 +467,7 @@ test('six-hour badges span every phase and individual bot resets survive restart
     const guestRoster = await openLobbyDialog(guest, 'Участники');
     await guestRoster.getByRole('button', { name: 'Настройки Первый', exact: true }).click();
     await expect(guest.getByLabel('Имя бота')).toBeDisabled();
-    await expect(guest.getByRole('button', { name: /^Сбросить победы/ })).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: /^Сбросить победы/ })).toBeDisabled();
     await guest.keyboard.press('Escape');
     await host.getByRole('button', { name: 'Начать', exact: true }).click();
     await expect(host.getByTestId('fake-guess-map')).toBeVisible({ timeout: 12_000 });

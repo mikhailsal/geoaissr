@@ -4,7 +4,14 @@ export interface OrbitRig {
   root: Group;
   update(
     seconds: number,
-    pose: { gesture?: string; progress?: number; spinWindup?: number; spinDrive?: number },
+    pose: {
+      gazeX?: number;
+      gazeY?: number;
+      gesture?: string;
+      progress?: number;
+      spinWindup?: number;
+      spinDrive?: number;
+    },
   ): void;
   dispose(): void;
 }

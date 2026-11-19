@@ -50,7 +50,7 @@ export interface WsClientCallbacks {
   onJoinOk: (msg: Extract<ServerMessage, { type: 'join_ok' }>) => void;
   onJoinError: (msg: Extract<ServerMessage, { type: 'join_error' }>) => void;
   onAck: (msg: Extract<ServerMessage, { type: 'ack' }>) => void;
-  onAvatarGesture: (msg: Extract<ServerMessage, { type: 'avatar_gesture' }>) => void;
+  onAvatarMotion: (msg: Extract<ServerMessage, { type: 'avatar_turn' | 'avatar_gesture' }>) => void;
   onVisionCheckResult: (msg: Extract<ServerMessage, { type: 'vision_check_result' }>) => void;
   onState: (msg: Extract<ServerMessage, { type: 'state' }>) => void;
   onSummaryUpdate?: (summary: LobbySummary) => void;
@@ -424,8 +424,9 @@ export class GeoWsClient {
       case 'ack':
         this.callbacks.onAck(msg);
         break;
+      case 'avatar_turn':
       case 'avatar_gesture':
-        this.callbacks.onAvatarGesture(msg);
+        this.callbacks.onAvatarMotion(msg);
         break;
       case 'vision_check_result':
         this.callbacks.onVisionCheckResult(msg);

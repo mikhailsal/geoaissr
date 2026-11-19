@@ -40,3 +40,8 @@ export const avatarSpinMessageSchema = z
     participantId: z.string().min(1).max(64),
   })
   .strict();
+
+export const avatarTurnMessageSchema = avatarSpinMessageSchema.extend({
+  type: z.literal('avatar_turn'),
+  yaw: z.number().finite().min(-Math.PI).max(Math.PI),
+});

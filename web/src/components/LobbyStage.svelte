@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Settings2, Play, ChevronLeft, ChevronRight, Shirt, UsersRound } from '@lucide/svelte';
-  import { onMount, type Snippet } from 'svelte';
+  import type { Snippet } from 'svelte';
   import { defaultAvatar, type AvatarGesture } from '$shared/avatar';
   import type { ClientViewState } from '$shared/protocol';
   import { RU } from '../i18n/ru';
@@ -34,11 +34,10 @@
   } = $props();
 
   let page = $state(0);
-  let narrow = $state(false);
   let actingBot = $state('');
   const human = defaultAvatar(false);
   const robot = defaultAvatar(true);
-  const othersPerPage = $derived(narrow ? 2 : 4);
+  const othersPerPage = 5;
   const stageBots = $derived(
     view.bots.map((bot, index, bots) => ({
       ...bot,
@@ -76,20 +75,6 @@
     const index = others.findIndex((p) => p.id === id);
     if (index >= 0) page = Math.floor(index / othersPerPage);
   }
-
-  onMount(() => {
-    const media = window.matchMedia(
-      '(max-width: 600px), (orientation: landscape) and (max-height: 480px) and (max-width: 899px)',
-    );
-    const resize = (): void => {
-      narrow = media.matches;
-    };
-    resize();
-    media.addEventListener('change', resize);
-    return () => {
-      media.removeEventListener('change', resize);
-    };
-  });
 </script>
 
 <section class="scene" aria-label="Сцена лобби">
@@ -127,13 +112,17 @@
       <LobbyPerformer
         member={p}
         position={i}
-        pair={visible.length === 2}
+        count={visible.length}
         self={p.id === view.viewerId}
         gesture={avatars.playing[p.id]}
         onSpin={() => {
           avatars.spin(p.id);
         }}
-        canSpin={connected && avatars.canAnimate}
+        manualYaw={avatars.yawById[p.id] ?? 0}
+        onTurn={(yaw: number, final: boolean) => {
+          avatars.turn(p.id, yaw, final);
+        }}
+        canSpin={connected}
         onEdit={(event: MouseEvent) => {
           onEdit(event, p.id, p.ai);
         }}
@@ -255,12 +244,6 @@
     gap: 6px;
     flex-wrap: wrap;
   }
-  .paging {
-    border: 1px solid var(--orbit-edge);
-    border-radius: var(--radius-sm);
-    color: var(--paper);
-    background: var(--orbit-plate);
-  }
   .room-actions .btn {
     padding-inline: var(--sp-2);
     font-size: var(--text-xs);
@@ -291,6 +274,10 @@
     flex: 1 0 min(26dvh, 240px);
   }
   .paging {
+    border: 1px solid var(--orbit-edge);
+    border-radius: var(--radius-sm);
+    color: var(--paper);
+    background: var(--orbit-plate);
     display: flex;
     width: fit-content;
     align-items: center;
@@ -364,6 +351,21 @@
       display: contents;
     }
   }
+  @media (max-width: 600px) and (orientation: portrait) {
+    .room {
+      width: 100%;
+    }
+    .room h1 {
+      font-size: clamp(1.27rem, 6vw, 1.75rem);
+    }
+    .room-actions {
+      flex-wrap: nowrap;
+    }
+    .deck:not(:has(.paging)) {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas: 'wardrobe actor launch' 'gestures gestures gestures';
+    }
+  }
   @media (max-width: 600px) {
     header,
     .deck {
@@ -373,9 +375,6 @@
     .room-actions,
     .menu :global(.host-menu-bar) {
       gap: var(--sp-1);
-    }
-    .room h1 {
-      display: inline;
     }
     .menu :global(.fake-pill) {
       padding-inline: var(--sp-2);
@@ -396,7 +395,31 @@
       max-width: min(32vw, 11rem);
     }
   }
+  @media (max-width: 600px) and (orientation: portrait),
+    (orientation: landscape) and (min-width: 630px) and (max-height: 330px) {
+    .room {
+      display: grid;
+      grid-template-columns: auto auto;
+      align-items: center;
+      column-gap: var(--sp-2);
+    }
+    .room .eyebrow,
+    .room h1 {
+      grid-column: 1;
+      margin: 0;
+    }
+    .room-actions {
+      grid-column: 2;
+      grid-row: 1 / 3;
+    }
+    .room-actions span {
+      display: none;
+    }
+  }
   @media (orientation: landscape) and (max-height: 480px) and (max-width: 899px) {
+    .room-actions span {
+      display: none;
+    }
     .scene {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(246px, 40%);
@@ -422,9 +445,6 @@
     .room-actions .btn {
       gap: var(--sp-1);
       padding-inline: var(--sp-1);
-    }
-    .room-actions span {
-      display: none;
     }
     .menu :global(.btn) {
       padding-inline: var(--sp-2);

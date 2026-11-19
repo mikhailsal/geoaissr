@@ -3,9 +3,8 @@
   import { untrack } from 'svelte';
   import type { ParticipantColorId } from '$shared/colors';
   import ParticipantColorPicker from './ParticipantColorPicker.svelte';
-  interface Props {
-    name: string;
-    color: ParticipantColorId;
+  interface PrivateControls {
+    publicOnly?: false;
     profileToken?: string;
     editable?: boolean;
     onLogout: () => void;
@@ -14,7 +13,12 @@
     onSave: (nick: string, color: ParticipantColorId) => void;
     onClose?: () => void;
   }
+  type PublicControls = { publicOnly: true } & {
+    [Key in Exclude<keyof PrivateControls, 'publicOnly'>]?: never;
+  };
+  type Props = { name: string; color: ParticipantColorId } & (PrivateControls | PublicControls);
   let {
+    publicOnly = false,
     name,
     color,
     profileToken,
@@ -37,10 +41,10 @@
 <form
   onsubmit={(e) => {
     e.preventDefault();
-    if (editable && !pending && nick.trim()) onSave(nick.trim(), selected);
+    if (!publicOnly && editable && !pending && nick.trim()) onSave?.(nick.trim(), selected);
   }}
 >
-  {#if profileToken}
+  {#if !publicOnly && profileToken}
     <label
       >Код профиля<input
         class="field-input"
@@ -69,7 +73,9 @@
     <label
       >Имя<input
         class="field-input"
-        bind:value={nick}
+        value={publicOnly ? name : nick}
+        disabled={publicOnly}
+        oninput={(event) => (nick = event.currentTarget.value)}
         bind:this={nameInput}
         maxlength="20"
         required
@@ -77,17 +83,18 @@
     >
     <ParticipantColorPicker
       legend="Цвет"
-      {selected}
+      selected={publicOnly ? color : selected}
+      disabled={publicOnly}
       onSelect={(next: ParticipantColorId) => (selected = next)}
     />
   {/if}
   {#if error}<p role="alert">{error}</p>{/if}
   <div class="actions">
     {#if onClose}<button type="button" class="btn" onclick={onClose}>Закрыть</button>{/if}
-    {#if editable}<button class="btn btn-primary" disabled={pending || !nick.trim()}
+    {#if editable}<button class="btn btn-primary" disabled={publicOnly || pending || !nick.trim()}
         >Сохранить</button
       >{/if}
-    <button type="button" class="btn" onclick={onLogout}>Выйти</button>
+    {#if !publicOnly}<button type="button" class="btn" onclick={onLogout}>Выйти</button>{/if}
   </div>
 </form>
 

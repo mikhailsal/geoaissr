@@ -2,7 +2,6 @@
   import { onMount, untrack, type Snippet } from 'svelte';
   import { dismissOnBackdrop } from '../lib/dialog';
   import CharacterTabs from './CharacterTabs.svelte';
-  import OutfitDetails from './OutfitDetails.svelte';
   import { Check, Dices, RotateCcw, X } from '@lucide/svelte';
   import type { AvatarAppearance } from '$shared/avatar';
   import type { AvatarSlot } from '$shared/avatar-catalog';
@@ -47,15 +46,16 @@
   );
   let dialog: HTMLDialogElement;
   let draft = $state(untrack(() => ({ ...appearance })));
+  const look = $derived(readOnly ? appearance : draft);
   let group = $state('Образ');
   let slot = $state<AvatarSlot>('outfit');
   let content = $state<HTMLDivElement>();
   const slots = $derived(groups.find((g) => g.name === group)?.slots ?? []);
   const selectedPreset = $derived(
     presets.find((p) => {
-      const look = applyPreset(draft, p);
-      return (Object.keys(look) as (keyof AvatarAppearance)[]).every(
-        (key) => look[key] === draft[key],
+      const preset = applyPreset(look, p);
+      return (Object.keys(preset) as (keyof AvatarAppearance)[]).every(
+        (key) => preset[key] === look[key],
       );
     })?.id,
   );
@@ -94,115 +94,121 @@
   <div class="studio">
     <div class="preview">
       <div class="stage">
-        <TurnableAvatar appearance={readOnly ? appearance : draft} {name} preview />
+        <TurnableAvatar appearance={look} {name} preview />
       </div>
-      {#if !readOnly && tab === 'appearance'}<div class="preview-tools">
-          <button type="button" class="btn" onclick={() => (draft = shuffle(draft))}
-            ><Dices size={18} aria-hidden="true" /> Случайный образ</button
-          >
-          <button
-            type="button"
-            class="btn icon"
-            aria-label="Вернуть сохранённый образ"
-            title="Вернуть сохранённый образ"
-            onclick={() => (draft = { ...appearance })}
-            ><RotateCcw size={18} aria-hidden="true" /></button
-          >
-        </div>{/if}
+      <div class="preview-tools" class:concealed={tab !== 'appearance'}>
+        <button
+          type="button"
+          class="btn"
+          disabled={readOnly}
+          onclick={() => (draft = shuffle(draft))}
+          ><Dices size={18} aria-hidden="true" /> Случайный образ</button
+        >
+        <button
+          type="button"
+          class="btn icon"
+          aria-label="Вернуть сохранённый образ"
+          title="Вернуть сохранённый образ"
+          disabled={readOnly}
+          onclick={() => (draft = { ...appearance })}
+          ><RotateCcw size={18} aria-hidden="true" /></button
+        >
+      </div>
     </div>
     {#if profile}<div class="settings" hidden={tab !== 'profile'}>{@render profile()}</div>{/if}
     {#if botSettings}<div class="settings" hidden={tab !== 'bot'}>{@render botSettings()}</div>{/if}
-    {#if readOnly}
-      <div class="settings" hidden={tab !== 'appearance'}><OutfitDetails {appearance} /></div>
-    {:else}
-      <div class="inspector" hidden={tab !== 'appearance'}>
-        <div class="sections" role="group" aria-label="Разделы гардероба">
-          {#each groups as categoryGroup (categoryGroup.name)}
+    <div class="inspector" hidden={tab !== 'appearance'}>
+      <div class="sections" role="group" aria-label="Разделы гардероба">
+        {#each groups as categoryGroup (categoryGroup.name)}
+          <button
+            type="button"
+            aria-pressed={categoryGroup.name === group}
+            onclick={() => {
+              category(categoryGroup);
+            }}>{categoryGroup.name}</button
+          >
+        {/each}
+      </div>
+      <div class="content" bind:this={content}>
+        {#if slots.length}
+          <div class="subnav" role="group" aria-label="Настройки раздела">
+            {#each slots as field (field)}
+              <button type="button" aria-pressed={field === slot} onclick={() => (slot = field)}
+                >{slotNames[field]}</button
+              >
+            {/each}
+          </div>
+          <WardrobeOptions
+            field={slot}
+            {look}
+            disabled={readOnly}
+            onChange={(next: AvatarAppearance) => {
+              draft = next;
+            }}
+          />
+        {:else}
+          <fieldset class="bases">
+            <legend>Основа персонажа</legend>
             <button
               type="button"
-              aria-pressed={categoryGroup.name === group}
-              onclick={() => {
-                category(categoryGroup);
-              }}>{categoryGroup.name}</button
+              disabled={readOnly}
+              aria-pressed={look.base === 'human'}
+              onclick={() => (draft = { ...draft, base: 'human' })}>Человек</button
             >
-          {/each}
-        </div>
-        <div class="content" bind:this={content}>
-          {#if slots.length}
-            <div class="subnav" role="group" aria-label="Настройки раздела">
-              {#each slots as field (field)}
-                <button type="button" aria-pressed={field === slot} onclick={() => (slot = field)}
-                  >{slotNames[field]}</button
-                >
-              {/each}
-            </div>
-            <WardrobeOptions
-              field={slot}
-              look={draft}
-              onChange={(next: AvatarAppearance) => {
-                draft = next;
-              }}
-            />
-          {:else}
-            <fieldset class="bases">
-              <legend>Основа персонажа</legend>
+            <button
+              type="button"
+              disabled={readOnly}
+              aria-pressed={look.base === 'robot'}
+              onclick={() => (draft = { ...draft, base: 'robot' })}>Робот</button
+            >
+          </fieldset>
+          <h3>Готовые образы</h3>
+          <div class="presets">
+            {#each presets as preset, index (preset.id)}
               <button
+                class="preset"
                 type="button"
-                aria-pressed={draft.base === 'human'}
-                onclick={() => (draft = { ...draft, base: 'human' })}>Человек</button
+                disabled={readOnly}
+                aria-pressed={selectedPreset === preset.id}
+                onclick={() => (draft = applyPreset(draft, preset))}
               >
-              <button
-                type="button"
-                aria-pressed={draft.base === 'robot'}
-                onclick={() => (draft = { ...draft, base: 'robot' })}>Робот</button
-              >
-            </fieldset>
-            <h3>Готовые образы</h3>
-            <div class="presets">
-              {#each presets as preset, index (preset.id)}
-                <button
-                  class="preset"
-                  type="button"
-                  aria-pressed={selectedPreset === preset.id}
-                  onclick={() => (draft = applyPreset(draft, preset))}
-                >
-                  <span
+                <span
+                  aria-hidden="true"
+                  class="thumbnail"
+                  style={thumbnail('look', index, presets.length)}
+                ></span>
+                <span>{preset.label}</span>
+                {#if selectedPreset === preset.id}<Check
+                    size={16}
+                    class="mark"
                     aria-hidden="true"
-                    class="thumbnail"
-                    style={thumbnail('look', index, presets.length)}
-                  ></span>
-                  <span>{preset.label}</span>
-                  {#if selectedPreset === preset.id}<Check
-                      size={16}
-                      class="mark"
-                      aria-hidden="true"
-                    />{/if}
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
+                  />{/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
       </div>
-    {/if}
+    </div>
   </div>
-  {#if tab === 'appearance' && !readOnly}<footer>
-      {#if error}<span role="alert">{error}</span>{/if}
-      <button
-        type="button"
-        class="btn"
-        onclick={() => {
-          dialog.close();
-        }}>Отмена</button
-      >
-      <button
+  <footer>
+    {#if tab === 'appearance' && error}<span role="alert">{error}</span>{/if}
+    <button
+      type="button"
+      class="btn"
+      onclick={() => {
+        dialog.close();
+      }}>{tab === 'appearance' && !readOnly ? 'Отмена' : 'Закрыть'}</button
+    >
+    {#if tab === 'appearance'}<button
         type="button"
         class="btn btn-primary"
-        disabled={pending}
+        disabled={readOnly || pending}
         onclick={() => {
           onSave({ ...draft });
         }}>{pending ? 'Сохранение…' : 'Сохранить образ'}</button
       >
-    </footer>{/if}
+    {/if}
+  </footer>
 </dialog>
 
 <style>
@@ -273,11 +279,17 @@
     min-height: 0;
     overflow: hidden;
   }
+  .stage :global(canvas) {
+    object-fit: contain;
+  }
   .preview-tools {
     justify-content: center;
     flex-wrap: wrap;
     padding: var(--sp-2);
     background: var(--orbit-scrim);
+  }
+  .preview-tools.concealed {
+    visibility: hidden;
   }
   .inspector {
     display: flex;
@@ -397,10 +409,12 @@
       flex-direction: row;
     }
     .preview-tools {
+      position: absolute;
+      right: 0;
+      bottom: 0;
       background: transparent;
-      align-self: flex-end;
       display: grid;
-      max-width: 40%;
+      max-width: 36%;
       justify-items: end;
     }
     .preview-tools .btn {

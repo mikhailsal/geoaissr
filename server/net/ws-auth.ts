@@ -70,6 +70,10 @@ function sendState(ctx: CoordCtx, ws: ServerWebSocket<WsClientData>): void {
     version: ++ctx.versionRef.value,
     view: ctx.shell.getView(ws.data.playerId ?? '__unjoined__'),
   });
+  if (ws.data.playerId && ctx.shell.getState().phase === 'LOBBY') {
+    for (const [participantId, yaw] of ctx.avatarTurns)
+      sendJson(ws, { type: 'avatar_turn', serverNow: Date.now(), participantId, yaw });
+  }
 }
 export function profileError(
   ws: ServerWebSocket<WsClientData>,

@@ -526,7 +526,11 @@ export function bindAvatar(root,bindings) {
     chest.position.y=approach(chest.position.y,.916+.006*breath,k);
     chest.rotation.set(approach(chest.rotation.x,.004*breath+bodyPitch*blend,k),approach(chest.rotation.y,-.027+.023*nod+bodyYaw*blend,k),approach(chest.rotation.z,-.013+.010*sway+bodyLean*blend,k));
     chest.scale.y=1+.0045*breath;
-    head.rotation.set(approach(head.rotation.x,.009*breath-.025*gazeV+headPitch*blend,k),approach(head.rotation.y,.047+.024*nod+.070*gazeH+headYaw*blend,k),approach(head.rotation.z,.027+.012*Math.sin(t*.79+.32)+headRoll*blend,k));
+    head.rotation.set(
+      approach(head.rotation.x, .009 * breath - .10 * gazeV + headPitch * blend, k),
+      approach(head.rotation.y, .047 + .024 * nod + .24 * gazeH + headYaw * blend, k),
+      approach(head.rotation.z, .027 + .012 * Math.sin(t * .79 + .32) + headRoll * blend, k),
+    );
     const eyelid=(x,center,width)=>Math.exp(-Math.pow((x-center)/width,2));
     const tick=(t+1.22)%8.67;
     const blink=Math.max(eyelid(tick,2.29,.074),eyelid(tick,6.25,.079),eyelid(tick,6.55,.064));

@@ -190,7 +190,7 @@ export class GameStore extends GameCommands {
       },
       onJoinError: this.applyJoinError.bind(this),
       onAck: this.handleAck.bind(this),
-      onAvatarGesture: (msg) => {
+      onAvatarMotion: (msg) => {
         this.avatars.receive(msg);
       },
       onVisionCheckResult: (msg) => {

@@ -17,25 +17,41 @@
   let {
     member,
     position,
-    pair,
+    count,
     self,
     gesture,
     onSpin,
+    manualYaw,
+    onTurn,
     canSpin,
     onEdit,
     editable,
   }: {
     member: Member;
     position: number;
-    pair: boolean;
+    count: number;
     self: boolean;
     gesture?: OrbitGesture;
     onSpin: () => void;
+    manualYaw: number;
+    onTurn: (yaw: number, final: boolean) => void;
     canSpin: boolean;
     onEdit: (event: MouseEvent) => void;
     editable: boolean;
   } = $props();
   const name = $derived(member.slotLabel ?? member.name);
+  // Percent from the lineup's left edge. Each row gets its own horizontal spacing.
+  const columns = [
+    [],
+    [50],
+    [50, 78],
+    [50, 16, 84],
+    [50, 16, 84, 50],
+    [50, 16, 84, 31, 69],
+    [50, 16, 84, 17, 83, 50],
+  ];
+  const column = $derived(columns[count]?.[position] ?? 50);
+  const facingYaw = $derived((50 - column) * 0.012);
   const caption = $derived(
     member.slotLabel ?? `${member.name} · ${self ? 'Вы' : member.ai ? 'ИИ' : 'Игрок'}`,
   );
@@ -44,14 +60,25 @@
 <article
   aria-label={name}
   class="performer pos-{position}"
-  class:pair
+  class:crowded={count >= 4}
   class:away={!member.available}
   data-gesture={gesture?.kind}
   data-base={member.appearance.base}
+  style:left={`${String(column)}%`}
   style:--participant-color={'var(--' + member.color + ')'}
 >
   <div class="figure">
-    <TurnableAvatar appearance={member.appearance} {name} {gesture} {onSpin} disabled={!canSpin} />
+    <TurnableAvatar
+      appearance={member.appearance}
+      {name}
+      {gesture}
+      {onSpin}
+      {onTurn}
+      {manualYaw}
+      {facingYaw}
+      followPointer={self}
+      disabled={!canSpin}
+    />
   </div>
   <button
     type="button"
@@ -88,7 +115,6 @@
   .performer {
     position: absolute;
     width: 26%;
-    left: 50%;
     bottom: 0;
     height: 100%;
     transform: translateX(-50%);
@@ -105,30 +131,21 @@
     bottom: 6%;
     z-index: 2;
   }
-  .performer.pos-1 {
-    left: 16%;
+  .crowded.pos-0 {
+    height: 53%;
   }
-  .performer.pos-2 {
-    left: 84%;
+  .crowded.pos-1,
+  .crowded.pos-2 {
+    height: 51%;
+    bottom: 1%;
   }
-  .performer.pos-3,
-  .performer.pos-4 {
-    width: 17%;
-    height: 70%;
-    bottom: 24%;
+  .crowded.pos-3,
+  .crowded.pos-4,
+  .crowded.pos-5 {
+    width: 25%;
+    height: 46%;
+    bottom: 54%;
     z-index: 1;
-  }
-  .performer.pos-3 {
-    left: 32%;
-  }
-  .performer.pos-4 {
-    left: 68%;
-  }
-  .pair.pos-0 {
-    left: 38%;
-  }
-  .pair.pos-1 {
-    left: 65%;
   }
   .figure {
     width: 100%;
@@ -188,6 +205,20 @@
       width: 30%;
       height: 79%;
       bottom: 12%;
+    }
+    .crowded {
+      width: 32%;
+    }
+    .crowded.pos-1,
+    .crowded.pos-2 {
+      width: 32%;
+      height: 52%;
+      bottom: 0;
+    }
+    .crowded.pos-3,
+    .crowded.pos-4,
+    .crowded.pos-5 {
+      width: 32%;
     }
     .nameplate {
       font-size: 0.72rem;

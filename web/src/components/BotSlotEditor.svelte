@@ -334,11 +334,14 @@
   </details>
 
   <div class="vision-row">
-    {#if isHost}
-      <button type="button" class="btn" disabled={isCheckingVision} onclick={onCheckVision}>
-        {isCheckingVision ? RU.lobby.visionRunning : RU.lobby.visionBtn}
-      </button>
-    {/if}
+    <button
+      type="button"
+      class="btn"
+      disabled={!isHost || isCheckingVision}
+      onclick={onCheckVision}
+    >
+      {isCheckingVision ? RU.lobby.visionRunning : RU.lobby.visionBtn}
+    </button>
 
     <span class="vision-status" style:visibility={isCheckingVision ? 'hidden' : null}>
       {#if visionToast}
@@ -354,17 +357,16 @@
       {/if}
     </span>
 
-    {#if isHost}
-      {#if onResetWins}<button
-          type="button"
-          class="btn"
-          aria-label={`Сбросить победы ${slot.name}`}
-          onclick={onResetWins}>Сбросить победы</button
-        >{/if}
-      <button type="button" class="btn btn-danger" onclick={onRemove}>
-        {RU.lobby.removeBot}
-      </button>
-    {/if}
+    {#if onResetWins}<button
+        type="button"
+        class="btn"
+        disabled={!isHost}
+        aria-label={`Сбросить победы ${slot.name}`}
+        onclick={onResetWins}>Сбросить победы</button
+      >{/if}
+    <button type="button" class="btn btn-danger" disabled={!isHost} onclick={onRemove}>
+      {RU.lobby.removeBot}
+    </button>
   </div>
 
   {#if visionSlowWarning && slot.lastVisionCheck}

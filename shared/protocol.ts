@@ -7,6 +7,7 @@ import {
   updateProfileMessageSchema,
   avatarGestureMessageSchema,
   avatarSpinMessageSchema,
+  avatarTurnMessageSchema,
 } from './profile-messages.ts';
 import {
   BOT_NAME_MAX_LEN,
@@ -191,6 +192,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   updateProfileMessageSchema,
   avatarGestureMessageSchema,
   avatarSpinMessageSchema,
+  avatarTurnMessageSchema,
   updateAudioPreferencesMessageSchema,
   resetBotWinsMessageSchema,
   pingMessageSchema,
@@ -429,6 +431,7 @@ export interface ProfileLoginError {
 export type ServerMessage =
   | ProfileLoginOk
   | ProfileLoginError
+  | { type: 'avatar_turn'; serverNow: number; participantId: string; yaw: number }
   | { type: 'avatar_gesture'; serverNow: number; participantId: string; gesture: AvatarGesture }
   | {
       type: 'hello_ok';

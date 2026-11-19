@@ -4,12 +4,14 @@ export interface OrbitGesture {
   kind: AvatarGesture;
   /** Local receipt time in milliseconds since epoch. */
   at: number;
-  /** Local start times for spin impulses that are still in flight. */
-  spinTimes?: readonly number[];
+  /** Initial conditions for a boosted turn. */
+  spinStartAngle?: number;
+  spinStartSpeed?: number;
+  spinDistance?: number;
 }
 
 export const gestureDuration: Record<AvatarGesture, number> = {
-  spin: 1340,
+  spin: 740,
   wave: 2500,
   gg: 2200,
   laugh: 2300,
@@ -22,6 +24,10 @@ export const gestureDuration: Record<AvatarGesture, number> = {
 export interface StageState {
   appearance: AvatarAppearance;
   gesture: OrbitGesture | null;
+  /** Resting stage direction and the user's chosen turn, in radians. */
+  yaw: number;
+  gazeX: number;
+  gazeY: number;
   width: number;
   height: number;
   visible: boolean;

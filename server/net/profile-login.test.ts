@@ -669,6 +669,36 @@ test('guest spin reaches a peer once and only the host can edit or animate a bot
   }
 });
 
+test('a guest can drag a lobby participant, release immediately, and then boost a spin', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  try {
+    const host = await register(f, 'host');
+    const guest = await register(f);
+    const participantId = host.owner.playerId;
+    for (const [i, yaw] of [0.52, -2.42].entries()) {
+      guest.c.send({ type: 'avatar_turn', seq: i + 2, participantId, yaw });
+      expect(await host.c.next('avatar_turn')).toMatchObject({ participantId, yaw });
+      expect((await guest.c.next('ack')).result).toBe('ok');
+    }
+    const late = await register(f);
+    expect(await late.c.next('avatar_turn')).toMatchObject({ participantId, yaw: -2.42 });
+    for (const seq of [4, 5]) {
+      guest.c.send({ type: 'avatar_spin', seq, participantId });
+      expect(await host.c.next('avatar_gesture')).toMatchObject({ participantId, gesture: 'spin' });
+      expect((await guest.c.next('ack')).result).toBe('ok');
+    }
+    guest.c.send({ type: 'avatar_turn', seq: 6, participantId: 'missing', yaw: 0 });
+    expect((await guest.c.next('ack')).result).toBe('invalid');
+    f.shell.getState().phase = 'FINAL';
+    guest.c.send({ type: 'avatar_turn', seq: 7, participantId, yaw: 0 });
+    expect((await guest.c.next('ack')).result).toBe('invalid');
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // Protects owner-bound durable audio settings and code restoration on a fresh server origin.
 test('host and guest audio preferences save before ack and restore through permanent codes', async () => {
   const dir = temporary();

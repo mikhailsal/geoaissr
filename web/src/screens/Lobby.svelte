@@ -2,6 +2,7 @@
   import { tick, type Snippet } from 'svelte';
   import { defaultAvatar, type AvatarAppearance } from '$shared/avatar';
   import type { LobbyAvatars } from '../lib/lobby-avatars.svelte';
+  import ProfileEditor from '../components/ProfileEditor.svelte';
   import AvatarWardrobe from '../components/AvatarWardrobe.svelte';
   import LobbyDialog from '../components/LobbyDialog.svelte';
   import LobbyParticipants from '../components/LobbyParticipants.svelte';
@@ -200,8 +201,12 @@
   </LobbyDialog>
 {/if}
 
-{#snippet selfProfile()}
-  {@render profile(closeWardrobe)}
+{#snippet participantProfile()}
+  {#if ownProfile}
+    {@render profile(closeWardrobe)}
+  {:else if person}
+    <ProfileEditor publicOnly name={person.name} color={person.color} />
+  {/if}
 {/snippet}
 {#snippet botSettings()}
   {#if activeBot}
@@ -238,7 +243,7 @@
     appearance={person?.avatar ?? editing.appearance}
     initialTab={editing.tab}
     readOnly={!canEdit}
-    profile={ownProfile ? selfProfile : undefined}
+    profile={editing.bot ? undefined : participantProfile}
     botSettings={activeBot ? botSettings : undefined}
     pending={savePending}
     error={saveError}

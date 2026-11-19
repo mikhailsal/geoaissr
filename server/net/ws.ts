@@ -7,7 +7,7 @@ import {
   handleProfileEdit,
 } from './ws-auth.ts';
 import type { ServerWebSocket } from 'bun';
-import { relayAvatarGesture } from './avatar-gestures.ts';
+import { pruneAvatarTurns, relayAvatarGesture } from './avatar-gestures.ts';
 import { handleAudioPreferences } from './ws-audio.ts';
 import {
   MAX_WS_MESSAGE_BYTES,
@@ -33,6 +33,8 @@ import {
 export interface WsClientData {
   connId: string;
   lastGestureAt?: number;
+  spinBudgetAt?: number;
+  turnBudgetAt?: number;
   ip: string;
   authenticated: boolean;
   role: 'host' | 'guest' | null;
@@ -68,6 +70,7 @@ export interface CoordCtx {
   botRunner?: BotRunner;
   rateLimiter: RateLimiter;
   sockets: Set<ServerWebSocket<WsClientData>>;
+  avatarTurns: Map<string, number>;
   inflightVisionChecks: Set<string>;
   countedPanoKeys: Set<string>;
   countedMapKindsByConnId: Map<string, Set<string>>;
@@ -163,7 +166,7 @@ function handleAuthenticatedAction(
   }
 
   const mappedResult =
-    msg.type === 'avatar_gesture' || msg.type === 'avatar_spin'
+    msg.type === 'avatar_gesture' || msg.type === 'avatar_spin' || msg.type === 'avatar_turn'
       ? relayAvatarGesture(ctx, ws, playerId, msg)
       : dispatchEngineClientMessage(ctx.shell, playerId, msg);
   acknowledgeAction(ws, playerId, msg.seq, mappedResult);
@@ -245,8 +248,10 @@ export function createWsRoomCoordinator(opts: {
   const countedMapKindsByConnId = new Map<string, Set<string>>();
   const countedMapCountsByMatchPlayer = new Map<string, number>();
   const versionRef = { value: 1 };
+  const avatarTurns = new Map<string, number>();
 
   const broadcastState = (): void => {
+    pruneAvatarTurns(avatarTurns, opts.shell.getState());
     versionRef.value += 1;
     const now = Date.now();
     for (const s of sockets) {
@@ -264,6 +269,7 @@ export function createWsRoomCoordinator(opts: {
     ...opts,
     profiles: opts.profiles,
     sockets,
+    avatarTurns,
     inflightVisionChecks,
     countedPanoKeys,
     countedMapKindsByConnId,
