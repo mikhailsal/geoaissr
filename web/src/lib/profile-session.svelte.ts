@@ -9,6 +9,12 @@ import {
 } from './profile';
 import type { StoredProfile } from '$shared/storage-schemas';
 import type { GeoWsClient } from './ws-client';
+import {
+  audioProfileAck,
+  bindAudioProfile,
+  clearAudioProfile,
+  disconnectAudioProfile,
+} from './audio-settings.svelte';
 
 /** Coordinates profile persistence with join state and acknowledged profile edits. */
 export class ProfileSession {
@@ -32,10 +38,14 @@ export class ProfileSession {
     saveProfile(this.saved);
     this.pendingJoin = null;
     this.restoredProfileId = null;
+    bindAudioProfile(profile, (preferences) =>
+      this.client.sendSequencedWithSeq('update_audio_preferences', { preferences }),
+    );
   }
 
-  reset(): void {
+  reset(preserveAudioPending: boolean): void {
     this.clearPending();
+    clearAudioProfile(preserveAudioPending, this.saved?.profileId);
     this.saved = null;
     this.error = null;
   }
@@ -84,6 +94,7 @@ export class ProfileSession {
   }
 
   onAck(msg: Extract<ServerMessage, { type: 'ack' }>): void {
+    audioProfileAck(msg);
     if (this.pendingEdit?.seq !== msg.seq) return;
     const edit = this.pendingEdit;
     this.pendingEdit = null;
@@ -95,6 +106,7 @@ export class ProfileSession {
   }
 
   clearPending(): void {
+    disconnectAudioProfile();
     if (this.pending) this.error = RU.join.serverUnreachable;
     this.pending = false;
     this.pendingEdit = null;

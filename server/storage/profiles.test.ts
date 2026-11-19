@@ -179,3 +179,63 @@ test('legacy profiles receive their stable starter and new profiles persist it o
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Protects private preference durability and legacy profile compatibility; no external services.
+test('audio preferences survive registry reload and code lookup without changing identity or other profiles', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'profiles-audio-'));
+  try {
+    const file = path.join(dir, 'profiles.json');
+    const store = new ProfileStore(file);
+    const owner = store.create({ nick: 'Owner', color: 'p-2', role: 'guest' });
+    const other = store.create({ nick: 'Other', color: 'p-3', role: 'host' });
+    expect(owner.audioPreferences).toBeUndefined();
+    const preferences = { effects: false, music: true, effectsVolume: 0.3, musicVolume: 0.6 };
+    const saved = store.editAudioPreferences(owner.profileId, preferences);
+    expect(saved).toEqual({ ...owner, audioPreferences: preferences });
+    expect(Object.isFrozen(saved.audioPreferences)).toBe(true);
+    const loaded = new ProfileStore(file);
+    expect(loaded.getByToken(formatProfileToken(owner.profileToken))).toEqual(saved);
+    expect(loaded.getById(other.profileId)).toEqual(other);
+    expect(loaded.edit(owner.profileId, 'Renamed', 'p-4').audioPreferences).toEqual(preferences);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('audio preference updates validate finite bounded volumes and reject client authority fields', () => {
+  const preferences = { effects: true, music: true, effectsVolume: 1, musicVolume: 0.6 };
+  const message = { type: 'update_audio_preferences', seq: 2, preferences };
+  expect(clientMessageSchema.safeParse(message).success).toBe(true);
+  for (const level of [-0.01, 1.01, NaN, Infinity, '0.5', null]) {
+    for (const key of ['effectsVolume', 'musicVolume'])
+      expect(
+        clientMessageSchema.safeParse({ ...message, preferences: { ...preferences, [key]: level } })
+          .success,
+      ).toBe(false);
+  }
+  for (const extra of [{ profileId: 'other' }, { playerId: 'other' }, { role: 'host' }])
+    expect(clientMessageSchema.safeParse({ ...message, ...extra }).success).toBe(false);
+  expect(
+    clientMessageSchema.safeParse({ ...message, preferences: { ...preferences, extra: true } })
+      .success,
+  ).toBe(false);
+});
+
+test('failed audio preference writes retain published preferences and original registry bytes', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'profiles-audio-failure-'));
+  try {
+    const file = path.join(dir, 'profiles.json');
+    const store = new ProfileStore(file);
+    const owner = store.create({ nick: 'Owner', color: 'p-1', role: 'host' });
+    const before = readFileSync(file, 'utf8');
+    const preferences = { effects: false, music: false, effectsVolume: 0.2, musicVolume: 0.1 };
+    rmSync(file);
+    mkdirSync(file);
+    writeFileSync(path.join(file, 'original'), before);
+    expect(() => store.editAudioPreferences(owner.profileId, preferences)).toThrow();
+    expect(store.getById(owner.profileId)).toEqual(owner);
+    expect(readFileSync(path.join(file, 'original'), 'utf8')).toBe(before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

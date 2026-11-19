@@ -16,6 +16,7 @@ const MIME_BY_EXT: Record<string, string> = {
   '.webp': 'image/webp',
   '.woff2': 'font/woff2',
   '.json': 'application/json; charset=utf-8',
+  '.ogg': 'audio/ogg',
 };
 
 function resolveStaticAsset(

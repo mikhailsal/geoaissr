@@ -163,3 +163,40 @@ test('a full turn reaches the other participant and clears after playback', asyn
     await server.stop();
   }
 });
+
+test('mobile stage paging keeps the right-hand gesture visible and the viewer on stage', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer({ seedBot: true });
+  const host = await browser.newPage();
+  const guest = await browser.newPage({ viewport: { width: 390, height: 740 } });
+  try {
+    await join(host, server.hostUrl, hostName);
+    await join(guest, server.guestUrl, guestName);
+    await host.getByRole('button', { name: '+ Добавить ИИ', exact: true }).click();
+    const pager = guest.getByRole('navigation', { name: 'Страницы сцены' });
+    await expect(pager).toBeVisible();
+    await host.getByLabel('Жесты персонажа').selectOption({ label: `ИИ · ${botName}` });
+    await host.getByRole('button', { name: 'Помахать', exact: true }).click();
+    const cue = card(guest, botName).getByRole('status');
+    await expect(cue).toContainText('Помахать');
+    const controls = await pager.boundingBox();
+    const badge = await cue.boundingBox();
+    if (!controls || !badge) throw new Error('Missing pager or gesture badge');
+    const overlap =
+      controls.x < badge.x + badge.width &&
+      badge.x < controls.x + controls.width &&
+      controls.y < badge.y + badge.height &&
+      badge.y < controls.y + controls.height;
+    expect(overlap, 'The stage pager covers the gesture badge').toBe(false);
+    await pager.getByRole('button', { name: 'Следующие участники' }).click();
+    await expect(card(guest, guestName)).toBeVisible();
+    await expect(card(guest, botName)).toHaveCount(0);
+    await pager.getByRole('button', { name: 'Предыдущие участники' }).click();
+    await expect(card(guest, botName)).toBeVisible();
+  } finally {
+    await guest.close();
+    await host.close();
+    await server.stop();
+  }
+});

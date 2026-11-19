@@ -8,6 +8,7 @@ import type {
   TunnelStatusView,
 } from '../../shared/protocol.ts';
 import type { AvatarAppearance } from '../../shared/avatar.ts';
+import type { RoundCompletion } from '../../shared/round-timing.ts';
 import type { LatLng } from '../../shared/score.ts';
 import type { BotAccounting, BotReasoning } from '../../shared/bot-results.ts';
 import type {
@@ -96,6 +97,7 @@ export interface ActiveRoundState {
 }
 
 export interface RoundResultsState {
+  completion: RoundCompletion;
   roundNumber: number;
   target: RoundTarget;
   entries: RoundResultEntryView[];

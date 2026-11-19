@@ -6,6 +6,8 @@
   import type { RegionId } from '$shared/storage-schemas';
   import ProfileModal from './components/ProfileModal.svelte';
   import StatusBanner from './components/StatusBanner.svelte';
+  import GameAudio from './components/GameAudio.svelte';
+  import { audioPlayer } from './lib/audio-settings.svelte';
   import { GameStore } from './lib/game-store.svelte';
   import Final from './screens/Final.svelte';
   import Join from './screens/Join.svelte';
@@ -13,15 +15,19 @@
   import Round from './screens/Round.svelte';
   import RoundResults from './screens/RoundResults.svelte';
 
-  const store = new GameStore();
+  const store = new GameStore(() => {
+    audioPlayer.cue('locked');
+  });
   let editingProfile = $state(false);
   let profileTrigger: HTMLElement | null = null;
   function openProfile(e: MouseEvent): void {
+    audioPlayer.cue('click');
     profileTrigger = e.currentTarget as HTMLElement;
     store.profile.error = null;
     editingProfile = true;
   }
   function closeProfile(): void {
+    audioPlayer.cue('click');
     editingProfile = false;
     void tick().then(() => {
       if (!editingProfile) profileTrigger?.focus();
@@ -43,11 +49,12 @@
   const inGamePhase = $derived(hasProfile && store.authState !== 'error');
   const roundRemainingMs = $derived(view?.active ? store.remainingMs(view.active.endsAt) : 0);
   const countdownStartsAt = $derived(view?.loading?.countdownStartsAt ?? null);
-  const countdownSeconds = $derived(
-    countdownStartsAt === null
-      ? null
-      : Math.max(1, Math.ceil(store.remainingMs(countdownStartsAt + COUNTDOWN_MS) / 1000)),
-  );
+  const countdownSeconds = $derived.by(() => {
+    if (countdownStartsAt === null) return null;
+    const elapsedMs = store.serverNow() - countdownStartsAt;
+    if (elapsedMs < 0) return null;
+    return Math.max(1, Math.ceil((COUNTDOWN_MS - elapsedMs) / 1000));
+  });
 
   const handleRetryConnect = (): void => {
     store.retryConnect();
@@ -62,6 +69,9 @@
     region?: RegionId;
     aiWaitWindowSec?: number;
   }): void => {
+    if (patch.roundDurationSec !== undefined && patch.roundDurationSec !== view?.roundDurationSec) {
+      audioPlayer.cue('tick');
+    }
     store.updateLobby(patch);
   };
   const handleAddBot = (): void => {
@@ -108,6 +118,9 @@
     store.reportClientError(source, code, message);
   };
   const handleSetPin = (roundNumber: number, lat: number, lng: number): void => {
+    if (view?.phase === 'ROUND_ACTIVE' && !view.viewerIsSpectator && !view.active?.myConfirmed) {
+      audioPlayer.cue('pin');
+    }
     store.setPin(roundNumber, lat, lng);
   };
   const handleSubmitGuess = (roundNumber: number, lat: number, lng: number): void => {
@@ -117,9 +130,11 @@
     store.retryRound(gen);
   };
   const handleSelectBotCard = (rn: number, entry: RoundResultEntryView): void => {
+    audioPlayer.cue('click');
     store.openBotCard(rn, entry);
   };
   const handleCloseBotCard = (): void => {
+    audioPlayer.cue('click');
     store.closeBotCard();
   };
   const handleNextRound = (rn: number): void => {
@@ -129,6 +144,12 @@
     store.playAgain();
   };
 </script>
+
+<GameAudio
+  {view}
+  now={store.serverNow()}
+  connected={store.joined && store.authState === 'ready' && store.connectionState === 'connected'}
+/>
 
 <div class="app-shell">
   {#if hasProfile && !inGamePhase}<button type="button" class="btn owner-menu" onclick={openProfile}

@@ -8,6 +8,7 @@ import {
 } from './ws-auth.ts';
 import type { ServerWebSocket } from 'bun';
 import { relayAvatarGesture } from './avatar-gestures.ts';
+import { handleAudioPreferences } from './ws-audio.ts';
 import {
   MAX_WS_MESSAGE_BYTES,
   clientMessageSchema,
@@ -40,7 +41,10 @@ export interface WsClientData {
   authTimer: ReturnType<typeof setTimeout> | null;
   /** When hello succeeded; used to evict sockets that authenticate but never join. */
   authenticatedAt: number | null;
-  lastSeqByPlayer: Map<string, { seq: number; result: AckResult }>;
+  lastSeqByPlayer: Map<
+    string,
+    { seq: number; result: AckResult; commandType?: 'update_audio_preferences' }
+  >;
   countedPanoRounds: Set<number>;
 }
 
@@ -72,6 +76,18 @@ export interface CoordCtx {
   broadcastState: () => void;
 }
 
+/** Keep acknowledgements from delayed work from moving the replay watermark backwards. */
+function acknowledgeAction(
+  ws: ServerWebSocket<WsClientData>,
+  playerId: string,
+  seq: number,
+  result: AckResult,
+): void {
+  const previous = ws.data.lastSeqByPlayer.get(playerId);
+  if (!previous || seq >= previous.seq) ws.data.lastSeqByPlayer.set(playerId, { seq, result });
+  sendJson(ws, { type: 'ack', serverNow: Date.now(), seq, result });
+}
+
 function handleAuthenticatedAction(
   ctx: CoordCtx,
   ws: ServerWebSocket<WsClientData>,
@@ -86,7 +102,10 @@ function handleAuthenticatedAction(
 
   const prev = ws.data.lastSeqByPlayer.get(playerId);
   if (prev && msg.seq <= prev.seq) {
-    sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result: prev.result });
+    const sameAudioCommand = msg.seq === prev.seq && prev.commandType === msg.type;
+    const result =
+      msg.type === 'update_audio_preferences' && !sameAudioCommand ? 'invalid' : prev.result;
+    sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result });
     return;
   }
 
@@ -98,8 +117,7 @@ function handleAuthenticatedAction(
       playerId,
       msg,
       sendAck: (result) => {
-        ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result });
-        sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result });
+        acknowledgeAction(ws, playerId, msg.seq, result);
       },
       onVisionResult: (resultMsg) => {
         for (const s of ctx.sockets) {
@@ -119,8 +137,7 @@ function handleAuthenticatedAction(
       playerId,
       msg,
     });
-    ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result: res });
-    sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result: res });
+    acknowledgeAction(ws, playerId, msg.seq, res);
     return;
   }
 
@@ -135,13 +152,13 @@ function handleAuthenticatedAction(
       playerId,
       msg,
     });
-    ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result: res });
-    sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result: res });
+    acknowledgeAction(ws, playerId, msg.seq, res);
     return;
   }
 
-  if (msg.type === 'update_profile') {
-    handleProfileEdit(ctx, ws, msg, playerId);
+  if (msg.type === 'update_profile' || msg.type === 'update_audio_preferences') {
+    if (msg.type === 'update_profile') handleProfileEdit(ctx, ws, msg, playerId);
+    else handleAudioPreferences(ctx, ws, msg, playerId);
     return;
   }
 
@@ -149,8 +166,7 @@ function handleAuthenticatedAction(
     msg.type === 'avatar_gesture'
       ? relayAvatarGesture(ctx, ws, playerId, msg)
       : dispatchEngineClientMessage(ctx.shell, playerId, msg);
-  ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result: mappedResult });
-  sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result: mappedResult });
+  acknowledgeAction(ws, playerId, msg.seq, mappedResult);
 }
 
 function routeRawWsMessage(

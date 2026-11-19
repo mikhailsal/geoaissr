@@ -1,6 +1,6 @@
 import { buildQuotaMetric } from '../storage/quota.ts';
 import { expect, test } from 'bun:test';
-import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
+import { COUNTDOWN_MS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
 import { reduce } from './reduce.ts';
 import { createInitialRoomState, type RoomState, type RoundTarget } from './types.ts';
@@ -119,7 +119,7 @@ test('non-host cannot mutate lobby or start match', () => {
   expect(reduce(s, { type: 'start_match', playerId: 'g' }, 103).ack).toBe('forbidden');
 });
 
-test('loading waits for connected humans then counts down 3s to ROUND_ACTIVE', () => {
+test('loading waits for connected humans and the full audio intro before counting down', () => {
   let s = makeRoom();
   s = reduce(
     s,
@@ -159,15 +159,48 @@ test('loading waits for connected humans then counts down 3s to ROUND_ACTIVE', (
   expect(p1.effects.some((e) => e.type === 'schedule_countdown')).toBe(false);
 
   const p2 = reduce(p1.state, { type: 'pano_loaded', playerId: 'g', roundNumber: 1 }, 1300);
-  expect(p2.effects.some((e) => e.type === 'schedule_countdown')).toBe(true);
+  const countdownStartsAt = 7_800;
+  const countdownEndsAt = countdownStartsAt + COUNTDOWN_MS;
+  expect(p2.state.loadingOrActive?.countdownStartsAt).toBe(countdownStartsAt);
+  expect(p2.effects).toContainEqual({
+    type: 'schedule_countdown',
+    matchId: 'm1',
+    gen: p2.state.gen,
+    atMs: countdownEndsAt,
+  });
 
   const active = reduce(
     p2.state,
     { type: 'countdown_done', matchId: 'm1', gen: p2.state.gen },
-    4300,
+    countdownEndsAt,
   );
   expect(active.state.phase).toBe('ROUND_ACTIVE');
   expect(active.effects.some((e) => e.type === 'release_bot_observe')).toBe(true);
+});
+
+test('countdown starts immediately when panorama readiness follows the audio intro', () => {
+  let s = makeRoom();
+  s = reduce(
+    s,
+    { type: 'player_join', playerId: 'h', secret: 's1', name: 'Хост', color: 'p-1', isHost: true },
+    100,
+  ).state;
+  s = reduce(s, { type: 'start_match', playerId: 'h' }, 1000).state;
+  s = reduce(
+    s,
+    { type: 'round_prepared', matchId: 'm1', gen: s.gen, roundNumber: 1, target: makeTarget(1) },
+    7000,
+  ).state;
+
+  const readyAt = 8_000;
+  const ready = reduce(s, { type: 'pano_loaded', playerId: 'h', roundNumber: 1 }, readyAt);
+  expect(ready.state.loadingOrActive?.countdownStartsAt).toBe(readyAt);
+  expect(ready.effects).toContainEqual({
+    type: 'schedule_countdown',
+    matchId: 'm1',
+    gen: s.gen,
+    atMs: readyAt + COUNTDOWN_MS,
+  });
 });
 
 test('stale gen timer ticks are dropped cleanly', () => {

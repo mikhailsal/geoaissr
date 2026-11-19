@@ -65,6 +65,7 @@ function projectLoading(state: RoomState): ClientViewState['loading'] {
     .map((p) => p.name);
   return {
     waitingFor,
+    startedLoadingAt: active.startedLoadingAt,
     countdownStartsAt: active.countdownStartsAt,
     countdownSeconds: active.countdownStartsAt !== null ? COUNTDOWN_MS / 1000 : null,
     prepError: active.prepError,
@@ -119,6 +120,7 @@ function projectResults(state: RoomState, viewerIsHost: boolean): ClientViewStat
   const res = state.results;
   if (state.phase !== 'ROUND_RESULTS' || !res) return undefined;
   return {
+    completion: res.completion,
     targetLat: res.target.lat,
     targetLng: res.target.lng,
     countryNameRu: res.target.countryNameRu,

@@ -66,7 +66,6 @@ export class GameStore extends GameCommands {
   visionToastByBot = $state<Record<string, VisionToast | undefined>>({});
   activeBotCard = $state<{ roundNumber: number; entry: RoundResultEntryView } | null>(null);
   clockTick = $state(0);
-
   private readonly clock = new ServerClock();
   private readonly wsClient: GeoWsClient;
   readonly profile: ProfileSession;
@@ -81,7 +80,7 @@ export class GameStore extends GameCommands {
   private resendPinOnNextState = false;
   private unsentPanoLoaded: { roundNumber: number; countedLoad: boolean } | null = null;
 
-  constructor() {
+  constructor(private readonly onGuessAccepted: () => void = () => undefined) {
     super();
     this.wsClient = new GeoWsClient(this.buildWsCallbacks());
     this.avatars = new LobbyAvatars(this.wsClient);
@@ -112,6 +111,7 @@ export class GameStore extends GameCommands {
     this.avatars.onAck(msg);
     this.profile.onAck(msg);
     if (seq === this.submitGuessSeq) {
+      if (msg.result === 'ok') this.onGuessAccepted();
       this.submittingGuess = false;
       this.submitGuessSeq = null;
     }
@@ -122,7 +122,6 @@ export class GameStore extends GameCommands {
   }
 
   private handleProfileLoginOk(msg: Extract<ServerMessage, { type: 'profile_login_ok' }>): void {
-    this.profile.accept(msg.profile);
     this.handleHelloOk({
       ...msg,
       type: 'hello_ok',
@@ -149,13 +148,9 @@ export class GameStore extends GameCommands {
         if (this.connectionState !== 'reconnecting') this.connectionState = 'connecting';
       },
       onSocketOpen: () => {
-        this.connectionState = 'connected';
-        this.reconnectAttempt = 0;
         this.offlinePinWarning = false;
       },
-      onBackOnline: () => {
-        this.triggerBackOnline();
-      },
+      onBackOnline: this.triggerBackOnline.bind(this),
       onReconnecting: (attempt) => {
         this.connectionState = 'reconnecting';
         this.reconnectAttempt = attempt;
@@ -271,6 +266,8 @@ export class GameStore extends GameCommands {
     const prevRound = this.view?.roundNumber;
     const prevPhase = this.view?.phase;
     this.view = view;
+    this.connectionState = 'connected';
+    this.reconnectAttempt = 0;
     this.profile.onState(view);
     this.joined = view.viewerId !== '__unjoined__';
     if (view.phase !== 'LOBBY') {
@@ -284,7 +281,8 @@ export class GameStore extends GameCommands {
         this.localPin = null;
         this.pinDirty = false;
         this.submittingGuess = false;
-        this.submitGuessSeq = null;
+        // The final answer may broadcast results before its acknowledgement arrives.
+        if (prevRound !== view.roundNumber) this.submitGuessSeq = null;
         this.wsClient.clearPendingPin();
       } else {
         this.pinDirty = false;
@@ -351,7 +349,7 @@ export class GameStore extends GameCommands {
     this.wsClient.logout(clearShared);
     this.destroy();
     clearProfile(clearShared);
-    this.profile.reset();
+    this.profile.reset(notify);
     this.resetForHashToken();
     this.authState = 'error';
     this.authError = 'no_token';
@@ -401,6 +399,7 @@ export class GameStore extends GameCommands {
   }
 
   destroy(): void {
+    this.profile.clearPending();
     window.removeEventListener('storage', this.handleStorage);
     this.wsClient.close();
     this.unsubMapsAuth?.();

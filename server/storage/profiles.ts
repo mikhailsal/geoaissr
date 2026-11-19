@@ -1,3 +1,4 @@
+import type { AudioPreferences } from '../../shared/audio-preferences.ts';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, chmodSync } from 'node:fs';
 import path from 'node:path';
@@ -40,7 +41,12 @@ export class ProfileStore {
     return code ? this.byToken.get(code) : undefined;
   }
   private publish(profiles: StoredProfile[]): void {
-    this.byId = new Map(profiles.map((p) => [p.profileId, Object.freeze({ ...p })]));
+    this.byId = new Map(
+      profiles.map((p) => {
+        if (p.audioPreferences) Object.freeze(p.audioPreferences);
+        return [p.profileId, Object.freeze({ ...p })];
+      }),
+    );
     this.byToken = new Map([...this.byId.values()].map((p) => [p.profileToken, p]));
   }
   private commit(profiles: StoredProfile[]): void {
@@ -99,6 +105,17 @@ export class ProfileStore {
     this.commit(
       [...this.byId.values()].map((p) =>
         p.profileId === profileId ? { ...p, nick, color, avatar: avatar ?? p.avatar } : p,
+      ),
+    );
+    const saved = this.byId.get(profileId);
+    if (!saved) throw new Error(PROFILE_STORE_ERROR);
+    return saved;
+  }
+  editAudioPreferences(profileId: string, preferences: AudioPreferences): StoredProfile {
+    if (!this.byId.has(profileId)) throw new Error(PROFILE_STORE_ERROR);
+    this.commit(
+      [...this.byId.values()].map((profile) =>
+        profile.profileId === profileId ? { ...profile, audioPreferences: preferences } : profile,
       ),
     );
     const saved = this.byId.get(profileId);

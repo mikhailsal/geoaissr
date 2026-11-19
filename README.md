@@ -95,10 +95,11 @@ In the lobby, choose a character and adjust its clothing, face, hair, accessorie
 
 The trophy beside each avatar counts wins from the last six hours. Only complete matches with exactly one first-place finisher count; ties and early finishes do not. Human wins follow the profile UUID, and AI wins follow the bot slot even after a rename. The host can reset an individual bot's count in the lobby or final results. Matches and reset timestamps persist on the server; a storage error is reported in the room.
 
-Browser storage remains origin-specific. On a new hostname, browser, or cleared site storage, enter your permanent profile code on the homepage to restore the same identity. See [Permanent profile codes](#permanent-profile-codes) for login, logout, and recovery details.
+Browser storage remains origin-specific. On a new hostname, browser, or cleared site storage, enter your permanent profile code on the homepage to restore the same identity, music and effects volumes, and mute choices from the server profile. See [Permanent profile codes](#permanent-profile-codes) for login, logout, and recovery details.
 
 ## Keyboard controls and accessibility
 
+- The header's **Звуковые эффекты** and **Фоновая музыка** buttons open independent volume controls with sliders, minus/plus buttons and mute. **Сбросить** in either panel restores both channels to their defaults. Choices are saved in the user profile and restored by permanent code across tunnel hostnames. Music defaults to 60% and effects to 100%. The lobby repeats the original Suspense track, with its drone, heartbeat and quiet ticks at a reduced volume. During matches, seven tracks play in sequence, each finishing before the next begins; round changes, answers and results preserve the queue. The loading phrase finishes before the countdown, and a timer that reaches zero keeps its recorded ending. Audio starts after an interaction; hiding the tab, disconnecting or muting saves the music's position for resuming. See the [audio reference](docs/audio.md) for every file's role, timing and license.
 - **Enter** in an active round — submit the placed marker («Угадать», "Guess").
 - **M** — expand/collapse the minimap in a round (or open the map sheet on a narrow screen `< 900px`).
 - **Space** on the round results screen — instantly show all arcs and pins without waiting for the animation.

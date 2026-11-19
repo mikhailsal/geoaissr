@@ -118,28 +118,28 @@
         </div>
       </article>
     {/each}
-    {#if pages > 1}
-      <nav class="paging" aria-label="Страницы сцены">
-        <button
-          class="page-btn"
-          aria-label="Предыдущие участники"
-          disabled={current === 0}
-          onclick={() => {
-            page = current - 1;
-          }}><ChevronLeft /></button
-        >
-        <span>{current + 1} / {pages}</span>
-        <button
-          class="page-btn"
-          aria-label="Следующие участники"
-          disabled={current + 1 === pages}
-          onclick={() => {
-            page = current + 1;
-          }}><ChevronRight /></button
-        >
-      </nav>
-    {/if}
   </div>
+  {#if pages > 1}
+    <nav class="paging" aria-label="Страницы сцены">
+      <button
+        class="page-btn"
+        aria-label="Предыдущие участники"
+        disabled={current === 0}
+        onclick={() => {
+          page = current - 1;
+        }}><ChevronLeft /></button
+      >
+      <span>{current + 1} / {pages}</span>
+      <button
+        class="page-btn"
+        aria-label="Следующие участники"
+        disabled={current + 1 === pages}
+        onclick={() => {
+          page = current + 1;
+        }}><ChevronRight /></button
+      >
+    </nav>
+  {/if}
 
   <div class="deck">
     <button class="wardrobe btn" onclick={onEdit} disabled={!me || !connected}
@@ -326,13 +326,11 @@
     object-fit: contain;
   }
   .paging {
-    position: absolute;
-    right: 10px;
-    top: 0;
     display: flex;
+    width: fit-content;
+    margin: var(--sp-2) var(--sp-3) 0 auto;
     align-items: center;
     gap: 2px;
-    z-index: 4;
     font-size: 0.85rem;
   }
   .page-btn,

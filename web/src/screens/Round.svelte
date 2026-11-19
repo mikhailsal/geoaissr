@@ -9,6 +9,7 @@
   import TimerRing from '../components/TimerRing.svelte';
   import { attachGlobalKeys } from '../lib/keys';
   import { RU } from '../i18n/ru';
+  import { audioPlayer } from '../lib/audio-settings.svelte';
 
   interface Props {
     onEditProfile: (event: MouseEvent) => void;
@@ -96,6 +97,7 @@
     return attachGlobalKeys(() => ({
       onEnter: submitCurrentPin,
       onToggleMap: () => {
+        audioPlayer.cue('click');
         mapPinned = !mapPinned;
         mobileMapOpen = !mobileMapOpen;
       },
@@ -119,9 +121,7 @@
       moveEnabled={view.moveEnabled}
       {onPanoLoaded}
       bind:heading
-      onClientError={(src: 'maps_js' | 'pano', code: string, msg: string) => {
-        onClientError(src, code, msg);
-      }}
+      {onClientError}
     />
   {/if}
 
@@ -168,7 +168,10 @@
     <button
       type="button"
       class="btn btn-primary mobile-map-fab"
-      onclick={() => (mobileMapOpen = true)}
+      onclick={() => {
+        audioPlayer.cue('click');
+        mobileMapOpen = true;
+      }}
     >
       <MapIcon size={18} />
       <span>{RU.round.openMapBtn}</span>
@@ -184,7 +187,14 @@
     >
       <div class="mobile-sheet-head">
         <span>Карта (M)</span>
-        <button type="button" class="btn" onclick={() => (mobileMapOpen = false)}>
+        <button
+          type="button"
+          class="btn"
+          onclick={() => {
+            audioPlayer.cue('click');
+            mobileMapOpen = false;
+          }}
+        >
           <X size={16} />
           <span>{RU.round.closeMapBtn}</span>
         </button>
@@ -203,9 +213,7 @@
             onSetPin(view.roundNumber, lat, lng);
           }}
           {onMapLoaded}
-          onClientError={(src: 'maps_js' | 'map', code: string, msg: string) => {
-            onClientError(src, code, msg);
-          }}
+          {onClientError}
         />
       </div>
 
@@ -287,7 +295,6 @@
     overflow: hidden;
     background-color: var(--asphalt-900);
   }
-
   .hud-top {
     position: absolute;
     top: var(--sp-3);
@@ -300,32 +307,27 @@
     z-index: 25;
     pointer-events: none;
   }
-
   .hud-top > :global(*) {
     pointer-events: auto;
   }
-
   .hud-center {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--sp-2);
   }
-
   .round-chip {
     padding: 0.55rem 0.9rem;
     font-family: var(--font-display);
     font-size: 0.88rem;
     background-color: var(--asphalt-900);
   }
-
   .hud-left {
     position: absolute;
     left: var(--sp-3);
     top: 4.5rem;
     z-index: 20;
   }
-
   .fatal-maps {
     position: absolute;
     top: 5rem;
@@ -335,7 +337,6 @@
     border-color: var(--signal);
     z-index: 40;
   }
-
   .map-dock {
     position: absolute;
     right: var(--sp-3);
@@ -353,7 +354,6 @@
       width var(--dur-fast) var(--ease),
       height var(--dur-fast) var(--ease);
   }
-
   .map-dock:hover,
   .map-dock:focus-within,
   .map-dock.expanded,
@@ -364,7 +364,6 @@
     width: min(560px, 52vw);
     height: min(440px, 65vh);
   }
-
   .mobile-sheet-head,
   .mobile-map-fab {
     display: none;

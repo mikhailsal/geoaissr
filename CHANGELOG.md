@@ -2,6 +2,29 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.2.2] - 2026-11-19
+
+### Added
+
+- Hear event sounds for round loading, countdowns, map markers, accepted answers, opponents and results, with quiet seamless music during active rounds.
+- Adjust effects and music independently through header volume panels with sliders, minus/plus buttons and mute. Save both levels and mute choices in the permanent user profile, restore them by code across tunnel hostnames, and apply volume changes without restarting music. Audio pauses in hidden or disconnected tabs and resumes without repeating past events.
+
+### Changed
+
+- Play all seven original background tracks in a continuous sequence, keeping their full endings and preserving the queue through round changes, answers, results and preparation.
+- Repeat the calmer original Suspense track in the lobby at a reduced volume and use one background-music control for both lobby and gameplay.
+- Default music volume to 60% while preserving explicitly saved levels and existing mute choices.
+
+### Fixed
+
+- Keep audio preferences with the authenticated profile across reconnects and changed tunnel addresses; reset both channels from the button beside mute.
+- Retain pending audio edits when switching profiles and prevent a replaced tab from overwriting a newer save when another tab logs out.
+- Let the loading phrase finish before the synchronized three-second countdown begins.
+- Preserve the final timer hit and whistle after zero, and let event tails finish across normal screen transitions.
+- Keep the previous background track audible until the next variant is ready to play.
+- Reduce audio loading contention on a fresh lobby visit by prioritizing Suspense before effects preloading and loading playlist tracks as needed.
+- Play the full swoosh at screen transitions and reserve the short swoosh for menus and panels.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

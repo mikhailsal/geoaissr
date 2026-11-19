@@ -1,5 +1,6 @@
 import { avatarAppearanceSchema } from './avatar.ts';
 import { z } from 'zod';
+import { audioPreferencesSchema } from './audio-preferences.ts';
 import {
   BOT_NAME_MAX_LEN,
   DIFFICULTY_PRESETS,
@@ -199,6 +200,7 @@ export const storedProfileSchema = z.object({
   nick: z.string().trim().min(1).max(20),
   color: z.enum(PARTICIPANT_COLOR_IDS),
   role: z.enum(['host', 'guest']),
+  audioPreferences: audioPreferencesSchema.optional(),
 });
 export type StoredProfile = z.infer<typeof storedProfileSchema>;
 export type ProfileRole = StoredProfile['role'];
