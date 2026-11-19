@@ -6,10 +6,8 @@ import { startIsolatedFakeServer } from './helpers';
 async function holdImageDecoding(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const NativeImage = window.Image;
-    let release = () => {};
-    const pending = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const releases = new Map<number, (fail: boolean) => void>();
+    let sequence = 0;
     const ObservedImage = function (width?: number, height?: number) {
       const image = new NativeImage(width, height);
       const decode = image.decode.bind(image);
@@ -19,20 +17,55 @@ async function holdImageDecoding(page: Page): Promise<void> {
         }
       });
       image.decode = async () => {
+        if (!new URL(image.src, location.href).pathname.startsWith('/thumb/qa-full')) {
+          return decode();
+        }
+        const id = ++sequence;
+        const root = document.documentElement;
+        const observer = new MutationObserver(() => {
+          if (image.hasAttribute('src')) return;
+          root.setAttribute(`data-qa-detached-${id}`, 'true');
+          observer.disconnect();
+        });
+        observer.observe(image, { attributes: true, attributeFilter: ['src'] });
+        root.setAttribute(`data-qa-started-${id}`, 'true');
         await decode();
-        if (image.src.endsWith('/thumb/qa-full')) await pending;
+        await new Promise<void>((resolve, reject) => {
+          releases.set(id, (fail) => {
+            releases.delete(id);
+            if (fail) reject(new DOMException('Test decode failure', 'EncodingError'));
+            else resolve();
+          });
+          root.setAttribute(`data-qa-decoded-${id}`, 'true');
+        });
       };
       return image;
     };
     ObservedImage.prototype = NativeImage.prototype as HTMLImageElement;
     window.Image = ObservedImage as unknown as typeof Image;
-    window.addEventListener('qa:release-decode', () => {
-      release();
+    window.addEventListener('qa:release-decode', (event) => {
+      const { id, fail } = (event as CustomEvent<{ id: number; fail: boolean }>).detail;
+      releases.get(id)?.(fail);
     });
   });
 }
 
-async function installImages(page: Page) {
+async function releaseDecode(page: Page, id: number, fail = false): Promise<void> {
+  await expect(page.locator('html')).toHaveAttribute(`data-qa-decoded-${id}`, 'true');
+  await page.evaluate(
+    async (detail) => {
+      window.dispatchEvent(new CustomEvent('qa:release-decode', { detail }));
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          resolve();
+        });
+      });
+    },
+    { id, fail },
+  );
+}
+
+async function installImages(page: Page, holdFirstRequest = false) {
   const full = await sharp({
     create: { width: 400, height: 400, channels: 3, background: '#c8b080' },
   })
@@ -40,11 +73,18 @@ async function installImages(page: Page) {
     .toBuffer();
   const thumbnail = await sharp(full).resize(160).jpeg().toBuffer();
   let requests = 0;
-  let update = () => {};
+  let publish = () => {};
+  let fullUrl = '/thumb/qa-full';
+  let label = '';
+  let releaseRequest = () => {};
+  const pendingRequest = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
   await holdImageDecoding(page);
   await page.route('**/thumb/qa-*', async (route) => {
-    const isFull = route.request().url().endsWith('/qa-full');
+    const isFull = new URL(route.request().url()).pathname.startsWith('/thumb/qa-full');
     if (isFull) requests += 1;
+    if (isFull && holdFirstRequest && requests === 1) await pendingRequest;
     await route.fulfill({
       contentType: 'image/jpeg',
       headers: { 'cache-control': 'no-store' },
@@ -67,10 +107,15 @@ async function installImages(page: Page) {
             ...base,
             turn,
             thumbUrl: '/thumb/qa-thumb',
-            fullUrl: '/thumb/qa-full',
+            fullUrl,
+            label: label || base.label,
           }));
         }
-        update = () => {
+        publish = () => {
+          for (const entry of snapshot.view.results?.entries ?? []) {
+            if (!entry.isAi) continue;
+            entry.thumbs = entry.thumbs.map((thumb) => ({ ...thumb, fullUrl, label }));
+          }
           socket.send(JSON.stringify(snapshot));
         };
       }
@@ -79,8 +124,11 @@ async function installImages(page: Page) {
   });
   return {
     requests: () => requests,
-    update: () => {
-      update();
+    releaseRequest,
+    update: (url: string, nextLabel: string) => {
+      fullUrl = url;
+      label = nextLabel;
+      publish();
     },
   };
 }
@@ -116,13 +164,12 @@ test('waits for decoded preloads and reuses them across snapshots and reopening'
     await expect(modal).toBeVisible();
     await expect(modal.locator('img')).toHaveAttribute('src', '/thumb/qa-thumb');
     await expect(modal.locator('img')).toHaveJSProperty('naturalWidth', 160);
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event('qa:release-decode'));
-    });
+    await releaseDecode(page, 1);
     await expect(modal.locator('img')).toHaveAttribute('src', '/thumb/qa-full');
     await expect(modal.locator('img')).toHaveJSProperty('complete', true);
     await expect(modal.locator('img')).toHaveJSProperty('naturalWidth', 400);
-    images.update();
+    images.update('/thumb/qa-full', 'Updated snapshot');
+    await expect(thumbnail.locator('img')).toHaveAttribute('alt', 'Ход 1: Updated snapshot');
     for (let i = 0; i < 2; i += 1) {
       await page.keyboard.press('Escape');
       await expect(thumbnail).toBeFocused();
@@ -132,9 +179,77 @@ test('waits for decoded preloads and reuses them across snapshots and reopening'
     }
     expect(images.requests()).toBe(1);
   } finally {
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event('qa:release-decode'));
-    });
+    await server.stop();
+  }
+});
+
+// Value: protects=only the current preload may upgrade or invalidate a preview after URL replacement;
+// fails_when=old readiness survives replacement or an obsolete decode upgrades or poisons the current URL;
+// why_new=the reuse case keeps the full URL stable; seam=none; no_claim=synthetic snapshots and controlled Chromium decode outcomes.
+test('ignores obsolete decode outcomes when a full URL returns to the same card', async ({
+  page,
+}) => {
+  const server = await startIsolatedFakeServer({ seedBot: true, rounds: 1 });
+  const images = await installImages(page);
+  try {
+    await openBotResults(page, server.hostUrl);
+    const root = page.locator('html');
+    const thumbnail = page.locator('.thumb-btn').first();
+    const preview = page.getByRole('dialog', { name: 'Снимок бота' }).locator('img');
+    await expect(root).toHaveAttribute('data-qa-decoded-1', 'true');
+    const replaceSnapshot = async (id: number, url: string): Promise<void> => {
+      images.update(url, `Snapshot ${id}`);
+      await expect(thumbnail.locator('img')).toHaveAttribute('alt', `Ход 1: Snapshot ${id}`);
+      await expect(root).toHaveAttribute(`data-qa-decoded-${id}`, 'true');
+    };
+    await replaceSnapshot(2, '/thumb/qa-full-other');
+    await releaseDecode(page, 2);
+    await thumbnail.click();
+    await expect(preview).toHaveAttribute('src', '/thumb/qa-full-other');
+    await page.keyboard.press('Escape');
+    await replaceSnapshot(3, '/thumb/qa-full');
+    await replaceSnapshot(4, '/thumb/qa-full-other');
+    await thumbnail.click();
+    await expect(preview).toHaveAttribute('src', '/thumb/qa-thumb');
+    await page.keyboard.press('Escape');
+    await replaceSnapshot(5, '/thumb/qa-full');
+    await thumbnail.click();
+    await expect(preview).toHaveAttribute('src', '/thumb/qa-thumb');
+    await releaseDecode(page, 1);
+    await expect(preview).toHaveAttribute('src', '/thumb/qa-thumb');
+    await releaseDecode(page, 3, true);
+    await releaseDecode(page, 5);
+    await expect(preview).toHaveAttribute('src', '/thumb/qa-full');
+    await expect(preview).toHaveJSProperty('naturalWidth', 400);
+  } finally {
+    await server.stop();
+  }
+});
+
+// Value: protects=closing bot details detaches a pending full source and reopening displays the new preload;
+// fails_when=the abandoned source remains attached or a reopened card cannot show the full image;
+// why_new=other card interactions close after preload settles; seam=none; no_claim=observes source detachment in Chromium with a routed response.
+test('releases a pending preview image when closing the bot card', async ({ page }) => {
+  const server = await startIsolatedFakeServer({ seedBot: true, rounds: 1 });
+  const images = await installImages(page, true);
+  try {
+    await openBotResults(page, server.hostUrl);
+    const root = page.locator('html');
+    const card = page.locator('.bot-card');
+    await expect.poll(images.requests).toBe(1);
+    await expect(root).toHaveAttribute('data-qa-started-1', 'true');
+    await card.getByRole('button', { name: 'свернуть' }).click();
+    await expect(card).toHaveCount(0);
+    await expect(root).toHaveAttribute('data-qa-detached-1', 'true');
+    images.releaseRequest();
+    await page.getByRole('button', { name: 'почему?' }).first().click();
+    await releaseDecode(page, 2);
+    await card.locator('.thumb-btn').first().click();
+    const preview = page.getByRole('dialog', { name: 'Снимок бота' }).locator('img');
+    await expect(preview).toHaveAttribute('src', '/thumb/qa-full');
+    await expect(preview).toHaveJSProperty('naturalWidth', 400);
+  } finally {
+    images.releaseRequest();
     await server.stop();
   }
 });
