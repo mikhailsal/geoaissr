@@ -1,3 +1,4 @@
+import { expectLobbyPlayers } from './lobby-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { startIsolatedFakeServer } from './helpers';
 
@@ -80,7 +81,7 @@ test('remote entry accepts the existing local owner profile code and identifies 
     await remote.getByLabel('Код профиля').fill(code);
     await remote.getByRole('button', { name: 'Войти по коду' }).click();
     await expect(remote.getByRole('button', { name: 'Начать', exact: true })).toBeVisible();
-    await expect(remote.getByText('ИГРОКИ 1 из 8')).toBeVisible();
+    await expectLobbyPlayers(remote, 1);
     expect((await profileCode(remote)) === code).toBe(true);
   } finally {
     await remote.close();

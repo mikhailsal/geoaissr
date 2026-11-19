@@ -49,15 +49,16 @@ test('idle rigs move on stage and in the wardrobe, pause offscreen and respect r
     await expectMoving(preview);
     await page.keyboard.press('Escape');
 
-    await page.setViewportSize({ width: 1080, height: 400 });
-    await page.evaluate(() => {
-      window.scrollTo(0, document.documentElement.scrollHeight);
+    // The lobby fits one screen. Move its lineup to exercise the real intersection observer.
+    const lineup = page.locator('.lineup');
+    await lineup.evaluate((element: HTMLElement) => {
+      element.style.translate = '0 -200vh';
     });
     await expect(human).not.toBeInViewport();
     await expect(robot).not.toBeInViewport();
     await Promise.all([expectStill(human), expectStill(robot)]);
-    await page.evaluate(() => {
-      window.scrollTo(0, 0);
+    await lineup.evaluate((element: HTMLElement) => {
+      element.style.translate = '';
     });
     await expectMoving(human);
 

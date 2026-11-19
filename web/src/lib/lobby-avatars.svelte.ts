@@ -2,6 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import { GESTURE_INTERVAL_MS, type AvatarAppearance, type AvatarGesture } from '$shared/avatar';
 import type { ClientViewState, ServerMessage } from '$shared/protocol';
 import { RU } from '../i18n/ru';
+import { nextSpin } from './avatar-spin';
 import type { GeoWsClient } from './ws-client';
 
 import { gestureDuration, type OrbitGesture } from './orbit/types';
@@ -61,7 +62,9 @@ export class LobbyAvatars {
 
   receive({ participantId, gesture }: Extract<ServerMessage, { type: 'avatar_gesture' }>): void {
     window.clearTimeout(this.timers.get(participantId));
-    this.playing[participantId] = { kind: gesture, at: Date.now() };
+    const at = Date.now();
+    this.playing[participantId] =
+      gesture === 'spin' ? nextSpin(this.playing[participantId], at) : { kind: gesture, at };
     this.timers.set(
       participantId,
       window.setTimeout(() => {

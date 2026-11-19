@@ -91,7 +91,9 @@ The [bot tool and accounting reference](docs/bot-tools.md) describes draft/final
 
 Your browser remembers your profile and permanent code and automatically signs you in on later visits. Names and colors may coincide with other participants. Use **«Профиль»** in the lobby or final results to edit your name and color; editing is unavailable during a match.
 
-In the lobby, choose a character and adjust its clothing, face, hair, accessories, and colors. Saving updates the shared stage and keeps the appearance with your permanent profile code, including when you sign in on another device. The host can open a robot’s wardrobe from its nameplate on the stage or the AI slot in the roster. Use **Участники и настройки** to reach the room settings. Gesture buttons play for everyone in the lobby. Click or tap any character on stage to turn it for the whole room. The wardrobe preview turns locally.
+The lobby opens on the shared stage once the visible characters have rendered. Select a nameplate to open that character. Your own window combines the wardrobe with your name, participant color, and permanent profile code. The host can dress robots and change their AI settings in the same window. Other players can inspect the outfit and turn the preview. Saved appearance changes appear for everyone and persist with the profile.
+
+Use **Участники** to manage the roster and **Настройки партии** to adjust the game. Close a window with its close button, Escape, or a click outside. Emotions and turns on the stage reach everyone in the lobby. Repeated clicks add momentum to the ongoing turn. Turning a wardrobe preview stays local.
 
 The trophy beside each avatar counts wins from the last six hours. Only complete matches with exactly one first-place finisher count; ties and early finishes do not. Human wins follow the profile UUID, and AI wins follow the bot slot even after a rename. The host can reset an individual bot's count in the lobby or final results. Matches and reset timestamps persist on the server; a storage error is reported in the room.
 

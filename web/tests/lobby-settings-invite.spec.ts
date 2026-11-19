@@ -22,6 +22,10 @@ test('host numeric settings show the accepted value after invalid or empty edits
   try {
     await join(page, server.hostUrl, 'Оля');
     await join(guest, server.guestUrl, 'Дима');
+    for (const viewer of [page, guest]) {
+      await viewer.getByRole('button', { name: 'Настройки партии', exact: true }).click();
+    }
+    await expect(guest.getByRole('spinbutton', { name: 'Раунды' })).toBeDisabled();
     for (const [label, bound, outside] of [
       ['Раунды', '20', '21'],
       ['Время раунда (с)', '60', '59'],

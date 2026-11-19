@@ -10,6 +10,8 @@ import {
   WebGLRenderer,
 } from 'three';
 import { addRobotDetails } from './robot';
+import { IdleFrames } from './idle-frames';
+import { spinMotion } from './spin';
 import { gestureDuration, type StageState, type Surface } from './types';
 
 export function buildRig(state: StageState) {
@@ -31,9 +33,16 @@ function poseRig(rig: OrbitRig, state: StageState, now: number, seconds: number)
   const progress = gesture && Math.max(0, (now - gesture.at) / gestureDuration[gesture.kind]);
   const active = gesture !== null && progress !== null && progress < 1;
   const pose = active && state.reduced ? 0.45 : (progress ?? 0);
-  const turning = active && gesture.kind === 'spin' && !state.reduced;
-  rig.root.rotation.y = -0.23 + (turning ? Math.PI * 2 * pose * pose * (3 - 2 * pose) : 0);
-  const expression = active ? { gesture: gesture.kind, progress: pose } : {};
+  const spin = active && gesture.kind === 'spin' ? spinMotion(gesture, now) : undefined;
+  rig.root.rotation.y = -0.23 + (state.reduced ? 0 : (spin?.angle ?? 0));
+  const expression = active
+    ? {
+        gesture: gesture.kind,
+        progress: pose,
+        spinDrive: state.reduced ? 0.6 : spin?.drive,
+        spinWindup: state.reduced ? 0 : spin?.windup,
+      }
+    : {};
   // A still pose has no subsequent frames for the Studio animator to ease toward it.
   if (state.reduced) {
     seconds = 1.9 + (active ? (pose * gestureDuration[gesture.kind]) / 1000 : 0);
@@ -92,23 +101,25 @@ function makeWebGL(surface: Surface): WebGLRenderer | null {
   }
 }
 
-type Context2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+interface SoftwareFrame {
+  raster: Rasterizer;
+  surface: Surface;
+  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+  idle?: IdleFrames;
+}
+
 export class Painter {
   private readonly scene = new Scene();
   private readonly camera = new OrthographicCamera(-2, 2, 2, -2, 0.1, 30);
   // Switching between differently sized canvases preserves each rig's projected vertex cache.
-  private readonly rasters = new WeakMap<OrbitRig, Rasterizer>();
+  private readonly rasters = new WeakMap<OrbitRig, SoftwareFrame>();
   private readonly surface: Surface;
   private readonly renderer;
-  private readonly ctx: Context2D | null;
   readonly mode;
 
-  constructor(makeSurface: () => Surface) {
-    this.surface = makeSurface();
+  constructor(private readonly makeSurface: () => Surface) {
+    this.surface = this.makeSurface();
     this.renderer = makeWebGL(this.surface);
-    // A canvas that has claimed WebGL cannot subsequently acquire a 2D context.
-    if (!this.renderer) this.surface = makeSurface();
-    this.ctx = this.renderer ? null : this.surface.getContext('2d');
     this.mode = this.renderer ? 'webgl' : 'software';
     lighting(this.scene);
   }
@@ -118,6 +129,7 @@ export class Painter {
     state: StageState,
     now: number,
     seconds: number,
+    idleInterval: number,
   ): Surface {
     const scale = Math.min(1, (this.renderer ? 960 : 320) / Math.max(state.width, state.height));
     const w = Math.max(1, Math.round(state.width * scale));
@@ -133,27 +145,41 @@ export class Painter {
     this.camera.position.set(0, focus + 1.03, 9.3);
     this.camera.lookAt(0, focus, 0);
     this.camera.updateProjectionMatrix();
-    poseRig(model.rig, state, now, seconds);
     if (this.renderer) {
+      poseRig(model.rig, state, now, seconds);
       if (this.surface.width !== w || this.surface.height !== h) this.renderer.setSize(w, h, false);
       this.scene.add(model.rig.root);
       this.renderer.render(this.scene, this.camera);
       this.scene.remove(model.rig.root);
-    } else if (this.ctx) {
-      if (this.surface.width !== w || this.surface.height !== h) {
-        this.surface.width = w;
-        this.surface.height = h;
-      }
-      let raster = this.rasters.get(model.rig);
-      if (!raster) {
-        raster = new Rasterizer();
-        this.rasters.set(model.rig, raster);
-      }
-      raster.setSize(w, h);
-      const rgba = raster.render(model.rig.root, this.camera);
-      this.ctx.putImageData(new ImageData(rgba, w, h), 0, 0);
+      return this.surface;
     }
-    return this.surface;
+    let frame = this.rasters.get(model.rig);
+    if (!frame) {
+      const surface = this.makeSurface();
+      const context = surface.getContext('2d');
+      if (!context) throw new Error('Orbit renderer could not create a 2D canvas.');
+      frame = { surface, context, raster: new Rasterizer() };
+      this.rasters.set(model.rig, frame);
+    }
+    if (frame.surface.width !== w || frame.surface.height !== h) {
+      frame.surface.width = w;
+      frame.surface.height = h;
+    }
+    const { raster } = frame;
+    raster.setSize(w, h);
+    const render = (time: number, context: SoftwareFrame['context']): void => {
+      poseRig(model.rig, state, now, time);
+      const rgba = raster.render(model.rig.root, this.camera);
+      context.putImageData(new ImageData(rgba, w, h), 0, 0);
+    };
+    if (state.reduced || state.gesture) {
+      frame.idle?.reset();
+      render(seconds, frame.context);
+    } else {
+      frame.idle ??= new IdleFrames(this.makeSurface);
+      frame.idle.draw(frame.context, seconds, idleInterval, render);
+    }
+    return frame.surface;
   }
 
   dispose(): void {

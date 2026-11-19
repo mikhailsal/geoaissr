@@ -1,3 +1,4 @@
+import { openLobbyDialog } from './lobby-navigation';
 import { expect, test } from '@playwright/test';
 import { assertNoHorizontalOverflow, startIsolatedFakeServer } from './helpers';
 
@@ -18,6 +19,7 @@ test('quotas show usage meters and keep details accessible', async ({ page }) =>
     if (await continueButton.isVisible()) await continueButton.click();
     await page.getByLabel('Ваше имя').fill('Оля');
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
+    await openLobbyDialog(page, 'Настройки партии');
     await expect(page.getByRole('meter')).toHaveCount(3);
     for (const [name, used, max, percent] of [
       ['Static Street View', 5, 20, 25],

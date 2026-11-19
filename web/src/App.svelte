@@ -5,6 +5,7 @@
   import { COUNTDOWN_MS, type RoundResultEntryView } from '$shared/protocol';
   import type { RegionId } from '$shared/storage-schemas';
   import ProfileModal from './components/ProfileModal.svelte';
+  import ProfileEditor from './components/ProfileEditor.svelte';
   import StatusBanner from './components/StatusBanner.svelte';
   import GameAudio from './components/GameAudio.svelte';
   import { audioPlayer } from './lib/audio-settings.svelte';
@@ -20,6 +21,8 @@
   });
   let editingProfile = $state(false);
   let profileTrigger: HTMLElement | null = null;
+  let lobby = $state<{ openProfile: (event: MouseEvent) => void }>();
+  let afterProfileSave: (() => void) | undefined;
   function openProfile(e: MouseEvent): void {
     audioPlayer.cue('click');
     profileTrigger = e.currentTarget as HTMLElement;
@@ -35,7 +38,10 @@
   }
   let wasPending = false;
   $effect(() => {
-    if (wasPending && !store.profile.pending && !store.profile.error) closeProfile();
+    if (wasPending && !store.profile.pending) {
+      if (!store.profile.error) (afterProfileSave ?? closeProfile)();
+      afterProfileSave = undefined;
+    }
     wasPending = store.profile.pending;
   });
   onMount(() => {
@@ -158,7 +164,13 @@
         <strong>Профиль создан. Вы уже в игре.</strong>
         Сохраните код профиля, если хотите войти с другого устройства или по новой ссылке.
       </p>
-      <button class="btn" onclick={openProfile}>Показать код</button><button
+      <button
+        class="btn"
+        onclick={(event) => {
+          if (lobby) lobby.openProfile(event);
+          else openProfile(event);
+        }}>Показать код</button
+      ><button
         class="btn"
         onclick={() => {
           store.showCodeNotice = false;
@@ -220,11 +232,11 @@
     />
   {:else if view.phase === 'LOBBY'}
     <Lobby
+      bind:this={lobby}
       {view}
       {profileNotice}
       avatars={store.avatars}
       connected={store.connectionState === 'connected'}
-      onEditProfile={openProfile}
       onResetBotWins={(id: string) => {
         store.resetBotWins(id);
       }}
@@ -240,7 +252,26 @@
       onConfirmQuotaReset={handleConfirmQuotaReset}
       onStartMatch={handleStartMatch}
       onEndMatch={handleEndMatch}
-    />
+    >
+      {#snippet profile(close: () => void)}
+        {@const me = view.players.find((player) => player.id === view.viewerId)}
+        {#if me}<ProfileEditor
+            name={me.name}
+            color={me.color}
+            profileToken={store.profile.saved?.profileToken}
+            pending={store.profile.pending}
+            error={store.profile.error}
+            onSave={(nick: string, color: ParticipantColorId) => {
+              afterProfileSave = close;
+              store.profile.update(nick, color);
+            }}
+            onLogout={() => {
+              close();
+              store.logout();
+            }}
+          />{/if}
+      {/snippet}
+    </Lobby>
   {:else if view.phase === 'ROUND_LOADING' || view.phase === 'ROUND_ACTIVE'}
     <Round
       {view}

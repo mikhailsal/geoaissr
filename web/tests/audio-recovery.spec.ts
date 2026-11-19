@@ -1,3 +1,4 @@
+import { expectLobbyPlayers } from './lobby-navigation';
 import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
 import { COUNTDOWN_MS, type ClientMessage, type ServerMessage } from '../../shared/protocol';
 import { audioUrl } from '../src/lib/audio-catalog';
@@ -71,7 +72,7 @@ test('reconnect waits for the fresh phase before resuming music', async ({ brows
     await join(page, server.hostUrl, 'Оля');
     await join(guest, server.guestUrl, 'Дима');
     await page.bringToFront();
-    await expect(page.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await expectLobbyPlayers(page, 2);
     await page.getByRole('button', { name: 'Начать', exact: true }).click();
     await expect(guessMap(page)).toBeVisible({ timeout: 12_000 });
     await expect(guessMap(guest)).toBeVisible({ timeout: 12_000 });
@@ -170,7 +171,10 @@ test('sound controls stay clickable above the pinned round map', async ({ page }
     await effects.getByRole('slider').press('ArrowLeft');
     await expect(effects.getByRole('slider')).toHaveValue('99');
     await effects.getByRole('button', { name: 'Выключить звуковые эффекты' }).click();
-    await effectsToggle.click();
+    await page
+      .getByRole('dialog', { name: 'Настройки звука' })
+      .getByRole('button', { name: 'Закрыть' })
+      .click();
 
     await page.getByRole('button', { name: 'Начать', exact: true }).click();
     await expect(guessMap(page)).toBeVisible({ timeout: 12_000 });

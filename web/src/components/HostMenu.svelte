@@ -4,6 +4,7 @@
   import { RU } from '../i18n/ru';
   import SoundControls from './SoundControls.svelte';
   import { audioPlayer } from '../lib/audio-settings.svelte';
+  import { dismissOnBackdrop } from '../lib/dialog';
 
   interface Props {
     fakeMode: boolean;
@@ -66,7 +67,7 @@
 <svelte:window onkeydown={handleWindowKeyDown} />
 
 <div class="host-menu-bar">
-  <SoundControls />
+  <SoundControls modal={phase === 'LOBBY'} />
   {#if onOpenProfile}<button type="button" class="btn" onclick={onOpenProfile}>Профиль</button>{/if}
   {#if fakeMode}
     <span class="fake-pill">{RU.fakeModeBadge}</span>
@@ -89,6 +90,7 @@
       {/if}
     </button>
     <dialog
+      use:dismissOnBackdrop
       class="panel invite-dialog"
       bind:this={inviteDialog}
       aria-labelledby="invite-title"

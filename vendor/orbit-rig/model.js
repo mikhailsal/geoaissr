@@ -487,7 +487,8 @@ export function bindAvatar(root,bindings) {
   const update=(t,state={})=>{
     const {gesture=null, progress=0, gazeX=0, gazeY=0}=state;
     const p=Math.max(0,Math.min(1,progress));
-    const blend=gesture ? smooth(p/.15)*smooth((1-p)/.19) : 0;
+    const blend = gesture === 'spin' ? 1 : gesture ? smooth(p / .15) * smooth((1 - p) / .19) : 0;
+    const { spinWindup = 0, spinDrive = 0 } = state;
     const k=lastT===null || Math.abs(t-lastT)>.35 ? 1 : 1-Math.exp(-Math.max(0,t-lastT)*29);
     lastT=t;
     const breath=Math.sin(t*1.74+.52), sway=Math.sin(t*.88), nod=Math.sin(t*1.14+.16);
@@ -497,6 +498,14 @@ export function bindAvatar(root,bindings) {
     let rise=0, bodyLean=0, bodyPitch=0, bodyYaw=0, headRoll=0, headYaw=0, headPitch=0;
     let happy=0, squint=0, raised=0;
     switch(gesture) {
+      case 'spin':
+        rise = -0.096 * spinWindup + 0.038 * spinDrive;
+        bodyPitch = 0.13 * spinWindup - 0.035 * spinDrive;
+        bodyYaw = -0.48 * spinWindup + 0.15 * spinDrive;
+        bodyLean = 0.055 * spinWindup - 0.060 * spinDrive;
+        headYaw = 0.20 * spinWindup + 0.24 * spinDrive;
+        headRoll = -0.045 * spinDrive;
+        break;
       case 'gg':
         headPitch=.05-.098*bounce;bodyPitch=-.031;headRoll=-.05;happy=.16;raised=.013;break;
       case 'laugh':
@@ -552,6 +561,15 @@ export function bindAvatar(root,bindings) {
       let fist=handOnHip?.19:.14, thumbAngle=0;
       const target=(a,b)=>a+(b-a)*blend;
       switch(gesture) {
+        case 'spin':
+          // Open the arms to wind up, then draw them across the chest for the pivot.
+          ax -= 0.35 * spinWindup + 0.51 * spinDrive;
+          ay += s * (0.55 * spinWindup + 0.85 * spinDrive);
+          az += s * (1.12 * spinWindup + 0.16 * spinDrive);
+          ex -= 0.15 * spinWindup + 1.08 * spinDrive;
+          wy += s * 0.30 * spinDrive;
+          fist += 0.28 * spinDrive;
+          break;
         case 'gg':
           ax=target(ax,-.27);ay=target(ay,-s*.114);az=target(az,s*.374);ex=target(ex,-2.011);ez=target(ez,0);
           wy=target(wy,s*.38);wz=target(wz,-s*.05);fist=target(fist,.87);thumbAngle=target(0,-.82);break;
@@ -591,10 +609,16 @@ export function bindAvatar(root,bindings) {
       fingers.rotation.x=approach(fingers.rotation.x,-fist*.66,k);
       thumb.rotation.x=approach(thumb.rotation.x,thumbAngle,k);
     }
-    pelvis.rotation.y=.009*nod;
+    pelvis.rotation.y = 0.009 * nod + (gesture === 'spin' ? -0.17 * spinWindup + 0.08 * spinDrive : 0);
     for(const {s,upper,knee,ankle} of legs) {
       let legX=s<0?-.055:.024, legZ=s*.058, kneeX=s<0?.082:-.029, footX=s<0?-.024:0;
-      if(gesture==='cheer') {
+      if (gesture === 'spin') {
+        // Push off the bent knees and lift one foot while the other carries the turn.
+        legX -= 0.39 * spinWindup + (s < 0 ? 0.48 : 0.035) * spinDrive;
+        kneeX += 0.77 * spinWindup + (s < 0 ? 0.95 : 0.12) * spinDrive;
+        footX -= 0.34 * spinWindup + 0.18 * spinDrive;
+        legZ += s * (0.12 * spinWindup - 0.055 * spinDrive);
+      } else if(gesture==='cheer') {
         const kick=Math.abs(Math.sin(p*PI*2.45))*blend;
         legX-=kick*(s>0?.29:.12);kneeX+=kick*(s>0?.71:.49);legZ+=s*kick*.10;footX-=kick*.20;
       } else if(gesture==='joy'&&s<0) {

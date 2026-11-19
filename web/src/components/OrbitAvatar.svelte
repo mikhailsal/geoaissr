@@ -53,7 +53,7 @@
       intersection.disconnect();
       document.removeEventListener('visibilitychange', updateVisibility);
       motion.removeEventListener('change', updateMotion);
-      instance?.destroy();
+      instance.destroy();
     };
   });
 
@@ -73,7 +73,9 @@
   $effect(() => {
     stage?.update({
       appearance: { ...appearance },
-      gesture: active ? { ...active } : null,
+      gesture: active
+        ? { ...active, spinTimes: active.spinTimes ? [...active.spinTimes] : undefined }
+        : null,
       width,
       height,
       reduced,

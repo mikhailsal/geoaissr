@@ -1,3 +1,4 @@
+import { expectLobbyPlayers } from './lobby-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { startIsolatedFakeServer } from './helpers';
 
@@ -74,7 +75,7 @@ test('a claimed legacy profile on an invitation can create a separate guest whil
     await expect(invited.getByLabel('Ваше имя')).toHaveValue('');
     await submitName(invited, 'Другой гость');
     await expect(invited.getByRole('button', { name: 'Начать' })).toHaveCount(0);
-    await expect(page.getByText('ИГРОКИ 2 из 8')).toBeVisible();
+    await expectLobbyPlayers(page, 2);
     await page.reload();
     await expect(page.getByRole('article', { name: 'Первый гость', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Профиль', exact: true }).click();

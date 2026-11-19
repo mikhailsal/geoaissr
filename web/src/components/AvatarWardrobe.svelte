@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { onMount, untrack, type Snippet } from 'svelte';
+  import { dismissOnBackdrop } from '../lib/dialog';
+  import CharacterTabs from './CharacterTabs.svelte';
+  import OutfitDetails from './OutfitDetails.svelte';
   import { Check, Dices, RotateCcw, X } from '@lucide/svelte';
   import type { AvatarAppearance } from '$shared/avatar';
   import type { AvatarSlot } from '$shared/avatar-catalog';
@@ -16,18 +19,37 @@
 
   interface Props {
     name: string;
+    readOnly?: boolean;
+    profile?: Snippet;
+    botSettings?: Snippet;
+    initialTab?: 'appearance' | 'profile' | 'bot';
     appearance: AvatarAppearance;
     onClose: () => void;
     onSave: (appearance: AvatarAppearance) => void;
     pending?: boolean;
     error?: string | null;
   }
-  let { name, appearance, onClose, onSave, pending = false, error = null }: Props = $props();
+  let {
+    name,
+    appearance,
+    readOnly = false,
+    profile,
+    botSettings,
+    initialTab = 'appearance',
+    onClose,
+    onSave,
+    pending = false,
+    error = null,
+  }: Props = $props();
+  let tab = $state(untrack(() => initialTab));
+  const title = $derived(
+    tab === 'profile' ? 'Профиль' : tab === 'bot' ? 'Настройки ИИ · ' + name : 'Гардероб: ' + name,
+  );
   let dialog: HTMLDialogElement;
   let draft = $state(untrack(() => ({ ...appearance })));
   let group = $state('Образ');
   let slot = $state<AvatarSlot>('outfit');
-  let content: HTMLDivElement;
+  let content = $state<HTMLDivElement>();
   const slots = $derived(groups.find((g) => g.name === group)?.slots ?? []);
   const selectedPreset = $derived(
     presets.find((p) => {
@@ -40,16 +62,26 @@
   function category(next: (typeof groups)[number]) {
     group = next.name;
     if (next.slots[0]) slot = next.slots[0];
-    content.scrollTop = 0;
+    if (content) content.scrollTop = 0;
   }
   onMount(() => {
     dialog.showModal();
   });
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="wardrobe-heading" onclose={onClose}>
+<dialog
+  bind:this={dialog}
+  use:dismissOnBackdrop
+  aria-labelledby="wardrobe-heading"
+  onclose={onClose}
+>
   <header>
-    <h2 id="wardrobe-heading">Гардероб: {name}</h2>
+    <h2 id="wardrobe-heading">{title}</h2>
+    {#if profile || botSettings}<CharacterTabs
+        bind:tab
+        showProfile={!!profile}
+        showBot={!!botSettings}
+      />{/if}
     <button
       type="button"
       class="btn icon"
@@ -61,111 +93,129 @@
   </header>
   <div class="studio">
     <div class="preview">
-      <div class="stage"><TurnableAvatar appearance={draft} {name} preview /></div>
-      <div class="preview-tools">
-        <button type="button" class="btn" onclick={() => (draft = shuffle(draft))}
-          ><Dices size={18} aria-hidden="true" /> Случайный образ</button
-        >
-        <button
-          type="button"
-          class="btn icon"
-          aria-label="Вернуть сохранённый образ"
-          title="Вернуть сохранённый образ"
-          onclick={() => (draft = { ...appearance })}
-          ><RotateCcw size={18} aria-hidden="true" /></button
-        >
+      <div class="stage">
+        <TurnableAvatar appearance={readOnly ? appearance : draft} {name} preview />
       </div>
-    </div>
-    <div class="inspector">
-      <div class="sections" role="group" aria-label="Разделы гардероба">
-        {#each groups as categoryGroup (categoryGroup.name)}
+      {#if !readOnly && tab === 'appearance'}<div class="preview-tools">
+          <button type="button" class="btn" onclick={() => (draft = shuffle(draft))}
+            ><Dices size={18} aria-hidden="true" /> Случайный образ</button
+          >
           <button
             type="button"
-            aria-pressed={categoryGroup.name === group}
-            onclick={() => {
-              category(categoryGroup);
-            }}>{categoryGroup.name}</button
+            class="btn icon"
+            aria-label="Вернуть сохранённый образ"
+            title="Вернуть сохранённый образ"
+            onclick={() => (draft = { ...appearance })}
+            ><RotateCcw size={18} aria-hidden="true" /></button
           >
-        {/each}
-      </div>
-      <div class="content" bind:this={content}>
-        {#if slots.length}
-          <div class="subnav" role="group" aria-label="Настройки раздела">
-            {#each slots as field (field)}
-              <button type="button" aria-pressed={field === slot} onclick={() => (slot = field)}
-                >{slotNames[field]}</button
-              >
-            {/each}
-          </div>
-          <WardrobeOptions
-            field={slot}
-            look={draft}
-            onChange={(next: AvatarAppearance) => {
-              draft = next;
-            }}
-          />
-        {:else}
-          <fieldset class="bases">
-            <legend>Основа персонажа</legend>
-            <button
-              type="button"
-              aria-pressed={draft.base === 'human'}
-              onclick={() => (draft = { ...draft, base: 'human' })}>Человек</button
-            >
-            <button
-              type="button"
-              aria-pressed={draft.base === 'robot'}
-              onclick={() => (draft = { ...draft, base: 'robot' })}>Робот</button
-            >
-          </fieldset>
-          <h3>Готовые образы</h3>
-          <div class="presets">
-            {#each presets as preset, index (preset.id)}
-              <button
-                class="preset"
-                type="button"
-                aria-pressed={selectedPreset === preset.id}
-                onclick={() => (draft = applyPreset(draft, preset))}
-              >
-                <span
-                  aria-hidden="true"
-                  class="thumbnail"
-                  style={thumbnail('look', index, presets.length)}
-                ></span>
-                <span>{preset.label}</span>
-                {#if selectedPreset === preset.id}<Check
-                    size={16}
-                    class="mark"
-                    aria-hidden="true"
-                  />{/if}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
+        </div>{/if}
     </div>
+    {#if profile}<div class="settings" hidden={tab !== 'profile'}>{@render profile()}</div>{/if}
+    {#if botSettings}<div class="settings" hidden={tab !== 'bot'}>{@render botSettings()}</div>{/if}
+    {#if readOnly}
+      <div class="settings" hidden={tab !== 'appearance'}><OutfitDetails {appearance} /></div>
+    {:else}
+      <div class="inspector" hidden={tab !== 'appearance'}>
+        <div class="sections" role="group" aria-label="Разделы гардероба">
+          {#each groups as categoryGroup (categoryGroup.name)}
+            <button
+              type="button"
+              aria-pressed={categoryGroup.name === group}
+              onclick={() => {
+                category(categoryGroup);
+              }}>{categoryGroup.name}</button
+            >
+          {/each}
+        </div>
+        <div class="content" bind:this={content}>
+          {#if slots.length}
+            <div class="subnav" role="group" aria-label="Настройки раздела">
+              {#each slots as field (field)}
+                <button type="button" aria-pressed={field === slot} onclick={() => (slot = field)}
+                  >{slotNames[field]}</button
+                >
+              {/each}
+            </div>
+            <WardrobeOptions
+              field={slot}
+              look={draft}
+              onChange={(next: AvatarAppearance) => {
+                draft = next;
+              }}
+            />
+          {:else}
+            <fieldset class="bases">
+              <legend>Основа персонажа</legend>
+              <button
+                type="button"
+                aria-pressed={draft.base === 'human'}
+                onclick={() => (draft = { ...draft, base: 'human' })}>Человек</button
+              >
+              <button
+                type="button"
+                aria-pressed={draft.base === 'robot'}
+                onclick={() => (draft = { ...draft, base: 'robot' })}>Робот</button
+              >
+            </fieldset>
+            <h3>Готовые образы</h3>
+            <div class="presets">
+              {#each presets as preset, index (preset.id)}
+                <button
+                  class="preset"
+                  type="button"
+                  aria-pressed={selectedPreset === preset.id}
+                  onclick={() => (draft = applyPreset(draft, preset))}
+                >
+                  <span
+                    aria-hidden="true"
+                    class="thumbnail"
+                    style={thumbnail('look', index, presets.length)}
+                  ></span>
+                  <span>{preset.label}</span>
+                  {#if selectedPreset === preset.id}<Check
+                      size={16}
+                      class="mark"
+                      aria-hidden="true"
+                    />{/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
   </div>
-  <footer>
-    {#if error}<span role="alert">{error}</span>{/if}
-    <button
-      type="button"
-      class="btn"
-      onclick={() => {
-        dialog.close();
-      }}>Отмена</button
-    >
-    <button
-      type="button"
-      class="btn btn-primary"
-      disabled={pending}
-      onclick={() => {
-        onSave({ ...draft });
-      }}>{pending ? 'Сохранение…' : 'Сохранить образ'}</button
-    >
-  </footer>
+  {#if tab === 'appearance' && !readOnly}<footer>
+      {#if error}<span role="alert">{error}</span>{/if}
+      <button
+        type="button"
+        class="btn"
+        onclick={() => {
+          dialog.close();
+        }}>Отмена</button
+      >
+      <button
+        type="button"
+        class="btn btn-primary"
+        disabled={pending}
+        onclick={() => {
+          onSave({ ...draft });
+        }}>{pending ? 'Сохранение…' : 'Сохранить образ'}</button
+      >
+    </footer>{/if}
 </dialog>
 
 <style>
+  [hidden] {
+    display: none !important;
+  }
+  .settings {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-3);
+  }
   dialog {
     color: var(--paper);
     background: var(--asphalt-800);

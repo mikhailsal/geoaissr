@@ -112,7 +112,9 @@ test('a host outfits the robot and guests see it, including after restart', asyn
     const editName = `Изменить аватар ${botName}`;
     await expect(guest.getByRole('button', { name: editName, exact: true })).toHaveCount(0);
     await expect(avatar(guest, botName)).toHaveAttribute('data-avatar-base', 'robot');
-    await host.getByRole('button', { name: editName, exact: true }).click();
+    await card(host, botName)
+      .getByRole('button', { name: 'Открыть гардероб: ' + botName })
+      .click();
     await chooseLook(host, botName, 'Неоновый гонщик');
     for (const page of [guest, host]) {
       await expect(avatar(page, botName)).toHaveAttribute('data-avatar-outfit', 'moto');
@@ -121,13 +123,16 @@ test('a host outfits the robot and guests see it, including after restart', asyn
     await host.getByLabel('Жесты персонажа').selectOption({ label: `ИИ · ${botName}` });
     await host.getByRole('button', { name: 'Помахать', exact: true }).click();
     await expect(avatar(guest, botName)).toHaveAttribute('data-avatar-gesture', 'wave');
+    await guest.getByRole('button', { name: 'Участники', exact: true }).click();
     await guest.getByRole('button', { name: `Настройки ${botName}`, exact: true }).click();
     await expect(guest.getByLabel('Имя бота')).toBeDisabled();
     await guest.keyboard.press('Escape');
+    await host.getByRole('button', { name: 'Участники', exact: true }).click();
     await host.getByRole('button', { name: `Настройки ${botName}`, exact: true }).click();
     await host.getByLabel('Имя бота').fill('Пилот');
     await host.getByLabel('Имя бота').press('Enter');
     await host.keyboard.press('Escape');
+    await guest.keyboard.press('Escape');
     await expect(avatar(guest, 'Пилот')).toHaveAttribute('data-avatar-outfit', 'moto');
     await server.restart();
     await host.goto(server.hostUrl);
@@ -214,7 +219,9 @@ test('mobile stage paging keeps the right-hand gesture visible and the viewer on
   try {
     await join(host, server.hostUrl, hostName);
     await join(guest, server.guestUrl, guestName);
+    await host.getByRole('button', { name: 'Участники', exact: true }).click();
     await host.getByRole('button', { name: '+ Добавить ИИ', exact: true }).click();
+    await host.keyboard.press('Escape');
     const pager = guest.getByRole('navigation', { name: 'Страницы сцены' });
     await expect(pager).toBeVisible();
     await host.getByLabel('Жесты персонажа').selectOption({ label: `ИИ · ${botName}` });
@@ -252,13 +259,17 @@ test('bots with the same name have matching slot labels in the gesture picker an
     await join(host, server.hostUrl, hostName);
     await join(guest, server.guestUrl, guestName);
     const addBot = host.getByRole('button', { name: '+ Добавить ИИ', exact: true });
+    await host.getByRole('button', { name: 'Участники', exact: true }).click();
     await addBot.click();
+    await host.keyboard.press('Escape');
     const picker = host.getByLabel('Жесты персонажа');
     const firstBot = picker.getByRole('option').nth(1);
     await expect(firstBot).toHaveText(/^ИИ · .+/);
     const name = (await firstBot.innerText()).replace('ИИ · ', '');
+    await host.getByRole('button', { name: 'Участники', exact: true }).click();
     await addBot.click();
     await addBot.click();
+    await host.keyboard.press('Escape');
     const slotLabel = (slot: number) => `ИИ №${slot} · ${name}`;
     const labels = [1, 2, 3].map(slotLabel);
     await expect(picker.getByRole('option')).toHaveText(['Мои жесты', ...labels]);
@@ -312,7 +323,10 @@ test('a host opens the robot wardrobe from its stage button and the selected act
     await join(guest, server.guestUrl, guestName);
     const wardrobe = `Открыть гардероб: ${botName}`;
     const edit = card(host, botName).getByRole('button', { name: wardrobe });
-    await expect(card(guest, botName).getByRole('button', { name: wardrobe })).toHaveCount(0);
+    await card(guest, botName).getByRole('button', { name: wardrobe }).click();
+    await expect(guest.getByRole('heading', { name: 'Образ персонажа' })).toBeVisible();
+    await expect(guest.getByRole('button', { name: 'Сохранить образ' })).toHaveCount(0);
+    await guest.keyboard.press('Escape');
     await edit.click();
     const dialog = host.getByRole('dialog', { name: `Гардероб: ${botName}` });
     await dialog.getByRole('button', { name: `Повернуть на 360°: ${botName}` }).click();

@@ -1,3 +1,4 @@
+import { closeLobbyDialog, expectLobbyPlayers, openLobbyDialog } from './lobby-navigation';
 // Value: protects=bot card zoom preview loads fullUrl with responsive CSS limits and broken thumb suppresses zoom; fails_when=zoomed preview ignores fullUrl or CSS sizing regresses or broken thumb still renders button; why_new=game-flow verified thumb presence but omitted CSS constraints, full-res naturalWidth, and broken thumb fallback; seam=none; no_claim=does not assert visual image canvas pixels or network disconnection timing
 import { expect, test, type Page } from '@playwright/test';
 import {
@@ -29,7 +30,7 @@ async function joinPlayer(page: Page, url: string, nick: string): Promise<void> 
   await expect.poll(() => page.url()).not.toContain('#t=');
   await page.getByLabel('Ваше имя').fill(nick);
   await page.getByRole('button', { name: 'Войти', exact: true }).click();
-  await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Участники', exact: true })).toBeVisible();
   const notice = page.getByRole('button', { name: 'Понятно', exact: true });
   if (await notice.isVisible()) await notice.click();
 }
@@ -220,14 +221,18 @@ test('full 2-round match satisfies T53 map telemetry, axe WCAG AA, and BotCard/S
     await assertNoHorizontalOverflow(hostPage);
     await joinPlayer(hostPage, srv.hostUrl, 'Оля');
 
-    await expect(hostPage.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
+    await expectLobbyPlayers(hostPage, 1);
     await assertAxeClean(hostPage, 'Lobby');
     await assertNoHorizontalOverflow(hostPage);
 
-    await expect(hostPage.locator('.alone-box')).toHaveText(
-      'Пока вы одни. Отправьте друзьям приглашение',
+    const participants = await openLobbyDialog(hostPage, 'Участники');
+    await expect(
+      participants.getByText('Пока вы одни. Отправьте друзьям приглашение', { exact: true }),
+    ).toBeVisible();
+    await expect(participants.getByRole('button', { name: 'Скопировать приглашение' })).toHaveCount(
+      0,
     );
-    await expect(hostPage.locator('.alone-box button')).toHaveCount(0);
+    await closeLobbyDialog(participants);
     await expect(hostPage.getByRole('button', { name: 'Меню хоста' })).toHaveCount(0);
     await assertInviteViewports(hostPage);
     await hostPage.getByRole('button', { name: 'Скопировать приглашение' }).click();
@@ -235,7 +240,7 @@ test('full 2-round match satisfies T53 map telemetry, axe WCAG AA, and BotCard/S
     expect(await hostPage.evaluate(() => navigator.clipboard.readText())).toBe(srv.guestUrl);
 
     await joinPlayer(guestPage, srv.guestUrl, 'Дима');
-    await expect(hostPage.getByText(/ИГРОКИ 2 из 8/)).toBeVisible();
+    await expectLobbyPlayers(hostPage, 2);
     await assertInviteHeader(guestPage);
 
     await hostPage.getByRole('button', { name: 'Начать' }).click();
@@ -248,7 +253,10 @@ test('full 2-round match satisfies T53 map telemetry, axe WCAG AA, and BotCard/S
     expect(guestMaps.getCount()).toBeLessThanOrEqual(2);
 
     await hostPage.getByRole('button', { name: 'Ещё раз' }).click();
-    await expect(hostPage.getByText(/ИГРОКИ 2 из 8/)).toBeVisible({ timeout: 10_000 });
+    await expect(hostPage.getByRole('button', { name: 'Участники', exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expectLobbyPlayers(hostPage, 2);
   } finally {
     await hostCtx.close();
     await guestCtx.close();

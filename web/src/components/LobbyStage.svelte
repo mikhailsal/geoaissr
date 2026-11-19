@@ -1,18 +1,12 @@
 <script lang="ts">
-  import {
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    Rotate3d,
-    Shirt,
-    UsersRound,
-  } from '@lucide/svelte';
+  import { Settings2, Play, ChevronLeft, ChevronRight, Shirt, UsersRound } from '@lucide/svelte';
   import { onMount, type Snippet } from 'svelte';
-  import { AVATAR_GESTURES, defaultAvatar } from '$shared/avatar';
+  import { defaultAvatar, type AvatarGesture } from '$shared/avatar';
   import type { ClientViewState } from '$shared/protocol';
-  import { formatRoundsRu, pluralizeRu } from '../i18n/format';
-  import { REGION_LABELS, RU } from '../i18n/ru';
-  import { gestureLabels, type LobbyAvatars } from '../lib/lobby-avatars.svelte';
+  import { RU } from '../i18n/ru';
+  import type { LobbyAvatars } from '../lib/lobby-avatars.svelte';
+  import StageLoading from './StageLoading.svelte';
+  import LobbyGestures from './LobbyGestures.svelte';
   import LobbyPerformer from './LobbyPerformer.svelte';
 
   let {
@@ -21,13 +15,21 @@
     connected,
     onEdit,
     onOpenSettings,
+    onOpenParticipants,
+    starting,
+    onStart,
+    profileNotice,
     menu,
   }: {
     view: ClientViewState;
     avatars: LobbyAvatars;
     connected: boolean;
-    onEdit: (event: MouseEvent, botId?: string) => void;
+    onEdit: (event: MouseEvent, id: string, bot: boolean) => void;
     onOpenSettings: () => void;
+    onOpenParticipants: () => void;
+    starting: boolean;
+    onStart: () => void;
+    profileNotice: Snippet;
     menu: Snippet;
   } = $props();
 
@@ -95,15 +97,27 @@
     <div class="room">
       <span class="eyebrow">Лобби</span>
       <h1>{RU.appName}</h1>
-      <div class="stats">
-        <span>{REGION_LABELS[view.region]}</span>
-        <span>{formatRoundsRu(view.totalRounds)}</span>
-        <span>{view.moveEnabled ? 'С движением' : 'Без движения'}</span>
-        <span class="party-size"
-          ><UsersRound size={14} aria-hidden="true" /><b aria-hidden="true">{partySize}</b><span
-            class="sr-only">{pluralizeRu(partySize, 'участник', 'участника', 'участников')}</span
-          ></span
+      <div class="room-actions">
+        <button
+          type="button"
+          class="btn"
+          aria-haspopup="dialog"
+          aria-label="Участники"
+          title="Участники"
+          onclick={onOpenParticipants}
         >
+          <UsersRound size={17} aria-hidden="true" /><span>Участники</span><b>{partySize}</b>
+        </button>
+        <button
+          type="button"
+          class="btn"
+          aria-haspopup="dialog"
+          aria-label="Настройки партии"
+          title="Настройки партии"
+          onclick={onOpenSettings}
+        >
+          <Settings2 size={17} aria-hidden="true" />Настройки
+        </button>
       </div>
     </div>
     <div class="menu">{@render menu()}</div>
@@ -120,14 +134,14 @@
           avatars.spin(p.id);
         }}
         canSpin={connected && avatars.canAnimate}
-        onEdit={p.ai && view.viewerIsHost
-          ? (event: MouseEvent) => {
-              onEdit(event, p.id);
-            }
-          : undefined}
-        {connected}
+        onEdit={(event: MouseEvent) => {
+          onEdit(event, p.id, p.ai);
+        }}
+        editable={p.ai ? view.viewerIsHost : p.id === view.viewerId}
       />
     {/each}
+    <StageLoading />
+    <div class="profile-notice">{@render profileNotice()}</div>
   </div>
   <div class="deck">
     {#if pages > 1}
@@ -155,7 +169,7 @@
     <button
       class="wardrobe btn"
       onclick={(event) => {
-        onEdit(event, actor?.id);
+        onEdit(event, actor?.id ?? view.viewerId, Boolean(actor));
       }}
       disabled={!me || !connected}
       ><Shirt size={19} aria-hidden="true" />{actor ? 'Гардероб ИИ' : 'Изменить аватар'}</button
@@ -176,29 +190,28 @@
           {/each}
         </select>
       {/if}
-      <div class="gestures" role="group" aria-label="Жесты">
-        {#each AVATAR_GESTURES as g (g)}
-          <button
-            class="gesture"
-            type="button"
-            disabled={!connected || !avatars.canAnimate}
-            aria-label={gestureLabels[g]}
-            title={gestureLabels[g]}
-            onclick={() => {
-              avatars.animate(g, actor?.id);
-            }}
-          >
-            {#if g === 'spin'}<Rotate3d size={23} aria-hidden="true" />{:else}<img
-                alt=""
-                src={'/orbit-stage/emote-' + g + '.png'}
-              />{/if}
-          </button>
-        {/each}
-      </div>
+      <LobbyGestures
+        disabled={!connected || !avatars.canAnimate}
+        onGesture={(gesture: AvatarGesture) => {
+          avatars.animate(gesture, actor?.id);
+        }}
+      />
     </div>
-    <button type="button" class="details-link btn" onclick={onOpenSettings}>
-      Участники и настройки <ChevronDown size={18} aria-hidden="true" />
-    </button>
+    {#if view.viewerIsHost}
+      <button
+        type="button"
+        class="launch btn btn-primary"
+        disabled={starting || view.startBlockedReasons.length > 0}
+        title={view.startBlockedReasons.length ? view.startBlockedReasons.join(' · ') : undefined}
+        onclick={onStart}
+      >
+        <Play size={17} aria-hidden="true" />{starting
+          ? RU.lobby.preparingFirstRound
+          : RU.lobby.startBtn}
+      </button>
+    {:else}
+      <span class="launch waiting" role="status">Ожидаем старта</span>
+    {/if}
   </div>
 </section>
 
@@ -236,37 +249,46 @@
     font: italic 850 clamp(1.75rem, 4vw, 3.25rem)/1 var(--font-display);
     letter-spacing: -0.06em;
   }
-  .stats,
+  .room-actions,
   .menu :global(.host-menu-bar) {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
   }
-  .stats span,
   .paging {
     border: 1px solid var(--orbit-edge);
     border-radius: var(--radius-sm);
     color: var(--paper);
     background: var(--orbit-plate);
   }
-  .stats span {
-    padding: 0.22rem 0.55rem;
-    font-size: 0.8rem;
-    font-weight: 600;
+  .room-actions .btn {
+    padding-inline: var(--sp-2);
+    font-size: var(--text-xs);
   }
-  .party-size {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
+  .waiting {
+    color: var(--paper);
+    background: var(--orbit-plate);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    font-size: var(--text-xs);
+  }
+  .profile-notice {
+    position: absolute;
+    z-index: 5;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(540px, calc(100% - var(--sp-4)));
+    pointer-events: none;
+  }
+  .profile-notice :global(.save-code-notice) {
+    width: 100%;
+    margin: 0;
+    pointer-events: auto;
   }
   .lineup {
     position: relative;
     flex: 1 0 min(26dvh, 240px);
-  }
-  .gesture img {
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
   }
   .paging {
     display: flex;
@@ -276,7 +298,6 @@
     font-size: 0.85rem;
   }
   .page-btn,
-  .gesture,
   .actor,
   .wardrobe {
     background: var(--orbit-plate);
@@ -302,27 +323,9 @@
     flex-wrap: wrap;
     align-items: center;
   }
-  .gestures {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-1);
-  }
-  .gesture {
-    min-width: 44px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    transition:
-      transform var(--dur-fast) var(--ease),
-      background var(--dur-fast);
-  }
-  .gesture:hover:enabled,
   .page-btn:hover:enabled,
   .wardrobe:hover:enabled {
     background: var(--orbit-hover);
-  }
-  .gesture:hover:enabled {
-    transform: translateY(-2px);
   }
   button:disabled {
     opacity: 0.5;
@@ -340,14 +343,14 @@
       display: grid;
       align-items: center;
       grid-template-columns: auto minmax(0, 1fr);
-      grid-template-areas: 'wardrobe details' 'paging actor' 'gestures gestures';
+      grid-template-areas: 'wardrobe launch' 'paging actor' 'gestures gestures';
     }
     .wardrobe {
       grid-area: wardrobe;
       justify-self: start;
     }
-    .details-link {
-      grid-area: details;
+    .launch {
+      grid-area: launch;
       justify-self: end;
     }
     .actor {
@@ -360,11 +363,6 @@
     .performance {
       display: contents;
     }
-    .gestures {
-      grid-area: gestures;
-      display: grid;
-      grid-template-columns: repeat(8, minmax(44px, 1fr));
-    }
   }
   @media (max-width: 600px) {
     header,
@@ -372,22 +370,18 @@
       padding: var(--sp-2);
     }
     header,
-    .stats,
+    .room-actions,
     .menu :global(.host-menu-bar) {
       gap: var(--sp-1);
     }
     .room h1 {
       display: inline;
     }
-    .stats span {
-      padding: 0.1rem var(--sp-1);
-      font-size: 0.75rem;
-    }
     .menu :global(.fake-pill) {
       padding-inline: var(--sp-2);
     }
     .wardrobe,
-    .details-link {
+    .launch {
       padding-inline: var(--sp-2);
       font-size: var(--text-xs);
     }
@@ -400,11 +394,6 @@
     }
     .actor {
       max-width: min(32vw, 11rem);
-    }
-  }
-  @media (max-width: 445px) {
-    .gestures {
-      grid-template-columns: repeat(4, 1fr);
     }
   }
   @media (orientation: landscape) and (max-height: 480px) and (max-width: 899px) {
@@ -426,12 +415,16 @@
       display: inline;
       font-size: 1.4rem;
     }
-    .stats,
+    .room-actions,
     .menu :global(.host-menu-bar) {
       gap: var(--sp-1);
     }
-    .stats span {
-      padding: 0 var(--sp-1);
+    .room-actions .btn {
+      gap: var(--sp-1);
+      padding-inline: var(--sp-1);
+    }
+    .room-actions span {
+      display: none;
     }
     .menu :global(.btn) {
       padding-inline: var(--sp-2);
@@ -462,7 +455,7 @@
       grid-template-columns: minmax(116px, 1fr) minmax(0, 1fr);
     }
     .wardrobe,
-    .details-link {
+    .launch {
       width: 100%;
       padding-inline: var(--sp-1);
       font-size: var(--text-xs);
@@ -479,9 +472,6 @@
     }
     .page-btn {
       flex-shrink: 0;
-    }
-    .gestures {
-      grid-template-columns: repeat(4, 1fr);
     }
   }
 </style>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { AvatarAppearance } from '$shared/avatar';
   import type { OrbitGesture } from '../lib/orbit/types';
+  import { nextSpin } from '../lib/avatar-spin';
   import OrbitAvatar from './OrbitAvatar.svelte';
 
   let {
@@ -21,7 +22,7 @@
   let localTurn = $state<OrbitGesture | null>(null);
   function turn(): void {
     if (onSpin) onSpin();
-    else localTurn = { kind: 'spin', at: Date.now() };
+    else localTurn = nextSpin(localTurn, Date.now());
   }
 </script>
 

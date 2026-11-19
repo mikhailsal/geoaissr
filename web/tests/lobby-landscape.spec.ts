@@ -29,13 +29,17 @@ for (const viewport of [
       await joinLobby(page, server.hostUrl, viewport);
       const trigger = page.getByRole('button', { name: 'Звуковые эффекты', exact: true });
       await trigger.tap();
-      const panel = page.getByRole('region', { name: 'Громкость звуковых эффектов' });
+      const modal = page.getByRole('dialog', { name: 'Настройки звука' });
+      await expect(modal).toBeInViewport({ ratio: 1 });
+      const panel = modal.getByRole('region', { name: 'Громкость звуковых эффектов' });
       await expect(panel).toBeInViewport({ ratio: 1 });
       const mute = panel.getByRole('button', { name: 'Выключить звуковые эффекты' });
+      const reset = panel.getByRole('button', { name: 'Сбросить настройки звука' });
       await expect(mute).toBeInViewport({ ratio: 1 });
+      await expect(reset).toBeInViewport({ ratio: 1 });
       await mute.tap();
       await expect(panel.getByRole('button', { name: 'Включить звуковые эффекты' })).toBeVisible();
-      await panel.getByRole('button', { name: 'Сбросить настройки звука' }).tap();
+      await reset.tap();
       await page.keyboard.press('Escape');
       await expect(trigger).toBeFocused();
     } finally {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Rotate3d, Shirt } from '@lucide/svelte';
+  import { Eye, Rotate3d, Shirt } from '@lucide/svelte';
   import type { AvatarAppearance } from '$shared/avatar';
   import type { ParticipantColorId } from '$shared/colors';
   import { gestureLabels } from '../lib/lobby-avatars.svelte';
@@ -23,7 +23,7 @@
     onSpin,
     canSpin,
     onEdit,
-    connected,
+    editable,
   }: {
     member: Member;
     position: number;
@@ -32,8 +32,8 @@
     gesture?: OrbitGesture;
     onSpin: () => void;
     canSpin: boolean;
-    onEdit?: (event: MouseEvent) => void;
-    connected: boolean;
+    onEdit: (event: MouseEvent) => void;
+    editable: boolean;
   } = $props();
   const name = $derived(member.slotLabel ?? member.name);
   const caption = $derived(
@@ -53,21 +53,19 @@
   <div class="figure">
     <TurnableAvatar appearance={member.appearance} {name} {gesture} {onSpin} disabled={!canSpin} />
   </div>
-  {#if onEdit}
-    <button
-      type="button"
-      class="nameplate edit"
-      aria-label={'Открыть гардероб: ' + name}
-      title={'Открыть гардероб: ' + name}
-      aria-haspopup="dialog"
-      disabled={!connected}
-      onclick={onEdit}
-    >
-      <Shirt size={16} aria-hidden="true" /><span>{caption}</span>
-    </button>
-  {:else}
-    <div class="nameplate">{caption}</div>
-  {/if}
+  <button
+    type="button"
+    class="nameplate edit"
+    aria-label={'Открыть гардероб: ' + name}
+    title={'Открыть гардероб: ' + name}
+    aria-haspopup="dialog"
+    onclick={onEdit}
+  >
+    {#if editable}<Shirt size={16} aria-hidden="true" />{:else}<Eye
+        size={16}
+        aria-hidden="true"
+      />{/if}<span>{caption}</span>
+  </button>
   <div class="action-cue" role="status" aria-atomic="true">
     {#if gesture}
       <span class="sr-only">{name} — {gestureLabels[gesture.kind]}</span>

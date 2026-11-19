@@ -18,8 +18,15 @@ function audioControls(page: Page, kind: AudioKind) {
   const channel = kind === 'music' ? 'музыки' : 'звуковых эффектов';
   const action = kind === 'music' ? 'музыку' : 'звуковые эффекты';
   const panel = page.getByRole('region', { name: `Громкость ${channel}` });
+  const trigger = page.getByTitle(`Громкость ${channel}`, { exact: true });
+  const modalChannel = page
+    .getByRole('group', { name: 'Каналы звука', exact: true })
+    .getByRole('button', { name: title, exact: true });
   return {
-    trigger: page.getByRole('button', { name: title, exact: true }),
+    trigger,
+    async toggle() {
+      await ((await modalChannel.isVisible()) ? modalChannel : trigger).click();
+    },
     panel,
     slider: panel.getByRole('slider', { name: `Громкость ${channel}` }),
     decrease: panel.getByRole('button', { name: `Уменьшить громкость ${channel}` }),
@@ -32,7 +39,7 @@ function audioControls(page: Page, kind: AudioKind) {
 
 async function openAudioControls(page: Page, kind: AudioKind) {
   const controls = audioControls(page, kind);
-  await controls.trigger.click();
+  await controls.toggle();
   await expect(controls.trigger).toHaveAttribute('aria-expanded', 'true');
   await expect(controls.slider).toBeVisible();
   return controls;
@@ -42,7 +49,7 @@ async function setMuted(page: Page, kind: AudioKind, muted: boolean): Promise<vo
   const controls = await openAudioControls(page, kind);
   await (muted ? controls.mute : controls.unmute).click();
   await expect(muted ? controls.unmute : controls.mute).toBeVisible();
-  await controls.trigger.click();
+  await controls.toggle();
 }
 
 async function join(page: Page, url: string, name = 'Оля'): Promise<void> {
@@ -441,7 +448,7 @@ test('volume controls update current and queued Web Audio sources without restar
     await musicControls.slider.press('End');
     await expect(musicControls.slider).toHaveValue('100');
     for (const source of [music, queued]) await expectGain(page, source, 0.18);
-    await musicControls.trigger.click();
+    await musicControls.toggle();
 
     const effects = await openAudioControls(page, 'effects');
     await expect(effects.slider).toHaveValue('100');
@@ -488,7 +495,7 @@ test('mute and volume preferences persist and popovers fit the header', async ({
     await effects.decrease.click();
     await effects.mute.click();
     await expect(effects.slider).toHaveValue('95');
-    await effects.trigger.click();
+    await effects.toggle();
     const music = await openAudioControls(page, 'music');
     await music.decrease.click();
     await music.mute.click();
@@ -553,7 +560,7 @@ async function loginByCode(page: Page, url: string, code: string): Promise<void>
   await page.goto(url);
   await page.getByLabel('Код профиля').fill(code);
   await page.getByRole('button', { name: 'Войти по коду', exact: true }).click();
-  await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Участники', exact: true })).toBeVisible();
 }
 
 function persistedAudio(dataDir: string, code: string): AudioPreferences | undefined {
@@ -571,7 +578,7 @@ async function expectProfileAudio(page: Page, preferences: AudioPreferences): Pr
     const control = await openAudioControls(page, kind);
     await expect(control.slider).toHaveValue(String(Math.round(volume * 100)));
     await expect(preferences[kind] ? control.mute : control.unmute).toBeVisible();
-    await control.trigger.click();
+    await control.toggle();
   }
 }
 
@@ -611,12 +618,12 @@ test('profile code restores audio across origins and reset persists after restar
     const music = await openAudioControls(page, 'music');
     await music.slider.press('ArrowLeft');
     await music.mute.click();
-    await music.trigger.click();
+    await music.toggle();
     const effects = await openAudioControls(page, 'effects');
     await expect(effects.slider).toHaveValue('98');
     await effects.slider.press('ArrowRight');
     await effects.mute.click();
-    await effects.trigger.click();
+    await effects.toggle();
     await expect.poll(() => persistedAudio(server.dataDir, code)).toEqual(changed);
 
     await join(other, server.guestUrl, 'Лена');
@@ -625,7 +632,7 @@ test('profile code restores audio across origins and reset persists after restar
     await expectProfileAudio(other, defaults);
     const otherMusic = await openAudioControls(other, 'music');
     await otherMusic.slider.press('ArrowRight');
-    await otherMusic.trigger.click();
+    await otherMusic.toggle();
     await expect.poll(() => persistedAudio(server.dataDir, otherCode)).toEqual(otherPrefs);
 
     await page.goto('about:blank');
@@ -640,7 +647,7 @@ test('profile code restores audio across origins and reset persists after restar
     const restored = await openAudioControls(alternate, 'music');
     await restored.reset.click();
     await expect(restored.slider).toHaveValue('60');
-    await restored.trigger.click();
+    await restored.toggle();
     await expectProfileAudio(alternate, defaults);
     await expect.poll(() => persistedAudio(server.dataDir, code)).toEqual(defaults);
     expect(persistedAudio(server.dataDir, otherCode)).toEqual(otherPrefs);
@@ -674,7 +681,7 @@ test('legacy preferences default music to 60% and saved 100% restores original g
     const effects = await openAudioControls(page, 'effects');
     await expect(effects.slider).toHaveValue('100');
     await expect(effects.unmute).toBeVisible();
-    await effects.trigger.click();
+    await effects.toggle();
     const music = await openAudioControls(page, 'music');
     await expect(music.slider).toHaveValue('60');
     await expect(music.mute).toBeVisible();

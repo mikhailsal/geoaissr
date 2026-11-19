@@ -9,7 +9,6 @@
     view: ClientViewState;
     minDurationSec: number;
     hostName: string;
-    starting: boolean;
     onUpdateLobby: (patch: {
       rounds?: number;
       roundDurationSec?: number;
@@ -18,18 +17,9 @@
       aiWaitWindowSec?: number;
     }) => void;
     onConfirmQuotaReset: () => void;
-    onStart: () => void;
   }
 
-  let {
-    view,
-    minDurationSec,
-    hostName,
-    starting,
-    onUpdateLobby,
-    onConfirmQuotaReset,
-    onStart,
-  }: Props = $props();
+  let { view, minDurationSec, hostName, onUpdateLobby, onConfirmQuotaReset }: Props = $props();
 
   function commitNumber(
     input: HTMLInputElement,
@@ -47,9 +37,7 @@
   }
 </script>
 
-<section class="panel card" aria-label="Настройки партии">
-  <h2 class="sec-head">{RU.lobby.partyHeading}</h2>
-
+<section class="settings">
   <div class="settings-grid">
     <label class="field">
       <span class="lbl">{RU.lobby.roundsLabel}</span>
@@ -160,16 +148,11 @@
     {/if}
   </div>
 
+  {#if view.tunnel.mode === 'local'}
+    <p class="muted" role="note">{RU.connection.localOnly}</p>
+  {/if}
   <div class="start-zone">
     {#if view.viewerIsHost}
-      <button
-        type="button"
-        class="btn btn-primary start-btn"
-        disabled={view.startBlockedReasons.length > 0 || starting}
-        onclick={onStart}
-      >
-        {starting ? RU.lobby.preparingFirstRound : RU.lobby.startBtn}
-      </button>
       {#if view.startBlockedReasons.length > 0}
         <ul class="blocked-list" aria-label="Почему нельзя начать">
           {#each view.startBlockedReasons as reason (reason)}
@@ -187,19 +170,10 @@
 </section>
 
 <style>
-  .card {
-    padding: var(--sp-4);
+  .settings {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-  }
-
-  .sec-head {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 0.92rem;
-    letter-spacing: 0.04em;
-    color: var(--paper-dim);
   }
 
   .settings-grid {
@@ -260,12 +234,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-  }
-
-  .start-btn {
-    width: 100%;
-    min-height: 50px;
-    font-size: 1.05rem;
   }
 
   .blocked-list {
