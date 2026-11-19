@@ -20,12 +20,17 @@ import {
 export class ProfileSession {
   saved = $state<SavedUserProfile | null>(loadSavedProfile());
   error = $state<string | null>(null);
+  canRegister = $state(false);
   pending = $state(false);
   private pendingEdit: (SavedUserProfile & { seq: number }) | null = null;
   private pendingJoin: SavedUserProfile | null = null;
   private restoredProfileId: string | null = null;
 
   constructor(private readonly client: GeoWsClient) {}
+
+  registerNew(): void {
+    this.client.registerNewProfile();
+  }
 
   accept(profile: StoredProfile): void {
     this.saved = {

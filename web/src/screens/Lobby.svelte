@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
   import { Settings2, Shirt } from '@lucide/svelte';
   import { defaultAvatar, type AvatarAppearance } from '$shared/avatar';
   import type { LobbyAvatars } from '../lib/lobby-avatars.svelte';
@@ -18,6 +18,7 @@
   import { PRESET_LABELS, RU } from '../i18n/ru';
 
   interface Props {
+    profileNotice: Snippet;
     view: ClientViewState;
     avatars: LobbyAvatars;
     connected: boolean;
@@ -44,6 +45,7 @@
   }
 
   let {
+    profileNotice,
     view,
     avatars,
     connected,
@@ -136,6 +138,7 @@
       />
     {/snippet}
   </LobbyStage>
+  {@render profileNotice()}
 
   {#if view.tunnel.mode === 'local'}
     <!-- Inline, not in the fixed banner: a permanent notice must not cover header controls. -->

@@ -151,20 +151,30 @@
   connected={store.joined && store.authState === 'ready' && store.connectionState === 'connected'}
 />
 
+{#snippet profileNotice()}
+  {#if store.showCodeNotice}
+    <div class="save-code-notice panel" role="status">
+      <p>
+        <strong>Профиль создан. Вы уже в игре.</strong>
+        Сохраните код профиля, если хотите войти с другого устройства или по новой ссылке.
+      </p>
+      <button class="btn" onclick={openProfile}>Показать код</button><button
+        class="btn"
+        onclick={() => {
+          store.showCodeNotice = false;
+          if (view?.phase === 'LOBBY') window.scrollTo(0, 0);
+        }}>Понятно</button
+      >
+    </div>
+  {/if}
+{/snippet}
+
 <div class="app-shell">
   {#if hasProfile && !inGamePhase}<button type="button" class="btn owner-menu" onclick={openProfile}
       >Профиль</button
     >{/if}
-  {#if store.showCodeNotice && inGamePhase}<div class="save-code-notice panel" role="status">
-      <p>
-        Сохраните код профиля. Он нужен для входа с другого устройства или по новому адресу сервера.
-      </p>
-      <button class="btn" onclick={openProfile}>Показать код</button><button
-        class="btn"
-        onclick={() => (store.showCodeNotice = false)}>Понятно</button
-      >
-    </div>{/if}
   {#if inGamePhase && view}
+    {#if view.phase !== 'LOBBY'}{@render profileNotice()}{/if}
     <div class="global-banner">
       <StatusBanner
         connectionState={store.connectionState}
@@ -199,6 +209,10 @@
       onLogin={(code: string) => {
         store.login(code);
       }}
+      canRegister={store.profile.canRegister}
+      onNewProfile={() => {
+        store.profile.registerNew();
+      }}
       onCodeLogin={() => {
         store.useCodeLogin();
       }}
@@ -207,6 +221,7 @@
   {:else if view.phase === 'LOBBY'}
     <Lobby
       {view}
+      {profileNotice}
       avatars={store.avatars}
       connected={store.connectionState === 'connected'}
       onEditProfile={openProfile}

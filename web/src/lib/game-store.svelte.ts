@@ -101,7 +101,7 @@ export class GameStore extends GameCommands {
     this.resendPinOnNextState = true;
     this.authError = null;
     this.authState = 'ready';
-    if (!msg.restoredPlayerId && this.profile.saved) {
+    if (!msg.restoredPlayerId && this.profile.saved && !this.wsClient.registeringNew) {
       this.authState = 'checking';
       this.join(this.profile.saved.nick, this.profile.saved.color);
     }
@@ -137,6 +137,7 @@ export class GameStore extends GameCommands {
   private buildWsCallbacks(): WsClientCallbacks {
     return {
       onNoToken: (reason) => {
+        this.profile.canRegister = this.wsClient.hasInvitation;
         this.clearTransientPending();
         this.authState = 'error';
         this.authError = reason ?? 'no_token';
@@ -175,6 +176,7 @@ export class GameStore extends GameCommands {
       },
       onProfileLoginOk: this.handleProfileLoginOk.bind(this),
       onProfileLoginError: (msg) => {
+        this.profile.canRegister = this.wsClient.hasInvitation;
         this.authState = 'error';
         this.authError = msg.code;
       },
@@ -237,11 +239,7 @@ export class GameStore extends GameCommands {
     this.authState = 'ready';
     this.lobbySummary = msg.lobbySummary;
     this.joinError = { code: msg.code, message: msg.message };
-    if (msg.code === 'profile_token_required') {
-      this.wsClient.useCodeLogin();
-      this.authState = 'error';
-      this.authError = 'no_token';
-    }
+    if (msg.code === 'profile_token_required') this.wsClient.useCodeLogin();
   }
 
   private triggerBackOnline(): void {
@@ -339,8 +337,6 @@ export class GameStore extends GameCommands {
 
   useCodeLogin(): void {
     this.wsClient.useCodeLogin();
-    this.authState = 'error';
-    this.authError = 'no_token';
     this.joinError = null;
   }
 

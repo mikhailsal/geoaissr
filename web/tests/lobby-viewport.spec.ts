@@ -42,6 +42,8 @@ test('the lobby stage fills the viewport and keeps room details reachable', asyn
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
     const notice = page.getByRole('button', { name: 'Понятно' });
     await expect(page.getByRole('article', { name: 'Луна' })).toBeVisible();
+    await expect(page.getByText('Профиль создан. Вы уже в игре.')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Сцена лобби' })).toBeInViewport({ ratio: 1 });
     if (await notice.isVisible()) await notice.click();
     const add = page.getByRole('button', { name: '+ Добавить ИИ' });
     await add.click();

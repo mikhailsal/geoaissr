@@ -59,9 +59,12 @@ export interface WsClientCallbacks {
 }
 
 export class GeoWsClient {
-  private readonly callbacks: WsClientCallbacks;
   private token: string | null = null;
   private profileToken: string | null = null;
+  registeringNew = false;
+  get hasInvitation(): boolean {
+    return this.token !== null;
+  }
   private ws: WebSocket | null = null;
   private seq = 1;
   private pingTimer: number | null = null;
@@ -79,9 +82,7 @@ export class GeoWsClient {
     this.sendSequenced('map_loaded', { kind }),
   );
 
-  constructor(callbacks: WsClientCallbacks) {
-    this.callbacks = callbacks;
-  }
+  constructor(private readonly callbacks: WsClientCallbacks) {}
 
   private readonly handleOffline = (): void => {
     this.browserOffline = true;
@@ -105,13 +106,23 @@ export class GeoWsClient {
   };
 
   private readonly handleHashChange = (): void => {
-    if (window.location.hash.length <= 1 || !hasInviteFragment()) {
-      return;
-    }
+    if (!hasInviteFragment()) return;
     const nextToken = extractAndStripInviteToken();
-    if (!nextToken) return;
-    if (this.wasAuthenticatedOnce || this.profileToken) return;
+    if (!nextToken || this.wasAuthenticatedOnce) return;
     this.token = nextToken;
+    if (this.profileToken) {
+      if (this.fatalStop) this.registerNewProfile();
+    } else this.restartInvitation();
+  };
+
+  registerNewProfile(): void {
+    if (!this.token) return;
+    this.registeringNew = true;
+    this.profileToken = null;
+    this.restartInvitation();
+  }
+
+  private restartInvitation(): void {
     this.intentionallyClosed = false;
     this.fatalStop = false;
     this.attempt = 0;
@@ -121,12 +132,8 @@ export class GeoWsClient {
     this.clearTimers();
     this.detachSocket();
     this.callbacks.onHashToken?.();
-    if (this.browserOffline || !window.navigator.onLine) {
-      this.scheduleReconnect();
-      return;
-    }
     this.openSocket();
-  };
+  }
 
   private attachBrowserListeners(): void {
     if (this.listenersAttached || typeof window === 'undefined') return;
@@ -168,7 +175,7 @@ export class GeoWsClient {
     if (!this.token) {
       this.token = extractAndStripInviteToken();
     }
-    this.profileToken ??= loadSavedProfile()?.profileToken ?? null;
+    if (!this.registeringNew) this.profileToken ??= loadSavedProfile()?.profileToken ?? null;
     if (!this.token && !this.profileToken) {
       this.callbacks.onNoToken();
       return;
@@ -180,23 +187,22 @@ export class GeoWsClient {
     if (this.wasAuthenticatedOnce && this.profileToken) return;
     this.close();
     this.wasAuthenticatedOnce = false;
-    this.token = null;
+    this.registeringNew = false;
     this.profileToken = normalizeProfileToken(raw) ?? raw;
     this.retry();
   }
 
   useCodeLogin(reason?: 'host_required'): void {
     this.close();
-    this.token = null;
     this.profileToken = null;
     this.wasAuthenticatedOnce = false;
-    clearStoredSessionToken();
     this.attachBrowserListeners();
     this.callbacks.onNoToken(reason);
   }
 
   logout(clearShared = true): void {
     this.close();
+    this.registeringNew = false;
     this.token = null;
     this.profileToken = null;
     this.wasAuthenticatedOnce = false;
@@ -258,7 +264,11 @@ export class GeoWsClient {
   }
 
   sendJoin(nick: string, color: ParticipantColorId, profileId?: string): boolean {
-    return this.sendSequenced('join', { nick, color, profileId });
+    return this.sendSequenced('join', {
+      nick,
+      color,
+      profileId: this.registeringNew ? undefined : profileId,
+    });
   }
 
   sendPinThrottled(roundNumber: number, lat: number, lng: number): boolean {
@@ -308,14 +318,14 @@ export class GeoWsClient {
       this.attempt = 0;
       this.disconnectedSince = null;
       this.callbacks.onSocketOpen();
-      const saved = loadSavedCreds();
+      const saved = this.registeringNew ? null : loadSavedCreds();
       ws.send(
         JSON.stringify(
           this.profileToken
             ? { type: 'profile_login', profileToken: this.profileToken }
             : {
                 type: 'hello',
-                profileId: getOrCreateProfileId(),
+                profileId: this.registeringNew ? undefined : getOrCreateProfileId(),
                 token: this.token,
                 ...(saved ? { playerId: saved.playerId, playerSecret: saved.playerSecret } : {}),
               },
@@ -358,6 +368,10 @@ export class GeoWsClient {
         (msg.type === 'profile_login_ok' && msg.profile.role === 'guest')) &&
       isOwnerEntry()
     ) {
+      if (msg.type === 'hello_ok') {
+        this.token = null;
+        clearStoredSessionToken();
+      }
       this.useCodeLogin('host_required');
       return;
     }
@@ -381,15 +395,14 @@ export class GeoWsClient {
           this.callbacks.onBackOnline();
         }
         this.wasAuthenticatedOnce = true;
-        if (!msg.restoredPlayerId) {
-          clearCreds();
-        }
+        if (!msg.restoredPlayerId && !this.registeringNew) clearCreds();
         if (msg.profile) this.profileToken = msg.profile.profileToken;
         this.callbacks.onHelloOk(msg);
         break;
       case 'hello_error':
         if (msg.code === 'invalid_token') {
-          clearCreds();
+          this.token = null;
+          if (!this.registeringNew) clearCreds();
           clearStoredSessionToken();
           this.fatalStop = true;
         } else if (msg.code === 'replaced_by_new_tab') {
@@ -398,6 +411,7 @@ export class GeoWsClient {
         this.callbacks.onHelloError(msg);
         break;
       case 'join_ok':
+        this.registeringNew = false;
         this.profileToken = msg.profile.profileToken;
         saveCreds({ playerId: msg.playerId, playerSecret: msg.playerSecret });
         this.callbacks.onJoinOk(msg);
