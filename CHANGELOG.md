@@ -2,6 +2,12 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.2.3] - 2026-11-19
+
+### Fixed
+
+- Keep full bot snapshots ready in memory while the details card is open, so opening or reopening a preview avoids another image load. Show the loaded thumbnail until the full image is ready.
+
 ## [0.2.2] - 2026-11-19
 
 ### Added

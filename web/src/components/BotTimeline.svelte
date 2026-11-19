@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { Eye, Move, ScanEye, X } from '@lucide/svelte';
-  import { untrack } from 'svelte';
-  import { SvelteSet } from 'svelte/reactivity';
   import type { BotTurnThumbView } from '$shared/protocol';
   import { formatZoom } from '../i18n/format';
   let { thumbs }: { thumbs: BotTurnThumbView[] } = $props();
@@ -10,36 +10,46 @@
     ...thumbs.filter((t) => t.action !== 'observe'),
   ]);
   let broken = $state<Record<string, boolean>>({});
-  let activeThumb = $state<BotTurnThumbView | null>(null);
-  let loaded = $state<Record<string, boolean>>({});
-  let zoomedUrl = $derived(
-    activeThumb
-      ? activeThumb.fullUrl && loaded[activeThumb.fullUrl] && !broken[activeThumb.fullUrl]
-        ? activeThumb.fullUrl
-        : activeThumb.thumbUrl
-      : null,
+  const ready = new SvelteSet<string>();
+  const preloaded = new SvelteMap<string, HTMLImageElement>();
+  let zoomedThumb = $state<BotTurnThumbView | null>(null);
+  const zoomedUrl = $derived(
+    zoomedThumb?.fullUrl && ready.has(zoomedThumb.fullUrl) && !broken[zoomedThumb.fullUrl]
+      ? zoomedThumb.fullUrl
+      : (zoomedThumb?.thumbUrl ?? null),
   );
-  const prefetched = new SvelteSet<string>();
-  let disposed = false;
-  $effect(() => () => {
-    disposed = true;
-  });
+  let previewDialog = $state<HTMLDialogElement | null>(null);
+
   $effect(() => {
-    for (const thumb of thumbs) {
-      const url = thumb.fullUrl;
-      if (!url || untrack(() => prefetched.has(url))) continue;
+    const urls = new Set(thumbs.flatMap((thumb) => (thumb.fullUrl ? [thumb.fullUrl] : [])));
+    for (const [url, image] of preloaded) {
+      if (urls.has(url)) continue;
+      preloaded.delete(url);
+      image.removeAttribute('src');
+      ready.delete(url);
+    }
+    for (const url of urls) {
+      if (preloaded.has(url)) continue;
+      // Retain decoded images while the card is open, including no-store responses.
       const image = new Image();
-      prefetched.add(url);
-      image.onload = () => {
-        if (!disposed) loaded = { ...loaded, [url]: true };
-      };
-      image.onerror = () => {
-        if (!disposed) markBroken(url);
-      };
+      preloaded.set(url, image);
       image.src = url;
+      void image.decode().then(
+        () => {
+          if (preloaded.get(url) === image) ready.add(url);
+        },
+        () => {
+          if (preloaded.get(url) === image) markBroken(url);
+        },
+      );
     }
   });
-  let previewDialog = $state<HTMLDialogElement | null>(null);
+
+  onDestroy(() => {
+    for (const image of preloaded.values()) image.removeAttribute('src');
+    preloaded.clear();
+  });
+
   $effect(() => {
     if (zoomedUrl && previewDialog && !previewDialog.open) previewDialog.showModal();
   });
@@ -50,7 +60,7 @@
     if (!zoomedUrl) return;
     const failed = zoomedUrl;
     markBroken(failed);
-    if (activeThumb?.thumbUrl === failed) activeThumb = null;
+    if (failed === zoomedThumb?.thumbUrl) zoomedThumb = null;
   }
 </script>
 
@@ -68,7 +78,7 @@
             class="thumb-btn"
             aria-haspopup="dialog"
             onclick={() => {
-              activeThumb = thumb;
+              zoomedThumb = thumb;
             }}
           >
             <img
@@ -109,7 +119,7 @@
     class="zoomed-preview"
     aria-label="Снимок бота"
     bind:this={previewDialog}
-    onclose={() => (activeThumb = null)}
+    onclose={() => (zoomedThumb = null)}
     onkeydown={(event) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
