@@ -184,6 +184,7 @@ function buildResultsState(
   state: RoomState,
   active: ActiveRoundState,
   entries: RoundResultEntryView[],
+  now: number,
 ): {
   results: RoundResultsState;
   humansMean: number;
@@ -202,6 +203,17 @@ function buildResultsState(
   const aiTotal = state.humanVsAiTotal.ai + aiMean;
 
   const results: RoundResultsState = {
+    completion: {
+      finishedAt: now,
+      confirmedIds: [
+        ...Object.entries(active.humanGuesses)
+          .filter(([, guess]) => guess.confirmed)
+          .map(([id]) => id),
+        ...Object.values(active.bots)
+          .filter((bot) => bot.status === 'done')
+          .map((bot) => bot.slotId),
+      ],
+    },
     roundNumber: active.roundNumber,
     target: active.target as RoundTarget,
     entries,
@@ -231,7 +243,7 @@ export function finishActiveRoundToResults(
   const botRes = scoreBotsForRound(state, active, finalizedBots, target, diagonalKm, now);
 
   const entries = rankRoundEntries([...humanRes.rawEntries, ...botRes.rawEntries]);
-  const built = buildResultsState(state, active, entries);
+  const built = buildResultsState(state, active, entries, now);
   const humanWaitMs =
     active.allHumansConfirmedAt !== null && Object.keys(finalizedBots).length > 0
       ? Math.max(0, now - active.allHumansConfirmedAt)
