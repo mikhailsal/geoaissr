@@ -139,6 +139,47 @@ test('a host outfits the robot and guests see it, including after restart', asyn
   }
 });
 
+test('host and guest can retry their open personal wardrobe after the server restarts', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const host = await browser.newPage();
+  const guest = await browser.newPage();
+  const players = [
+    { page: host, name: hostName, preset: 'Лунный пилот', outfit: 'spacesuit' },
+    { page: guest, name: guestName, preset: 'Неоновый гонщик', outfit: 'moto' },
+  ];
+  try {
+    await join(host, server.hostUrl, hostName);
+    await join(guest, server.guestUrl, guestName);
+    for (const { page, preset } of players) {
+      await page.getByRole('button', { name: 'Изменить аватар', exact: true }).click();
+      await page.getByRole('dialog').getByRole('button', { name: preset, exact: true }).click();
+      await page.context().setOffline(true);
+    }
+    await server.restart();
+    for (const { page } of players) {
+      await expect(page.getByText(/Связь потеряна/)).toBeVisible();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('button', { name: 'Сохранить образ' }).click();
+      await expect(dialog.getByRole('alert')).toContainText('Сервер не отвечает');
+      await page.context().setOffline(false);
+      await expect(page.getByText('Снова на связи', { exact: true })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Сохранить образ' }).click();
+      await expect(dialog).toBeHidden();
+    }
+    for (const { page } of players) {
+      for (const { name, outfit } of players) {
+        await expect(avatar(page, name)).toHaveAttribute('data-avatar-outfit', outfit);
+      }
+    }
+  } finally {
+    await guest.close();
+    await host.close();
+    await server.stop();
+  }
+});
+
 test('a full turn reaches the other participant and clears after playback', async ({ browser }) => {
   const server = await startIsolatedFakeServer();
   const host = await browser.newPage();
@@ -194,6 +235,40 @@ test('mobile stage paging keeps the right-hand gesture visible and the viewer on
     await expect(card(guest, botName)).toHaveCount(0);
     await pager.getByRole('button', { name: 'Предыдущие участники' }).click();
     await expect(card(guest, botName)).toBeVisible();
+  } finally {
+    await guest.close();
+    await host.close();
+    await server.stop();
+  }
+});
+
+test('bots with the same name have matching slot labels in the gesture picker and on stage', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer({ rounds: 2 });
+  const host = await browser.newPage();
+  const guest = await browser.newPage();
+  try {
+    await join(host, server.hostUrl, hostName);
+    await join(guest, server.guestUrl, guestName);
+    const addBot = host.getByRole('button', { name: '+ Добавить ИИ', exact: true });
+    await addBot.click();
+    const picker = host.getByLabel('Жесты персонажа');
+    const firstBot = picker.getByRole('option').nth(1);
+    await expect(firstBot).toHaveText(/^ИИ · .+/);
+    const name = (await firstBot.innerText()).replace('ИИ · ', '');
+    await addBot.click();
+    await addBot.click();
+    const slotLabel = (slot: number) => `ИИ №${slot} · ${name}`;
+    const labels = [1, 2, 3].map(slotLabel);
+    await expect(picker.getByRole('option')).toHaveText(['Мои жесты', ...labels]);
+    for (const label of labels) {
+      await expect(card(guest, label)).toContainText(label);
+    }
+    await picker.selectOption({ label: slotLabel(2) });
+    await host.getByRole('button', { name: 'Помахать', exact: true }).click();
+    await expect(card(guest, slotLabel(2))).toHaveAttribute('data-gesture', 'wave');
+    await expect(card(guest, slotLabel(1))).not.toHaveAttribute('data-gesture', 'wave');
   } finally {
     await guest.close();
     await host.close();

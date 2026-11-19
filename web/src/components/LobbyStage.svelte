@@ -28,19 +28,26 @@
   const human = defaultAvatar(false);
   const robot = defaultAvatar(true);
   const othersPerPage = $derived(narrow ? 2 : 4);
+  const stageBots = $derived(
+    view.bots.map((bot, index, bots) => ({
+      ...bot,
+      slotLabel: bots.some((other) => other.id !== bot.id && other.name === bot.name)
+        ? `ИИ №${index + 1} · ${bot.name}`
+        : null,
+      appearance: bot.avatar ?? robot,
+      ai: true,
+      available: bot.enabled,
+    })),
+  );
   const members = $derived([
     ...view.players.map((p) => ({
       ...p,
+      slotLabel: null,
       appearance: p.avatar ?? human,
       ai: false,
       available: p.connected,
     })),
-    ...view.bots.map((b) => ({
-      ...b,
-      appearance: b.avatar ?? robot,
-      ai: true,
-      available: b.enabled,
-    })),
+    ...stageBots,
   ]);
   const me = $derived(members.find((p) => p.id === view.viewerId));
   const others = $derived(members.filter((p) => p.id !== view.viewerId));
@@ -93,22 +100,23 @@
   <div class="lineup" class:pair={visible.length === 2}>
     {#each visible as p, i (p.id)}
       {@const gesture = avatars.playing[p.id]}
+      {@const name = p.slotLabel ?? p.name}
       <article
-        aria-label={p.name}
+        aria-label={name}
         class="performer pos-{i}"
         class:away={!p.available}
         data-gesture={gesture?.kind}
         data-base={p.appearance.base}
       >
         <div class="figure">
-          <OrbitAvatar appearance={p.appearance} label={'Аватар ' + p.name} {gesture} />
+          <OrbitAvatar appearance={p.appearance} label={'Аватар ' + name} {gesture} />
         </div>
         <div class="nameplate" style:--participant-color={'var(--' + p.color + ')'}>
-          {p.name} · {p.id === view.viewerId ? 'Вы' : p.ai ? 'ИИ' : 'Игрок'}
+          {p.slotLabel ?? `${p.name} · ${p.id === view.viewerId ? 'Вы' : p.ai ? 'ИИ' : 'Игрок'}`}
         </div>
         <div class="action-cue" role="status" aria-atomic="true">
           {#if gesture}
-            <span class="sr-only">{p.name} — {gestureLabels[gesture.kind]}</span>
+            <span class="sr-only">{name} — {gestureLabels[gesture.kind]}</span>
             {#if gesture.kind === 'spin'}
               <Rotate3d aria-hidden="true" />
             {:else}
@@ -156,7 +164,9 @@
           }}
         >
           <option value="">Мои жесты</option>
-          {#each view.bots as b (b.id)}<option value={b.id}>ИИ · {b.name}</option>{/each}
+          {#each stageBots as b (b.id)}
+            <option value={b.id}>{b.slotLabel ?? `ИИ · ${b.name}`}</option>
+          {/each}
         </select>
       {/if}
       <div class="gestures" role="group" aria-label="Жесты">

@@ -328,7 +328,8 @@
     color: var(--signal);
     margin-right: auto;
   }
-  @media (max-width: 680px) {
+  @media (max-width: 680px) and (orientation: portrait),
+    (max-width: 680px) and (min-height: 431px) {
     dialog {
       width: calc(100vw - var(--sp-4));
       max-height: 96dvh;
@@ -371,9 +372,52 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
-  @media (max-height: 430px) {
+  @media (orientation: landscape) and (max-height: 430px) {
+    dialog[open] {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      height: 96dvh;
+      max-height: 96dvh;
+    }
+    header,
+    footer,
+    .preview-tools,
+    .sections {
+      padding-block: var(--sp-1);
+    }
     .studio {
-      min-height: 210px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      min-height: 0;
+      height: auto;
+    }
+    .inspector {
+      display: block;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .content {
+      overflow: visible;
+    }
+    .preview-tools,
+    .sections {
+      flex-wrap: nowrap;
+    }
+    .preview-tools .btn {
+      padding-inline: var(--sp-1);
+      font-size: var(--text-xs);
+    }
+    .sections {
+      overflow-x: auto;
+    }
+    .sections button {
+      flex-shrink: 0;
+    }
+    .presets {
+      grid-template-columns: repeat(auto-fill, minmax(min(80px, 100%), 1fr));
+    }
+    .preset .thumbnail {
+      width: min(100%, 62px);
+      justify-self: center;
     }
   }
 </style>

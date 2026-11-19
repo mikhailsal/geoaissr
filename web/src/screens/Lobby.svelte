@@ -65,7 +65,7 @@
 
   let expandedBotId = $state<string | null>(null);
 
-  let editing = $state<{ id: string; name: string; appearance: AvatarAppearance } | null>(null);
+  let editing = $state<{ botId?: string; name: string; appearance: AvatarAppearance } | null>(null);
   let savePending = $state(false);
   let saveError = $state<string | null>(null);
 
@@ -76,20 +76,26 @@
       if (!editing && wardrobeTrigger?.isConnected) wardrobeTrigger.focus();
     });
   }
-  function openWardrobe(id: string, event: MouseEvent): void {
-    const bot = view.bots.find((b) => b.id === id);
-    const person = bot ?? view.players.find((p) => p.id === id);
-    if (!person || (id !== view.viewerId && !(bot && view.viewerIsHost))) return;
+  function openWardrobe(event: MouseEvent, botId?: string): void {
+    if (botId && !view.viewerIsHost) return;
+    const person = botId
+      ? view.bots.find((b) => b.id === botId)
+      : view.players.find((p) => p.id === view.viewerId);
+    if (!person) return;
     wardrobeTrigger = event.currentTarget as HTMLElement;
     saveError = null;
-    editing = { id, name: person.name, appearance: person.avatar ?? defaultAvatar(Boolean(bot)) };
+    editing = {
+      botId,
+      name: person.name,
+      appearance: person.avatar ?? defaultAvatar(Boolean(botId)),
+    };
   }
 
   async function saveWardrobe(appearance: AvatarAppearance): Promise<void> {
     const participant = editing;
     if (!participant || savePending) return;
     savePending = true;
-    const error = await avatars.save(view, participant.id, appearance);
+    const error = await avatars.save(view, appearance, participant.botId);
     savePending = false;
     if (editing !== participant) return;
     saveError = error;
@@ -106,14 +112,7 @@
 </script>
 
 <main class="lobby-page">
-  <LobbyStage
-    {view}
-    {avatars}
-    {connected}
-    onEdit={(event: MouseEvent) => {
-      openWardrobe(view.viewerId, event);
-    }}
-  >
+  <LobbyStage {view} {avatars} {connected} onEdit={openWardrobe}>
     {#snippet menu()}
       <HostMenu
         onOpenProfile={onEditProfile}
@@ -214,7 +213,7 @@
                     title="Изменить аватар"
                     disabled={!connected}
                     onclick={(event) => {
-                      openWardrobe(bot.id, event);
+                      openWardrobe(event, bot.id);
                     }}><Shirt size={18} /></button
                   >
                 {/if}

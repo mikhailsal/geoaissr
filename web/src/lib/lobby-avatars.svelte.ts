@@ -40,24 +40,16 @@ export class LobbyAvatars {
     );
   }
 
-  save(
-    view: ClientViewState,
-    participantId: string,
-    avatar: AvatarAppearance,
-  ): Promise<string | null> {
+  save(view: ClientViewState, avatar: AvatarAppearance, botId?: string): Promise<string | null> {
     const me = view.players.find((p) => p.id === view.viewerId);
     if (!me || this.saveRequest) return Promise.resolve('Сохранение пока недоступно.');
-    const res =
-      participantId === me.id
-        ? this.client.sendSequencedWithSeq('update_profile', {
-            nick: me.name,
-            color: me.color,
-            avatar,
-          })
-        : this.client.sendSequencedWithSeq('update_bot', {
-            botId: participantId,
-            patch: { avatar },
-          });
+    const res = botId
+      ? this.client.sendSequencedWithSeq('update_bot', { botId, patch: { avatar } })
+      : this.client.sendSequencedWithSeq('update_profile', {
+          nick: me.name,
+          color: me.color,
+          avatar,
+        });
     if (!res.sent) return Promise.resolve(RU.join.serverUnreachable);
     return new Promise((finish) => {
       this.saveRequest = { seq: res.seq, finish };

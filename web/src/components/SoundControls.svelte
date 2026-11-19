@@ -17,8 +17,6 @@
   let slider = $state<HTMLInputElement>();
   let trigger: HTMLButtonElement | null = null;
   let open = $state<AudioKind | null>(null);
-  let left = $state(12);
-  let top = $state(0);
   const channelVolume = (kind: AudioKind): number =>
     audioPreferences[kind === 'music' ? 'musicVolume' : 'effectsVolume'];
   const muted = (kind: AudioKind): boolean => !audioPreferences[kind] || channelVolume(kind) === 0;
@@ -30,20 +28,49 @@
     open = null;
     if (restoreFocus) trigger?.focus();
   }
+  function positionPanel(node: HTMLDivElement): void {
+    if (!trigger || !node.matches(':popover-open')) return;
+    const anchor = trigger.getBoundingClientRect();
+    const box = node.getBoundingClientRect();
+    const margin = 12;
+    const gap = 4;
+    const maxLeft = document.documentElement.clientWidth - box.width - margin;
+    const maxTop = document.documentElement.clientHeight - box.height - margin;
+    let left = anchor.right - box.width;
+    let top = anchor.bottom + gap;
+    if (top > maxTop) {
+      const above = anchor.top - gap - box.height;
+      const toggles = root.getBoundingClientRect();
+      if (above >= margin) top = above;
+      else if (toggles.right + gap <= maxLeft) left = toggles.right + gap;
+      else if (toggles.left - gap - box.width >= margin) left = toggles.left - gap - box.width;
+    }
+    node.style.left = `${Math.max(margin, Math.min(left, maxLeft))}px`;
+    node.style.top = `${Math.max(margin, Math.min(top, maxTop))}px`;
+  }
+  function observePanel(node: HTMLDivElement) {
+    const observer = new ResizeObserver(() => {
+      positionPanel(node);
+    });
+    observer.observe(node);
+    return {
+      destroy: () => {
+        observer.disconnect();
+      },
+    };
+  }
   function togglePanel(kind: AudioKind, event: MouseEvent): void {
     if (open === kind) {
       close();
       return;
     }
     trigger = event.currentTarget as HTMLButtonElement;
-    const rect = trigger.getBoundingClientRect();
-    left = Math.max(12, Math.min(rect.right - 260, window.innerWidth - 272));
-    top = rect.bottom + 4;
     open = kind;
     void tick().then(() => {
       if (open !== kind || !panel?.isConnected) return;
       panel.showPopover();
-      slider?.focus();
+      positionPanel(panel);
+      slider?.focus({ preventScroll: true });
     });
   }
   function outside(event: PointerEvent): void {
@@ -95,10 +122,9 @@
       class="volume-panel panel"
       popover="manual"
       bind:this={panel}
+      use:observePanel
       role="region"
       aria-label={`Громкость ${channelName(open)}`}
-      style:left={`${left}px`}
-      style:top={`${top}px`}
     >
       <div class="volume-heading">
         <label for={`${uid}-range`}>Громкость {channelName(open)}</label><output
@@ -193,6 +219,8 @@
     margin: 0;
     box-sizing: border-box;
     width: min(260px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
     padding: var(--sp-3);
     display: flex;
     flex-direction: column;

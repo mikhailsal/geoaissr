@@ -30,6 +30,21 @@
     onConfirmQuotaReset,
     onStart,
   }: Props = $props();
+
+  function commitNumber(
+    input: HTMLInputElement,
+    setting: 'rounds' | 'roundDurationSec' | 'aiWaitWindowSec',
+    current: number,
+  ): void {
+    const value = input.valueAsNumber;
+    if (!Number.isFinite(value)) {
+      input.value = String(current);
+      return;
+    }
+    const accepted = Math.max(Number(input.min), Math.min(Number(input.max), Math.trunc(value)));
+    input.value = String(accepted);
+    onUpdateLobby({ [setting]: accepted });
+  }
 </script>
 
 <section class="panel card" aria-label="Настройки партии">
@@ -46,8 +61,7 @@
         disabled={!view.viewerIsHost}
         value={view.totalRounds}
         onchange={(e) => {
-          const v = Number.parseInt(e.currentTarget.value, 10);
-          if (Number.isFinite(v)) onUpdateLobby({ rounds: Math.max(1, Math.min(20, v)) });
+          commitNumber(e.currentTarget, 'rounds', view.totalRounds);
         }}
       />
     </label>
@@ -63,10 +77,7 @@
         disabled={!view.viewerIsHost}
         value={view.roundDurationSec}
         onchange={(e) => {
-          const v = Number.parseInt(e.currentTarget.value, 10);
-          if (Number.isFinite(v)) {
-            onUpdateLobby({ roundDurationSec: Math.max(minDurationSec, Math.min(600, v)) });
-          }
+          commitNumber(e.currentTarget, 'roundDurationSec', view.roundDurationSec);
         }}
       />
     </label>
@@ -113,10 +124,7 @@
           disabled={!view.viewerIsHost}
           value={view.aiWaitWindowSec}
           onchange={(e) => {
-            const v = Number.parseInt(e.currentTarget.value, 10);
-            if (Number.isFinite(v)) {
-              onUpdateLobby({ aiWaitWindowSec: Math.max(0, Math.min(120, v)) });
-            }
+            commitNumber(e.currentTarget, 'aiWaitWindowSec', view.aiWaitWindowSec);
           }}
         />
         <span class="hint">{RU.lobby.waitWindowHint}</span>
