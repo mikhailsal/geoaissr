@@ -142,12 +142,14 @@ async function fakeStep(
 const pause = (ms: number): Promise<unknown> => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Simulates a full journal without a CLI: observe, a look and a move, each with a reason and
- * a finding, one shift of every effect, a current point that moves, and a final summary.
+ * Simulates a full journal without a CLI: observe, a look and a move (a second look when moves
+ * are off, as in eval-bots), each with a reason and a finding, one shift of every effect, a
+ * current point that moves, and a final summary.
  */
 export async function runFakeBotSequence(opts: {
   ids: FakeIds;
   isStopped: () => boolean;
+  moveEnabled?: boolean;
   slot: BotSlotConfig;
   target: RoundTarget;
   imageService: BotImageService;
@@ -194,10 +196,12 @@ export async function runFakeBotSequence(opts: {
   await pause(stepDelayMs);
   if (isStopped()) return;
 
-  // Step 2: move. Its call carries the finding about the look and a point that has moved.
+  // Step 2: move (or a second look when moves are off). Its call carries the finding about the
+  // look and a point that has moved.
+  const canMove = opts.moveEnabled !== false;
   await fakeStep(base, {
     turn: 2,
-    kind: 'move',
+    kind: canMove ? 'move' : 'look',
     previous: {
       finding:
         'Приближение показало разметку и знаки местного образца; соседняя страна не подходит.',
@@ -206,9 +210,14 @@ export async function runFakeBotSequence(opts: {
       ],
       point: near(0.5),
     },
-    hypothesis: 'Иду вдоль дороги: новый знак подтвердит или опровергнет текущую версию.',
-    params: { heading: 0, step: 1 },
-    render: () => opts.imageService.getMoveView({ ...common, heading: 0, step: 1 }),
+    hypothesis: canMove
+      ? 'Иду вдоль дороги: новый знак подтвердит или опровергнет текущую версию.'
+      : 'Смотрю в другую сторону: новый знак подтвердит или опровергнет текущую версию.',
+    params: canMove ? { heading: 0, step: 1 } : { heading: 270, pitch: 0, fov: 60 },
+    render: () =>
+      canMove
+        ? opts.imageService.getMoveView({ ...common, heading: 0, step: 1 })
+        : opts.imageService.getLookView({ ...common, heading: 270, pitch: 0, fov: 60 }),
   });
   await pause(stepDelayMs);
   if (!isStopped()) finishFakeBot(ids, slot, target, dispatch);
@@ -221,6 +230,7 @@ export function startMonitoredFakeBot(opts: {
   roundNumber: number;
   slot: BotSlotConfig;
   target: RoundTarget;
+  moveEnabled?: boolean;
   imageService: BotImageService;
   observePromise: Promise<void>;
   dispatch: (event: EngineEvent) => void;
@@ -241,6 +251,7 @@ export function startMonitoredFakeBot(opts: {
   void runFakeBotSequence({
     ids: { matchId, gen, roundNumber, slotId: slot.id },
     isStopped: () => handle.stopped,
+    ...(opts.moveEnabled !== undefined ? { moveEnabled: opts.moveEnabled } : {}),
     slot,
     target: opts.target,
     imageService: opts.imageService,
