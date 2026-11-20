@@ -2,7 +2,6 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { BotSlotConfig, MatchRecord } from '../../shared/storage-schemas';
@@ -88,22 +87,6 @@ function waitForUrls(proc: ChildProcess): Promise<{ hostUrl: string; guestUrl: s
   });
 }
 
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = createServer();
-    srv.unref();
-    srv.on('error', reject);
-    srv.listen(0, '127.0.0.1', () => {
-      const addr = srv.address();
-      const port = typeof addr === 'object' && addr ? addr.port : 0;
-      srv.close((err) => {
-        if (err) reject(err);
-        else resolve(port);
-      });
-    });
-  });
-}
-
 function launchFakeProcess(configDir: string, dataDir: string, port: number): ChildProcess {
   return spawn('bun', ['run', 'test/fixtures/browser-server.ts', String(port)], {
     cwd: process.cwd(),
@@ -171,8 +154,7 @@ export async function startIsolatedFakeServer(opts?: {
       'utf8',
     );
   }
-  const freePort = await findFreePort();
-  let proc = launchFakeProcess(configDir, dataDir, freePort);
+  let proc = launchFakeProcess(configDir, dataDir, 0);
 
   let hostUrl = '';
   let guestUrl = '';
@@ -198,7 +180,7 @@ export async function startIsolatedFakeServer(opts?: {
     },
     restart: async () => {
       await stopFakeProcess(proc);
-      proc = launchFakeProcess(configDir, dataDir, freePort);
+      proc = launchFakeProcess(configDir, dataDir, Number(parsed.port || 80));
       ({ hostUrl, guestUrl } = await waitForUrls(proc));
     },
     stop: async () => {

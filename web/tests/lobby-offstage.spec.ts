@@ -15,6 +15,8 @@ async function expectStageHits(page: Page): Promise<void> {
     [653, 280],
   ] as const) {
     await page.setViewportSize({ width, height });
+    const scene = page.getByRole('region', { name: 'Сцена лобби' });
+    await expect(scene).toHaveCSS('min-height', `${height}px`);
     await expect(page.getByText('Загружаем персонажей', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Показать на сцене:/u })).toBeInViewport({
       ratio: 1,
