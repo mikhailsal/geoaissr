@@ -1,0 +1,940 @@
+[
+  {
+    "id": "spot-01",
+    "countryNameRu": "Австралия",
+    "lat": -42.88555556,
+    "lng": 147.33055556,
+    "imagePaths": [
+      "./frames/spot-01-0.jpg",
+      "./frames/spot-01-1.jpg",
+      "./frames/spot-01-2.jpg",
+      "./frames/spot-01-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "School Climate Strike 360 (40651483473).jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:School_Climate_Strike_360_(40651483473).jpg",
+      "author": "Roger from Tasmania, Australia",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+    },
+    "labels": {
+      "driving_side": "left",
+      "script": "none_visible",
+      "centre_line": "not_visible",
+      "pole_material": "metal",
+      "plate_colour": "not_visible",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-02",
+    "countryNameRu": "Аргентина",
+    "lat": -34.74136194,
+    "lng": -58.38949694,
+    "imagePaths": [
+      "./frames/spot-02-0.jpg",
+      "./frames/spot-02-1.jpg",
+      "./frames/spot-02-2.jpg",
+      "./frames/spot-02-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (nicolas17) 2018-02-26 19H25M32S000 (538403897165153 at Vf6I2knaaxEFJx1qNumNQw) taken with 360fly, Inc. 360FLY4K.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(nicolas17)_2018-02-26_19H25M32S000_(538403897165153_at_Vf6I2knaaxEFJx1qNumNQw)_taken_with_360fly,_Inc._360FLY4K.jpg",
+      "author": "nicolas17",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "none_visible",
+      "centre_line": "none",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-03",
+    "countryNameRu": "Великобритания",
+    "lat": 50.838904,
+    "lng": 0.482665,
+    "imagePaths": [
+      "./frames/spot-03-0.jpg",
+      "./frames/spot-03-1.jpg",
+      "./frames/spot-03-2.jpg",
+      "./frames/spot-03-3.jpg"
+    ],
+    "headingDeg": 0,
+    "source": {
+      "title": "Shelter No.3, East Parade, Bexhill (360 panorama).jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Shelter_No.3,_East_Parade,_Bexhill_(360_panorama).jpg",
+      "author": "Alexis Markwick",
+      "license": "CC0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "not_visible",
+      "pole_material": "metal",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [{ "frame": 2, "text": "KEEP CLEAR" }],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-04",
+    "countryNameRu": "Германия",
+    "lat": 50.94988333,
+    "lng": 6.91805333,
+    "imagePaths": [
+      "./frames/spot-04-0.jpg",
+      "./frames/spot-04-1.jpg",
+      "./frames/spot-04-2.jpg",
+      "./frames/spot-04-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Wohn- und Geschäftshaus Hansemannstraße 2, Köln-Ehrenfeld-0010861.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Wohn-_und_Gesch%C3%A4ftshaus_Hansemannstra%C3%9Fe_2,_K%C3%B6ln-Ehrenfeld-0010861.jpg",
+      "author": "Raimond Spekking",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "not_visible",
+      "pole_material": "metal",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_slate_shingle"
+    },
+    "signText": [{ "frame": 1, "text": "KARNEVALSQUELL?" }],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-05",
+    "countryNameRu": "Грузия",
+    "lat": 41.693969,
+    "lng": 44.926083,
+    "imagePaths": [
+      "./frames/spot-05-0.jpg",
+      "./frames/spot-05-1.jpg",
+      "./frames/spot-05-2.jpg",
+      "./frames/spot-05-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "2023-06-03. Chantladze 18a. Orkhevi, Tbilisi 01.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:2023-06-03._Chantladze_18a._Orkhevi,_Tbilisi_01.jpg",
+      "author": "David Osipov",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "concrete",
+      "plate_colour": "white",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "flat"
+    },
+    "signText": [{ "frame": 0, "text": "VN-348-NN" }],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-06",
+    "countryNameRu": "Грузия",
+    "lat": 41.695908,
+    "lng": 44.927225,
+    "imagePaths": [
+      "./frames/spot-06-0.jpg",
+      "./frames/spot-06-1.jpg",
+      "./frames/spot-06-2.jpg",
+      "./frames/spot-06-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "2023-06-05. Orkhevi Central Park, Orkhevi, Tbilisi (5).jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:2023-06-05._Orkhevi_Central_Park,_Orkhevi,_Tbilisi_(5).jpg",
+      "author": "David Osipov",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "metal",
+      "plate_colour": "not_visible",
+      "vegetation": "coniferous",
+      "soil_colour": "not_visible",
+      "roof_type": "none_visible"
+    },
+    "signText": [{ "frame": 2, "text": "EVERGREEN" }],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-07",
+    "countryNameRu": "Индия",
+    "lat": 29.969671,
+    "lng": 75.796794,
+    "imagePaths": [
+      "./frames/spot-07-0.jpg",
+      "./frames/spot-07-1.jpg",
+      "./frames/spot-07-2.jpg",
+      "./frames/spot-07-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Changali Wala 2.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Changali_Wala_2.jpg",
+      "author": "Harpreet",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "unreadable",
+      "centre_line": "none",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "brown",
+      "roof_type": "flat"
+    },
+    "signText": [],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-08",
+    "countryNameRu": "Индия",
+    "lat": 12.96546111,
+    "lng": 77.63784444,
+    "imagePaths": [
+      "./frames/spot-08-0.jpg",
+      "./frames/spot-08-1.jpg",
+      "./frames/spot-08-2.jpg",
+      "./frames/spot-08-3.jpg"
+    ],
+    "headingDeg": 343,
+    "source": {
+      "title": "360° panoramic view of Domlur 2nd Stage, Bengaluru, Karnataka, India.JPG",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:360%C2%B0_panoramic_view_of_Domlur_2nd_Stage,_Bengaluru,_Karnataka,_India.JPG",
+      "author": "Subhashish Panigrahi",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "tropical",
+      "soil_colour": "red",
+      "roof_type": "flat"
+    },
+    "signText": [{ "frame": 3, "text": "ISHWAR?" }],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-09",
+    "countryNameRu": "Испания",
+    "lat": 38.563531,
+    "lng": -0.261395,
+    "imagePaths": [
+      "./frames/spot-09-0.jpg",
+      "./frames/spot-09-1.jpg",
+      "./frames/spot-09-2.jpg",
+      "./frames/spot-09-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Orcheta-Orxeta 3 - Esferofoto Plaza Dr. Ferrándiz.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Orcheta-Orxeta_3_-_Esferofoto_Plaza_Dr._Ferr%C3%A1ndiz.jpg",
+      "author": "Galopax",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "none_visible",
+      "plate_colour": "white",
+      "vegetation": "mediterranean",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [
+      { "frame": 0, "text": "7862 FJP" },
+      { "frame": 1, "text": "2644 BHS" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-10",
+    "countryNameRu": "Италия",
+    "lat": 45.882259,
+    "lng": 9.267063,
+    "imagePaths": [
+      "./frames/spot-10-0.jpg",
+      "./frames/spot-10-1.jpg",
+      "./frames/spot-10-2.jpg",
+      "./frames/spot-10-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Piazza Roma a Lasnigo.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Piazza_Roma_a_Lasnigo.jpg",
+      "author": "Kaitu",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "white_dashed",
+      "pole_material": "none_visible",
+      "plate_colour": "white",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-11",
+    "countryNameRu": "Италия",
+    "lat": 45.913634,
+    "lng": 8.834532,
+    "imagePaths": [
+      "./frames/spot-11-0.jpg",
+      "./frames/spot-11-1.jpg",
+      "./frames/spot-11-2.jpg",
+      "./frames/spot-11-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Photosphere in Boarezzo, Via Ambrogio Chini, near località Curtesela.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Photosphere_in_Boarezzo,_Via_Ambrogio_Chini,_near_localit%C3%A0_Curtesela.jpg",
+      "author": "Kaitu",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "metal",
+      "plate_colour": "white",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [
+      { "frame": 2, "text": "CO' CUPELLINI?" },
+      { "frame": 1, "text": "FN 353 ??" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-12",
+    "countryNameRu": "Непал",
+    "lat": 27.674917,
+    "lng": 85.324743,
+    "imagePaths": [
+      "./frames/spot-12-0.jpg",
+      "./frames/spot-12-1.jpg",
+      "./frames/spot-12-2.jpg",
+      "./frames/spot-12-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (1464601220550375, 1j6oaqkBKQBSXJ6xguGNiS) (sarthak) 2021-02-27 04H06M35S000.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(1464601220550375,_1j6oaqkBKQBSXJ6xguGNiS)_(sarthak)_2021-02-27_04H06M35S000.jpg",
+      "author": "sarthak",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [
+      { "frame": 1, "text": "NEPARU" },
+      { "frame": 2, "text": "Kuber Handicraft" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-13",
+    "countryNameRu": "Непал",
+    "lat": 27.6743155,
+    "lng": 85.32537975,
+    "imagePaths": [
+      "./frames/spot-13-0.jpg",
+      "./frames/spot-13-1.jpg",
+      "./frames/spot-13-2.jpg",
+      "./frames/spot-13-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (461484345063091, 1j6oaqkBKQBSXJ6xguGNiS) (sarthak) 2021-02-27 04H07M07S000.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(461484345063091,_1j6oaqkBKQBSXJ6xguGNiS)_(sarthak)_2021-02-27_04H07M07S000.jpg",
+      "author": "sarthak",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "none_visible"
+    },
+    "signText": [
+      { "frame": 0, "text": "THANKA CENTRE Pvt. Ltd." },
+      { "frame": 1, "text": "PIZZA SQUARE" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-14",
+    "countryNameRu": "Новая Зеландия",
+    "lat": -42.5499305,
+    "lng": 173.4442255,
+    "imagePaths": [
+      "./frames/spot-14-0.jpg",
+      "./frames/spot-14-1.jpg",
+      "./frames/spot-14-2.jpg",
+      "./frames/spot-14-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (irvinfly) 2026-08-15 02H52M32S000 (1052210040937372 at OhtGZQTXqrVK6P3NL2m087) taken with Arashi Vision insta360 oners.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(irvinfly)_2026-08-15_02H52M32S000_(1052210040937372_at_OhtGZQTXqrVK6P3NL2m087)_taken_with_Arashi_Vision_insta360_oners.jpg",
+      "author": "irvinfly",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "left",
+      "script": "none_visible",
+      "centre_line": "white_dashed",
+      "pole_material": "none_visible",
+      "plate_colour": "not_visible",
+      "vegetation": "coniferous",
+      "soil_colour": "not_visible",
+      "roof_type": "none_visible"
+    },
+    "signText": [],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-15",
+    "countryNameRu": "Пуэрто-Рико",
+    "lat": 18.11496652,
+    "lng": -65.43877642,
+    "imagePaths": [
+      "./frames/spot-15-0.jpg",
+      "./frames/spot-15-1.jpg",
+      "./frames/spot-15-2.jpg",
+      "./frames/spot-15-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (federicodebetto) 2023-11-13 12H11M00S000 (921054072777571 at PvUqIjQSfHl2tTnsY7r1CX) taken with Insta360 Insta360 Titan.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(federicodebetto)_2023-11-13_12H11M00S000_(921054072777571_at_PvUqIjQSfHl2tTnsY7r1CX)_taken_with_Insta360_Insta360_Titan.jpg",
+      "author": "federicodebetto",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "white_solid",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "tropical",
+      "soil_colour": "not_visible",
+      "roof_type": "none_visible"
+    },
+    "signText": [{ "frame": 0, "text": "39" }],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-16",
+    "countryNameRu": "Россия",
+    "lat": 55.857994,
+    "lng": 37.480555,
+    "imagePaths": [
+      "./frames/spot-16-0.jpg",
+      "./frames/spot-16-1.jpg",
+      "./frames/spot-16-2.jpg",
+      "./frames/spot-16-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Пятиэтажки на Фестивальной улице (24477717211).jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:%D0%9F%D1%8F%D1%82%D0%B8%D1%8D%D1%82%D0%B0%D0%B6%D0%BA%D0%B8_%D0%BD%D0%B0_%D0%A4%D0%B5%D1%81%D1%82%D0%B8%D0%B2%D0%B0%D0%BB%D1%8C%D0%BD%D0%BE%D0%B9_%D1%83%D0%BB%D0%B8%D1%86%D0%B5_(24477717211).jpg",
+      "author": "Artem Svetlov from Moscow, Russia",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "none_visible",
+      "plate_colour": "white",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "flat"
+    },
+    "signText": [{ "frame": 1, "text": "KY 566 77" }],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-17",
+    "countryNameRu": "США",
+    "lat": 38.910416,
+    "lng": -77.03853,
+    "imagePaths": [
+      "./frames/spot-17-0.jpg",
+      "./frames/spot-17-1.jpg",
+      "./frames/spot-17-2.jpg",
+      "./frames/spot-17-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "2017.06.09 DCRainbowCrosswalks, Washington, DC USA 6209 (34360457574).jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:2017.06.09_DCRainbowCrosswalks,_Washington,_DC_USA_6209_(34360457574).jpg",
+      "author": "Ted Eytan",
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+    },
+    "labels": {
+      "driving_side": "right",
+      "script": "latin",
+      "centre_line": "not_visible",
+      "pole_material": "metal",
+      "plate_colour": "not_visible",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "flat"
+    },
+    "signText": [
+      { "frame": 1, "text": "17 ST" },
+      { "frame": 2, "text": "JR's" },
+      { "frame": 3, "text": "GIBBS NW SPECIALTY PHARMACY?" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-18",
+    "countryNameRu": "Таиланд",
+    "lat": 13.7515389,
+    "lng": 100.4987729,
+    "imagePaths": [
+      "./frames/spot-18-0.jpg",
+      "./frames/spot-18-1.jpg",
+      "./frames/spot-18-2.jpg",
+      "./frames/spot-18-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (JIgtm4r7flTEpoxc28sjDG) (mapconcierge) 2024-12-18 01H58M37S037.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(JIgtm4r7flTEpoxc28sjDG)_(mapconcierge)_2024-12-18_01H58M37S037.jpg",
+      "author": "mapconcierge",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "left",
+      "script": "thai",
+      "centre_line": "white_dashed",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "flat"
+    },
+    "signText": [
+      { "frame": 0, "text": "เอกธรรม?" },
+      { "frame": 2, "text": "พระพุทธคุณ" },
+      { "frame": 2, "text": "TAXI-METER" },
+      { "frame": 3, "text": "ชิน ชิน" },
+      { "frame": 3, "text": "TAXI-METER" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-19",
+    "countryNameRu": "Таиланд",
+    "lat": 13.75215132,
+    "lng": 100.50419329,
+    "imagePaths": [
+      "./frames/spot-19-0.jpg",
+      "./frames/spot-19-1.jpg",
+      "./frames/spot-19-2.jpg",
+      "./frames/spot-19-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (JIgtm4r7flTEpoxc28sjDG) (mapconcierge) 2024-12-18 02H03M38S027.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(JIgtm4r7flTEpoxc28sjDG)_(mapconcierge)_2024-12-18_02H03M38S027.jpg",
+      "author": "mapconcierge",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "left",
+      "script": "thai",
+      "centre_line": "white_solid",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "flat"
+    },
+    "signText": [
+      { "frame": 2, "text": "TAXI-METER" },
+      { "frame": 3, "text": "ชิน ชิน" },
+      { "frame": 3, "text": "TAXI-METER" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-20",
+    "countryNameRu": "Тайвань",
+    "lat": 25.00401,
+    "lng": 121.528191,
+    "imagePaths": [
+      "./frames/spot-20-0.jpg",
+      "./frames/spot-20-1.jpg",
+      "./frames/spot-20-2.jpg",
+      "./frames/spot-20-3.jpg"
+    ],
+    "headingDeg": 350,
+    "source": {
+      "title": "Panorama360SomewhereYongheNewTaipeiTaiwan20200822.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Panorama360SomewhereYongheNewTaipeiTaiwan20200822.jpg",
+      "author": "OnionBulb",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "han",
+      "centre_line": "white_dashed",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "flat"
+    },
+    "signText": [
+      { "frame": 0, "text": "?" },
+      { "frame": 2, "text": "50" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-21",
+    "countryNameRu": "Тайвань",
+    "lat": 24.684586,
+    "lng": 120.871273,
+    "imagePaths": [
+      "./frames/spot-21-0.jpg",
+      "./frames/spot-21-1.jpg",
+      "./frames/spot-21-2.jpg",
+      "./frames/spot-21-3.jpg"
+    ],
+    "headingDeg": 350,
+    "source": {
+      "title": "Panorama360BoaiParkZhunanMiaoliTaiwan20200829.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Panorama360BoaiParkZhunanMiaoliTaiwan20200829.jpg",
+      "author": "OnionBulb",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "han",
+      "centre_line": "yellow_solid",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "urban_sparse",
+      "soil_colour": "not_visible",
+      "roof_type": "flat"
+    },
+    "signText": [
+      { "frame": 3, "text": "人行道禁止停車" },
+      { "frame": 1, "text": "第一?" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-22",
+    "countryNameRu": "Франция",
+    "lat": 48.869956,
+    "lng": 2.300986,
+    "imagePaths": [
+      "./frames/spot-22-0.jpg",
+      "./frames/spot-22-1.jpg",
+      "./frames/spot-22-2.jpg",
+      "./frames/spot-22-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "39 avenue George-V, Paris 26 April 2008.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:39_avenue_George-V,_Paris_26_April_2008.jpg",
+      "author": "Alexandre Duret-Lutz from Paris, France",
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+    },
+    "labels": {
+      "driving_side": "right",
+      "script": "latin",
+      "centre_line": "none",
+      "pole_material": "none_visible",
+      "plate_colour": "white",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_slate_shingle"
+    },
+    "signText": [{ "frame": 2, "text": "BVLGARI DEPUIS 1884" }],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-23",
+    "countryNameRu": "Шри-Ланка",
+    "lat": 6.8780243,
+    "lng": 79.87288117,
+    "imagePaths": [
+      "./frames/spot-23-0.jpg",
+      "./frames/spot-23-1.jpg",
+      "./frames/spot-23-2.jpg",
+      "./frames/spot-23-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (768519537190053, cIq8o9K6cBIlxeHaWXdLLQ) (gazaly) 2019-12-29 10H16M39S000.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(768519537190053,_cIq8o9K6cBIlxeHaWXdLLQ)_(gazaly)_2019-12-29_10H16M39S000.jpg",
+      "author": "gazaly",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "latin",
+      "centre_line": "white_dashed",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "tropical",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [
+      { "frame": 0, "text": "Lighting" },
+      { "frame": 2, "text": "MIDNIGHT DIVAS" },
+      { "frame": 2, "text": "Bullfinch" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-24",
+    "countryNameRu": "Шри-Ланка",
+    "lat": 6.86132129,
+    "lng": 79.8692689,
+    "imagePaths": [
+      "./frames/spot-24-0.jpg",
+      "./frames/spot-24-1.jpg",
+      "./frames/spot-24-2.jpg",
+      "./frames/spot-24-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Mapillary (710349598834076, ZhQD4FtpoP1wCsOLxkKdTl) (gazaly) 2022-01-14 10H46M59S000.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Mapillary_(710349598834076,_ZhQD4FtpoP1wCsOLxkKdTl)_(gazaly)_2022-01-14_10H46M59S000.jpg",
+      "author": "gazaly",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "none_visible",
+      "centre_line": "none",
+      "pole_material": "wood",
+      "plate_colour": "not_visible",
+      "vegetation": "tropical",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-25",
+    "countryNameRu": "ЮАР",
+    "lat": -33.927803,
+    "lng": 18.419444,
+    "imagePaths": [
+      "./frames/spot-25-0.jpg",
+      "./frames/spot-25-1.jpg",
+      "./frames/spot-25-2.jpg",
+      "./frames/spot-25-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "360 photograph of Zuma Must Fall protests in Cape Town.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:360_photograph_of_Zuma_Must_Fall_protests_in_Cape_Town.jpg",
+      "author": "Discott",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "labels": {
+      "driving_side": "left",
+      "script": "latin",
+      "centre_line": "not_visible",
+      "pole_material": "metal",
+      "plate_colour": "not_visible",
+      "vegetation": "mediterranean",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [
+      { "frame": 1, "text": "ZUMA MUST" },
+      { "frame": 3, "text": "REMEMBER KHWEZI" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-26",
+    "countryNameRu": "Япония",
+    "lat": 35.724675,
+    "lng": 139.686388,
+    "imagePaths": [
+      "./frames/spot-26-0.jpg",
+      "./frames/spot-26-1.jpg",
+      "./frames/spot-26-2.jpg",
+      "./frames/spot-26-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Memorial for Tokiwa-so apartment house.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Memorial_for_Tokiwa-so_apartment_house.jpg",
+      "author": "heiwa4126",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "japanese",
+      "centre_line": "not_visible",
+      "pole_material": "concrete",
+      "plate_colour": "not_visible",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [
+      { "frame": 0, "text": "トキワ荘のヒーローたち" },
+      { "frame": 1, "text": "椎名町五丁目" }
+    ],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-27",
+    "countryNameRu": "Япония",
+    "lat": 34.855806,
+    "lng": 135.618583,
+    "imagePaths": [
+      "./frames/spot-27-0.jpg",
+      "./frames/spot-27-1.jpg",
+      "./frames/spot-27-2.jpg",
+      "./frames/spot-27-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Hirugami Kurumazuka Kofun, North.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Hirugami_Kurumazuka_Kofun,_North.jpg",
+      "author": "AsPJT",
+      "license": "CC0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "none_visible",
+      "centre_line": "none",
+      "pole_material": "metal",
+      "plate_colour": "not_visible",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "none_visible"
+    },
+    "signText": [],
+    "labelledBy": "model, unreviewed"
+  },
+  {
+    "id": "spot-28",
+    "countryNameRu": "Япония",
+    "lat": 36.103083,
+    "lng": 139.351889,
+    "imagePaths": [
+      "./frames/spot-28-0.jpg",
+      "./frames/spot-28-1.jpg",
+      "./frames/spot-28-2.jpg",
+      "./frames/spot-28-3.jpg"
+    ],
+    "headingDeg": null,
+    "source": {
+      "title": "Saitama Wada-gawa, 360-degree.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Saitama_Wada-gawa,_360-degree.jpg",
+      "author": "AsPJT",
+      "license": "CC0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+    },
+    "labels": {
+      "driving_side": "not_visible",
+      "script": "none_visible",
+      "centre_line": "none",
+      "pole_material": "none_visible",
+      "plate_colour": "not_visible",
+      "vegetation": "temperate_deciduous",
+      "soil_colour": "not_visible",
+      "roof_type": "pitched_tile"
+    },
+    "signText": [],
+    "labelledBy": "model, unreviewed"
+  }
+]

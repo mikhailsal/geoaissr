@@ -1,0 +1,119 @@
+{
+  "features": [
+    {
+      "id": "driving_side",
+      "ru": "Сторона движения",
+      "values": [
+        { "id": "left", "ru": "Левостороннее" },
+        { "id": "right", "ru": "Правостороннее" },
+        { "id": "not_visible", "ru": "Не видно" }
+      ]
+    },
+    {
+      "id": "script",
+      "ru": "Письменность",
+      "values": [
+        { "id": "latin", "ru": "Латиница" },
+        { "id": "cyrillic", "ru": "Кириллица" },
+        { "id": "greek", "ru": "Греческая" },
+        { "id": "arabic", "ru": "Арабская" },
+        { "id": "hebrew", "ru": "Иврит" },
+        { "id": "devanagari", "ru": "Деванагари" },
+        { "id": "bengali", "ru": "Бенгальская" },
+        { "id": "gurmukhi", "ru": "Гурмукхи" },
+        { "id": "gujarati", "ru": "Гуджарати" },
+        { "id": "dravidian", "ru": "Дравидийская" },
+        { "id": "sinhala", "ru": "Сингальская" },
+        { "id": "thai", "ru": "Тайская" },
+        { "id": "lao", "ru": "Лаосская" },
+        { "id": "khmer", "ru": "Кхмерская" },
+        { "id": "burmese", "ru": "Бирманская" },
+        { "id": "han", "ru": "Иероглифы хань" },
+        { "id": "japanese", "ru": "Японская" },
+        { "id": "hangul", "ru": "Хангыль" },
+        { "id": "georgian", "ru": "Грузинская" },
+        { "id": "armenian", "ru": "Армянская" },
+        { "id": "ethiopic", "ru": "Эфиопская" },
+        { "id": "other", "ru": "Другая" },
+        { "id": "none_visible", "ru": "Текста нет" },
+        { "id": "unreadable", "ru": "Не разобрать" }
+      ]
+    },
+    {
+      "id": "centre_line",
+      "ru": "Осевая линия",
+      "values": [
+        { "id": "white_solid", "ru": "Белая сплошная" },
+        { "id": "white_dashed", "ru": "Белая прерывистая" },
+        { "id": "yellow_solid", "ru": "Жёлтая сплошная" },
+        { "id": "yellow_dashed", "ru": "Жёлтая прерывистая" },
+        { "id": "double_yellow", "ru": "Двойная жёлтая" },
+        { "id": "double_white", "ru": "Двойная белая" },
+        { "id": "none", "ru": "Нет" },
+        { "id": "not_visible", "ru": "Не видно" }
+      ]
+    },
+    {
+      "id": "pole_material",
+      "ru": "Материал столбов",
+      "values": [
+        { "id": "wood", "ru": "Дерево" },
+        { "id": "concrete", "ru": "Бетон" },
+        { "id": "metal", "ru": "Металл" },
+        { "id": "none_visible", "ru": "Столбов нет" }
+      ]
+    },
+    {
+      "id": "plate_colour",
+      "ru": "Цвет номеров",
+      "values": [
+        { "id": "white", "ru": "Белые" },
+        { "id": "yellow", "ru": "Жёлтые" },
+        { "id": "white_front_yellow_rear", "ru": "Спереди белые, сзади жёлтые" },
+        { "id": "black", "ru": "Чёрные" },
+        { "id": "blue", "ru": "Синие" },
+        { "id": "other", "ru": "Другие" },
+        { "id": "not_visible", "ru": "Не видно" }
+      ]
+    },
+    {
+      "id": "vegetation",
+      "ru": "Растительность",
+      "values": [
+        { "id": "tropical", "ru": "Тропическая" },
+        { "id": "temperate_deciduous", "ru": "Лиственная умеренная" },
+        { "id": "coniferous", "ru": "Хвойная" },
+        { "id": "mediterranean", "ru": "Средиземноморская" },
+        { "id": "arid", "ru": "Засушливая" },
+        { "id": "grassland", "ru": "Травяная" },
+        { "id": "urban_sparse", "ru": "Городская, скудная" },
+        { "id": "snow", "ru": "Снег" }
+      ]
+    },
+    {
+      "id": "soil_colour",
+      "ru": "Цвет почвы",
+      "values": [
+        { "id": "red", "ru": "Красная" },
+        { "id": "brown", "ru": "Коричневая" },
+        { "id": "grey", "ru": "Серая" },
+        { "id": "yellow_sand", "ru": "Жёлтый песок" },
+        { "id": "black", "ru": "Чёрная" },
+        { "id": "not_visible", "ru": "Не видно" }
+      ]
+    },
+    {
+      "id": "roof_type",
+      "ru": "Тип крыши",
+      "values": [
+        { "id": "flat", "ru": "Плоская" },
+        { "id": "pitched_tile", "ru": "Скатная, черепица" },
+        { "id": "pitched_metal", "ru": "Скатная, металл" },
+        { "id": "pitched_slate_shingle", "ru": "Скатная, сланец или гонт" },
+        { "id": "thatch", "ru": "Солома" },
+        { "id": "dome", "ru": "Купол" },
+        { "id": "none_visible", "ru": "Крыш не видно" }
+      ]
+    }
+  ]
+}
