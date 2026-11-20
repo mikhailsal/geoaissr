@@ -126,9 +126,10 @@ async function assertBotCardInteractions(hostPage: Page): Promise<void> {
   const whyBtn = hostPage.getByRole('button', { name: 'почему?' }).first();
   await whyBtn.click();
   await expect(hostPage.locator('.bot-card')).toBeVisible();
+  await hostPage.getByRole('button', { name: /Ход за ходом/ }).click();
   // All four start frames (N, E, S, W) are shown, not only the first one.
-  expect(await hostPage.locator('.bot-card .thumb-item').count()).toBeGreaterThanOrEqual(4);
-  const firstThumb = hostPage.locator('.bot-card .thumb-btn').first();
+  expect(await hostPage.locator('.bot-card .frame-btn').count()).toBeGreaterThanOrEqual(4);
+  const firstThumb = hostPage.locator('.bot-card .frame-btn').first();
   await firstThumb.click();
   const zoomedImg = hostPage.locator('.zoomed-preview img');
   await expect(zoomedImg).toBeVisible();
@@ -155,13 +156,10 @@ async function assertBotCardInteractions(hostPage: Page): Promise<void> {
   await hostPage.getByRole('button', { name: 'Закрыть снимок' }).click();
   await expect(zoomedImg).toHaveCount(0);
 
-  const secondThumb = hostPage.locator('.bot-card .thumb-item').nth(1);
+  const secondThumb = hostPage.locator('.bot-card .frame-btn').nth(1);
   await secondThumb.locator('img').dispatchEvent('error');
-  await expect(secondThumb.locator('.thumb-fallback')).toBeVisible();
-  await expect(secondThumb.locator('.thumb-fallback')).toHaveText(
-    'Снимки этого раунда уже удалены',
-  );
-  await expect(secondThumb.locator('.thumb-btn')).toHaveCount(0);
+  await expect(secondThumb).toHaveText('Кадр недоступен');
+  await expect(secondThumb).toBeDisabled();
   await expect(hostPage.locator('.zoomed-preview')).toHaveCount(0);
 
   await hostPage.keyboard.press('Escape');

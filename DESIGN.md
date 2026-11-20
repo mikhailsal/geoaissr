@@ -78,9 +78,17 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 
 ## AI result cards
 
-Reasoning appears in a fixed reading order: facts, rejected alternatives, conclusion and coordinates. A draft badge identifies checkpoint fallback. A legacy explanation fills the conclusion slot when no valid conclusion exists, including alongside partial structured reasoning. Absent reasoning does not imply that coordinates were missing.
+The card reads top to bottom: header, bot's story, step-by-step disclosure, coordinates, accounting (always last).
 
-The inspection timeline groups initial observations above numbered paid steps. Each row pairs a clickable image with its action, camera or move parameters and hypothesis. Image buttons use a pointer cursor and open a native modal dialog above the page. Escape, its close button and a backdrop click dismiss it and restore thumbnail focus. Zoom is always derived from field of view, including a `1.0×` normal view. Long text wraps within the card on narrow screens.
+The story block has a small caption «Рассказ бота» and the bot's first-person summary at 16 px. The «Черновик» badge sits beside it when the scored pin came from a checkpoint. Without a summary the card says «Итог не записан» and still lists the steps. A legacy result without a journal hides the disclosure, shows its conclusion as the story when present and keeps the old snapshot timeline below it.
+
+The disclosure «Ход за ходом (N шагов)» is a native button (at least 44 px tall, chevron icon, `aria-expanded`, `aria-controls`) and starts collapsed. N counts every step, including «Первый взгляд». Steps mount only when it is open and load thumbnails only; the full frame loads in the preview dialog. Its state survives live accounting updates and resets when the bot or round changes.
+
+Each step row is separated by a 1 px `--line` divider (no nested shadows, no per-entry animation) and shows, in order: title, frames, «Зачем:», «Вывод:», shifts and the pin line. «Первый взгляд» shows its four frames in a wrapping 2×2 grid. Other steps are titled from the action and camera ("Зум 2.0× · азимут 90°", "Шаг 1 · азимут 0°"). Frames are image buttons named «Кадр шага N: …» with a reserved square box while loading and «Кадр недоступен» on error. Below 480 px of card width everything is one column; above it a single frame sits in a 128 px left column.
+
+State copy: a missing finding reads «вывод не записан»; a finding cut off by the round end (or still pending on the last step) reads «раунд закончился раньше вывода». Shifts are text labels with their reason, never colour alone: «Отпало» (`--signal`), «Менее вероятно» (`--paper-dim`), «Более вероятно» (`--ok`). The pin line reads «первая точка», «точка сдвинулась на N км» (tabular numerals), «точка не сдвинулась» or «новая точка не записана». All model text is plain text with `overflow-wrap: anywhere`.
+
+One shared native modal dialog previews a frame. Escape closes it first and restores focus to the frame button; the card's own Escape order is unchanged. The «почему?» button is at least 44 px tall.
 
 Token and estimated-cost details use one compact metric button. Its tooltip works with hover, keyboard focus and tap; Escape closes the tooltip before the surrounding card, and clicking outside dismisses it. Reference API prices show three decimal places and the label “API-цена для справки”; approximate model matches are explicit.
 
