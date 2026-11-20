@@ -2,6 +2,25 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.4.0] - 2026-11-20
+
+### Added
+
+- See why each bot answered the way it did. On the results screen, «почему?» opens a card with the bot's summary. Below it, a collapsed step-by-step journal shows, for every paid look or move, what the bot expected to see, what it found, how the clues shifted its thinking, and where its guess moved. Each step has its frames, which open in a full-size preview that shows the thumbnail at once and switches to the full frame when it loads.
+- Measure one bot configuration on a fixed photo set with `bun run eval:bots`. It runs real rounds against 28 licensed street-level spots in `docs/evals/dataset` and writes `summary.json` and `rounds.jsonl`. The summary reports finish rate with a confidence interval, time to the final guess, distance error, rejected tool calls and the share of steps with a finding. `--help` lists every flag. Unknown flags, unknown spots and datasets that break a manifest rule exit with code 2 and one readable line. A harness that cannot start, a CLI that fails before its first tool call and a frame that does not decode are reported as infra errors rather than measured rounds. Only guesses made within the time budget count. A run never overwrites an earlier one. Reusing an `--out` folder or a `--label` exits with code 2. The summary records the selected spot ids and a fingerprint of the manifest and its photos, so two runs can be compared. Rules and results format: `docs/evals/README.md`.
+
+### Changed
+
+- Bots now write their reasoning as they play. Every `look` and `move` carries the hypothesis it tests, the finding from the previous frame and a current guess, and `final_guess` carries a summary and the last finding. An incomplete call gets one correction per step (`GEO_BOT_JOURNAL_FIELD_MISSING`) and is never charged as a paid turn.
+- **Upgrade note:** the `draft_guess` and `submit_guess` bot tools are removed. The current guess now rides on `look` and `move`, and `final_guess` ends the round. Saved custom prompts or external MCP clients that call the old tools must switch to these fields.
+- When every human has answered and the round end moves earlier, bots get the new deadline and wrap up before it.
+- When the bot bridge cannot reach the game server, the bot gets a short coded message (`GEO_BOT_BRIDGE_UNREACHABLE`) instead of the raw exception text and local address. After a failed `look` or `move`, which may already be charged, the message tells the bot not to repeat it and to send `final_guess`.
+
+### Fixed
+
+- Keep the «почему?» button on screen on narrow phones: below 420 px it moves under the bot's name.
+- Show «Кадр недоступен» in the preview when a frame and its thumbnail both fail to load, instead of closing the preview without a word.
+
 ## [0.3.0] - 2026-11-20
 
 ### Added
