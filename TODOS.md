@@ -62,7 +62,7 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 
 **Why:** A bridge retry after a network blip can today charge a second paid turn or write a second checkpoint. The step journal dedupes identical writes, but not a repeated camera action.
 
-**Context:** Raised in the eng review of the bot step journal (2026-11-20). `server/bots/queue.ts` serializes calls; the operation ID would be checked before the turn is charged. Until then the bridge transport error (`GEO_BOT_BRIDGE_UNREACHABLE`) tells the model to repeat a free call only once and never to repeat a paid `look` or `move` (v0.4.0). Tracked as GitHub issue #23.
+**Context:** Raised in the eng review of the bot step journal (2026-11-20). `server/bots/queue.ts` serializes calls; the operation ID would be checked before the turn is charged. Until then the bridge transport error (`GEO_BOT_BRIDGE_UNREACHABLE`) tells the model to repeat a free call only once and never to repeat a paid `look` or `move` (v0.3.1). Tracked as GitHub issue #23.
 
 **Effort:** S
 **Priority:** P3
