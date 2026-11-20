@@ -77,14 +77,30 @@ test('buildRoundRecord derives timing, movement and look counts from events', ()
   expect(rec.steps.map((s) => s.hypothesis)).toEqual(['h1', 'h2']);
 });
 
-test('buildRoundRecord counts findings only when the thumb carries the field', () => {
+const finding = (tMs: number, turn: number, text: string | null): TimedEvent => ({
+  tMs,
+  event: {
+    type: 'bot_finding',
+    ...IDS,
+    turn,
+    findingState: text ? 'recorded' : 'missing',
+    ...(text ? { finding: text } : {}),
+  },
+});
+
+// protects=Stage 1 findings counted per paid step from bot_finding events; fails_when=findings read from thumbs (never set) or the observe step counted; no_claim=finding quality.
+test('buildRoundRecord counts paid steps whose journal finding was recorded', () => {
   const rec = buildRoundRecord(CTX, [
-    thumb(1, 1, { finding: 'left-hand traffic' }),
-    thumb(2, 2, { finding: '' }),
-    guess(3, 0, true),
-    finished(4),
+    finding(1, 0, 'start frames'),
+    thumb(2, 1),
+    finding(3, 1, null),
+    thumb(4, 2),
+    finding(5, 2, 'left-hand traffic'),
+    guess(6, 0, true),
+    finished(7),
   ]);
   expect(rec.stepsWithFinding).toBe(1);
+  expect(rec.steps.map((s) => s.finding)).toEqual([null, 'left-hand traffic']);
 });
 
 test('buildRoundRecord marks a round without guesses as no pin', () => {

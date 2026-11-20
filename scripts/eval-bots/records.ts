@@ -12,7 +12,7 @@ export interface StepText {
   turn: number;
   action: 'look' | 'move';
   hypothesis: string | null;
-  /** Only present when the bot contract carries a per-step finding. */
+  /** The step's finding from the journal; null when none was recorded. */
   finding: string | null;
 }
 
@@ -100,31 +100,38 @@ function firstGuessBeforeFinish(
   return null;
 }
 
-/** Reads an optional per-step `finding` that a later bot contract may add to thumbs. */
-function readFinding(thumb: object): string | null | undefined {
-  if (!('finding' in thumb)) return undefined;
-  const value = (thumb as { finding?: unknown }).finding;
-  return typeof value === 'string' && value.trim() !== '' ? value : null;
+/** Findings by step, from the journal's `bot_finding` events (the latest recorded one wins). */
+function findingsByTurn(events: readonly TimedEvent[]): Map<number, string> | null {
+  let seen = false;
+  const byTurn = new Map<number, string>();
+  for (const { event } of events) {
+    if (event.type !== 'bot_finding') continue;
+    seen = true;
+    if (event.findingState === 'recorded' && event.finding) byTurn.set(event.turn, event.finding);
+  }
+  return seen ? byTurn : null;
 }
 
+/**
+ * Paid steps with their reason and finding. `hasFindingField` is false for a bot contract
+ * without findings (the baseline arm), so the metric is null there rather than zero.
+ */
 export function collectSteps(events: readonly TimedEvent[]): {
   steps: StepText[];
   hasFindingField: boolean;
 } {
+  const findings = findingsByTurn(events);
   const steps: StepText[] = [];
-  let hasFindingField = false;
   for (const { event } of events) {
     if (event.type !== 'bot_thumb_added' || event.thumb.action === 'observe') continue;
-    const finding = readFinding(event.thumb);
-    if (finding !== undefined) hasFindingField = true;
     steps.push({
       turn: event.thumb.turn,
       action: event.thumb.action,
       hypothesis: event.thumb.hypothesis ?? null,
-      finding: finding ?? null,
+      finding: findings?.get(event.thumb.turn) ?? null,
     });
   }
-  return { steps, hasFindingField };
+  return { steps, hasFindingField: findings !== null };
 }
 
 function lastTokenUsage(events: readonly TimedEvent[]): BotTokenUsage | null {
