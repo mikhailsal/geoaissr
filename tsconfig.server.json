@@ -30,6 +30,7 @@
     "web/src/**/*.test.ts",
     "web/src/i18n/format.ts",
     "web/src/lib/clock.ts",
+    "web/src/lib/journal-format.ts",
     "web/src/lib/audio-catalog.ts",
     "web/src/lib/audio-director.ts",
     "web/src/lib/audio-player.ts",

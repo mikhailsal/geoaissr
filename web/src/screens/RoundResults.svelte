@@ -292,6 +292,7 @@
   }
 
   .table-pane {
+    min-width: 0;
     border-radius: 0;
     border-top: 0;
     border-bottom: 0;
@@ -343,6 +344,7 @@
   }
 
   .table-scroll {
+    container-type: inline-size;
     flex: 1;
     overflow: auto;
     min-height: 0;
@@ -383,12 +385,13 @@
   }
 
   .why-btn {
-    min-height: 36px;
+    min-height: 44px;
     padding: 0 0.65rem;
     font-size: 0.85rem;
   }
 
   .bot-card-row td {
+    max-width: 0;
     padding: var(--sp-2) 0;
   }
 
@@ -407,7 +410,7 @@
     }
 
     .results-layout {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       grid-template-rows: 42dvh 1fr;
       height: auto;
       min-height: 100dvh;

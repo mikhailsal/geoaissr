@@ -13,7 +13,9 @@ async function openBotCard(page: Page, url: string): Promise<void> {
       const state = JSON.parse(message) as ServerMessage;
       if (state.type === 'state' && state.view.results) {
         for (const entry of state.view.results.entries) {
-          if (entry.isAi && entry.thumbs[0]) entry.thumbs[0].fullUrl = '/slow-full';
+          if (!entry.isAi || !entry.thumbs[0]) continue;
+          delete entry.journal;
+          entry.thumbs[0].fullUrl = '/slow-full';
         }
       }
       socket.send(JSON.stringify(state));

@@ -103,6 +103,7 @@ async function installImages(page: Page, holdFirstRequest = false) {
         for (const entry of snapshot.view.results.entries) {
           const base = entry.isAi && entry.thumbs[0];
           if (!base) continue;
+          delete entry.journal;
           entry.thumbs = [1, 2].map((turn) => ({
             ...base,
             turn,
