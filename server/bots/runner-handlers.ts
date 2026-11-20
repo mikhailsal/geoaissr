@@ -102,6 +102,22 @@ async function runMoveTool(
   }
 }
 
+/**
+ * Seconds left for the bot: the earlier of its slot budget end and the engine's round end. The
+ * engine moves the round end earlier when every human confirmed, so a bot must not keep reading
+ * its full slot budget then.
+ */
+export function effectiveRemainingSec(opts: {
+  budgetSec: number;
+  startedAt: number;
+  roundDeadlineAt: number | null;
+  now: number;
+}): number {
+  const slotEnd = opts.startedAt + opts.budgetSec * 1000;
+  const end = opts.roundDeadlineAt === null ? slotEnd : Math.min(slotEnd, opts.roundDeadlineAt);
+  return Math.max(0, (end - opts.now) / 1000);
+}
+
 export function buildRoundHandlers(
   ctx: RunnerCtx,
   params: RoundBotParams,
@@ -110,6 +126,7 @@ export function buildRoundHandlers(
     waitObserveRelease: (signal: AbortSignal) => Promise<void>;
     getTurnsUsed: () => number;
     getStartedAt: () => number;
+    getRoundDeadlineAt?: () => number | null;
     onSubmittedGuess: () => void;
   },
 ): BotSessionHandlers {
@@ -171,6 +188,11 @@ export function buildRoundHandlers(
       });
     },
     getRemainingTimeSec: () =>
-      Math.max(0, slot.budgetSec - (Date.now() - deps.getStartedAt()) / 1000),
+      effectiveRemainingSec({
+        budgetSec: slot.budgetSec,
+        startedAt: deps.getStartedAt(),
+        roundDeadlineAt: deps.getRoundDeadlineAt?.() ?? null,
+        now: Date.now(),
+      }),
   };
 }

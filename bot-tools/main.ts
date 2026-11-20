@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { getBotToolDefinitions } from '../shared/bot-tools.ts';
+import { transportErrorResult } from './transport-error.ts';
 
 interface BackendToolResponse {
   text: string;
@@ -85,16 +86,8 @@ async function main(): Promise<void> {
         content: buildContentBlocks(result),
         ...(result.isError ? { isError: true } : {}),
       };
-    } catch (err) {
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Ошибка обращения к серверу игры: ${err instanceof Error ? err.message : String(err)}`,
-          },
-        ],
-        isError: true,
-      };
+    } catch {
+      return transportErrorResult();
     }
   });
 

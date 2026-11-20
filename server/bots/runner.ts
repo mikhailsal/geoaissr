@@ -4,12 +4,46 @@ import type { BotImageService } from '../images/bot-image-service.ts';
 import type { LocationService } from '../location.ts';
 import type { ServerLogger } from '../log.ts';
 import { createBotToolApiServer } from './api.ts';
-import type { CustomBotLaunchBuilder } from './process.ts';
+import type { ActiveBotHandle, CustomBotLaunchBuilder } from './process.ts';
 import { dispatchLaunchFailure, launchBotProcess, stopBotHandle } from './runner-launch.ts';
 import type { BotRunner, RunnerCtx } from './runner-types.ts';
 import { runVisionCheck } from './vision-check.ts';
 
 export type { BotRunner } from './runner-types.ts';
+
+function roundHandles(
+  ctx: RunnerCtx,
+  matchId: string,
+  gen: number,
+  roundNumber: number,
+): ActiveBotHandle[] {
+  return [...ctx.activeHandles.values()].filter(
+    (h) => h.matchId === matchId && h.gen === gen && h.roundNumber === roundNumber,
+  );
+}
+
+const closedVisionCheck = () =>
+  Promise.resolve({ passed: false, elapsedMs: 0, message: 'Сервер останавливается' });
+
+/** Runs one vision check and tracks it so `close()` can abort and await it. */
+function startVisionCheck(
+  ctx: RunnerCtx,
+  slot: Parameters<BotRunner['runVisionCheck']>[0],
+): ReturnType<BotRunner['runVisionCheck']> {
+  const ac = new AbortController();
+  const promise = runVisionCheck({
+    runDir: ctx.runDir,
+    childrenFile: ctx.childrenFile,
+    fakeMode: ctx.fakeMode,
+    api: ctx.api,
+    slot,
+    signal: ac.signal,
+  }).finally(() => {
+    ctx.activeVisionChecks.delete(ac);
+  });
+  ctx.activeVisionChecks.set(ac, promise);
+  return promise;
+}
 
 export function createBotRunner(opts: {
   runDir: string;
@@ -46,12 +80,13 @@ export function createBotRunner(opts: {
     },
     releaseObserve(matchId, gen, roundNumber) {
       const now = Date.now();
-      for (const h of ctx.activeHandles.values()) {
-        if (h.matchId === matchId && h.gen === gen && h.roundNumber === roundNumber) {
-          h.setStartedAt(now);
-          h.releaseObserve();
-        }
+      for (const h of roundHandles(ctx, matchId, gen, roundNumber)) {
+        h.setStartedAt(now);
+        h.releaseObserve();
       }
+    },
+    setRoundDeadline(matchId, gen, roundNumber, atMs) {
+      for (const h of roundHandles(ctx, matchId, gen, roundNumber)) h.setRoundDeadline?.(atMs);
     },
     stopBot(matchId, gen, botId, reason) {
       const h = ctx.activeHandles.get(botId);
@@ -62,24 +97,7 @@ export function createBotRunner(opts: {
       const stops = [...ctx.activeHandles.values()].map((h) => stopBotHandle(ctx, h, reason));
       await Promise.allSettled(stops);
     },
-    runVisionCheck: (slot) => {
-      if (closed) {
-        return Promise.resolve({ passed: false, elapsedMs: 0, message: 'Сервер останавливается' });
-      }
-      const ac = new AbortController();
-      const promise = runVisionCheck({
-        runDir: ctx.runDir,
-        childrenFile: ctx.childrenFile,
-        fakeMode: ctx.fakeMode,
-        api: ctx.api,
-        slot,
-        signal: ac.signal,
-      }).finally(() => {
-        ctx.activeVisionChecks.delete(ac);
-      });
-      ctx.activeVisionChecks.set(ac, promise);
-      return promise;
-    },
+    runVisionCheck: (slot) => (closed ? closedVisionCheck() : startVisionCheck(ctx, slot)),
     getApiBaseUrl: () => ctx.api.baseUrl,
     async close() {
       closed = true;

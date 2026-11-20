@@ -56,6 +56,30 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 **Priority:** P3
 **Depends on:** spike S1, the "First game" gate
 
+### Idempotent bot tool calls through bridge operation IDs
+
+**What:** The MCP bridge stamps each tool call with an operation ID; the server answers a repeated ID with the stored result instead of running the action again.
+
+**Why:** A bridge retry after a network blip can today charge a second paid turn or write a second checkpoint. The step journal dedupes identical writes, but not a repeated camera action.
+
+**Context:** Raised in the eng review of the bot step journal (2026-11-20). `server/bots/queue.ts` serializes calls; the operation ID would be checked before the turn is charged. The bridge transport error (`GEO_BOT_BRIDGE_UNREACHABLE`) already tells the model to retry only once.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** bot step journal (Stage 1)
+
+### Cancel in-flight image fetches when a bot round is aborted
+
+**What:** Pass the queue's abort signal into the Street View fetches of `look` and `move`, so an aborted round stops downloading frames.
+
+**Why:** Today a late fetch finishes and its result is dropped (no journal, thumb or checkpoint event), but the request still spends quota and time. Stage 2 (Detective) doubles the processes per bot, so the waste grows.
+
+**Context:** Raised in the eng review of the bot step journal (2026-11-20). `runner-handlers.ts` already receives the signal and checks it after the fetch; `server/images/bot-image-service.ts` does not accept one yet.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** before Stage 2 (Detective play style)
+
 ## Interface
 
 ### Replaying a round when a panorama has not loaded
@@ -85,6 +109,18 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 **Effort:** M
 **Priority:** P3
 **Depends on:** milestone M4
+
+### Human guess versus bot pin trail on the results map
+
+**What:** On the results screen, draw the bot's pin trail (its `current_guess` after each step) next to the human's pin, so a player sees where the bot's belief moved and where their own guess sat.
+
+**Why:** The step journal shows «точка сдвинулась на N км» as text; a map overlay makes the comparison with the human guess immediate and is the strongest teaching moment.
+
+**Context:** Deferred in the CEO review of the bot step journal (2026-11-20). The trail already reaches clients as `currentGuess` on each journal step. The results map already draws pins; the trail needs a line layer and a legend.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** bot step journal card
 
 ## Completed
 

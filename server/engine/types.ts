@@ -330,6 +330,14 @@ export type EngineEffect =
       moveEnabled: boolean;
     }
   | { type: 'release_bot_observe'; matchId: string; gen: number; roundNumber: number }
+  /** The engine moved the round end earlier (all humans confirmed); bots see the new deadline. */
+  | {
+      type: 'set_bot_round_deadline';
+      matchId: string;
+      gen: number;
+      roundNumber: number;
+      atMs: number;
+    }
   | {
       type: 'schedule_deadline';
       matchId: string;

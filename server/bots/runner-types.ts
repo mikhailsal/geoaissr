@@ -27,6 +27,8 @@ export interface BotRunner {
     moveEnabled: boolean;
   }) => void;
   releaseObserve: (matchId: string, gen: number, roundNumber: number) => void;
+  /** The engine shortened the round: remaining time and the urgent nudge use `atMs` from now on. */
+  setRoundDeadline: (matchId: string, gen: number, roundNumber: number, atMs: number) => void;
   stopBot: (matchId: string, gen: number, botId: string, reason: string) => void;
   stopAll: (reason: string) => Promise<void>;
   runVisionCheck: (

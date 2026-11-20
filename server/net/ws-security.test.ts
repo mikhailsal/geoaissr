@@ -504,6 +504,7 @@ test('check_bot_vision emits vision_check_result on completion and on mid-check 
   const { shell, srv } = createSecServer(dir, 'local', true, {
     startRoundBots: () => undefined,
     releaseObserve: () => undefined,
+    setRoundDeadline: () => undefined,
     stopBot: () => undefined,
     stopAll: () => Promise.resolve(),
     runVisionCheck: async () => {

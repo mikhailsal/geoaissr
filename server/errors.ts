@@ -27,6 +27,7 @@ export const ERROR_CODES = [
   'GEO_HARNESS_HIDDEN',
   'GEO_QUOTA_CEILING',
   'GEO_BOT_JOURNAL_FIELD_MISSING',
+  'GEO_BOT_BRIDGE_UNREACHABLE',
   'GEO_CRASH',
 ] as const;
 
@@ -167,6 +168,15 @@ export const ERROR_REGISTRY: Record<ErrorCode, ErrorRegistryEntry> = {
     whatTemplate: 'вызов инструмента бота пришёл без обязательного поля журнала',
     fixTemplate: 'бот повторяет тот же вызов с недостающим полем; хосту ничего делать не нужно',
     docAnchor: 'docs/errors.md#GEO_BOT_JOURNAL_FIELD_MISSING',
+  },
+  GEO_BOT_BRIDGE_UNREACHABLE: {
+    code: 'GEO_BOT_BRIDGE_UNREACHABLE',
+    errorClass: 'environment',
+    exitCode: 1,
+    whatTemplate: 'мост инструментов бота не достучался до сервера игры',
+    fixTemplate:
+      'бот повторяет вызов один раз и затем отправляет final_guess; если так в каждом раунде — перезапустите `bun run start`',
+    docAnchor: 'docs/errors.md#GEO_BOT_BRIDGE_UNREACHABLE',
   },
   GEO_CRASH: {
     code: 'GEO_CRASH',

@@ -72,6 +72,31 @@ function startBotExecution(
   });
 }
 
+/** Structured log lines for every tool call and every journal correction of one bot. */
+function queueDiagnostics(
+  ctx: RunnerCtx,
+  params: RoundBotParams,
+): Pick<Parameters<typeof createBotToolQueue>[0], 'onCorrection' | 'onDispatch'> {
+  const { matchId, gen, roundNumber, slot } = params;
+  const ids = { matchId, gen, roundNumber, slotId: slot.id };
+  return {
+    onCorrection: (info) => {
+      logBotDiagnostic(ctx.logger, 'bot_journal_correction', {
+        ...ids,
+        harness: slot.harness,
+        ...info,
+      });
+    },
+    onDispatch: (audit) => {
+      logBotDiagnostic(ctx.logger, 'bot_tool_call', {
+        ...ids,
+        ...audit,
+        ok: audit.result ? !audit.result.isError : false,
+      });
+    },
+  };
+}
+
 export function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
   const { matchId, gen, roundNumber, target, slot, moveEnabled } = params;
   const workDir = joinUnder(ctx.runDir, matchId, `r${roundNumber}-g${gen}`, slot.id);
@@ -83,38 +108,24 @@ export function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
     locationService: ctx.locationService,
   });
 
-  const roundRef = { startedAt: Date.now(), submittedGuess: false };
+  const roundRef: { startedAt: number; submittedGuess: boolean; deadlineAt: number | null } = {
+    startedAt: Date.now(),
+    submittedGuess: false,
+    deadlineAt: null,
+  };
   const gate = createGatePair();
   const queueState: { instance: BotToolQueue | null } = { instance: null };
   const queue = createBotToolQueue({
     moveLimit: slot.moveLimit,
     moveEnabled,
     requireCompleteReasoning: true,
-    onCorrection: (info) => {
-      logBotDiagnostic(ctx.logger, 'bot_journal_correction', {
-        matchId,
-        gen,
-        roundNumber,
-        slotId: slot.id,
-        harness: slot.harness,
-        ...info,
-      });
-    },
-    onDispatch: (audit) => {
-      logBotDiagnostic(ctx.logger, 'bot_tool_call', {
-        matchId,
-        gen,
-        roundNumber,
-        slotId: slot.id,
-        ...audit,
-        ok: audit.result ? !audit.result.isError : false,
-      });
-    },
+    ...queueDiagnostics(ctx, params),
     handlers: buildRoundHandlers(ctx, params, {
       tracker,
       waitObserveRelease: gate.waitObserveRelease,
       getTurnsUsed: () => queueState.instance?.getTurnsUsed() ?? 0,
       getStartedAt: () => roundRef.startedAt,
+      getRoundDeadlineAt: () => roundRef.deadlineAt,
       onSubmittedGuess: () => {
         roundRef.submittedGuess = true;
       },
@@ -137,6 +148,9 @@ export function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
     releaseObserve: gate.releaseObserve,
     setStartedAt: (ms) => {
       roundRef.startedAt = ms;
+    },
+    setRoundDeadline: (ms) => {
+      roundRef.deadlineAt = ms;
     },
   };
   const prev = ctx.activeHandles.get(slot.id);

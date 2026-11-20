@@ -373,6 +373,13 @@ export function checkAllHumansConfirmedAndBotsState(state: RoomState, now: numbe
         kind: 'wait',
         atMs: waitEnd,
       },
+      {
+        type: 'set_bot_round_deadline',
+        matchId: state.matchId,
+        gen: state.gen,
+        roundNumber: state.roundNumber,
+        atMs: waitEnd,
+      },
     ],
   };
 }

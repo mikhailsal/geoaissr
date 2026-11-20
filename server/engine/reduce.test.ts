@@ -259,6 +259,14 @@ test('all humans confirmed with thinking bot waits at least 60s from start or ai
   expect(guess.ack).toBe('ok');
   expect(guess.state.phase).toBe('ROUND_ACTIVE');
   expect(guess.state.loadingOrActive?.endsAt).toBe(70_000);
+  // Bots must read the shortened end, not their full slot budget.
+  expect(guess.effects).toContainEqual({
+    type: 'set_bot_round_deadline',
+    matchId: 'm1',
+    gen: guess.state.gen,
+    roundNumber: 1,
+    atMs: 70_000,
+  });
 
   const botGuess = reduce(
     guess.state,

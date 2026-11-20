@@ -34,6 +34,8 @@ export interface ActiveBotHandle {
   stopped: boolean;
   releaseObserve: () => void;
   setStartedAt: (ms: number) => void;
+  /** Engine round end (epoch ms) when it is earlier than the slot budget, e.g. after early confirmation. */
+  setRoundDeadline?: (atMs: number) => void;
   flushDiagnostics?: () => void;
 }
 

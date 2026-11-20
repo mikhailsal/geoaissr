@@ -68,9 +68,17 @@ Not a command-line error: it is the code at the end of the one-time correction t
 
 - **What:** a `look` or `move` arrived without `finding` (required after `observe`) or `current_guess`, or a `final_guess` arrived without `summary` or `finding`.
 - **Why:** the step journal needs the reason before the action and the finding after it; the finding for the previous frame rides on the next call.
-- **What the bot should do:** repeat the same call with the missing field. The correction is returned once per call with `isError: true`; no frame is requested and no paid turn is charged (a partial `final_guess` is saved as a checkpoint). The repeated call is accepted: the step is marked "вывод не записан" (a missing `current_guess` keeps the previous checkpoint).
+- **What the bot should do:** repeat the same call with the missing field. The correction is returned once per pending step with `isError: true` and lists every missing field; no frame is requested and no paid turn is charged (a partial `final_guess` is saved as a checkpoint). The next call for the same step is accepted even if it changes the camera arguments: the step is marked "вывод не записан" (a missing `current_guess` keeps the previous checkpoint and the step shows «новая точка не записана»).
 - **What the host sees:** nothing during play. On the result card the step shows «вывод не записан». A round that ended before the finding shows «раунд закончился раньше вывода».
 - **Logging:** every correction is one `bot_journal_correction` line in `<GEOAISSR_DATA_DIR>/logs/` with `harness`, `tool`, `missing` and `code`, so the correction rate per harness can be counted. Prompt text, environment values and file paths are never logged.
+
+## GEO_BOT_BRIDGE_UNREACHABLE
+
+Not a command-line error: it is the code at the end of the tool result that the MCP bridge (`bot-tools/main.ts`) returns to a bot when its HTTP call to the game server fails (server stopped, connection reset, a reply that is not JSON).
+
+- **What the bot sees:** «Нет связи с сервером игры. Повторите вызов один раз; если ошибка повторится — вызовите final_guess.» with `isError: true`. The raw exception text is not passed to the model.
+- **Why:** the bridge runs inside the bot's CLI process and reaches the server over `127.0.0.1`; the server may have stopped the round or be restarting.
+- **What the host should do:** nothing for a single occurrence. If every bot hits it every round, restart `bun run start` and check `bun run doctor`.
 
 ## GEO_CRASH
 

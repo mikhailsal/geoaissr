@@ -265,6 +265,9 @@ export function buildConfiguredShell(opts: {
     releaseBotObserve: (matchId, gen, roundNumber) => {
       opts.getBotRunner()?.releaseObserve(matchId, gen, roundNumber);
     },
+    setBotRoundDeadline: (matchId, gen, roundNumber, atMs) => {
+      opts.getBotRunner()?.setRoundDeadline(matchId, gen, roundNumber, atMs);
+    },
     stopBotProcess: (matchId, gen, botId, reason) => {
       opts.getBotRunner()?.stopBot(matchId, gen, botId, reason);
     },

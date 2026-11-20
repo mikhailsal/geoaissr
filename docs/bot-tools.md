@@ -31,13 +31,40 @@ The allowance belongs to the pending step (the one whose finding is due), not to
 
 If the round ends before the last step got its finding, that step is `round-ended` (card text «раунд закончился раньше вывода»). Steps start as `pending` while the bot is working.
 
+Parallel calls: a `look`, `move` or `final_guess` sent before the pending step's frame was delivered could not have seen that frame. It is accepted without a correction, its `finding` and `shifts` are not written (the pending step shows «вывод не записан»), and its `current_guess` still becomes the checkpoint. A repeated `observe` returns the same four frames and adds no step. After the round is aborted or finalized, a late call emits no journal, frame or checkpoint event.
+
+Transport errors: if the bridge cannot reach the server, the bot gets «Нет связи с сервером игры. Повторите вызов один раз; если ошибка повторится — вызовите final_guess.» with `isError: true` and `[GEO_BOT_BRIDGE_UNREACHABLE]` (see [errors](./errors.md#GEO_BOT_BRIDGE_UNREACHABLE)).
+
+### Example
+
+One round, as the bot sends it (`observe` → one `look` with a bounced first attempt → `final_guess`):
+
+```jsonc
+// 1. observe: no arguments; returns four frames and opens step 0 «Первый взгляд».
+{}
+// 2. look without a finding: rejected, nothing stored, no turn charged.
+{ "heading": 90, "pitch": 0, "fov": 40, "hypothesis": "Щит справа: кириллица значит восток Европы, латиница — запад.",
+  "current_guess": { "lat": 50.1, "lng": 14.4 } }
+// → isError: «Вызов look отклонён: не хватает поля finding (что показал предыдущий кадр). Повторите тот же вызов и добавьте finding. Кадр не запрошен, ход не списан. Исправление одно на шаг: … [GEO_BOT_JOURNAL_FIELD_MISSING]»
+// 3. the same look with the finding about step 0: accepted, opens step 1.
+{ "heading": 90, "pitch": 0, "fov": 40, "hypothesis": "Щит справа: кириллица значит восток Европы, латиница — запад.",
+  "finding": "Правостороннее движение, жёлтая разметка по краю, ели: Центральная Европа.",
+  "shifts": [{ "version": "Скандинавия", "effect": "weaker", "because": "Разметка по краю жёлтая." }],
+  "current_guess": { "lat": 50.1, "lng": 14.4 } }
+// 4. final_guess: the finding is about step 1's frame.
+{ "lat": 49.2, "lng": 16.6, "finding": "На щите чешские диакритики: Brno 12.",
+  "shifts": [{ "version": "Польша", "effect": "excluded", "because": "Буква ě бывает только в чешском." }],
+  "summary": "Сначала понял, что это Центральная Европа, потом на щите увидел чешскую букву ě и Брно в 12 км.",
+  "quip": "Брно, я тебя вижу!" }
+```
+
 ### Journal data
 
 `shared/bot-journal.ts` defines one shape (zod and types): steps `{index, kind: observe | look | move, reason?, frames, finding?, findingState: pending | recorded | missing | round-ended, shifts?, currentGuess?, pointMissing?, movedKm?, atMs}` plus `{summary?, finalFinding?}`. The engine event `bot_finding` attaches a finding, shifts and point to a step; the journal reaches clients as `journal` on the AI entry of the round results. Old results with `facts`, `conclusion` or `rejectedGuesses` and no journal still parse, and a record without a journal shows no steps.
 
 The prompt asks the bot to keep several region versions, record the reason before each action and the finding after it, add shifts that exclude or weaken a version, send the current point with every paid action and finish with a first-person summary. A clue counts only if it is tied to a frame and shifts the weight between versions. File-based harnesses may use `read_file` only for game-provided images. These instructions do not guarantee a model's compliance or geographic accuracy.
 
-The advertised time budget is capped by the round duration. Every tool response reports remaining time; at 15 seconds or less it requests a final answer, while the prompt asks the bot to reserve time for submission. An early end to the shared AI waiting window can still end the round before that personal budget.
+The advertised time budget is capped by the round duration. Every tool response reports remaining time; at 15 seconds or less it says «Немедленно отправь лучшую версию через final_guess с выводом по последнему кадру.», while the prompt asks the bot to reserve time for submission. Remaining time is the earlier of the bot's own budget end and the engine's round end: when every human has confirmed, the engine shortens the round to the shared AI waiting window and the bots read that shorter deadline from then on. The checkpoint that counts is the last one the server received before the round was finalized.
 
 `look` accepts heading, optional pitch, optional `fov` and optional `zoom` in `1..9`. Explicit finite `fov` takes precedence and is clamped to `10..120`; otherwise `fov = clamp(round(90 / zoom), 10, 120)`, defaulting to 90. A field of view of 20–45 zooms in, while 120 is wide. Fake images use the same field-of-view projection. Successful step records preserve the effective parameters and the valid hypothesis (the step's reason).
 
