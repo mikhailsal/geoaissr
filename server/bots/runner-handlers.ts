@@ -136,10 +136,11 @@ export function buildRoundHandlers(
     async executeObserve(): Promise<ToolResponsePayload> {
       try {
         const views = await ctx.imageService.getObserveViews({ target, size: slot.imageSize });
+        // The start frames are always step 0, even when a paid call came first.
         dispatchObserveThumbs(
           ctx.dispatch,
           { matchId, gen, roundNumber, botId: slot.id },
-          deps.getTurnsUsed(),
+          0,
           views,
         );
         return {

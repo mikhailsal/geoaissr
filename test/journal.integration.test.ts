@@ -183,3 +183,18 @@ test('an unavailable look frame keeps the accepted finding and a retry does not 
   expect(steps.some((s) => s.kind === 'look')).toBe(false);
   expect(steps[0]?.findingState).toBe('recorded');
 }, 20_000);
+
+// Value: protects=the start frames stay step 0 when a bot looks before observe; fails_when=observe frames join the look step and step 0 is missing; why_new=only the observe-first order was driven end to end; seam=none; no_claim=which finding the out-of-order bot owes.
+test('observe after a paid look still opens step 0 with its four frames', async () => {
+  const events = await withBridgeBot({ moveLimit: 4 }, async (callTool) => {
+    const look = await callTool('look', { ...CAMERA, current_guess: POINT });
+    expect(look.isError ?? false).toBe(false);
+    expect((await callTool('observe', {})).isError ?? false).toBe(false);
+    expect((await callTool('final_guess', FINAL)).isError ?? false).toBe(false);
+  });
+  const steps = foldJournal(events);
+  expect(steps.map((s) => [s.index, s.kind, s.frames.length])).toEqual([
+    [0, 'observe', 4],
+    [1, 'look', 1],
+  ]);
+}, 20_000);

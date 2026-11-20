@@ -33,7 +33,7 @@ If the round ends before the last step got its finding, that step is `round-ende
 
 Parallel calls: a `look`, `move` or `final_guess` sent before the pending step's frame was delivered could not have seen that frame. It is accepted without a correction, its `finding` and `shifts` are not written (the pending step shows «вывод не записан»), and its `current_guess` still becomes the checkpoint. A repeated `observe` returns the same four frames and adds no step. After the round is aborted or finalized, a late call emits no journal, frame or checkpoint event.
 
-Transport errors: if the bridge cannot reach the server, the bot gets «Нет связи с сервером игры. Повторите вызов один раз; если ошибка повторится — вызовите final_guess.» with `isError: true` and `[GEO_BOT_BRIDGE_UNREACHABLE]` (see [errors](./errors.md#GEO_BOT_BRIDGE_UNREACHABLE)).
+Transport errors: if the bridge cannot reach the server, the bot gets «Нет связи с сервером игры. Повторите вызов один раз; если ошибка повторится — вызовите final_guess.» with `isError: true` and `[GEO_BOT_BRIDGE_UNREACHABLE]` (see [errors](./errors.md#GEO_BOT_BRIDGE_UNREACHABLE)). For `look` and `move`, whose turn may already be charged, the line asks for `final_guess` instead of a repeat.
 
 ### Example
 

@@ -5,7 +5,7 @@ import type { BotRoundState, EngineEvent } from './types.ts';
 
 type FindingEvent = Extract<EngineEvent, { type: 'bot_finding' }>;
 
-/** A thumb opens its step on the first frame and adds frames to it afterwards. */
+/** A thumb opens its step on the first frame and adds frames to it afterwards; steps stay in index order. */
 export function addThumbToJournal(
   journal: readonly JournalStep[],
   thumb: BotTurnThumbView,
@@ -29,7 +29,30 @@ export function addThumbToJournal(
     findingState: 'pending',
     atMs,
   };
-  return [...journal, step];
+  return [...journal, step].sort((a, b) => a.index - b.index);
+}
+
+/** A later point replaces the «новая точка не записана» marker of an earlier write. */
+function applyFinding(
+  s: JournalStep,
+  event: FindingEvent,
+  prev: JournalStep['currentGuess'],
+): JournalStep {
+  const { pointMissing: _stale, ...withoutMarker } = s;
+  const base = event.currentGuess ? withoutMarker : s;
+  return {
+    ...base,
+    findingState: event.findingState,
+    ...(event.pointMissing ? { pointMissing: true } : {}),
+    ...(event.finding ? { finding: event.finding } : {}),
+    ...(event.shifts ? { shifts: event.shifts } : {}),
+    ...(event.currentGuess
+      ? {
+          currentGuess: event.currentGuess,
+          ...(prev ? { movedKm: haversineDistanceKm(prev, event.currentGuess) } : {}),
+        }
+      : {}),
+  };
 }
 
 /** Attaches a finding to its step; an event for an unknown step changes nothing. */
@@ -40,23 +63,7 @@ export function addFindingToJournal(
   const prev = journal
     .filter((s) => s.index < event.turn && s.currentGuess)
     .sort((a, b) => b.index - a.index)[0]?.currentGuess;
-  return journal.map((s) =>
-    s.index === event.turn
-      ? {
-          ...s,
-          findingState: event.findingState,
-          ...(event.pointMissing ? { pointMissing: true } : {}),
-          ...(event.finding ? { finding: event.finding } : {}),
-          ...(event.shifts ? { shifts: event.shifts } : {}),
-          ...(event.currentGuess
-            ? {
-                currentGuess: event.currentGuess,
-                ...(prev ? { movedKm: haversineDistanceKm(prev, event.currentGuess) } : {}),
-              }
-            : {}),
-        }
-      : s,
-  );
+  return journal.map((s) => (s.index === event.turn ? applyFinding(s, event, prev) : s));
 }
 
 /**

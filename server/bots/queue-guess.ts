@@ -1,5 +1,6 @@
 import { parseGuessInput } from '../../shared/bot-tools.ts';
 import {
+  checkpointKey,
   correctionText,
   gateStepCall,
   isBlindCall,
@@ -42,6 +43,9 @@ export async function executeFinalGuess(
   }
   const { finding: _finding, shifts: _shifts, ...record } = guess;
   st.handlers.onGuess(record, finalized);
+  // A rejected final is now the stored point: a later checkpoint with the earlier point must
+  // not be skipped as a duplicate.
+  st.lastCheckpointKey = checkpointKey(st, guess);
   st.checkpoints += 1;
   st.finalized = finalized;
   if (!finalized) return { text: correctionText('final_guess', missing), isError: true };

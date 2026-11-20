@@ -98,20 +98,22 @@ export function gateStepCall(
 /**
  * Writes what an accepted call carried onto the pending step (the observe step for the first
  * call): finding and shifts, then the point (also stored as a checkpoint). A retry that carries
- * the same values writes nothing twice.
+ * the same values writes nothing twice. A retry for a step whose finding is already recorded
+ * (its camera action failed) keeps that finding and only moves the point or the shifts.
  */
 export function recordStepFields(st: QueueState, fields: StepFields, withPoint: boolean): void {
   if (!st.observed || st.signal.aborted) return;
   const turn = st.turnsUsed;
-  if (!fields.finding && st.findingTurn === turn) return;
+  const kept = !fields.finding && st.findingTurn === turn;
+  if (kept && !fields.currentGuess && !fields.shifts) return;
   if (fields.finding) st.findingTurn = turn;
   const record = {
     turn,
-    findingState: fields.finding ? 'recorded' : 'missing',
+    findingState: fields.finding || kept ? 'recorded' : 'missing',
     ...(fields.finding ? { finding: fields.finding } : {}),
     ...(fields.shifts ? { shifts: fields.shifts } : {}),
     ...(fields.currentGuess ? { currentGuess: fields.currentGuess } : {}),
-    ...(withPoint && !fields.currentGuess ? { pointMissing: true as const } : {}),
+    ...(withPoint && !fields.currentGuess && !kept ? { pointMissing: true as const } : {}),
   } as const;
   const key = JSON.stringify(record);
   if (key === st.lastWrittenKey) return;
@@ -119,9 +121,14 @@ export function recordStepFields(st: QueueState, fields: StepFields, withPoint: 
   st.handlers.onFinding?.(record);
 }
 
+/** Key of the latest stored point: the same point on the same step is not stored twice. */
+export function checkpointKey(st: QueueState, guess: CurrentGuess): string {
+  return `${st.turnsUsed}:${guess.lat}:${guess.lng}`;
+}
+
 export function recordCheckpoint(st: QueueState, guess: CurrentGuess | undefined): void {
   if (!guess || st.signal.aborted) return;
-  const key = `${st.turnsUsed}:${guess.lat}:${guess.lng}`;
+  const key = checkpointKey(st, guess);
   if (key === st.lastCheckpointKey) return;
   st.lastCheckpointKey = key;
   st.handlers.onGuess({ lat: guess.lat, lng: guess.lng, explanation: '' }, false);

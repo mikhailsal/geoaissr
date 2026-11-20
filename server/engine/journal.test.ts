@@ -54,6 +54,21 @@ test('an accepted call without a point marks the step', () => {
   expect(next[0]).toMatchObject({ findingState: 'missing', pointMissing: true });
 });
 
+// Value: protects=a later point clears «новая точка не записана» and a late observe still becomes step 0 before the paid steps; fails_when=the marker sticks after a retry supplies a point or the start frames sort after a look; why_new=retries and out-of-order observe were untested; seam=none; no_claim=how the queue orders calls.
+test('a later point clears the missing-point marker and step 0 sorts first', () => {
+  let journal = addThumbToJournal([], thumb(1, 'look'), 1);
+  journal = addThumbToJournal(journal, thumb(0, 'observe'), 2);
+  expect(journal.map((s) => s.index)).toEqual([0, 1]);
+  journal = addFindingToJournal(journal, finding(1, { pointMissing: true }));
+  expect(journal[1]?.pointMissing).toBe(true);
+  journal = addFindingToJournal(
+    journal,
+    finding(1, { finding: undefined, currentGuess: { lat: 1, lng: 1 } }),
+  );
+  expect(journal[1]).toMatchObject({ finding: 'вывод', currentGuess: { lat: 1, lng: 1 } });
+  expect(journal[1]?.pointMissing).toBeUndefined();
+});
+
 function botWith(journal: BotRoundState['journal'], guess: BotRoundState['guess']) {
   return { journal, guess, guessFinalized: guess !== null } as BotRoundState;
 }

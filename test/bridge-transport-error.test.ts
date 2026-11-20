@@ -8,13 +8,24 @@ import { connectBridgeMcp } from './fake-harness.ts';
 
 // protects=bots get a recovery line and a stable code on transport failure; fails_when=raw exception text or no code reaches the model; no_claim=how each CLI shows isError.
 test('transport error result carries the recovery line and a registered code', () => {
-  const res = transportErrorResult();
+  const res = transportErrorResult('observe');
   expect(res.isError).toBe(true);
   const text = res.content[0]?.text ?? '';
   expect(text).toContain('Повторите вызов один раз');
   expect(text).toContain('final_guess');
   expect(text).toContain(`[${BRIDGE_UNREACHABLE_CODE}]`);
   expect(ERROR_CODES).toContain(BRIDGE_UNREACHABLE_CODE);
+});
+
+// Value: protects=a lost reply to a paid call does not invite a repeat that the server would charge again; fails_when=look or move are told to repeat the call; why_new=the line was the same for every tool; seam=none; no_claim=idempotent replays (TODOS.md).
+test('a paid call is not told to repeat itself after a transport failure', () => {
+  for (const tool of ['look', 'move']) {
+    const text = transportErrorResult(tool).content[0]?.text ?? '';
+    expect(text).not.toContain('Повторите вызов');
+    expect(text).toContain('не повторяйте');
+    expect(text).toContain('final_guess');
+    expect(text).toContain(`[${BRIDGE_UNREACHABLE_CODE}]`);
+  }
 });
 
 // protects=the real bridge turns a dead server into the coded recovery result; fails_when=fetch errors escape as raw text or crash the bridge; no_claim=timeouts (deferred to Stage 2).

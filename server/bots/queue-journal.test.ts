@@ -261,6 +261,22 @@ test('after a failed camera action the step keeps its finding and final_guess st
   expect(seen.guesses.at(-1)?.finalized).toBe(false);
 });
 
+// Value: protects=a retry after a failed camera action moves the journal point together with the checkpoint, and a rejected final does not swallow the next checkpoint; fails_when=the retry's point is dropped from the journal or an earlier point is skipped as a duplicate after a rejected final; why_new=both retry paths were untested; seam=none; no_claim=the camera failure itself.
+test('a camera retry moves the journal point and a rejected final does not hide the next checkpoint', async () => {
+  const seen: Seen = { guesses: [], findings: [], looks: 0, observes: 0 };
+  const { queue } = createQueue(seen, () => ({ text: 'нет кадра', isError: true }));
+  const OTHER = { lat: 11, lng: 21 };
+  await queue.dispatch('observe', {});
+  await queue.dispatch('look', FULL);
+  await queue.dispatch('look', { heading: 90, hypothesis: 'снова', current_guess: OTHER });
+  expect(seen.findings.at(-1)).toEqual({ turn: 0, findingState: 'recorded', currentGuess: OTHER });
+  expect(seen.guesses.at(-1)).toMatchObject({ ...OTHER, finalized: false });
+  const rejected = await queue.dispatch('final_guess', { lat: 50, lng: 60 });
+  expect(rejected.isError).toBe(true);
+  await queue.dispatch('look', { heading: 90, hypothesis: 'ещё раз', current_guess: OTHER });
+  expect(seen.guesses.at(-1)).toMatchObject({ ...OTHER, finalized: false });
+});
+
 test('a repeated observe returns the frames and writes nothing new', async () => {
   const { queue, seen } = setup();
   const first = await queue.dispatch('observe', {});

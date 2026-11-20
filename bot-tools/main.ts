@@ -87,7 +87,7 @@ async function main(): Promise<void> {
         ...(result.isError ? { isError: true } : {}),
       };
     } catch {
-      return transportErrorResult();
+      return transportErrorResult(toolName);
     }
   });
 
