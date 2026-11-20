@@ -1,363 +1,100 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { z } from 'zod';
-import { HARNESS_IDS, type HarnessId } from '../shared/storage-schemas.ts';
-import { haversineDistanceKm } from '../shared/score.ts';
-import { getHarnessAdapter } from '../server/bots/adapters/index.ts';
-import { createBotRunner } from '../server/bots/runner.ts';
-import type { BotGuessData, EngineEvent, RoundTarget } from '../server/engine/types.ts';
-import { createThumbStore } from '../server/http/thumbs.ts';
-import {
-  createBotImageService,
-  type BotImageService,
-  type RenderedBotImage,
-} from '../server/images/bot-image-service.ts';
-import {
-  annotateStreetViewImage,
-  createThumb,
-  formatImageLabel,
-  normalizeHeadingDeg,
-} from '../server/images/label.ts';
-import { createFakeLocationService } from '../server/location.ts';
-import { createQuotaManager } from '../server/storage/quota.ts';
+import { parseEvalArgs, type EvalArgs } from './eval-bots/args.ts';
+import { loadDataset, type EvalSampleItem } from './eval-bots/manifest.ts';
+import { summarizeRounds, type RunConfig } from './eval-bots/metrics.ts';
+import type { RoundRecord } from './eval-bots/records.ts';
+import { runEvalRound } from './eval-bots/round.ts';
 
-export const evalSampleSchema = z.object({
-  id: z.string().trim().min(1),
-  countryNameRu: z.string().trim().min(1),
-  lat: z.number().finite().min(-90).max(90),
-  lng: z.number().finite().min(-180).max(180),
-  imagePaths: z
-    .tuple([z.string().min(1), z.string().min(1), z.string().min(1), z.string().min(1)])
-    .optional(),
-});
+const REPO_ROOT = path.resolve(import.meta.dir, '..');
 
-export const evalDatasetManifestSchema = z.array(evalSampleSchema).min(1);
-
-export type EvalSampleItem = z.infer<typeof evalSampleSchema>;
-
-export interface EvalArmMetrics {
-  armName: string;
-  runs: number;
-  medianKm: number | null;
-  iqrKm: number | null;
-  distancesKm: number[];
+function gitCommit(): string {
+  const res = Bun.spawnSync(['git', 'rev-parse', '--short', 'HEAD'], { cwd: REPO_ROOT });
+  return res.exitCode === 0 ? res.stdout.toString().trim() : 'unknown';
 }
 
-export function computeMedianAndIqr(values: readonly number[]): {
-  median: number | null;
-  iqr: number | null;
-} {
-  if (values.length === 0) return { median: null, iqr: null };
-  const sorted = [...values].sort((a, b) => a - b);
-  const quantile = (q: number): number => {
-    const pos = (sorted.length - 1) * q;
-    const base = Math.floor(pos);
-    const rest = pos - base;
-    const lo = sorted[base] ?? 0;
-    const hi = sorted[base + 1] ?? lo;
-    return lo + rest * (hi - lo);
-  };
-  const q1 = quantile(0.25);
-  const q2 = quantile(0.5);
-  const q3 = quantile(0.75);
-  return { median: Math.round(q2 * 10) / 10, iqr: Math.round((q3 - q1) * 10) / 10 };
-}
-
-/** Select the first final guess, or the latest draft before the bot finishes. */
-export function pickFinalGuess(events: readonly EngineEvent[]): BotGuessData | null {
-  let draft: BotGuessData | null = null;
-  for (const event of events) {
-    if (event.type === 'bot_finished') break;
-    if (event.type !== 'bot_guess_recorded') continue;
-    if (event.finalized ?? true) return event.guess;
-    draft = event.guess;
-  }
-  return draft;
-}
-
-export function loadDataset(datasetDir: string | null): EvalSampleItem[] {
-  if (datasetDir !== null) {
-    const absDir = path.resolve(datasetDir);
-    const manifestPath = path.join(absDir, 'manifest.json');
-    if (!existsSync(manifestPath)) {
-      throw new Error(`Не найден файл манифеста датасета: ${manifestPath}`);
-    }
-    const parsed = evalDatasetManifestSchema.parse(JSON.parse(readFileSync(manifestPath, 'utf8')));
-    return parsed.map((item) => {
-      if (!item.imagePaths) return item;
-      const resolved = item.imagePaths.map((p) => {
-        const absImg = path.resolve(absDir, p);
-        if (!existsSync(absImg)) {
-          throw new Error(`Не найден файл изображения датасета (${item.id}): ${absImg}`);
-        }
-        return absImg;
-      }) as [string, string, string, string];
-      return { ...item, imagePaths: resolved };
-    });
-  }
-  return [
-    { id: 'sample-warsaw', countryNameRu: 'Польша', lat: 52.2297, lng: 21.0122 },
-    { id: 'sample-tokyo', countryNameRu: 'Япония', lat: 35.6762, lng: 139.6503 },
-    { id: 'sample-milan', countryNameRu: 'Италия', lat: 45.4642, lng: 9.19 },
-  ];
-}
-
-function readFlagValue(argv: readonly string[], flag: string): string | null {
-  const idx = argv.indexOf(flag);
-  if (idx < 0) return null;
-  const val = argv[idx + 1];
-  if (!val || val.startsWith('--')) {
-    throw new Error(`Флаг ${flag} требует непустое значение`);
-  }
-  return val;
-}
-
-export function parseEvalArgs(argv: readonly string[]): {
-  dry: boolean;
-  harness: HarnessId;
-  datasetDir: string | null;
-  repeats: number;
-  outPath: string | null;
-} {
-  const dry = argv.includes('--dry');
-  const rawHarness = readFlagValue(argv, '--harness') ?? 'claude';
-  if (!(HARNESS_IDS as readonly string[]).includes(rawHarness)) {
-    throw new Error(`Неизвестный харнесс "${rawHarness}". Допустимо: ${HARNESS_IDS.join(', ')}`);
-  }
-  const harness = rawHarness as HarnessId;
-  const datasetDir = readFlagValue(argv, '--dataset');
-  const rawRepeats = readFlagValue(argv, '--repeats');
-  let repeats = 3;
-  if (rawRepeats !== null) {
-    const parsed = Number(rawRepeats);
-    if (!Number.isInteger(parsed) || parsed < 1) {
-      throw new Error(`Флаг --repeats требует целое число >= 1, получено: ${rawRepeats}`);
-    }
-    repeats = parsed;
-  }
-  const outPath = readFlagValue(argv, '--out');
-  return { dry, harness, datasetDir, repeats, outPath };
-}
-
-function makeEvalBotSlot(harness: HarnessId, personalityText: string) {
-  const adapter = getHarnessAdapter(harness);
-  return {
-    id: 'eval-bot',
-    name: 'EvalBot',
-    color: 'p-4' as const,
-    harness,
-    model: adapter.defaultModel,
-    effort: 'low' as const,
-    moveLimit: 0,
-    imageSize: 640 as const,
-    budgetSec: 60,
-    personalityPreset: 'neutral' as const,
-    personalityText,
-    difficultyPreset: 'custom' as const,
-    enabled: true,
-  };
-}
-
-async function renderDatasetFrame(
-  raw: Buffer,
-  thumbStore: ReturnType<typeof createThumbStore>,
-  action: 'observe' | 'look',
-  heading: number,
-  size: 256 | 400 | 640,
-): Promise<RenderedBotImage> {
-  const parts = formatImageLabel(action, heading);
-  const jpeg = await annotateStreetViewImage(raw, size, parts);
-  const thumb = await createThumb(jpeg);
-  const thumbId = thumbStore.put(thumb);
-  return {
-    jpeg,
-    thumbId,
-    thumbUrl: `/thumb/${thumbId}`,
-    fullId: thumbId,
-    fullUrl: `/thumb/${thumbId}`,
-    label: parts.fullText,
-  };
-}
-
-function createEvalDatasetImageService(
-  imagePaths: readonly [string, string, string, string],
-  thumbStore: ReturnType<typeof createThumbStore>,
-): BotImageService {
-  const rawBuffers = imagePaths.map((p) => readFileSync(p));
-  const headings = [0, 90, 180, 270] as const;
-  return {
-    prepareStartViews: () => Promise.resolve(),
-    async getObserveViews({ size }): Promise<RenderedBotImage[]> {
-      return Promise.all(
-        headings.map(async (heading, idx) => {
-          const raw = rawBuffers[idx];
-          if (!raw) throw new Error(`Missing raw image buffer at index ${idx}`);
-          return renderDatasetFrame(raw, thumbStore, 'observe', heading, size);
-        }),
-      );
-    },
-    async getLookView({ heading, size }): Promise<RenderedBotImage> {
-      const idx = Math.round(normalizeHeadingDeg(heading) / 90) % 4;
-      const raw = rawBuffers[idx];
-      if (!raw) throw new Error(`Missing raw image buffer at index ${idx}`);
-      return renderDatasetFrame(raw, thumbStore, 'look', heading, size);
-    },
-    getMoveView: () => Promise.reject(new Error('Move отключён в eval-bots')),
-    clearRound: () => undefined,
-  };
-}
-
-async function runSingleEvalSample(opts: {
-  root: string;
-  harness: HarnessId;
-  dry: boolean;
-  sample: EvalSampleItem;
-  personalityText: string;
-}): Promise<number | null> {
-  if (!opts.dry && !opts.sample.imagePaths) {
+function selectSamples(args: EvalArgs): EvalSampleItem[] {
+  const samples = loadDataset(args.datasetDir);
+  if (!args.dry && samples.some((s) => !s.imagePaths)) {
     throw new Error(
-      `Образец "${opts.sample.id}" не содержит imagePaths: для live-оценки нужен --dataset с реальными 4 панорамными JPEG.`,
+      'Live runs need --dataset with a manifest.json where every spot has 4 imagePaths (use --dry for the built-in fake spots).',
     );
   }
-  const events: EngineEvent[] = [];
-  const sub = path.join(opts.root, `${opts.sample.id}-${Math.random().toString(16).slice(2, 8)}`);
-  mkdirSync(sub, { recursive: true });
-  const loc = createFakeLocationService();
-  const thumbStore = createThumbStore();
-  const img = opts.sample.imagePaths
-    ? createEvalDatasetImageService(opts.sample.imagePaths, thumbStore)
-    : createBotImageService({
-        serverKey: '',
-        fakeMode: true,
-        quotaManager: createQuotaManager(path.join(sub, 'quota.json')),
-        thumbStore,
-      });
-  const runner = createBotRunner({
-    runDir: path.join(sub, 'run'),
-    childrenFile: path.join(sub, 'children.json'),
-    fakeMode: opts.dry,
-    fakeStepDelayMs: 10,
-    imageService: img,
-    locationService: loc,
-    dispatch: (e) => events.push(e),
-  });
-  const target: RoundTarget = {
-    panoId: `eval-${opts.sample.id}`,
-    lat: opts.sample.lat,
-    lng: opts.sample.lng,
-    countryId: 'EVAL',
-    countryNameRu: opts.sample.countryNameRu,
-    region: 'world',
-    fakeSceneIndex: 0,
-  };
-  await img.prepareStartViews(target);
-  try {
-    runner.startRoundBots({
-      matchId: `eval-${opts.sample.id}`,
-      gen: 1,
-      roundNumber: 1,
-      target,
-      moveEnabled: false,
-      bots: [makeEvalBotSlot(opts.harness, opts.personalityText)],
-    });
-    runner.releaseObserve(`eval-${opts.sample.id}`, 1, 1);
-    const deadline = Date.now() + 65_000;
-    while (Date.now() < deadline && !events.some((e) => e.type === 'bot_finished')) {
-      await Bun.sleep(25);
-    }
-    const guess = pickFinalGuess(events);
-    if (!guess) return null;
-    return haversineDistanceKm(
-      { lat: opts.sample.lat, lng: opts.sample.lng },
-      { lat: guess.lat, lng: guess.lng },
-    );
-  } finally {
-    await runner.close();
-    rmSync(sub, { recursive: true, force: true });
-  }
+  return args.limit === null ? samples : samples.slice(0, args.limit);
 }
 
-async function runArm(opts: {
-  armName: string;
-  root: string;
-  harness: HarnessId;
-  dry: boolean;
-  samples: readonly EvalSampleItem[];
-  repeats: number;
-  personalityText: string;
-}): Promise<EvalArmMetrics> {
-  const distancesKm: number[] = [];
-  for (let rep = 0; rep < opts.repeats; rep += 1) {
-    for (const sample of opts.samples) {
-      const dist = await runSingleEvalSample({
-        root: opts.root,
-        harness: opts.harness,
-        dry: opts.dry,
-        sample,
-        personalityText: opts.personalityText,
-      });
-      if (dist !== null) distancesKm.push(dist);
+/** Runs `jobs` with at most `concurrency` in flight; results keep job order. */
+async function runPool<T>(jobs: readonly (() => Promise<T>)[], concurrency: number): Promise<T[]> {
+  const results: T[] = new Array<T>(jobs.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < jobs.length) {
+      const idx = next;
+      next += 1;
+      const job = jobs[idx];
+      if (job) results[idx] = await job();
     }
-  }
-  const { median, iqr } = computeMedianAndIqr(distancesKm);
-  return {
-    armName: opts.armName,
-    runs: distancesKm.length,
-    medianKm: median,
-    iqrKm: iqr,
-    distancesKm,
   };
+  await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length) }, worker));
+  return results;
 }
 
 async function main(): Promise<void> {
   const args = parseEvalArgs(Bun.argv.slice(2));
-  const samples = loadDataset(args.datasetDir);
-  if (!args.dry && samples.some((s) => !s.imagePaths)) {
-    throw new Error(
-      'Для live-оценки (--dry не указан) передайте --dataset с manifest.json, где каждый образец содержит 4 пути imagePaths.',
-    );
-  }
+  const samples = selectSamples(args);
+  const startedAt = new Date();
+  const runName = args.label ?? startedAt.toISOString().replace(/[:.]/g, '-');
+  const outDir = path.resolve(
+    args.outDir ?? path.join(REPO_ROOT, '.geoaissr-dev', 'evals', runName),
+  );
+  mkdirSync(outDir, { recursive: true });
+  const roundsFile = path.join(outDir, 'rounds.jsonl');
+  writeFileSync(roundsFile, '', 'utf8');
   const root = path.join(tmpdir(), `geo-eval-${Date.now()}`);
   mkdirSync(root, { recursive: true });
+  const jobs: Array<() => Promise<RoundRecord>> = [];
+  for (let repeat = 1; repeat <= args.repeats; repeat += 1) {
+    for (const sample of samples) {
+      jobs.push(async () => {
+        const record = await runEvalRound({ root, settings: args, sample, repeat });
+        appendFileSync(roundsFile, `${JSON.stringify(record)}\n`, 'utf8');
+        const pin =
+          record.errorKm === null ? 'no pin' : `${record.errorKm} km (${record.pinSource})`;
+        console.log(`[${sample.id} #${repeat}] ${record.error ?? pin}`);
+        return record;
+      });
+    }
+  }
   try {
-    const armA = await runArm({
-      armName: 'baseline',
-      root,
+    const records = await runPool(jobs, args.concurrency);
+    const config: RunConfig = {
+      label: args.label,
       harness: args.harness,
-      dry: args.dry,
-      samples,
+      model: records[0]?.model ?? 'unknown',
+      budgetSec: args.budgetSec,
+      moveLimit: args.moveLimit,
+      imageSize: args.imageSize,
+      concurrency: args.concurrency,
       repeats: args.repeats,
-      personalityText: 'Сравнивай знаки, язык вывесок, солнце и климат.',
-    });
-    const armB = await runArm({
-      armName: 'candidate',
-      root,
-      harness: args.harness,
+      spots: samples.length,
       dry: args.dry,
-      samples,
-      repeats: args.repeats,
-      personalityText:
-        'Сначала определи полушарие, сторону движения, шрифт на знаках и архитектуру.',
-    });
-    const reportPath = args.outPath
-      ? path.resolve(args.outPath)
-      : path.resolve(
-          process.cwd(),
-          'docs',
-          'evals',
-          `latest-${args.harness}${args.dry ? '-dry' : ''}.json`,
-        );
-    mkdirSync(path.dirname(reportPath), { recursive: true });
-    writeFileSync(
-      reportPath,
-      `${JSON.stringify({ harness: args.harness, dry: args.dry, samples: samples.length, repeats: args.repeats, baseline: armA, candidate: armB }, null, 2)}\n`,
-      'utf8',
-    );
-    console.log(
-      `eval-bots (${args.harness}, ${args.dry ? 'dry' : 'live'}): baseline median=${armA.medianKm} km (IQR=${armA.iqrKm}), candidate median=${armB.medianKm} km (IQR=${armB.iqrKm})`,
-    );
-    console.log(`Отчёт сохранён: ${reportPath}`);
+      gitCommit: gitCommit(),
+      date: startedAt.toISOString(),
+    };
+    const summary = summarizeRounds(config, records);
+    const summaryPath = path.join(outDir, 'summary.json');
+    writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    let reported = summaryPath;
+    if (args.label !== null) {
+      const resultsDir = path.join(REPO_ROOT, 'docs', 'evals', 'results');
+      mkdirSync(resultsDir, { recursive: true });
+      reported = path.join(resultsDir, `${args.label}.json`);
+      copyFileSync(summaryPath, reported);
+    }
+    console.log(JSON.stringify(summary, null, 2));
+    console.log(`Rounds: ${roundsFile}`);
+    console.log(`Summary: ${reported}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -43,7 +43,7 @@ A single root `package.json` (no workspaces):
 - `bun run doctor` / `bun run doctor --json` — check keys, `cloudflared`, harnesses.
 - `bun run start` — build the client, start the server and tunnel (`--no-tunnel`, `--public-url`, `--port`, `--no-open`).
 - `bun run test:harness` / `bun run test:tunnel` — on-demand live checks (with network/CLI).
-- `bun run eval:bots` — evaluate bot prompts and schemas on local snapshots.
+- `bun run eval:bots` — measure one bot configuration (finish rate, time, error, pin movement) on the licensed panorama dataset; flags and metrics in [docs/evals/README.md](./docs/evals/README.md).
 
 ## Data storage and errors
 
