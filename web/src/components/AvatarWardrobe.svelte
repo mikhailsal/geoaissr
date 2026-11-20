@@ -56,6 +56,9 @@
       );
     })?.id,
   );
+  function closeDialog() {
+    dialog.close();
+  }
   function category(next: (typeof groups)[number]) {
     group = next.name;
     if (next.slots[0]) slot = next.slots[0];
@@ -83,13 +86,8 @@
         showProfile={!!profile}
         showBot={!!botSettings}
       />{/if}
-    <button
-      type="button"
-      class="btn icon"
-      aria-label="Закрыть гардероб"
-      onclick={() => {
-        dialog.close();
-      }}><X size={20} aria-hidden="true" /></button
+    <button type="button" class="btn icon" aria-label="Закрыть гардероб" onclick={closeDialog}
+      ><X size={20} aria-hidden="true" /></button
     >
   </header>
   <div class="studio">
@@ -193,12 +191,8 @@
   </div>
   <footer>
     {#if tab === 'appearance' && error}<span role="alert">{error}</span>{/if}
-    <button
-      type="button"
-      class="btn"
-      onclick={() => {
-        dialog.close();
-      }}>{tab === 'appearance' && !readOnly ? 'Отмена' : 'Закрыть'}</button
+    <button type="button" class="btn" onclick={closeDialog}
+      >{tab === 'appearance' && !readOnly ? 'Отмена' : 'Закрыть'}</button
     >
     {#if tab === 'appearance'}<button
         type="button"
@@ -262,9 +256,6 @@
   h2 span {
     grid-area: 1 / 1;
   }
-  h2 .inactive {
-    visibility: hidden;
-  }
   .icon {
     padding: 0;
     width: var(--control-h);
@@ -297,6 +288,7 @@
     padding: var(--sp-2);
     background: var(--orbit-scrim);
   }
+  h2 .inactive,
   .preview-tools.concealed {
     visibility: hidden;
   }
@@ -400,7 +392,8 @@
     margin-right: auto;
   }
   @media (max-width: 680px) and (orientation: portrait),
-    (max-width: 680px) and (min-height: 431px) {
+    (max-width: 680px) and (min-height: 431px),
+    (max-width: 384px) {
     dialog {
       width: calc(100vw - var(--sp-4));
       max-height: 96dvh;
@@ -412,7 +405,6 @@
     }
     .preview {
       position: relative;
-      min-height: 126px;
       height: clamp(126px, 22dvh, 180px);
       flex-shrink: 0;
       flex-direction: row;
@@ -445,10 +437,20 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
-  @media (orientation: landscape) and (max-height: 430px) {
+  @media (max-width: 384px) and (orientation: landscape) {
+    header {
+      flex-wrap: wrap;
+      padding: var(--sp-1) var(--sp-2);
+    }
+    .studio {
+      height: auto;
+    }
+  }
+  @media (width > 384px) and (orientation: landscape) and (max-height: 430px) {
     dialog[open] {
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+      /* Keep two control heights for the model above its toolbar when the dialog scrolls. */
+      grid-template-rows: auto minmax(calc(3 * var(--control-h) + 2 * var(--sp-1)), 1fr) auto;
       height: 96dvh;
       max-height: 96dvh;
     }
@@ -474,13 +476,14 @@
     .preview-tools,
     .sections {
       flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+    .preview-tools {
+      justify-content: safe center;
     }
     .preview-tools .btn {
       padding-inline: var(--sp-1);
       font-size: var(--text-xs);
-    }
-    .sections {
-      overflow-x: auto;
     }
     .sections button {
       flex-shrink: 0;

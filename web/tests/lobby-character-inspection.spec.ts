@@ -139,6 +139,8 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
       [390, 740],
       [844, 390],
       [420, 320],
+      [385, 240],
+      [320, 240],
     ] as const) {
       await page.setViewportSize({ width, height });
       await expect.poll(async () => (await previewFrame(canvas)).aspectError).toBeLessThan(0.02);
@@ -157,7 +159,15 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
         const settled = await previewFrame(canvas);
         expect(settled.silhouette / before.silhouette).toBeCloseTo(1, 1);
       }
+      await dialog.getByRole('button', { name: 'Вернуть сохранённый образ' }).click();
     }
+    await dialog.getByRole('button', { name: 'Настройки ИИ', exact: true }).click();
+    await dialog.getByText('Дополнительно', { exact: true }).click();
+    const imageSize = dialog.getByLabel('Размер снимка');
+    await imageSize.scrollIntoViewIfNeeded();
+    await expect(imageSize).toBeInViewport({ ratio: 1 });
+    await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await expect(dialog).toBeHidden();
   } finally {
     await server.stop();
   }
