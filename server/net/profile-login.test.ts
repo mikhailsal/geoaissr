@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { defaultAvatar } from '../../shared/avatar.ts';
 import { formatProfileToken } from '../../shared/profile-token.ts';
 import type { ServerMessage } from '../../shared/protocol.ts';
 import type { StoredProfile } from '../../shared/storage-schemas.ts';
@@ -10,6 +11,8 @@ import { createInitialRoomState } from '../engine/types.ts';
 import { createThumbStore } from '../http/thumbs.ts';
 import { createServerLogger } from '../log.ts';
 import { ProfileStore } from '../storage/profiles.ts';
+import { createSettingsWriter } from '../cli/settings-writer.ts';
+import { loadSettings } from '../storage/settings.ts';
 import { buildQuotaSummaryForRoom, createQuotaManager } from '../storage/quota.ts';
 import { startAppHttpServer } from './http.ts';
 import { createAuthRateLimiter } from './rate-limit.ts';
@@ -21,6 +24,7 @@ function fixture(dir: string, suffix = '') {
     logger.registerSecrets([], tokens);
   });
   const quota = createQuotaManager(path.join(dir, 'quota.json'));
+  const settingsFile = path.join(dir, 'settings.json');
   const initial = createInitialRoomState({
     matchId: 'profile-test',
     fakeMode: true,
@@ -41,7 +45,7 @@ function fixture(dir: string, suffix = '') {
     onStateChange: () => {
       coordinator.broadcastState();
     },
-    saveSettings: async () => {},
+    saveSettings: createSettingsWriter(settingsFile, loadSettings(settingsFile).status),
     confirmQuotaReset: () => Promise.resolve(initial.quotaSummary),
     prepareRound: () =>
       Promise.resolve({
@@ -122,10 +126,12 @@ async function connect(url: string) {
     },
     next: async <T extends ServerMessage['type']>(
       type: T,
+      unexpected?: ServerMessage['type'],
     ): Promise<Extract<ServerMessage, { type: T }>> => {
       const deadline = Date.now() + 2000;
       for (;;) {
         const value = queue.shift();
+        if (value && value.type === unexpected) throw new Error('unexpected ' + unexpected);
         if (value?.type === type) return value as Extract<ServerMessage, { type: T }>;
         if (value) continue;
         if (closed !== null || Date.now() > deadline) throw new Error('missing ' + type);
@@ -228,8 +234,26 @@ test('registry roles survive room restart and fresh invitation tokens', async ()
   try {
     const host = await register(f, 'host');
     const guest = await register(f);
+    async function expectHostRequired(request: Record<string, unknown>) {
+      const ownerEntry = await connect(f.url);
+      ownerEntry.send({ ...request, expectedRole: 'host' });
+      expect((await ownerEntry.next('profile_login_error')).code).toBe('host_required');
+      expect(await ownerEntry.closeCode()).toBe(4003);
+    }
+    const guestLogin = { type: 'profile_login', profileToken: guest.owner.profile.profileToken };
+    await expectHostRequired(guestLogin);
+    await expectHostRequired({
+      type: 'hello',
+      token: 'host',
+      playerId: guest.owner.playerId,
+      playerSecret: guest.owner.playerSecret,
+    });
+    guest.c.send({ type: 'avatar_gesture', seq: 2, gesture: 'wave' });
+    expect((await guest.c.next('ack', 'hello_error')).result).toBe('ok');
     f.stop();
     f = fixture(dir, '-fresh');
+    await expectHostRequired(guestLogin);
+    expect(f.shell.getState().playerOrder).toHaveLength(0);
     for (const [owner, role, expected] of [
       [host.owner, 'host', 'ok'],
       [guest.owner, 'guest', 'forbidden'],
@@ -587,6 +611,202 @@ test('idle sockets retain the shared unauthenticated timeout', async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 }, 8000);
+
+test('a customized avatar reaches peers, survives legacy profile edits and restores after restart', async () => {
+  const dir = temporary();
+  let f = fixture(dir);
+  try {
+    const peer = await register(f, 'host');
+    const player = await register(f);
+    const avatar = { ...defaultAvatar(false), gear: 'beanie', color: '#abcdef' };
+    player.c.send({ type: 'update_profile', seq: 2, nick: 'Orbit', color: 'p-3', avatar });
+    expect((await player.c.next('ack')).result).toBe('ok');
+    const view = f.shell.getView(peer.owner.playerId);
+    expect(view.players.find((p) => p.id === player.owner.playerId)?.avatar).toEqual(avatar);
+    const preferences = { effects: false, music: true, effectsVolume: 0.4, musicVolume: 0.6 };
+    player.c.send({ type: 'update_audio_preferences', seq: 3, preferences });
+    expect((await player.c.next('ack')).result).toBe('ok');
+    player.c.send({ type: 'update_profile', seq: 4, nick: 'Nova', color: 'p-3' });
+    expect((await player.c.next('ack')).result).toBe('ok');
+    f.stop();
+    f = fixture(dir);
+    const restored = await login(f, player.owner.profile);
+    expect(restored.ok.profile.avatar).toEqual(avatar);
+    expect(restored.ok.profile.audioPreferences).toEqual(preferences);
+    expect((await restored.c.next('state')).view.players[0]?.avatar).toEqual(avatar);
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('guest spin reaches a peer once and only the host can edit or animate a bot', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  try {
+    const host = await register(f, 'host');
+    const guest = await register(f);
+    host.c.send({ type: 'add_bot', seq: 2 });
+    expect((await host.c.next('ack')).result).toBe('ok');
+    const bot = f.shell.getView(guest.owner.playerId).bots[0];
+    if (!bot) throw new Error('missing bot');
+    const avatar = { ...defaultAvatar(true), outfit: 'hoodie' };
+    for (const [actor, result] of [
+      [guest, 'forbidden'],
+      [host, 'ok'],
+    ] as const) {
+      actor.c.send({ type: 'update_bot', seq: 3, botId: bot.id, patch: { avatar } });
+      expect((await actor.c.next('ack')).result).toBe(result);
+      actor.c.send({ type: 'avatar_gesture', seq: 4, botId: bot.id, gesture: 'wave' });
+      expect((await actor.c.next('ack')).result).toBe(result);
+    }
+    expect(f.shell.getView(guest.owner.playerId).bots[0]?.avatar).toEqual(avatar);
+    expect(await guest.c.next('avatar_gesture')).toMatchObject({
+      participantId: bot.id,
+      gesture: 'wave',
+    });
+    const spin = { type: 'avatar_gesture', seq: 5, gesture: 'spin' };
+    guest.c.send(spin);
+    expect(await host.c.next('avatar_gesture')).toMatchObject({
+      participantId: guest.owner.playerId,
+      gesture: 'spin',
+    });
+    expect((await guest.c.next('ack')).result).toBe('ok');
+    guest.c.send(spin);
+    expect((await guest.c.next('ack')).result).toBe('ok');
+    expect(f.shell.getState().players[guest.owner.playerId]).not.toHaveProperty('gesture');
+    f.shell.getState().phase = 'FINAL';
+    guest.c.send({ ...spin, seq: 6 });
+    expect((await guest.c.next('ack')).result).toBe('invalid');
+    host.c.send({ type: 'ping', clientNow: 0 });
+    expect((await host.c.next('pong', 'avatar_gesture')).clientNow).toBe(0);
+    expect(loadSettings(path.join(dir, 'settings.json')).value.bots[0]?.avatar).toEqual(avatar);
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A successful wardrobe acknowledgement promises an atomic settings write and a published look.
+test('bot wardrobe rejects failed and newer-version writes without publishing the draft', async () => {
+  for (const failure of ['unwritable', 'newer_version'] as const) {
+    const dir = temporary();
+    const file = path.join(dir, 'settings.json');
+    if (failure === 'newer_version') writeFileSync(file, '{"version":999}');
+    const f = fixture(dir);
+    try {
+      const host = await register(f, 'host');
+      const guest = await register(f);
+      host.c.send({ type: 'add_bot', seq: 2 });
+      expect((await host.c.next('ack')).result).toBe('ok');
+      const before = f.shell.getView(guest.owner.playerId).bots[0];
+      if (!before) throw new Error('missing bot');
+      const original = readFileSync(file, 'utf8');
+      if (failure === 'unwritable') {
+        rmSync(file);
+        mkdirSync(file);
+      }
+      const avatar = { ...defaultAvatar(true), outfit: 'hoodie' };
+      const edit = { type: 'update_bot', seq: 3, botId: before.id, patch: { avatar } };
+      host.c.send(edit);
+      host.c.send(edit);
+      expect((await host.c.next('ack')).result).toBe('invalid');
+      expect((await host.c.next('ack')).result).toBe('invalid');
+      expect(f.shell.getView(guest.owner.playerId).bots[0]).toEqual(before);
+      if (failure === 'newer_version') {
+        expect(readFileSync(file, 'utf8')).toBe(original);
+        continue;
+      }
+      rmSync(file, { recursive: true });
+      writeFileSync(file, original);
+      host.c.send({ type: 'update_lobby', seq: 4, patch: { rounds: 3 } });
+      host.c.send(edit);
+      expect((await host.c.next('ack')).result).toBe('ok');
+      expect((await host.c.next('ack')).result).toBe('invalid');
+      host.c.send({ ...edit, seq: 5 });
+      host.c.send({ type: 'update_bot', seq: 6, botId: before.id, patch: { name: 'Пилот' } });
+      expect(await host.c.next('ack')).toMatchObject({ seq: 5, result: 'ok' });
+      expect(loadSettings(file).value.bots[0]?.avatar).toEqual(avatar);
+      expect(await host.c.next('ack')).toMatchObject({ seq: 6, result: 'ok' });
+      expect(loadSettings(file).value).toMatchObject({
+        rounds: 3,
+        bots: [{ name: 'Пилот', avatar }],
+      });
+      expect(f.shell.getView(guest.owner.playerId).bots[0]?.avatar).toEqual(avatar);
+    } finally {
+      f.stop();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+// Value: protects=shared angles and per-lineup cleanup; fails_when=players diverge or removed angles replay; why_new=one sender misses both; seam=none; no_claim=local sockets do not model tunnel latency.
+test('a guest can drag a lobby participant, release immediately, and then boost a spin', async () => {
+  const dir = temporary();
+  const f = fixture(dir);
+  try {
+    const host = await register(f, 'host');
+    const guest = await register(f);
+    const participantId = host.owner.playerId;
+    for (const [i, yaw] of [0.52, -2.42].entries()) {
+      guest.c.send({ type: 'avatar_turn', seq: i + 2, participantId, yaw });
+      expect(await host.c.next('avatar_turn')).toMatchObject({ participantId, yaw });
+      expect(await guest.c.next('avatar_turn')).toMatchObject({ participantId, yaw });
+      expect((await guest.c.next('ack')).result).toBe('ok');
+    }
+    const late = await register(f);
+    expect(await late.c.next('avatar_turn')).toMatchObject({ participantId, yaw: -2.42 });
+    host.c.send({ type: 'avatar_turn', seq: 2, participantId, yaw: 1 });
+    late.c.send({ type: 'avatar_turn', seq: 2, participantId, yaw: -1 });
+    const streams = await Promise.all(
+      [host, guest, late].map(async ({ c }) => [
+        (await c.next('avatar_turn')).yaw,
+        (await c.next('avatar_turn')).yaw,
+      ]),
+    );
+    expect(streams[0]?.toSorted()).toEqual([-1, 1]);
+    expect(streams[1]).toEqual(streams[0]);
+    expect(streams[2]).toEqual(streams[0]);
+    host.c.send({ type: 'ping', clientNow: 9 });
+    await host.c.next('pong');
+    for (const seq of [4, 5]) {
+      guest.c.send({ type: 'avatar_spin', seq, participantId });
+      expect(await host.c.next('avatar_gesture')).toMatchObject({ participantId, gesture: 'spin' });
+      expect((await guest.c.next('ack')).result).toBe('ok');
+    }
+    guest.c.send({ type: 'avatar_turn', seq: 6, participantId: 'missing', yaw: 0 });
+    expect((await guest.c.next('ack')).result).toBe('invalid');
+    host.c.send({ type: 'add_bot', seq: 3 });
+    expect((await host.c.next('ack')).result).toBe('ok');
+    const botId = f.shell.getState().settings.bots[0]?.id;
+    if (!botId) throw new Error('Missing test bot');
+    guest.c.send({ type: 'avatar_turn', seq: 7, participantId: botId, yaw: 2 });
+    expect((await guest.c.next('ack')).result).toBe('ok');
+    host.c.send({ type: 'remove_bot', botId, seq: 4 });
+    expect((await host.c.next('ack')).result).toBe('ok');
+    const afterRemoval = await register(f);
+    expect((await afterRemoval.c.next('avatar_turn')).participantId).toBe(participantId);
+    afterRemoval.c.send({ type: 'ping', clientNow: 10 });
+    await afterRemoval.c.next('pong', 'avatar_turn');
+    host.c.send({ type: 'start_match', seq: 5 });
+    expect((await host.c.next('ack')).result).toBe('ok');
+    guest.c.send({ type: 'avatar_turn', seq: 8, participantId, yaw: 0 });
+    expect((await guest.c.next('ack')).result).toBe('invalid');
+    for (const [seq, type] of [
+      [6, 'end_match'],
+      [7, 'play_again'],
+    ] as const) {
+      host.c.send({ type, seq });
+      expect((await host.c.next('ack')).result).toBe('ok');
+    }
+    const nextLobby = await register(f);
+    nextLobby.c.send({ type: 'ping', clientNow: 11 });
+    await nextLobby.c.next('pong', 'avatar_turn');
+  } finally {
+    f.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 // Protects owner-bound durable audio settings and code restoration on a fresh server origin.
 test('host and guest audio preferences save before ack and restore through permanent codes', async () => {

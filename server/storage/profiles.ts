@@ -2,6 +2,7 @@ import type { AudioPreferences } from '../../shared/audio-preferences.ts';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, chmodSync } from 'node:fs';
 import path from 'node:path';
+import { starterAvatar } from '../../shared/avatar-starter.ts';
 import { profilesFileSchema, type StoredProfile } from '../../shared/storage-schemas.ts';
 import { normalizeProfileToken } from '../../shared/profile-token.ts';
 
@@ -20,7 +21,9 @@ export class ProfileStore {
       const document = profilesFileSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
       this.registerSecrets(document.profiles.map((p) => p.profileToken));
       chmodSync(file, 0o600);
-      this.publish(document.profiles);
+      this.publish(
+        document.profiles.map((p) => ({ ...p, avatar: p.avatar ?? starterAvatar(p.profileId) })),
+      );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
       this.available = false;
@@ -80,17 +83,29 @@ export class ProfileStore {
       profileToken = randomBytes(16).toString('hex');
     } while (this.byToken.has(profileToken));
     this.registerSecrets([profileToken]);
-    const profile = { ...input, profileId, profileToken };
+    const profile = {
+      ...input,
+      profileId,
+      profileToken,
+      avatar: input.avatar ?? starterAvatar(profileId),
+    };
     this.commit([...this.byId.values(), profile]);
     const saved = this.byId.get(profileId);
     if (!saved) throw new Error(PROFILE_STORE_ERROR);
     return saved;
   }
-  edit(profileId: string, nick: string, color: StoredProfile['color']): StoredProfile {
+  edit(
+    profileId: string,
+    nick: string,
+    color: StoredProfile['color'],
+    avatar?: StoredProfile['avatar'],
+  ): StoredProfile {
     const current = this.byId.get(profileId);
     if (!current) throw new Error(PROFILE_STORE_ERROR);
     this.commit(
-      [...this.byId.values()].map((p) => (p.profileId === profileId ? { ...p, nick, color } : p)),
+      [...this.byId.values()].map((p) =>
+        p.profileId === profileId ? { ...p, nick, color, avatar: avatar ?? p.avatar } : p,
+      ),
     );
     const saved = this.byId.get(profileId);
     if (!saved) throw new Error(PROFILE_STORE_ERROR);

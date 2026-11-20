@@ -10,6 +10,7 @@
   import { RU } from '../i18n/ru';
 
   interface Props {
+    role: 'host' | 'guest' | null;
     authState: 'checking' | 'error' | 'ready';
     authError: AuthScreenError | null;
     fakeMode: boolean;
@@ -21,11 +22,14 @@
     onLogout: () => void;
     onRetry: () => void;
     onLogin: (code: string) => void;
+    canRegister: boolean;
+    onNewProfile: () => void;
     onCodeLogin: () => void;
     onJoin: (nick: string, color: ParticipantColorId) => void;
   }
 
   let {
+    role,
     authState,
     authError,
     fakeMode,
@@ -37,6 +41,8 @@
     onLogout,
     onRetry,
     onLogin,
+    canRegister,
+    onNewProfile,
     onCodeLogin,
     onJoin,
   }: Props = $props();
@@ -48,6 +54,7 @@
   let nickInput = $state<HTMLInputElement | null>(null);
 
   let profileCode = $state('');
+  let hasRegistrationDraft = $state(false);
   const loginMode = $derived(
     authState === 'error' && authError !== 'replaced_tab' && !sessionActive,
   );
@@ -73,6 +80,8 @@
 
   const authErrorText = $derived.by(() => {
     switch (authError) {
+      case 'host_required':
+        return 'Для входа хоста нужен код профиля хоста или личная ссылка из терминала сервера.';
       case 'no_token':
         return '';
       case 'invalid_profile_token':
@@ -119,7 +128,11 @@
       <h2>Войти по коду</h2>
       {#if savedProfile}<button class="btn" onclick={onLogout}>Выйти</button>{/if}
       {#if joinError}<p role="alert">{joinError.message}</p>{/if}
-      <p>Введите сохранённый код профиля. Для нового профиля нужна ссылка приглашения.</p>
+      <p>
+        {canRegister && authError !== 'invalid_token'
+          ? 'Введите код, если хотите вернуться в свой профиль.'
+          : 'Введите сохранённый код профиля. Для нового профиля откройте ссылку приглашения.'}
+      </p>
       {#if authErrorText}<p class="err-msg" role="alert">{authErrorText}</p>{/if}
       <form
         class="join-form"
@@ -145,6 +158,21 @@
           >Войти по коду</button
         >
       </form>
+      {#if canRegister && authError !== 'invalid_token'}
+        <button
+          type="button"
+          class="btn"
+          onclick={() => {
+            if (!hasRegistrationDraft) {
+              nick = '';
+              selectedColor = 'p-1';
+            }
+            profileCode = '';
+            hasRegistrationDraft = false;
+            onNewProfile();
+          }}>{hasRegistrationDraft ? 'Назад к созданию профиля' : 'Создать новый профиль'}</button
+        >
+      {/if}
       {#if authError === 'unreachable' || authError === 'profile_store_unavailable' || authError === 'room_full'}<button
           class="btn"
           onclick={onRetry}>Попробовать снова</button
@@ -161,6 +189,15 @@
         onAction={onRetry}
       />
     {:else}
+      {#if role === 'host'}
+        <h2>Вход для хоста</h2>
+        <p>
+          Для создания профиля хоста достаточно имени. Код нужен только для входа в существующий
+          профиль.
+        </p>
+      {:else}
+        <h2>Создать новый профиль</h2>
+      {/if}
       {#if lobbySummary}
         <p class="context-line">
           Людей: {lobbySummary.humans.length} · ИИ: {lobbySummary.aiCount} ·
@@ -178,7 +215,6 @@
         <p class="notice" role="status">{RU.join.reconnectHint(disconnectedNames)}</p>
       {/if}
 
-      <button class="btn" onclick={onCodeLogin}>Войти по коду</button>
       <form class="join-form" onsubmit={handleSubmit}>
         <label class="field">
           <span class="lbl">{RU.join.nameLabel}</span>
@@ -232,6 +268,13 @@
           {/if}
         </button>
       </form>
+      <button
+        class="btn"
+        onclick={() => {
+          hasRegistrationDraft = true;
+          onCodeLogin();
+        }}>Войти по коду</button
+      >
     {/if}
   </section>
 </main>

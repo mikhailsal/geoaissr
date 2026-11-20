@@ -36,6 +36,10 @@
     "web/src/lib/audio-profile-sync.ts",
     "web/src/lib/audio-preferences.ts",
     "web/src/lib/profile.ts",
+    "web/src/lib/orbit/spin.ts",
+    "web/src/lib/orbit/pose.ts",
+    "web/src/lib/orbit/framing.ts",
+    "web/src/lib/orbit/types.ts",
     "web/src/lib/map-load-reports.ts",
     "web/src/lib/maps-loader.ts",
     "web/src/lib/fake-canvas.ts"

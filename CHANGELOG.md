@@ -2,6 +2,22 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.3.0] - 2026-11-20
+
+### Added
+
+- Dress human players and bots with the Orbit Studio wardrobe. The lobby shows up to six animated characters per page. Open a character to inspect their outfit, or edit your own appearance, color and profile details. Hosts can also change bot appearance and AI settings in the same window.
+- Wave, laugh and send other gestures to the room. Click an avatar to spin it, click again to accelerate, or drag to set its angle. Players on another page can follow a gesture notification to its performer.
+
+### Changed
+
+- Put roster and game settings in dialogs that close with Escape or a click outside. The stage waits for the first avatar frames and offers a keyboard-accessible way to enter if rendering stalls.
+- Keep the guest's current session connected when their code is entered on the owner page. Confirm a bot wardrobe save after the host's settings reach disk, and clear stored angles between lineups and games.
+
+### Fixed
+
+- Keep the robot preview at a consistent size when switching between wardrobe and AI settings on small screens, with a scrollable layout for short windows. Keep the keyboard focus ring visible inside off-page gesture notifications.
+
 ## [0.2.3] - 2026-11-19
 
 ### Fixed

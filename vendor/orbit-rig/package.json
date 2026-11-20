@@ -1,0 +1,19 @@
+{
+  "name": "@geoaissr/orbit-rig",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./model.d.ts",
+      "import": "./model.js"
+    },
+    "./raster": {
+      "types": "./raster.d.ts",
+      "import": "./raster.js"
+    }
+  },
+  "peerDependencies": {
+    "three": "0.160.x"
+  }
+}

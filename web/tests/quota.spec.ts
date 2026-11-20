@@ -1,3 +1,4 @@
+import { openLobbyDialog } from './lobby-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { assertNoHorizontalOverflow, startIsolatedFakeServer } from './helpers';
 
@@ -7,7 +8,7 @@ async function join(page: Page, url: string, name: string) {
   if (await continueButton.isVisible()) await continueButton.click();
   await page.getByLabel('Ваше имя').fill(name);
   await page.getByRole('button', { name: 'Войти', exact: true }).click();
-  await expect(page.getByText(/ИГРОКИ/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Участники', exact: true })).toBeVisible();
 }
 
 // Value: protects=host and guest see configured quota values and zero/nonzero details; fails_when=metrics use defaults, hide from guests, or show a forecast for zero; no_claim=does not verify server arithmetic independently
@@ -22,6 +23,7 @@ test('host and guest see configured quota metrics', async ({ browser }) => {
     await join(host, server.hostUrl, 'Host');
     await join(guest, server.guestUrl, 'Guest');
     for (const page of [host, guest]) {
+      await openLobbyDialog(page, 'Настройки партии');
       const staticButton = page.getByRole('button', { name: 'Static Street View' });
       await expect(staticButton).toHaveText('0%');
       await expect(staticButton).toHaveAccessibleName('Static Street View: 0%');
@@ -59,6 +61,7 @@ test('quota details support keyboard and touch dismissal', async ({ browser }) =
   const page = await context.newPage();
   try {
     await join(page, server.hostUrl, 'Host');
+    await openLobbyDialog(page, 'Настройки партии');
     const button = page.getByRole('button', { name: 'Static Street View' });
     const details = page.getByRole('region', { name: 'Static Street View' });
     await button.focus();
@@ -72,7 +75,7 @@ test('quota details support keyboard and touch dismissal', async ({ browser }) =
     await expect(details).toHaveCount(0);
     await button.tap();
     await expect(details).toBeVisible();
-    await page.getByRole('heading', { name: 'ПАРТИЯ' }).tap();
+    await page.getByRole('heading', { name: 'Настройки партии', exact: true }).tap();
     await expect(details).toHaveCount(0);
     await assertNoHorizontalOverflow(page);
   } finally {

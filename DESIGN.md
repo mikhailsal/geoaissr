@@ -4,7 +4,7 @@ The image: **asphalt and road markings**. The panorama and the map fill the whol
 
 ## Principles
 
-1. **No glass, glow, gradients or decorative icons.** Text never sits directly on the panorama or the map — on a dark panel (`--asphalt-800` or `--asphalt-900`). The idle desktop round minimap is translucent; it becomes opaque on hover, focus, or expansion. Results maps and mobile open maps remain opaque. Emoji in the interface are forbidden.
+1. **No glass or decorative icons.** Glow and gradients are reserved for the Orbit lobby stage, where illuminated podiums mark each character’s place. Text never sits directly on the panorama or the map — on a dark panel (`--asphalt-800` or `--asphalt-900`). The idle desktop round minimap is translucent; it becomes opaque on hover, focus, or expansion. Results maps and mobile open maps remain opaque. Emoji in the interface are forbidden.
 2. **Colors only from `web/src/styles/tokens.css`.** In `.svelte` files the literals `#rrggbb`, `#rgb`, `rgb(...)`, `rgba(...)` are forbidden (checked by the `scripts/check-colors.ts` script in `bun run check`).
 3. **Light map, dark interface.** The answer map (Google Maps JS API) is always in the standard light scheme with point-of-interest icons hidden and English labels (`language=en`). The panels do not clash with daytime panoramas.
 4. **One yellow accent (`--paint`).** Used only for the screen's primary action, the timer ring and the focus ring (`2px solid var(--paint)` with a `2px` offset).
@@ -68,8 +68,9 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 
 ## Avatars, markers and states
 
-- **Human:** a round avatar with the first letter of the nickname.
-- **AI:** a square avatar with a `6px` corner radius and a chip icon next to the letter.
+- The lobby stage and wardrobe display the participant’s dressed Orbit character. Select the nameplate to inspect the character.
+- Compact human avatars show the first letter of the nickname inside a circle.
+- Compact AI avatars show the initial and a chip icon inside a square with a `6px` corner radius.
 - **Recent wins:** a meaningful trophy icon and a 14px count beside participant avatars, with an accessible name describing the six-hour window. Profile editing sits beside the viewer's identity; final-result administration stays below the standings.
 - **Map markers:** compact circular participant buttons with a dark outline (light when selected); the target is a circular yellow star button. Fake maps use compact circular participants and a star target.
 - **Icons:** only `@lucide/svelte`, and only meaningful ones.

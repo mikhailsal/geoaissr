@@ -4,6 +4,7 @@
   import { RU } from '../i18n/ru';
   import SoundControls from './SoundControls.svelte';
   import { audioPlayer } from '../lib/audio-settings.svelte';
+  import { dismissOnBackdrop } from '../lib/dialog';
 
   interface Props {
     fakeMode: boolean;
@@ -30,6 +31,9 @@
   let copied = $state(false);
   let menuOpen = $state(false);
   let confirmEnd = $state(false);
+  let inviteButton = $state<HTMLButtonElement>();
+  let inviteDialog = $state<HTMLDialogElement>();
+  let inviteField = $state<HTMLInputElement>();
 
   const canEndEarly = $derived(viewerIsHost && phase !== 'LOBBY' && phase !== 'FINAL');
   const playedBeforeEnd = $derived(
@@ -46,6 +50,8 @@
       }, 2_000);
     } catch {
       copied = false;
+      inviteDialog?.showModal();
+      inviteField?.select();
     }
     menuOpen = false;
   }
@@ -61,14 +67,20 @@
 <svelte:window onkeydown={handleWindowKeyDown} />
 
 <div class="host-menu-bar">
-  <SoundControls />
+  <SoundControls modal={phase === 'LOBBY'} />
   {#if onOpenProfile}<button type="button" class="btn" onclick={onOpenProfile}>Профиль</button>{/if}
   {#if fakeMode}
     <span class="fake-pill">{RU.fakeModeBadge}</span>
   {/if}
 
   {#if inviteUrl}
-    <button type="button" class="btn copy-btn" onclick={() => void copyInvite()}>
+    <button
+      type="button"
+      class="btn copy-btn"
+      title={RU.lobby.copyInvite}
+      bind:this={inviteButton}
+      onclick={() => void copyInvite()}
+    >
       {#if copied}
         <Check size={16} />
         <span>{RU.lobby.copiedInvite}</span>
@@ -77,6 +89,43 @@
         <span>{RU.lobby.copyInvite}</span>
       {/if}
     </button>
+    <dialog
+      use:dismissOnBackdrop
+      class="panel invite-dialog"
+      bind:this={inviteDialog}
+      aria-labelledby="invite-title"
+      aria-describedby="invite-help"
+      onkeydown={(event) => {
+        event.stopPropagation();
+      }}
+      onclose={() => {
+        inviteButton?.focus();
+      }}
+    >
+      <h2 id="invite-title">Приглашение в игру</h2>
+      <p id="invite-help">
+        Не удалось скопировать приглашение. Скопируйте ссылку вручную и отправьте её гостям.
+      </p>
+      <label>
+        Ссылка для гостей
+        <input
+          class="field-input"
+          bind:this={inviteField}
+          readonly
+          value={inviteUrl}
+          onclick={(event) => {
+            event.currentTarget.select();
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        class="btn"
+        onclick={() => {
+          inviteDialog?.close();
+        }}>Закрыть</button
+      >
+    </dialog>
   {/if}
 
   {#if viewerIsHost && canEndEarly}
@@ -169,6 +218,28 @@
 
   .copy-btn {
     padding: 0 0.85rem;
+  }
+
+  .invite-dialog {
+    width: min(26rem, calc(100% - 2rem));
+    padding: var(--sp-4);
+    color: var(--paper);
+  }
+
+  .invite-dialog::backdrop {
+    background-color: var(--asphalt-900);
+    opacity: 0.8;
+  }
+
+  .invite-dialog h2 {
+    font-size: 1.25rem;
+    margin: 0;
+  }
+
+  .invite-dialog label {
+    display: grid;
+    gap: var(--sp-1);
+    margin-bottom: var(--sp-3);
   }
 
   .menu-trigger {

@@ -6,6 +6,7 @@
     reconnectAttempt: number;
     backOnline: boolean;
     hostConnected: boolean;
+    hostHasJoined: boolean;
     tunnelChanged: boolean;
     onRetryConnect?: () => void;
   }
@@ -15,6 +16,7 @@
     reconnectAttempt,
     backOnline,
     hostConnected,
+    hostHasJoined,
     tunnelChanged,
     onRetryConnect,
   }: Props = $props();
@@ -44,7 +46,9 @@
     if (!hostConnected) {
       return {
         tone: 'warn' as const,
-        text: RU.connection.hostOffline,
+        text: hostHasJoined
+          ? RU.connection.hostOffline
+          : 'Хост ещё не вошёл в игру. Ждём его подключения.',
         retry: false,
       };
     }

@@ -27,6 +27,7 @@ export default tseslint.config(
   {
     ignores: [
       'node_modules/**',
+      'vendor/orbit-rig/*.js',
       'web/dist/**',
       'dist/**',
       '.geoaissr-dev/**',

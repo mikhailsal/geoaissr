@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { starterAvatar } from '../../shared/avatar-starter.ts';
 import { normalizeProfileToken, formatProfileToken } from '../../shared/profile-token.ts';
 import { clientMessageSchema } from '../../shared/protocol.ts';
 import { profilesFileSchema } from '../../shared/storage-schemas.ts';
@@ -159,6 +160,24 @@ test('authentication schemas reject oversized or forged login messages and dupli
         .success,
     ).toBe(false);
   expect(profilesFileSchema.safeParse({ version: 2, profiles: [] }).success).toBe(false);
+});
+
+test('legacy profiles receive their stable starter and new profiles persist it on enrollment', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'profiles-avatar-'));
+  try {
+    const file = path.join(dir, 'profiles.json');
+    const legacy = { profileId: 'A', profileToken: token, nick: 'A', color: 'p-1', role: 'guest' };
+    writeFileSync(file, JSON.stringify({ version: 1, profiles: [legacy] }));
+    const store = new ProfileStore(file);
+    expect(store.getByToken(token)?.avatar).toEqual(starterAvatar('A'));
+    const fresh = store.create({ profileId: 'B', nick: 'B', color: 'p-2', role: 'guest' });
+    expect(fresh.avatar).toEqual(starterAvatar('B'));
+    expect(fresh.avatar).not.toEqual(store.getByToken(token)?.avatar);
+    const saved = profilesFileSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+    expect(saved.profiles.map((p) => p.avatar)).toEqual([starterAvatar('A'), starterAvatar('B')]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // Protects private preference durability and legacy profile compatibility; no external services.

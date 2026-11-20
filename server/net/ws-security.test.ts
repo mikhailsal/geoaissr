@@ -128,7 +128,7 @@ function createSecServer(
   let coordRef: ReturnType<typeof createWsRoomCoordinator> | null = null;
   const shell = createRoomShell(initial, {
     onStateChange: () => coordRef?.broadcastState(),
-    saveSettings: () => Promise.resolve(),
+    saveSettings: () => {},
     confirmQuotaReset: () => Promise.resolve(initial.quotaSummary),
     prepareRound: () =>
       Promise.resolve({
@@ -600,7 +600,7 @@ test('RoomShell confirm_quota_reset keeps the gate closed when persisting fails'
     {
       onStateChange: (s) => snapshots.push(s.quotaSummary.needsResetConfirm),
       onAsyncError: (ctx) => asyncErrors.push(ctx),
-      saveSettings: () => Promise.resolve(),
+      saveSettings: () => {},
       confirmQuotaReset: () => Promise.reject(new Error('disk full')),
       recalculateQuotaSummary: () => ({
         ...baseSummary,

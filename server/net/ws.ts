@@ -7,6 +7,7 @@ import {
   handleProfileEdit,
 } from './ws-auth.ts';
 import type { ServerWebSocket } from 'bun';
+import { pruneAvatarTurns, relayAvatarGesture } from './avatar-gestures.ts';
 import { handleAudioPreferences } from './ws-audio.ts';
 import {
   MAX_WS_MESSAGE_BYTES,
@@ -29,8 +30,17 @@ import {
   scheduleUnauthClose,
 } from './ws-actions.ts';
 
+type DurableAction = 'update_audio_preferences' | 'bot_appearance';
+type AuthenticatedAction = Exclude<
+  ClientMessage,
+  { type: 'ping' | 'join' | 'hello' | 'profile_login' }
+>;
+
 export interface WsClientData {
   connId: string;
+  lastGestureAt?: number;
+  spinBudgetAt?: number;
+  turnBudgetAt?: number;
   ip: string;
   authenticated: boolean;
   role: 'host' | 'guest' | null;
@@ -39,10 +49,8 @@ export interface WsClientData {
   authTimer: ReturnType<typeof setTimeout> | null;
   /** When hello succeeded; used to evict sockets that authenticate but never join. */
   authenticatedAt: number | null;
-  lastSeqByPlayer: Map<
-    string,
-    { seq: number; result: AckResult; commandType?: 'update_audio_preferences' }
-  >;
+  pendingAction?: Promise<void>;
+  lastSeqByPlayer: Map<string, { seq: number; result: AckResult; commandType?: DurableAction }>;
   countedPanoRounds: Set<number>;
 }
 
@@ -66,6 +74,7 @@ export interface CoordCtx {
   botRunner?: BotRunner;
   rateLimiter: RateLimiter;
   sockets: Set<ServerWebSocket<WsClientData>>;
+  avatarTurns: Map<string, number>;
   inflightVisionChecks: Set<string>;
   countedPanoKeys: Set<string>;
   countedMapKindsByConnId: Map<string, Set<string>>;
@@ -80,31 +89,46 @@ function acknowledgeAction(
   playerId: string,
   seq: number,
   result: AckResult,
+  commandType?: 'bot_appearance',
 ): void {
   const previous = ws.data.lastSeqByPlayer.get(playerId);
-  if (!previous || seq >= previous.seq) ws.data.lastSeqByPlayer.set(playerId, { seq, result });
+  if (!previous || seq >= previous.seq)
+    ws.data.lastSeqByPlayer.set(playerId, { seq, result, commandType });
   sendJson(ws, { type: 'ack', serverNow: Date.now(), seq, result });
+}
+
+function replayAction(
+  ws: ServerWebSocket<WsClientData>,
+  playerId: string,
+  seq: number,
+  durableType: DurableAction | undefined,
+): boolean {
+  const prev = ws.data.lastSeqByPlayer.get(playerId);
+  if (!prev || seq > prev.seq) return false;
+  const result =
+    durableType && (prev.seq !== seq || prev.commandType !== durableType) ? 'invalid' : prev.result;
+  sendJson(ws, { type: 'ack', serverNow: Date.now(), seq, result });
+  return true;
 }
 
 function handleAuthenticatedAction(
   ctx: CoordCtx,
   ws: ServerWebSocket<WsClientData>,
-  msg: ClientMessage,
+  msg: AuthenticatedAction,
   playerId: string,
-): void {
-  if (msg.type === 'ping') {
-    sendJson(ws, { type: 'pong', serverNow: Date.now(), clientNow: msg.clientNow });
-    return;
-  }
-  if (msg.type === 'join' || msg.type === 'hello' || msg.type === 'profile_login') return;
+): void | Promise<void> {
+  const botAppearance = msg.type === 'update_bot' && msg.patch.avatar !== undefined;
+  const durableType = botAppearance
+    ? 'bot_appearance'
+    : msg.type === 'update_audio_preferences'
+      ? msg.type
+      : undefined;
+  if (replayAction(ws, playerId, msg.seq, durableType)) return;
 
-  const prev = ws.data.lastSeqByPlayer.get(playerId);
-  if (prev && msg.seq <= prev.seq) {
-    const sameAudioCommand = msg.seq === prev.seq && prev.commandType === msg.type;
-    const result =
-      msg.type === 'update_audio_preferences' && !sameAudioCommand ? 'invalid' : prev.result;
-    sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result });
-    return;
+  if (botAppearance) {
+    return ctx.shell.saveBotAppearance({ ...msg, playerId }).then((result) => {
+      acknowledgeAction(ws, playerId, msg.seq, result, 'bot_appearance');
+    });
   }
 
   if (msg.type === 'check_bot_vision') {
@@ -135,8 +159,7 @@ function handleAuthenticatedAction(
       playerId,
       msg,
     });
-    ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result: res });
-    sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result: res });
+    acknowledgeAction(ws, playerId, msg.seq, res);
     return;
   }
 
@@ -151,8 +174,7 @@ function handleAuthenticatedAction(
       playerId,
       msg,
     });
-    ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result: res });
-    sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result: res });
+    acknowledgeAction(ws, playerId, msg.seq, res);
     return;
   }
 
@@ -162,9 +184,31 @@ function handleAuthenticatedAction(
     return;
   }
 
-  const mappedResult = dispatchEngineClientMessage(ctx.shell, playerId, msg);
-  ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result: mappedResult });
-  sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result: mappedResult });
+  const mappedResult =
+    msg.type === 'avatar_gesture' || msg.type === 'avatar_spin' || msg.type === 'avatar_turn'
+      ? relayAvatarGesture(ctx, ws, playerId, msg)
+      : dispatchEngineClientMessage(ctx.shell, playerId, msg);
+  acknowledgeAction(ws, playerId, msg.seq, mappedResult);
+}
+
+// Preserve socket order while a wardrobe save waits for earlier writes, including duplicate requests.
+function dispatchOrderedAction(
+  ctx: CoordCtx,
+  ws: ServerWebSocket<WsClientData>,
+  msg: AuthenticatedAction,
+  playerId: string,
+): void {
+  const run = () => {
+    if (ws.data.playerId === playerId && ctx.sockets.has(ws))
+      return handleAuthenticatedAction(ctx, ws, msg, playerId);
+  };
+  const pending = ws.data.pendingAction ? ws.data.pendingAction.then(run) : run();
+  if (!pending) return;
+  ws.data.pendingAction = pending;
+  const clear = () => {
+    if (ws.data.pendingAction === pending) delete ws.data.pendingAction;
+  };
+  void pending.then(clear, clear);
 }
 
 function routeRawWsMessage(
@@ -203,7 +247,7 @@ function routeRawWsMessage(
 
   const msg = parsed.data;
   if (msg.type === 'profile_login') {
-    handleProfileLogin(ctx, ws, msg.profileToken);
+    handleProfileLogin(ctx, ws, msg);
     return;
   }
   if (msg.type === 'hello') {
@@ -222,7 +266,7 @@ function routeRawWsMessage(
     handleJoinMsg(ctx, ws, msg);
     return;
   }
-  if (ws.data.playerId) handleAuthenticatedAction(ctx, ws, msg, ws.data.playerId);
+  if (ws.data.playerId) dispatchOrderedAction(ctx, ws, msg, ws.data.playerId);
 }
 
 export function createWsRoomCoordinator(opts: {
@@ -243,8 +287,10 @@ export function createWsRoomCoordinator(opts: {
   const countedMapKindsByConnId = new Map<string, Set<string>>();
   const countedMapCountsByMatchPlayer = new Map<string, number>();
   const versionRef = { value: 1 };
+  const avatarTurns = new Map<string, number>();
 
   const broadcastState = (): void => {
+    pruneAvatarTurns(avatarTurns, opts.shell.getState());
     versionRef.value += 1;
     const now = Date.now();
     for (const s of sockets) {
@@ -262,6 +308,7 @@ export function createWsRoomCoordinator(opts: {
     ...opts,
     profiles: opts.profiles,
     sockets,
+    avatarTurns,
     inflightVisionChecks,
     countedPanoKeys,
     countedMapKindsByConnId,

@@ -1,14 +1,16 @@
+import { profileStorageScope } from './profile';
+
 const TOKEN_PARAM_RE = /(?:^|&)t=([^&]+)/;
 export interface SavedPlayerCreds {
   playerId: string;
   playerSecret: string;
 }
 function playerStorageKey(): string {
-  return `geoaissr:player:${window.location.origin}`;
+  return `geoaissr:player:${profileStorageScope()}`;
 }
 
 function tabTokenStorageKey(): string {
-  return `geoaissr:tok:${window.location.origin}`;
+  return `geoaissr:tok:${profileStorageScope()}`;
 }
 
 export function loadSavedCreds(): SavedPlayerCreds | null {

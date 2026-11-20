@@ -8,6 +8,7 @@ import {
   type EffortLevel,
   type PersonalityPreset,
 } from '../../shared/bot-tools.ts';
+import { avatarAppearanceSchema, type AvatarAppearance } from '../../shared/avatar.ts';
 import { pickFirstFreeColor } from '../../shared/colors.ts';
 import { MAX_BOTS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { BotSlotConfig, HarnessId, SettingsFile } from '../../shared/storage-schemas.ts';
@@ -240,7 +241,11 @@ export function handleUpdateBot(
   const idx = state.settings.bots.findIndex((b) => b.id === botId);
   const existingBot = idx >= 0 ? state.settings.bots[idx] : undefined;
   if (!existingBot) return { state, effects: [], ack: 'invalid' };
+  const appearance =
+    patch.avatar === undefined ? undefined : avatarAppearanceSchema.safeParse(patch.avatar);
+  if (appearance && !appearance.success) return { state, effects: [], ack: 'invalid' };
   const updated = mergeBotSlotPatch(existingBot, patch, state.availableHarnesses);
+  if (appearance) updated.avatar = appearance.data;
   const bots = state.settings.bots.map((b, i) => (i === idx ? updated : b));
   const { settings, notice } = enforceMinRoundWithBots({ ...state.settings, bots });
   return {
@@ -337,12 +342,19 @@ export function handlePlayerJoinOrReclaim(
         kind: 'join';
         profileId?: string;
         playerId: string;
+        avatar?: AvatarAppearance;
         secret: string;
         name: string;
         color: BotSlotConfig['color'];
         isHost: boolean;
       }
-    | { kind: 'reconnect'; playerId: string; isHost: boolean; profileId?: string }
+    | {
+        kind: 'reconnect';
+        playerId: string;
+        isHost: boolean;
+        profileId?: string;
+        avatar?: AvatarAppearance;
+      }
     | {
         kind: 'reclaim';
         profileId?: string;
@@ -358,6 +370,7 @@ export function handlePlayerJoinOrReclaim(
     const updated: PlayerState = {
       ...existing,
       profileId: existing.profileId ?? opts.profileId,
+      avatar: opts.avatar ?? existing.avatar,
       connected: true,
       isHost: existing.isHost || opts.isHost,
     };
@@ -377,6 +390,7 @@ export function handlePlayerJoinOrReclaim(
     secret: opts.secret,
     name: opts.name,
     color: opts.color,
+    avatar: opts.avatar,
     isHost: opts.isHost,
     connected: true,
     isSpectator,

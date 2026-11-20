@@ -1,0 +1,936 @@
+{
+  "outfit": {
+    "bomber": {
+      "label": "Бомбер Орбита",
+      "color": "#ec813f"
+    },
+    "varsity": {
+      "label": "Клубная куртка",
+      "color": "#a64f68"
+    },
+    "wrap": {
+      "label": "Кимоно",
+      "color": "#af6891"
+    },
+    "spacesuit": {
+      "label": "Скафандр",
+      "color": "#e5dfc9"
+    },
+    "denim": {
+      "label": "Джинсовка",
+      "color": "#6696ae"
+    },
+    "hoodie": {
+      "label": "Худи",
+      "color": "#ac90e9"
+    },
+    "sailor": {
+      "label": "Матроска",
+      "color": "#e8dec8"
+    },
+    "moto": {
+      "label": "Косуха",
+      "color": "#4e4858"
+    },
+    "poncho": {
+      "label": "Пончо",
+      "color": "#c9844d"
+    },
+    "knight": {
+      "label": "Латы",
+      "color": "#8599b3"
+    },
+    "vest": {
+      "label": "Полевой жилет",
+      "color": "#77ad97"
+    },
+    "tech": {
+      "label": "Технокуртка",
+      "color": "#444859"
+    },
+    "breton": {
+      "label": "Тельняшка",
+      "color": "#374f75"
+    },
+    "blazer": {
+      "label": "Пиджак",
+      "color": "#586481"
+    },
+    "overalls": {
+      "label": "Комбинезон",
+      "color": "#628e9a"
+    },
+    "track": {
+      "label": "Олимпийка",
+      "color": "#48a1ad"
+    },
+    "cableknit": {
+      "label": "Вязаный свитер",
+      "color": "#91a887"
+    },
+    "crop": {
+      "label": "Кроп-топ",
+      "color": "#cc91b4"
+    },
+    "slicker": {
+      "label": "Дождевик",
+      "color": "#e3ac45"
+    },
+    "folk": {
+      "label": "Вышитая туника",
+      "color": "#a05f74"
+    },
+    "turtleneck": {
+      "label": "Водолазка",
+      "color": "#b67a53"
+    },
+    "jersey": {
+      "label": "Джерси",
+      "color": "#6795bb"
+    },
+    "blouse": {
+      "label": "Блузка с бантом",
+      "color": "#d1a5c3"
+    },
+    "ranger": {
+      "label": "Куртка рейнджера",
+      "color": "#949666"
+    },
+    "chef": {
+      "label": "Китель повара",
+      "color": "#e2ddd0"
+    },
+    "bowling": {
+      "label": "Рубашка для боулинга",
+      "color": "#d58879"
+    },
+    "mage": {
+      "label": "Мантия мага",
+      "color": "#786299"
+    },
+    "western": {
+      "label": "Куртка с бахромой",
+      "color": "#ad7956"
+    }
+  },
+  "bottom": {
+    "cargo": {
+      "label": "Карго",
+      "color": "#414351"
+    },
+    "jeans": {
+      "label": "Джинсы с отворотами",
+      "color": "#557998"
+    },
+    "slacks": {
+      "label": "Классические брюки",
+      "color": "#695d70"
+    },
+    "joggers": {
+      "label": "Джоггеры",
+      "color": "#9b91aa"
+    },
+    "trackpants": {
+      "label": "Спортивные брюки",
+      "color": "#2b6871"
+    },
+    "wideleg": {
+      "label": "Широкие джинсы",
+      "color": "#678ea8"
+    },
+    "flares": {
+      "label": "Клёш",
+      "color": "#94658d"
+    },
+    "shorts": {
+      "label": "Шорты чинос",
+      "color": "#c09a69"
+    },
+    "boardshorts": {
+      "label": "Пляжные шорты",
+      "color": "#599aaa"
+    },
+    "pleats": {
+      "label": "Юбка в складку",
+      "color": "#b59bc8"
+    },
+    "kilt": {
+      "label": "Килт",
+      "color": "#637f72"
+    },
+    "leggings": {
+      "label": "Легинсы",
+      "color": "#705987"
+    },
+    "bloomers": {
+      "label": "Шаровары",
+      "color": "#aa7f90"
+    },
+    "wrapskirt": {
+      "label": "Юбка с запахом",
+      "color": "#b86968"
+    },
+    "riding": {
+      "label": "Бриджи",
+      "color": "#aa8e6a"
+    }
+  },
+  "shoe": {
+    "sneakers": {
+      "label": "Кроссовки",
+      "color": "#464554"
+    },
+    "hightops": {
+      "label": "Высокие кеды",
+      "color": "#b55c62"
+    },
+    "combat": {
+      "label": "Берцы",
+      "color": "#51494f"
+    },
+    "loafers": {
+      "label": "Лоферы",
+      "color": "#80574b"
+    },
+    "runners": {
+      "label": "Беговые кроссовки",
+      "color": "#72979b"
+    },
+    "sandals": {
+      "label": "Сандалии",
+      "color": "#ab7954"
+    },
+    "skate": {
+      "label": "Скейтерские кеды",
+      "color": "#747396"
+    },
+    "maryjanes": {
+      "label": "Туфли с ремешком",
+      "color": "#985d78"
+    },
+    "chelsea": {
+      "label": "Челси",
+      "color": "#6e5454"
+    },
+    "moonboots": {
+      "label": "Луноходы",
+      "color": "#aaaec8"
+    },
+    "moccasins": {
+      "label": "Мокасины",
+      "color": "#b18560"
+    },
+    "ballet": {
+      "label": "Балетки",
+      "color": "#c48d97"
+    },
+    "westernboots": {
+      "label": "Ковбойские сапоги",
+      "color": "#92684f"
+    }
+  },
+  "hair": {
+    "swoop": {
+      "label": "Набок",
+      "color": "#483029"
+    },
+    "afro": {
+      "label": "Афро",
+      "color": "#483029"
+    },
+    "bob": {
+      "label": "Каре",
+      "color": "#39303e"
+    },
+    "mohawk": {
+      "label": "Ирокез",
+      "color": "#ab6987"
+    },
+    "buns": {
+      "label": "Два пучка",
+      "color": "#aa7291"
+    },
+    "pixie": {
+      "label": "Пикси",
+      "color": "#aa7291"
+    },
+    "locs": {
+      "label": "Дреды",
+      "color": "#69503c"
+    },
+    "curls": {
+      "label": "Мягкие кудри",
+      "color": "#734832"
+    },
+    "ponytail": {
+      "label": "Высокий хвост",
+      "color": "#734832"
+    },
+    "cornrows": {
+      "label": "Брейды",
+      "color": "#483029"
+    },
+    "longwaves": {
+      "label": "Длинные волны",
+      "color": "#a46353"
+    },
+    "curtains": {
+      "label": "Шторки",
+      "color": "#d3a467"
+    },
+    "buzz": {
+      "label": "Ёжик",
+      "color": "#39303e"
+    },
+    "twinbraids": {
+      "label": "Две косы",
+      "color": "#a16b46"
+    },
+    "hime": {
+      "label": "Химэ",
+      "color": "#39303e"
+    },
+    "puffs": {
+      "label": "Пышные пучки",
+      "color": "#4f3430"
+    },
+    "quiff": {
+      "label": "Квифф",
+      "color": "#583c36"
+    },
+    "crown": {
+      "label": "Коса-венок",
+      "color": "#c99563"
+    },
+    "shag": {
+      "label": "Шегги",
+      "color": "#aa7766"
+    },
+    "bubble": {
+      "label": "Хвост с перехватами",
+      "color": "#a18cb2"
+    },
+    "crop": {
+      "label": "Кроп",
+      "color": "#724c40"
+    },
+    "coils": {
+      "label": "Мелкие кудри",
+      "color": "#624235"
+    },
+    "pigtails": {
+      "label": "Два хвоста",
+      "color": "#a86556"
+    },
+    "mullet": {
+      "label": "Маллет",
+      "color": "#b09372"
+    },
+    "topknot": {
+      "label": "Верхний узел",
+      "color": "#635050"
+    },
+    "victory": {
+      "label": "Ретро-валики",
+      "color": "#b36e59"
+    },
+    "chignon": {
+      "label": "Низкий пучок",
+      "color": "#6f4736"
+    },
+    "bald": {
+      "label": "Без волос",
+      "color": "#483029"
+    }
+  },
+  "dye": {
+    "solid": {
+      "label": "Один цвет"
+    },
+    "tips": {
+      "label": "Цветные кончики"
+    },
+    "split": {
+      "label": "Две половины"
+    },
+    "streaks": {
+      "label": "Мелирование"
+    }
+  },
+  "eyeStyle": {
+    "classic": {
+      "label": "Классические"
+    },
+    "round": {
+      "label": "Круглые"
+    },
+    "almond": {
+      "label": "Миндалевидные"
+    },
+    "sleepy": {
+      "label": "Прикрытые"
+    },
+    "wide": {
+      "label": "Распахнутые"
+    },
+    "winged": {
+      "label": "Стрелки"
+    },
+    "doe": {
+      "label": "Оленьи"
+    },
+    "cat": {
+      "label": "Кошачьи"
+    },
+    "star": {
+      "label": "Звёздные"
+    },
+    "bead": {
+      "label": "Бусинки"
+    }
+  },
+  "brow": {
+    "classic": {
+      "label": "Классические"
+    },
+    "straight": {
+      "label": "Прямые"
+    },
+    "bold": {
+      "label": "Густые"
+    },
+    "arched": {
+      "label": "Высокая дуга"
+    },
+    "rounded": {
+      "label": "Округлые"
+    },
+    "slim": {
+      "label": "Тонкие"
+    },
+    "angular": {
+      "label": "С изломом"
+    },
+    "notched": {
+      "label": "С прорезью"
+    },
+    "feathered": {
+      "label": "Пушистые"
+    },
+    "none": {
+      "label": "Без бровей"
+    }
+  },
+  "nose": {
+    "button": {
+      "label": "Кнопка"
+    },
+    "small": {
+      "label": "Маленький"
+    },
+    "broad": {
+      "label": "Широкий"
+    },
+    "upturn": {
+      "label": "Курносый"
+    },
+    "straight": {
+      "label": "Прямой"
+    },
+    "aquiline": {
+      "label": "С горбинкой"
+    },
+    "round": {
+      "label": "Округлый"
+    },
+    "softsquare": {
+      "label": "Квадратный"
+    }
+  },
+  "freckles": {
+    "none": {
+      "label": "Без веснушек"
+    },
+    "light": {
+      "label": "Лёгкие"
+    },
+    "bridge": {
+      "label": "На переносице"
+    },
+    "cluster": {
+      "label": "На щеках"
+    },
+    "dense": {
+      "label": "Густые"
+    },
+    "pearl": {
+      "label": "Жемчужные"
+    }
+  },
+  "mark": {
+    "none": {
+      "label": "Без рисунка"
+    },
+    "spot": {
+      "label": "Мушка"
+    },
+    "bandage": {
+      "label": "Пластырь"
+    },
+    "star": {
+      "label": "Звёздочки"
+    },
+    "heart": {
+      "label": "Сердечко"
+    },
+    "bolt": {
+      "label": "Молния"
+    },
+    "scar": {
+      "label": "Шрам"
+    },
+    "stripes": {
+      "label": "Полосы"
+    },
+    "constellation": {
+      "label": "Созвездие"
+    },
+    "whiskers": {
+      "label": "Усики"
+    },
+    "moon": {
+      "label": "Полумесяц"
+    },
+    "daisy": {
+      "label": "Ромашка"
+    },
+    "birthmark": {
+      "label": "Родинка"
+    },
+    "patches": {
+      "label": "Пятнышки"
+    }
+  },
+  "mustache": {
+    "none": {
+      "label": "Без усов",
+      "color": "#483029"
+    },
+    "chevron": {
+      "label": "Шеврон",
+      "color": "#734832"
+    },
+    "handlebar": {
+      "label": "Закрученные",
+      "color": "#483029"
+    },
+    "pencil": {
+      "label": "Карандаш",
+      "color": "#39303e"
+    },
+    "horseshoe": {
+      "label": "Подкова",
+      "color": "#483029"
+    },
+    "walrus": {
+      "label": "Морж",
+      "color": "#786865"
+    },
+    "dali": {
+      "label": "Дали",
+      "color": "#39303e"
+    },
+    "english": {
+      "label": "Английские",
+      "color": "#483029"
+    },
+    "imperial": {
+      "label": "Императорские",
+      "color": "#734832"
+    },
+    "lampshade": {
+      "label": "Абажур",
+      "color": "#483029"
+    },
+    "brush": {
+      "label": "Кисточка",
+      "color": "#734832"
+    },
+    "hungarian": {
+      "label": "Венгерские",
+      "color": "#483029"
+    },
+    "whiskers": {
+      "label": "Длинные усы",
+      "color": "#39303e"
+    },
+    "pyramid": {
+      "label": "Пирамида",
+      "color": "#734832"
+    },
+    "natural": {
+      "label": "Естественные",
+      "color": "#483029"
+    }
+  },
+  "beard": {
+    "none": {
+      "label": "Без бороды",
+      "color": "#483029"
+    },
+    "stubble": {
+      "label": "Щетина",
+      "color": "#39303e"
+    },
+    "boxed": {
+      "label": "Короткая",
+      "color": "#483029"
+    },
+    "goatee": {
+      "label": "Эспаньолка",
+      "color": "#734832"
+    },
+    "chinstrap": {
+      "label": "По контуру",
+      "color": "#39303e"
+    },
+    "full": {
+      "label": "Полная",
+      "color": "#483029"
+    },
+    "ducktail": {
+      "label": "Утиный хвост",
+      "color": "#734832"
+    },
+    "chops": {
+      "label": "Бакенбарды",
+      "color": "#483029"
+    },
+    "anchor": {
+      "label": "Якорь",
+      "color": "#39303e"
+    },
+    "soulpatch": {
+      "label": "Островок",
+      "color": "#483029"
+    },
+    "garibaldi": {
+      "label": "Гарибальди",
+      "color": "#734832"
+    },
+    "forked": {
+      "label": "Раздвоенная",
+      "color": "#483029"
+    },
+    "braided": {
+      "label": "Косичка",
+      "color": "#734832"
+    },
+    "balbo": {
+      "label": "Бальбо",
+      "color": "#39303e"
+    },
+    "sage": {
+      "label": "Борода мудреца",
+      "color": "#bab4b2"
+    },
+    "curly": {
+      "label": "Кудрявая",
+      "color": "#483029"
+    }
+  },
+  "gear": {
+    "none": {
+      "label": "Без убора"
+    },
+    "headset": {
+      "label": "Наушники",
+      "color": "#e88a48"
+    },
+    "beanie": {
+      "label": "Вязаная шапка",
+      "color": "#a494ce"
+    },
+    "club-cap": {
+      "label": "Кепка",
+      "color": "#526fa0"
+    },
+    "bucket": {
+      "label": "Панама",
+      "color": "#86ab98"
+    },
+    "trail-hat": {
+      "label": "Походная шляпа",
+      "color": "#ad7750"
+    },
+    "beret": {
+      "label": "Берет",
+      "color": "#af577e"
+    },
+    "spellhat": {
+      "label": "Колпак мага",
+      "color": "#765898"
+    },
+    "toadstool": {
+      "label": "Грибная шляпка",
+      "color": "#cf6854"
+    },
+    "crown": {
+      "label": "Корона",
+      "color": "#d9ad5f"
+    },
+    "cat-ears": {
+      "label": "Кошачьи ушки",
+      "color": "#7e6792"
+    },
+    "sun-visor": {
+      "label": "Козырёк",
+      "color": "#dd8871"
+    },
+    "flowers": {
+      "label": "Венок",
+      "color": "#cda0d0"
+    },
+    "halo": {
+      "label": "Нимб",
+      "color": "#f1cd76"
+    },
+    "aviator-cap": {
+      "label": "Шлем пилота",
+      "color": "#976851"
+    },
+    "silk-bow": {
+      "label": "Шёлковый бант",
+      "color": "#c86e85"
+    },
+    "horns": {
+      "label": "Рожки",
+      "color": "#a06d9b"
+    }
+  },
+  "eyewear": {
+    "none": {
+      "label": "Без очков"
+    },
+    "shades": {
+      "label": "Солнцезащитные",
+      "color": "#444859"
+    },
+    "round": {
+      "label": "Круглые",
+      "color": "#bb9969"
+    },
+    "square": {
+      "label": "Квадратные",
+      "color": "#655166"
+    },
+    "cat-eye": {
+      "label": "Кошачьи",
+      "color": "#aa647d"
+    },
+    "aviators": {
+      "label": "Авиаторы",
+      "color": "#c5a671"
+    },
+    "star-glasses": {
+      "label": "Звёзды",
+      "color": "#d5ae64"
+    },
+    "heart-glasses": {
+      "label": "Сердечки",
+      "color": "#cd758e"
+    },
+    "wrap-visor": {
+      "label": "Визор",
+      "color": "#83bcca"
+    },
+    "eye-patch": {
+      "label": "Повязка",
+      "color": "#544453"
+    },
+    "monocle": {
+      "label": "Монокль",
+      "color": "#c8a76e"
+    },
+    "goggles": {
+      "label": "Защитные",
+      "color": "#9d7258"
+    },
+    "cinema": {
+      "label": "Киноочки",
+      "color": "#ede4d6"
+    }
+  },
+  "earrings": {
+    "none": {
+      "label": "Без серёг",
+      "color": "#ada6b1"
+    },
+    "studs": {
+      "label": "Гвоздики",
+      "color": "#64bcb6"
+    },
+    "hoops": {
+      "label": "Кольца",
+      "color": "#dcb96d"
+    },
+    "star-drops": {
+      "label": "Звёздочки",
+      "color": "#eaaa5b"
+    },
+    "pearl-drops": {
+      "label": "Жемчужины",
+      "color": "#e1c9dc"
+    },
+    "bolts": {
+      "label": "Молнии",
+      "color": "#dba64c"
+    },
+    "tassels": {
+      "label": "Кисточки",
+      "color": "#a878ba"
+    },
+    "cuffs": {
+      "label": "Каффы",
+      "color": "#bac6d1"
+    },
+    "crescents": {
+      "label": "Полумесяцы",
+      "color": "#bc9fd9"
+    }
+  },
+  "neckwear": {
+    "none": {
+      "label": "Без украшения",
+      "color": "#ada6b1"
+    },
+    "bandana": {
+      "label": "Бандана",
+      "color": "#c77768"
+    },
+    "scarf": {
+      "label": "Шарф",
+      "color": "#839bcb"
+    },
+    "bow-tie": {
+      "label": "Бабочка",
+      "color": "#aa6f9a"
+    },
+    "tie": {
+      "label": "Галстук",
+      "color": "#688eb0"
+    },
+    "tags": {
+      "label": "Жетоны",
+      "color": "#a2b3bf"
+    },
+    "crystal": {
+      "label": "Кристалл",
+      "color": "#88b5c4"
+    },
+    "beads": {
+      "label": "Бусы",
+      "color": "#c9919e"
+    },
+    "compass": {
+      "label": "Компас",
+      "color": "#c4a26b"
+    }
+  },
+  "skin": {
+    "#fbe0cf": {
+      "label": "Фарфор",
+      "color": "#fbe0cf"
+    },
+    "#f3d1c0": {
+      "label": "Розовый фарфор",
+      "color": "#f3d1c0"
+    },
+    "#f5c4a1": {
+      "label": "Персик",
+      "color": "#f5c4a1"
+    },
+    "#e4bc91": {
+      "label": "Песочный",
+      "color": "#e4bc91"
+    },
+    "#e5ac80": {
+      "label": "Медовый",
+      "color": "#e5ac80"
+    },
+    "#ce9064": {
+      "label": "Золотистый",
+      "color": "#ce9064"
+    },
+    "#b37752": {
+      "label": "Карамель",
+      "color": "#b37752"
+    },
+    "#a76b4c": {
+      "label": "Сиена",
+      "color": "#a76b4c"
+    },
+    "#935f45": {
+      "label": "Каштан",
+      "color": "#935f45"
+    },
+    "#805742": {
+      "label": "Орех",
+      "color": "#805742"
+    },
+    "#704632": {
+      "label": "Умбра",
+      "color": "#704632"
+    },
+    "#4b3028": {
+      "label": "Эспрессо",
+      "color": "#4b3028"
+    }
+  },
+  "faceShape": {
+    "classic": {
+      "label": "Классическая"
+    },
+    "round": {
+      "label": "Круглая"
+    },
+    "oval": {
+      "label": "Овальная"
+    },
+    "square": {
+      "label": "Квадратная"
+    },
+    "heart": {
+      "label": "Сердце"
+    },
+    "diamond": {
+      "label": "Ромб"
+    },
+    "long": {
+      "label": "Продолговатая"
+    }
+  },
+  "build": {
+    "classic": {
+      "label": "Классическое"
+    },
+    "petite": {
+      "label": "Миниатюрное"
+    },
+    "tall": {
+      "label": "Высокое"
+    },
+    "broad": {
+      "label": "Широкое"
+    },
+    "slender": {
+      "label": "Стройное"
+    },
+    "compact": {
+      "label": "Коренастое"
+    },
+    "chibi": {
+      "label": "Чиби"
+    }
+  }
+}

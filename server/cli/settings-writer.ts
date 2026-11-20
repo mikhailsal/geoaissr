@@ -23,12 +23,10 @@ export function writeResetSettings(
   }
 }
 
-export function writeNormalSettings(
-  file: string,
-  settings: SettingsFile,
-  status: LoadOutcome<SettingsFile>['status'],
-): Promise<void> {
-  return Promise.resolve().then(() => {
-    persistSettingsSafe(file, settings, status);
-  });
+/** Durable room edits must report refusal when a newer settings file is protected. */
+export function createSettingsWriter(file: string, status: LoadOutcome<SettingsFile>['status']) {
+  return (settings: SettingsFile, strict = false): undefined => {
+    if (strict) saveSettings(file, settings, status);
+    else persistSettingsSafe(file, settings, status);
+  };
 }

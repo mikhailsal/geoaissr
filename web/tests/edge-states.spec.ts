@@ -1,3 +1,4 @@
+import { expectLobbyPlayers } from './lobby-navigation';
 import { expect, test } from '@playwright/test';
 import {
   assertNoHorizontalOverflow,
@@ -45,7 +46,7 @@ test('mobile viewport, reconnect banner, and early end match work cleanly', asyn
 
     await page.getByLabel('Ваше имя').fill('Саша');
     await page.getByRole('button', { name: 'Войти', exact: true }).click();
-    await expect(page.getByText(/ИГРОКИ 1 из 8/)).toBeVisible();
+    await expectLobbyPlayers(page, 1);
     await assertNoHorizontalOverflow(page);
 
     await ctx.setOffline(true);

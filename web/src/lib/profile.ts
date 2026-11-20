@@ -11,8 +11,16 @@ export interface SavedUserProfile {
 let temporaryId: string | null = null;
 let memoryProfile: SavedUserProfile | null = null;
 let memoryOrigin: string | null = null;
+export function isOwnerEntry(): boolean {
+  return new URLSearchParams(window.location.search).get('entry') === 'owner';
+}
+/** Keep a remote owner's profile and seat independent of guest sign-in on the same origin. */
+export function profileStorageScope(): string {
+  const origin = window.location.origin;
+  return isOwnerEntry() ? `${origin}:owner` : origin;
+}
 export function profileStorageKey(): string {
-  return `geoaissr:profile:${window.location.origin}`;
+  return `geoaissr:profile:${profileStorageScope()}`;
 }
 export function logoutStorageKey(): string {
   return `geoaissr:logout:${window.location.origin}`;
@@ -72,9 +80,9 @@ function validProfile(value: unknown): SavedUserProfile | null {
   return { profileId: p.profileId, nick: p.nick.trim(), color };
 }
 export function loadSavedProfile(): SavedUserProfile | null {
-  if (memoryOrigin !== window.location.origin) {
+  if (memoryOrigin !== profileStorageScope()) {
     memoryProfile = null;
-    memoryOrigin = window.location.origin;
+    memoryOrigin = profileStorageScope();
   }
   let raw: string | null;
   try {
@@ -92,7 +100,7 @@ export function loadSavedProfile(): SavedUserProfile | null {
   return memoryProfile;
 }
 export function saveProfile(profile: SavedUserProfile): void {
-  memoryOrigin = window.location.origin;
+  memoryOrigin = profileStorageScope();
   memoryProfile = validProfile(profile);
   if (!memoryProfile) return;
   try {

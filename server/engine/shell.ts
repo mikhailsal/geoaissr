@@ -16,7 +16,7 @@ export interface ShellDeps {
   matchRecords?: MatchRecord[];
   onStateChange?: (state: RoomState, version: number) => void;
   onAsyncError?: (context: string, err: unknown) => void;
-  saveSettings: (settings: SettingsFile) => Promise<void>;
+  saveSettings: (settings: SettingsFile, strict?: boolean) => undefined;
   saveSettingsForReset?: (settings: SettingsFile) => Promise<void>;
   confirmQuotaReset: () => Promise<QuotaSummaryView>;
   recalculateQuotaSummary?: (state: RoomState) => QuotaSummaryView;
@@ -56,6 +56,7 @@ export interface RoomShell {
   getVersion: () => number;
   getView: (viewerId: string) => ClientViewState;
   dispatch: (event: EngineEvent) => AckResult | undefined;
+  saveBotAppearance: (event: Extract<EngineEvent, { type: 'update_bot' }>) => Promise<AckResult>;
   dispose: () => void;
 }
 
@@ -105,7 +106,7 @@ function scheduleDelay(
 
 function runAsyncEffect(ctx: EffectContext, effect: EngineEffect, state: RoomState): void {
   if (effect.type === 'save_settings') {
-    ctx.settingsWrites.save(effect.settings);
+    ctx.settingsWrites.save();
     return;
   }
   if (effect.type === 'persist_bot_wins_reset') {
@@ -318,7 +319,11 @@ function settingsQueue(
   return createSettingsWrites({
     getState,
     save: deps.saveSettings,
-    saveReset: deps.saveSettingsForReset ?? deps.saveSettings,
+    saveReset:
+      deps.saveSettingsForReset ??
+      ((settings) => {
+        deps.saveSettings(settings, true);
+      }),
     dispatch,
     onError: deps.onAsyncError,
     isDisposed,
@@ -373,22 +378,19 @@ export function createRoomShell(
   winsClock.refresh();
   const timers = createTimerRegistry();
 
-  const settingsWrites = settingsQueue(
-    deps,
-    () => state,
-    dispatch,
-    () => disposed,
-  );
+  const getState = () => state;
+  const isDisposed = () => disposed;
+  const settingsWrites = settingsQueue(deps, getState, dispatch, isDisposed);
   const ctx: EffectContext = {
     settingsWrites,
     deps,
     timers,
     nowFn,
-    isDisposed: () => disposed,
+    isDisposed,
     dispatch,
   };
 
-  function dispatch(event: EngineEvent): AckResult | undefined {
+  function dispatch(event: EngineEvent, durable = false): AckResult | undefined {
     if (disposed) return undefined;
     const { prevState, nextState, out, refreshWins } = applyShellEvent(
       state,
@@ -397,6 +399,8 @@ export function createRoomShell(
       nowFn(),
       records,
     );
+    // Persist and publish in the same JS turn, after all older settings writes finish.
+    if (durable && out.ack === 'ok') deps.saveSettings(nextState.settings, true);
     const changed = nextState !== prevState;
     state = nextState;
     if (refreshWins) winsClock.refresh();
@@ -405,7 +409,7 @@ export function createRoomShell(
       clearAllTimers(timers);
     }
     for (const effect of out.effects) {
-      runSyncEffect(ctx, effect, nextState);
+      if (!durable || effect.type !== 'save_settings') runSyncEffect(ctx, effect, nextState);
     }
     if (changed) {
       version += 1;
@@ -415,10 +419,12 @@ export function createRoomShell(
   }
 
   return {
-    getState: () => state,
+    getState,
     getVersion: () => version,
     getView: (viewerId) => projectView(state, viewerId),
     dispatch,
+    saveBotAppearance: (event) =>
+      settingsWrites.enqueue(() => dispatch(event, true) ?? 'invalid').catch(() => 'invalid'),
     dispose: () => {
       disposed = true;
       winsClock.dispose();

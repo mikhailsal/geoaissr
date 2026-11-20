@@ -13,6 +13,7 @@ const MIME_BY_EXT: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.webp': 'image/webp',
   '.woff2': 'font/woff2',
   '.json': 'application/json; charset=utf-8',
   '.ogg': 'audio/ogg',
@@ -114,7 +115,9 @@ function handleHttpFetch(
   if (asset) {
     const cache = asset.filePath.endsWith('index.html')
       ? 'no-store'
-      : 'public, max-age=31536000, immutable';
+      : url.pathname.startsWith('/orbit/') || url.pathname.startsWith('/orbit-stage/')
+        ? 'no-cache'
+        : 'public, max-age=31536000, immutable';
     return new Response(Bun.file(asset.filePath), {
       headers: { 'content-type': asset.mime, 'cache-control': cache },
     });

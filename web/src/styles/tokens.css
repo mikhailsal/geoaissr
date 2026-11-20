@@ -78,3 +78,20 @@
     --dur-fly: 0ms;
   }
 }
+
+/* The Orbit lobby stage uses the workshop's lunar sky and translucent violet controls. */
+:root {
+  --orbit-night: #18132e;
+  --orbit-plate: #26213ce8;
+  --orbit-scrim: #130e2bde;
+  --orbit-hover: #443954;
+  --orbit-edge: #756396;
+  --orbit-ice: #e2d6ff;
+}
+
+:root {
+  --orbit-violet: #b794ff;
+  --orbit-aqua: #5fe5e1;
+  --orbit-platform: #594b72;
+  --orbit-platform-shade: #211c32;
+}

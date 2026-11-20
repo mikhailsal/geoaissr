@@ -1,3 +1,4 @@
+import { LobbyAvatars } from './lobby-avatars.svelte';
 import { GameCommands } from './game-commands';
 import type { ParticipantColorId } from '$shared/colors';
 import type {
@@ -26,6 +27,7 @@ export type AuthScreenError =
   | 'room_full'
   | 'unreachable'
   | 'invalid_profile_token'
+  | 'host_required'
   | 'profile_store_unavailable';
 
 export interface VisionToast {
@@ -68,6 +70,7 @@ export class GameStore extends GameCommands {
   private readonly clock = new ServerClock();
   private readonly wsClient: GeoWsClient;
   readonly profile: ProfileSession;
+  readonly avatars: LobbyAvatars;
   private backOnlineTimer: number | null = null;
   private clockTimer: number | null = null;
   private unsubMapsAuth: (() => void) | null = null;
@@ -81,6 +84,7 @@ export class GameStore extends GameCommands {
   constructor(private readonly onGuessAccepted: () => void = () => undefined) {
     super();
     this.wsClient = new GeoWsClient(this.buildWsCallbacks());
+    this.avatars = new LobbyAvatars(this.wsClient);
     this.profile = new ProfileSession(this.wsClient);
   }
 
@@ -97,7 +101,7 @@ export class GameStore extends GameCommands {
     this.resendPinOnNextState = true;
     this.authError = null;
     this.authState = 'ready';
-    if (!msg.restoredPlayerId && this.profile.saved) {
+    if (!msg.restoredPlayerId && this.profile.saved && !this.wsClient.registeringNew) {
       this.authState = 'checking';
       this.join(this.profile.saved.nick, this.profile.saved.color);
     }
@@ -105,6 +109,7 @@ export class GameStore extends GameCommands {
 
   private handleAck(msg: Extract<ServerMessage, { type: 'ack' }>): void {
     const { seq } = msg;
+    this.avatars.onAck(msg);
     this.profile.onAck(msg);
     if (seq === this.submitGuessSeq) {
       if (msg.result === 'ok') this.onGuessAccepted();
@@ -131,10 +136,11 @@ export class GameStore extends GameCommands {
 
   private buildWsCallbacks(): WsClientCallbacks {
     return {
-      onNoToken: () => {
+      onNoToken: (reason) => {
+        this.profile.canRegister = this.wsClient.hasInvitation;
         this.clearTransientPending();
         this.authState = 'error';
-        this.authError = 'no_token';
+        this.authError = reason ?? 'no_token';
       },
       onHashToken: () => {
         this.resetForHashToken();
@@ -146,9 +152,7 @@ export class GameStore extends GameCommands {
       onSocketOpen: () => {
         this.offlinePinWarning = false;
       },
-      onBackOnline: () => {
-        this.triggerBackOnline();
-      },
+      onBackOnline: this.triggerBackOnline.bind(this),
       onReconnecting: (attempt) => {
         this.connectionState = 'reconnecting';
         this.reconnectAttempt = attempt;
@@ -172,6 +176,7 @@ export class GameStore extends GameCommands {
       },
       onProfileLoginOk: this.handleProfileLoginOk.bind(this),
       onProfileLoginError: (msg) => {
+        this.profile.canRegister = this.wsClient.hasInvitation;
         this.authState = 'error';
         this.authError = msg.code;
       },
@@ -183,11 +188,10 @@ export class GameStore extends GameCommands {
         this.joined = true;
         this.authState = 'ready';
       },
-      onJoinError: (msg) => {
-        this.applyJoinError(msg);
-      },
-      onAck: (msg) => {
-        this.handleAck(msg);
+      onJoinError: this.applyJoinError.bind(this),
+      onAck: this.handleAck.bind(this),
+      onAvatarMotion: (msg) => {
+        this.avatars.receive(msg);
       },
       onVisionCheckResult: (msg) => {
         if (this.checkingVisionBotId === msg.botId) this.checkingVisionBotId = null;
@@ -206,6 +210,7 @@ export class GameStore extends GameCommands {
   }
 
   private clearTransientPending(): void {
+    this.avatars.reset();
     this.profile.clearPending();
     this.joinPending = false;
     this.checkingVisionBotId = null;
@@ -234,11 +239,7 @@ export class GameStore extends GameCommands {
     this.authState = 'ready';
     this.lobbySummary = msg.lobbySummary;
     this.joinError = { code: msg.code, message: msg.message };
-    if (msg.code === 'profile_token_required') {
-      this.wsClient.useCodeLogin();
-      this.authState = 'error';
-      this.authError = 'no_token';
-    }
+    if (msg.code === 'profile_token_required') this.wsClient.useCodeLogin();
   }
 
   private triggerBackOnline(): void {
@@ -272,6 +273,7 @@ export class GameStore extends GameCommands {
       this.startMatchPending = false;
       this.startMatchSeq = null;
     }
+    if (prevPhase === 'LOBBY' && prevPhase !== view.phase) this.avatars.reset();
     if (prevRound !== view.roundNumber || prevPhase !== view.phase) {
       if (view.phase !== 'ROUND_RESULTS') this.activeBotCard = null;
       if (view.phase !== 'ROUND_ACTIVE') {
@@ -335,8 +337,6 @@ export class GameStore extends GameCommands {
 
   useCodeLogin(): void {
     this.wsClient.useCodeLogin();
-    this.authState = 'error';
-    this.authError = 'no_token';
     this.joinError = null;
   }
 
@@ -422,10 +422,6 @@ export class GameStore extends GameCommands {
       this.joinPending = false;
       this.joinError = { code: 'offline', message: RU.join.serverUnreachable };
     }
-  }
-
-  updateProfile(nick: string, color: ParticipantColorId): void {
-    this.profile.update(nick, color);
   }
 
   checkBotVision(botId: string): void {

@@ -1,8 +1,10 @@
 import { expect, test } from 'bun:test';
+import { defaultAvatar } from '../../shared/avatar.ts';
 import type { MatchRecord } from '../../shared/storage-schemas.ts';
 import { computeWins6h, createWinsClock, WIN_WINDOW_MS } from './wins.ts';
 import { handleProfileAction } from './profile.ts';
 import type { RoomState } from './types.ts';
+import type { RoomShell } from './shell.ts';
 
 const now = Date.parse('2026-01-01T12:00:00Z');
 function record(
@@ -63,7 +65,10 @@ function room(): RoomState {
       h: { id: 'h', name: 'Host', color: 'p-1', isHost: true },
       g: { id: 'g', name: 'Guest', color: 'p-2', isHost: false },
     },
-    settings: { bots: [{ id: 'bot', name: 'Bot', color: 'p-3', enabled: false }] },
+    availableHarnesses: [],
+    settings: {
+      bots: [{ id: 'bot', name: 'Bot', model: 'test-model', color: 'p-3', enabled: false }],
+    },
   } as unknown as RoomState;
 }
 
@@ -161,7 +166,7 @@ test('shell restores historical wins, broadcasts expiry and disposes its timer',
       broadcasts += 1;
       expired();
     },
-    saveSettings: async () => {},
+    saveSettings: () => {},
     confirmQuotaReset: () => Promise.resolve(initial.quotaSummary),
     prepareRound: () => Promise.reject(new Error('unused')),
     startBotProcesses: () => {},
@@ -183,6 +188,17 @@ test('shell restores historical wins, broadcasts expiry and disposes its timer',
     shell.dispose();
   }
 });
+
+function saveBotAvatar(shell: RoomShell) {
+  const avatar = defaultAvatar(true);
+  const saved = shell.saveBotAppearance({
+    type: 'update_bot',
+    playerId: 'h',
+    botId: 'bot',
+    patch: { avatar },
+  });
+  return { avatar, saved };
+}
 
 test('settings reset waits for persistence, preserves concurrent edits and warns on failure', async () => {
   // protects: durable reset, concurrent lobby changes and visible failure; fails_when: pending/failed writes clear wins or stale snapshots replace edits; no_claim: real filesystem durability.
@@ -216,10 +232,9 @@ test('settings reset waits for persistence, preserves concurrent edits and warns
       onStateChange: (state) => {
         if (state.winsWarning || state.settings.bots[0]?.winResetAt) completed();
       },
-      saveSettings: (settings) => {
+      saveSettings: (settings, strict) => {
         saved.push(settings);
-        savedDone();
-        return Promise.resolve();
+        if (!strict) savedDone();
       },
       saveSettingsForReset: () => {
         started();
@@ -240,7 +255,9 @@ test('settings reset waits for persistence, preserves concurrent edits and warns
       expect(shell.dispatch({ type: 'reset_bot_wins', playerId: 'h', botId: 'bot' })).toBe('ok');
       await startedPromise;
       expect(shell.getState().wins6h.byBotId.bot).toBe(1);
+      const appearance = saveBotAvatar(shell);
       shell.dispatch({ type: 'update_lobby', playerId: 'h', patch: { rounds: 5 } });
+      expect(shell.getState().settings.bots[0]?.avatar).toBeUndefined();
       if (succeeds) resolveSave();
       else rejectSave(new Error('write failed'));
       await completedPromise;
@@ -248,6 +265,10 @@ test('settings reset waits for persistence, preserves concurrent edits and warns
       expect(shell.getState().wins6h.byBotId.bot).toBe(succeeds ? undefined : 1);
       expect(Boolean(shell.getState().winsWarning)).toBe(!succeeds);
       await savedPromise;
+      expect(await appearance.saved).toBe('ok');
+      expect(shell.getState().settings.bots[0]?.avatar).toEqual(appearance.avatar);
+      expect(saved.at(-1)?.rounds).toBe(5);
+      expect(saved.at(-1)?.bots[0]?.avatar).toEqual(appearance.avatar);
       expect(saved.at(-1)?.bots[0]?.winResetAt).toBe(
         succeeds ? new Date(now).toISOString() : undefined,
       );

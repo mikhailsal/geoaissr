@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { PARTICIPANT_COLORS, type ParticipantColorId } from '$shared/colors';
+  import type { ParticipantColorId } from '$shared/colors';
+  import ParticipantColorPicker from './ParticipantColorPicker.svelte';
   import type { DifficultyPreset } from '$shared/bot-tools';
   import type { HarnessCatalogEntry } from '$shared/protocol';
   import type { BotSlotConfig } from '$shared/storage-schemas';
@@ -8,7 +9,7 @@
   import { EFFORT_LABELS, PERSONALITY_LABELS, PRESET_LABELS, RU } from '../i18n/ru';
 
   interface Props {
-    slot: BotSlotConfig;
+    config: BotSlotConfig;
     availableHarnesses: readonly HarnessCatalogEntry[];
     usedColors: readonly ParticipantColorId[];
     isCheckingVision: boolean;
@@ -18,10 +19,11 @@
     onApplyPreset: (preset: Exclude<DifficultyPreset, 'custom'>) => void;
     onCheckVision: () => void;
     onRemove: () => void;
+    onResetWins?: () => void;
   }
 
   let {
-    slot,
+    config: slot,
     availableHarnesses,
     usedColors,
     isCheckingVision,
@@ -31,6 +33,7 @@
     onApplyPreset,
     onCheckVision,
     onRemove,
+    onResetWins,
   }: Props = $props();
 
   let draftName = $state('');
@@ -79,10 +82,6 @@
       onUpdate({ personalityText: clean });
     }
   }
-
-  function isSlotColorTaken(colorId: ParticipantColorId): boolean {
-    return colorId !== slot.color && usedColors.includes(colorId);
-  }
 </script>
 
 <div class="bot-editor">
@@ -122,29 +121,17 @@
     </label>
   </div>
 
-  <fieldset class="color-group">
-    <legend class="lbl">Цвет фишки</legend>
-    <div class="swatches" role="radiogroup" aria-label="Цвет бота">
-      {#each PARTICIPANT_COLORS as c (c.id)}
-        {@const taken = isSlotColorTaken(c.id)}
-        <button
-          type="button"
-          class="swatch"
-          class:selected={slot.color === c.id}
-          style="background-color: var({c.cssVar}); color: var({c.inkToken});"
-          role="radio"
-          aria-checked={slot.color === c.id}
-          aria-label={c.labelRu}
-          disabled={!isHost || taken}
-          onclick={() => {
-            onUpdate({ color: c.id });
-          }}
-        >
-          {#if slot.color === c.id}✓{/if}
-        </button>
-      {/each}
-    </div>
-  </fieldset>
+  <ParticipantColorPicker
+    legend="Цвет фишки"
+    label="Цвет бота"
+    compact
+    selected={slot.color}
+    unavailable={usedColors}
+    disabled={!isHost}
+    onSelect={(color) => {
+      onUpdate({ color });
+    }}
+  />
 
   <div class="row-2">
     <label class="field">
@@ -347,11 +334,14 @@
   </details>
 
   <div class="vision-row">
-    {#if isHost}
-      <button type="button" class="btn" disabled={isCheckingVision} onclick={onCheckVision}>
-        {isCheckingVision ? RU.lobby.visionRunning : RU.lobby.visionBtn}
-      </button>
-    {/if}
+    <button
+      type="button"
+      class="btn"
+      disabled={!isHost || isCheckingVision}
+      onclick={onCheckVision}
+    >
+      {isCheckingVision ? RU.lobby.visionRunning : RU.lobby.visionBtn}
+    </button>
 
     <span class="vision-status" style:visibility={isCheckingVision ? 'hidden' : null}>
       {#if visionToast}
@@ -367,11 +357,16 @@
       {/if}
     </span>
 
-    {#if isHost}
-      <button type="button" class="btn btn-danger" onclick={onRemove}>
-        {RU.lobby.removeBot}
-      </button>
-    {/if}
+    {#if onResetWins}<button
+        type="button"
+        class="btn"
+        disabled={!isHost}
+        aria-label={`Сбросить победы ${slot.name}`}
+        onclick={onResetWins}>Сбросить победы</button
+      >{/if}
+    <button type="button" class="btn btn-danger" disabled={!isHost} onclick={onRemove}>
+      {RU.lobby.removeBot}
+    </button>
   </div>
 
   {#if visionSlowWarning && slot.lastVisionCheck}
@@ -412,39 +407,6 @@
   .hint {
     font-size: 0.78rem;
     color: var(--paper-dim);
-  }
-
-  .color-group {
-    border: 0;
-    margin: 0;
-    padding: 0;
-  }
-
-  .swatches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    margin-top: 0.35rem;
-  }
-
-  .swatch {
-    width: 36px;
-    height: 36px;
-    min-height: 36px;
-    border-radius: 6px;
-    border: 2px solid transparent;
-    cursor: pointer;
-    font-weight: 700;
-  }
-
-  .swatch.selected {
-    border-color: var(--paper);
-    outline: 2px solid var(--paint);
-  }
-
-  .swatch:disabled {
-    opacity: 0.28;
-    cursor: not-allowed;
   }
 
   .custom-model-row {
