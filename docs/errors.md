@@ -62,6 +62,16 @@ The harness selected in the slot failed the S1 spike check or was not found on t
 
 Current usage plus the worst case of the new match exceeds the configured monthly quota ceiling. Reduce the rounds, the number of bots or the move limit in the lobby.
 
+## GEO_BOT_JOURNAL_FIELD_MISSING
+
+Not a command-line error: it is the code at the end of the one-time correction that the bot-tool queue returns to a bot.
+
+- **What:** a `look` or `move` arrived without `finding` (required after `observe`) or `current_guess`, or a `final_guess` arrived without `summary` or `finding`.
+- **Why:** the step journal needs the reason before the action and the finding after it; the finding for the previous frame rides on the next call.
+- **What the bot should do:** repeat the same call with the missing field. The correction is returned once per call with `isError: true`; no frame is requested and no paid turn is charged (a partial `final_guess` is saved as a checkpoint). The repeated call is accepted: the step is marked "вывод не записан" (a missing `current_guess` keeps the previous checkpoint).
+- **What the host sees:** nothing during play. On the result card the step shows «вывод не записан». A round that ended before the finding shows «раунд закончился раньше вывода».
+- **Logging:** every correction is one `bot_journal_correction` line in `<GEOAISSR_DATA_DIR>/logs/` with `harness`, `tool`, `missing` and `code`, so the correction rate per harness can be counted. Prompt text, environment values and file paths are never logged.
+
 ## GEO_CRASH
 
 Unexpected exception on the server. The full stack trace (without keys and tokens) is written to `<GEOAISSR_DATA_DIR>/logs/crash-<timestamp>.log`. Restart `bun run start`.

@@ -26,6 +26,7 @@ export const ERROR_CODES = [
   'GEO_HARNESS_NOT_LOGGED_IN',
   'GEO_HARNESS_HIDDEN',
   'GEO_QUOTA_CEILING',
+  'GEO_BOT_JOURNAL_FIELD_MISSING',
   'GEO_CRASH',
 ] as const;
 
@@ -158,6 +159,14 @@ export const ERROR_REGISTRY: Record<ErrorCode, ErrorRegistryEntry> = {
     whatTemplate: 'достигнут месячный потолок расхода квоты приложения',
     fixTemplate: 'уменьшите число раундов, ботов или ходов в лобби и повторите запуск партии',
     docAnchor: 'docs/errors.md#GEO_QUOTA_CEILING',
+  },
+  GEO_BOT_JOURNAL_FIELD_MISSING: {
+    code: 'GEO_BOT_JOURNAL_FIELD_MISSING',
+    errorClass: 'usage',
+    exitCode: 1,
+    whatTemplate: 'вызов инструмента бота пришёл без обязательного поля журнала',
+    fixTemplate: 'бот повторяет тот же вызов с недостающим полем; хосту ничего делать не нужно',
+    docAnchor: 'docs/errors.md#GEO_BOT_JOURNAL_FIELD_MISSING',
   },
   GEO_CRASH: {
     code: 'GEO_CRASH',

@@ -2,16 +2,34 @@ import {
   formatToolZodError,
   lookInputSchema,
   moveInputSchema,
-  parseGuessInput,
   observeInputSchema,
-  type NormalizedGuessInput,
 } from '../../shared/bot-tools.ts';
+import { executeFinalGuess } from './queue-guess.ts';
+import {
+  correctionText,
+  gateStepCall,
+  isBlindCall,
+  missingStepFields,
+  recordBlindStep,
+  recordCheckpoint,
+  recordStepFields,
+  splitStepFields,
+  type StepFields,
+} from './queue-journal.ts';
+import {
+  awaitRoundStart,
+  recordQueueFailure,
+  type BotSessionHandlers,
+  type QueueState,
+  type ToolResponsePayload,
+} from './queue-state.ts';
 
-export interface ToolResponsePayload {
-  text: string;
-  images?: Array<{ name: string; base64: string; mimeType: string }>;
-  isError?: boolean;
-}
+export type {
+  BotSessionHandlers,
+  FindingRecord,
+  GuessRecord,
+  ToolResponsePayload,
+} from './queue-state.ts';
 
 export interface ToolDispatchAudit {
   tool: string;
@@ -27,21 +45,6 @@ export interface ToolDispatchAudit {
   error?: string;
 }
 
-export interface BotSessionHandlers {
-  waitObserveRelease: (signal: AbortSignal) => Promise<void>;
-  executeObserve: () => Promise<ToolResponsePayload>;
-  executeLook: (args: {
-    heading: number;
-    pitch: number;
-    fov: number;
-    hypothesis?: string;
-  }) => Promise<ToolResponsePayload>;
-  executeMove: (args: { heading: number; hypothesis?: string }) => Promise<ToolResponsePayload>;
-  onGuess: (guess: NormalizedGuessInput, finalized: boolean) => void;
-  onTurnsChanged: (turnsUsed: number) => void;
-  getRemainingTimeSec: () => number;
-}
-
 export interface BotToolQueue {
   dispatch: (toolName: string, rawArgs: unknown) => Promise<ToolResponsePayload>;
   getTurnsUsed: () => number;
@@ -49,23 +52,12 @@ export interface BotToolQueue {
   abort: (reason: string) => void;
 }
 
-interface QueueState {
-  moveLimit: number;
-  moveEnabled: boolean;
-  handlers: BotSessionHandlers;
-  signal: AbortSignal;
-  turnsUsed: number;
-  failedCalls: number;
-  roundStartedPromise: Promise<void> | null;
-  finalized: boolean;
-  requireCompleteReasoning: boolean;
-  checkpoints: number;
-}
-
-function recordQueueFailure(st: QueueState, baseMsg: string): ToolResponsePayload {
-  st.failedCalls += 1;
-  return { text: `${baseMsg}\nХод не списан.`, isError: true };
-}
+const LOOK_ARGS = lookInputSchema
+  .omit({ finding: true, shifts: true, current_guess: true })
+  .extend({ hypothesis: lookInputSchema.shape.hypothesis.optional() });
+const MOVE_ARGS = moveInputSchema
+  .omit({ finding: true, shifts: true, current_guess: true })
+  .extend({ hypothesis: moveInputSchema.shape.hypothesis.optional() });
 
 function optionalHypothesis(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return raw;
@@ -76,125 +68,95 @@ function optionalHypothesis(raw: unknown): unknown {
   return data;
 }
 
-function isSignalAborted(signal: AbortSignal): boolean {
-  return signal.aborted;
-}
-
-async function awaitRoundStart(st: QueueState): Promise<boolean> {
-  if (isSignalAborted(st.signal)) return false;
-  st.roundStartedPromise ??= st.handlers.waitObserveRelease(st.signal);
-  try {
-    await st.roundStartedPromise;
-  } catch {
-    return false;
-  }
-  return !isSignalAborted(st.signal);
-}
-
-async function executeGuess(
-  st: QueueState,
-  toolName: string,
-  rawArgs: unknown,
-): Promise<ToolResponsePayload> {
-  const guess = parseGuessInput(rawArgs);
-  if (!guess) return recordQueueFailure(st, 'Неверные координаты догадки.');
-  if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
-  const missingReasoning =
-    toolName !== 'submit_guess' && !guess.facts && !guess.conclusion && !guess.explanation;
-  const incompleteFinal =
-    toolName === 'final_guess' &&
-    st.requireCompleteReasoning &&
-    (!guess.facts || !guess.conclusion || !guess.rejectedGuesses);
-  const finalized = toolName !== 'draft_guess' && !missingReasoning && !incompleteFinal;
-  st.handlers.onGuess(guess, finalized);
-  st.checkpoints += 1;
-  st.finalized = finalized;
-  if (incompleteFinal) {
-    return {
-      text: 'Координаты сохранены как черновик. Повтори final_guess с lat, lng, непустыми facts и conclusion и списком rejected_guesses; если обоснованных исключённых версий нет, укажи [].',
-      isError: true,
-    };
-  }
-  if (missingReasoning) {
-    return {
-      text: 'Координаты сохранены как черновик. Добавь непустое объяснение: facts (до 1000 символов) или conclusion (до 600); повтори вызов с lat и lng.',
-      ...(toolName === 'final_guess' ? { isError: true } : {}),
-    };
-  }
-  const remMoves = Math.max(0, st.moveLimit - st.turnsUsed);
-  const remSec = Math.max(0, Math.floor(st.handlers.getRemainingTimeSec()));
+function limitReached(st: QueueState): ToolResponsePayload {
   return {
-    text: finalized
-      ? 'Окончательная догадка принята.'
-      : `Черновик сохранён. Осталось ходов: ${remMoves}, времени: ${remSec} с.${remSec > 15 ? ' Продолжай исследование, если не уверен окончательно.' : ''}`,
+    text: `Лимит ходов (${st.moveLimit}) исчерпан. Отправьте догадку через final_guess.`,
+    isError: true,
   };
+}
+
+/**
+ * Journal gate shared by look and move. A call missing the finding (owed after observe) or
+ * `current_guess` is bounced once per pending step and persists nothing. An accepted call
+ * writes the finding, shifts and point onto the pending step before the camera action runs.
+ * A blind call (enqueued before the pending frame was delivered) is accepted without a
+ * correction and writes no finding. Returns a response when the call must not run.
+ */
+function reviewStep(
+  st: QueueState,
+  tool: 'look' | 'move',
+  fields: StepFields,
+  enqueuedAt: number,
+): ToolResponsePayload | null {
+  const blind = isBlindCall(st, enqueuedAt);
+  const missing = missingStepFields(st, fields, blind);
+  const verdict = gateStepCall(st, tool, missing);
+  if (verdict === 'bounce') return recordQueueFailure(st, correctionText(tool, missing));
+  if (blind) recordBlindStep(st);
+  else recordStepFields(st, fields, true);
+  recordCheckpoint(st, fields.currentGuess);
+  return null;
+}
+
+async function executePaidStep(
+  st: QueueState,
+  tool: 'look' | 'move',
+  rawArgs: unknown,
+  enqueuedAt: number,
+): Promise<ToolResponsePayload> {
+  const { rest, fields } = splitStepFields(rawArgs ?? {});
+  const parsed = (tool === 'look' ? LOOK_ARGS : MOVE_ARGS).safeParse(optionalHypothesis(rest));
+  if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
+  if (st.turnsUsed >= st.moveLimit) return limitReached(st);
+  if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
+  const bounced = reviewStep(st, tool, fields, enqueuedAt);
+  if (bounced) return bounced;
+
+  let res: ToolResponsePayload;
+  if (tool === 'look') {
+    const { fov, zoom, ...look } = LOOK_ARGS.parse(optionalHypothesis(rest));
+    const effectiveFov = Math.max(10, Math.min(120, fov ?? (zoom ? Math.round(90 / zoom) : 90)));
+    res = await st.handlers.executeLook({ ...look, fov: effectiveFov }, st.signal);
+  } else {
+    res = await st.handlers.executeMove(MOVE_ARGS.parse(optionalHypothesis(rest)), st.signal);
+  }
+  if (st.signal.aborted) return { text: 'Раунд уже завершён.', isError: true };
+  if (res.isError) return recordQueueFailure(st, res.text);
+  st.frameDeliveredAt = performance.now();
+  st.turnsUsed += 1;
+  st.handlers.onTurnsChanged(st.turnsUsed);
+  return res;
+}
+
+async function executeObserve(st: QueueState, rawArgs: unknown): Promise<ToolResponsePayload> {
+  const parsed = observeInputSchema.safeParse(rawArgs ?? {});
+  if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
+  if (st.observeResponse) return st.observeResponse;
+  if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
+  const res = await st.handlers.executeObserve();
+  if (!res.isError && !st.signal.aborted) {
+    st.observed = true;
+    st.observeResponse = res;
+    st.frameDeliveredAt = performance.now();
+  }
+  return res;
 }
 
 async function executeQueuedTool(
   st: QueueState,
   toolName: string,
   rawArgs: unknown,
+  enqueuedAt: number,
 ): Promise<ToolResponsePayload> {
-  if (isSignalAborted(st.signal)) {
-    return { text: 'Раунд уже завершён.', isError: true };
-  }
-
+  if (st.signal.aborted) return { text: 'Раунд уже завершён.', isError: true };
   if (st.finalized) return { text: 'Окончательная догадка уже отправлена.', isError: true };
-
-  if (toolName === 'observe') {
-    const parsed = observeInputSchema.safeParse(rawArgs ?? {});
-    if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
-    if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
-    return st.handlers.executeObserve();
-  }
-
-  if (toolName === 'submit_guess' || toolName === 'final_guess' || toolName === 'draft_guess') {
-    return executeGuess(st, toolName, rawArgs);
-  }
-
-  if (toolName === 'look') {
-    const parsed = lookInputSchema
-      .extend({ hypothesis: lookInputSchema.shape.hypothesis.optional() })
-      .safeParse(optionalHypothesis(rawArgs ?? {}));
-    if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
-    if (st.turnsUsed >= st.moveLimit) {
-      return {
-        text: `Лимит ходов (${st.moveLimit}) исчерпан. Отправьте догадку через final_guess.`,
-        isError: true,
-      };
-    }
-    if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
-    const { fov, zoom, ...rest } = parsed.data;
-    const effectiveFov = Math.max(10, Math.min(120, fov ?? (zoom ? Math.round(90 / zoom) : 90)));
-    const res = await st.handlers.executeLook({ ...rest, fov: effectiveFov });
-    if (res.isError) return recordQueueFailure(st, res.text);
-    st.turnsUsed += 1;
-    st.handlers.onTurnsChanged(st.turnsUsed);
-    return res;
-  }
-
+  if (toolName === 'observe') return executeObserve(st, rawArgs);
+  if (toolName === 'final_guess') return executeFinalGuess(st, rawArgs, enqueuedAt);
+  if (toolName === 'look') return executePaidStep(st, 'look', rawArgs, enqueuedAt);
   if (toolName === 'move') {
-    if (!st.moveEnabled) {
-      return recordQueueFailure(st, 'Движение (move) отключено в этой партии.');
-    }
-    const parsed = moveInputSchema
-      .extend({ hypothesis: moveInputSchema.shape.hypothesis.optional() })
-      .safeParse(optionalHypothesis(rawArgs ?? {}));
-    if (!parsed.success) return recordQueueFailure(st, formatToolZodError(parsed.error));
-    if (st.turnsUsed >= st.moveLimit) {
-      return {
-        text: `Лимит ходов (${st.moveLimit}) исчерпан. Отправьте догадку через final_guess.`,
-        isError: true,
-      };
-    }
-    if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
-    const res = await st.handlers.executeMove(parsed.data);
-    if (res.isError) return recordQueueFailure(st, res.text);
-    st.turnsUsed += 1;
-    st.handlers.onTurnsChanged(st.turnsUsed);
-    return res;
+    if (!st.moveEnabled) return recordQueueFailure(st, 'Движение (move) отключено в этой партии.');
+    return executePaidStep(st, 'move', rawArgs, enqueuedAt);
   }
-
   return recordQueueFailure(st, `Неизвестный инструмент: ${toolName}`);
 }
 
@@ -222,41 +184,58 @@ function emitDispatchAudit(
   }
 }
 
-export function createBotToolQueue(opts: {
-  moveLimit: number;
-  moveEnabled: boolean;
-  handlers: BotSessionHandlers;
-  requireCompleteReasoning?: boolean;
-  onDispatch?: (audit: ToolDispatchAudit) => void;
-}): BotToolQueue {
-  const ac = new AbortController();
-  const st: QueueState = {
+function initialState(
+  opts: Parameters<typeof createBotToolQueue>[0],
+  signal: AbortSignal,
+): QueueState {
+  return {
     moveLimit: opts.moveLimit,
     moveEnabled: opts.moveEnabled,
     handlers: opts.handlers,
-    signal: ac.signal,
+    signal,
     turnsUsed: 0,
     failedCalls: 0,
     roundStartedPromise: null,
     finalized: false,
     requireCompleteReasoning: opts.requireCompleteReasoning ?? false,
     checkpoints: 0,
+    observed: false,
+    observeResponse: null,
+    frameDeliveredAt: 0,
+    correctedStep: null,
+    closedStep: null,
+    lastWrittenKey: null,
+    lastCheckpointKey: null,
+    onCorrection: opts.onCorrection,
   };
+}
+
+export function createBotToolQueue(opts: {
+  moveLimit: number;
+  moveEnabled: boolean;
+  handlers: BotSessionHandlers;
+  requireCompleteReasoning?: boolean;
+  onCorrection?: QueueState['onCorrection'];
+  onDispatch?: (audit: ToolDispatchAudit) => void;
+}): BotToolQueue {
+  const ac = new AbortController();
+  const st = initialState(opts, ac.signal);
   let tail: Promise<unknown> = Promise.resolve();
 
   function dispatch(toolName: string, rawArgs: unknown): Promise<ToolResponsePayload> {
     const startedAt = Date.now();
+    const enqueuedAt = performance.now();
     const next = tail.then(async () => {
       const checkpoints = st.checkpoints;
       let result: ToolResponsePayload | undefined;
       let error: string | undefined;
       try {
-        const response = await executeQueuedTool(st, toolName, rawArgs);
+        const response = await executeQueuedTool(st, toolName, rawArgs, enqueuedAt);
         const remaining = Math.max(0, Math.floor(st.handlers.getRemainingTimeSec()));
         const urgent = remaining <= 15 && !st.finalized && !st.signal.aborted;
         result = {
           ...response,
-          text: `${response.text}\nОсталось времени: ${remaining} с.${urgent ? ' Немедленно отправь лучшую версию через final_guess.' : ''}`,
+          text: `${response.text}\nОсталось времени: ${remaining} с.${urgent ? ' Немедленно отправь лучшую версию через final_guess с выводом по последнему кадру.' : ''}`,
         };
         return result;
       } catch (err) {

@@ -38,6 +38,7 @@ function buildInitialBotsForRound(state: RoomState): {
       lastGuessAt: null,
       guess: null,
       thumbs: [],
+      journal: [],
       startedAt: null,
       finishedAt: null,
     };

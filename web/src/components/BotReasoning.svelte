@@ -5,28 +5,38 @@
 </script>
 
 <div class="reasoning">
-  {#if entry.facts}<section>
+  {#if entry.journal?.steps.length}
+    <section>
+      <h4>Журнал шагов</h4>
+      <ol>
+        {#each entry.journal.steps as step (step.index)}<li>
+            {#if step.reason}<p class="muted">{step.reason}</p>{/if}
+            {#if step.finding}<p>{step.finding}</p>
+            {:else if step.findingState === 'round-ended'}<p class="muted">
+                раунд закончился раньше вывода
+              </p>
+            {:else if step.findingState === 'missing'}<p class="muted">вывод не записан</p>{/if}
+            {#if step.pointMissing}<p class="muted">новая точка не записана</p>{/if}
+            {#each step.shifts ?? [] as shift, index (`${shift.version}-${index}`)}<p class="muted">
+                <strong>{shift.version}</strong> ({shift.effect}) — {shift.because}
+              </p>{/each}
+          </li>{/each}
+      </ol>
+    </section>
+  {:else if entry.facts}
+    <section>
       <h4>Факты и улики</h4>
       <p>{entry.facts}</p>
-    </section>{/if}
-  {#if entry.rejectedGuesses}
-    <section>
-      <h4>Исключённые версии</h4>
-      {#if entry.rejectedGuesses.length}
-        <ul>
-          {#each entry.rejectedGuesses as rejected, index (`${rejected.guess}-${index}`)}<li>
-              <strong>{rejected.guess}</strong> — {rejected.reason}
-            </li>{/each}
-        </ul>
-      {:else}<p>Нет обоснованных исключённых версий.</p>{/if}
     </section>
   {/if}
-  {#if entry.conclusion || entry.explanation || (entry.lat !== null && entry.lng !== null)}
+  {#if entry.journal?.summary || entry.conclusion || entry.explanation || (entry.lat !== null && entry.lng !== null)}
     <section>
       <h4>
         Итоговый вывод {#if entry.usedDraft}<span class="draft">Черновик</span>{/if}
       </h4>
-      {#if entry.conclusion || entry.explanation}<p>{entry.conclusion || entry.explanation}</p>{/if}
+      {#if entry.journal?.summary || entry.conclusion || entry.explanation}<p>
+          {entry.journal?.summary || entry.conclusion || entry.explanation}
+        </p>{/if}
       {#if entry.lat !== null && entry.lng !== null}<p class="coordinates">
           {entry.lat.toFixed(5)}, {entry.lng.toFixed(5)}
         </p>{/if}
@@ -49,7 +59,7 @@
   }
   h4,
   p,
-  ul {
+  ol {
     margin: 0;
   }
   h4 {
@@ -61,7 +71,7 @@
   li {
     white-space: pre-line;
   }
-  ul {
+  ol {
     padding-left: var(--sp-4);
   }
   .coordinates,

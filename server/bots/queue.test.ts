@@ -51,7 +51,7 @@ test('only successful look and move consume turns', async () => {
   expect(over.text).toContain('Лимит ходов');
 });
 
-test('observe blocks on waitObserveRelease until released and submit_guess stays free', async () => {
+test('observe blocks on waitObserveRelease until released and final_guess stays free', async () => {
   let released = false;
   let releaseFn: (() => void) | undefined;
   let recordedLat = 0;
@@ -85,17 +85,17 @@ test('observe blocks on waitObserveRelease until released and submit_guess stays
   expect(mvDisabled.isError).toBe(true);
   expect(q.getTurnsUsed()).toBe(0);
 
-  const g = await q.dispatch('submit_guess', {
+  const g = await q.dispatch('final_guess', {
     lat: 55.75,
     lng: 190,
-    explanation: 'Дорожные знаки',
+    summary: 'Дорожные знаки',
   });
   expect(g.isError).toBeUndefined();
   expect(recordedLat).toBe(55.75);
   expect(q.getTurnsUsed()).toBe(0);
 });
 
-test('look and submit_guess wait for round start release before executing', async () => {
+test('look and final_guess wait for round start release before executing', async () => {
   let released = false;
   let releaseFn: (() => void) | undefined;
   let guessCalls = 0;
@@ -116,7 +116,7 @@ test('look and submit_guess wait for round start release before executing', asyn
     }),
   });
 
-  const pendingGuess = q.dispatch('submit_guess', { lat: 10, lng: 20, explanation: 'Wait' });
+  const pendingGuess = q.dispatch('final_guess', { lat: 10, lng: 20, summary: 'Wait' });
   await new Promise((r) => setTimeout(r, 15));
   expect(released).toBe(false);
   expect(guessCalls).toBe(0);
@@ -126,8 +126,8 @@ test('look and submit_guess wait for round start release before executing', asyn
   expect(guessCalls).toBe(1);
 });
 
-// protects=draft fallback and final immutability; fails_when=checkpoint terminates or final is overwritten; no_claim=engine scoring.
-test('drafts remain free, final is accepted at the limit and closes the queue', async () => {
+// protects=checkpoint fallback and final immutability; fails_when=checkpoint terminates or final is overwritten; no_claim=engine scoring.
+test('checkpoints stay free, final is accepted at the limit and closes the queue', async () => {
   const guesses: Array<{ lat: number; finalized: boolean }> = [];
   const q = createBotToolQueue({
     moveLimit: 1,
@@ -136,20 +136,16 @@ test('drafts remain free, final is accepted at the limit and closes the queue', 
       onGuess: (g, finalized) => guesses.push({ lat: g.lat, finalized }),
     }),
   });
-  expect((await q.dispatch('draft_guess', { lat: 1, lng: 190, facts: 'Дорога' })).text).toContain(
-    'Осталось ходов: 1',
-  );
-  expect((await q.dispatch('look', { heading: 0 })).isError).toBeUndefined();
+  expect((await q.dispatch('draft_guess', { lat: 1, lng: 190 })).isError).toBe(true);
   expect(
-    (await q.dispatch('draft_guess', { lat: 2, lng: 0, facts: 'Дорога' })).isError,
+    (await q.dispatch('look', { heading: 0, current_guess: { lat: 1, lng: 190 } })).isError,
   ).toBeUndefined();
   expect(
-    (await q.dispatch('final_guess', { lat: 3, lng: 0, facts: 'Дорога' })).isError,
+    (await q.dispatch('final_guess', { lat: 3, lng: 0, summary: 'Дорога' })).isError,
   ).toBeUndefined();
-  expect((await q.dispatch('draft_guess', { lat: 4, lng: 0 })).isError).toBe(true);
+  expect((await q.dispatch('look', { heading: 0 })).isError).toBe(true);
   expect(guesses).toEqual([
     { lat: 1, finalized: false },
-    { lat: 2, finalized: false },
     { lat: 3, finalized: true },
   ]);
   expect(q.getTurnsUsed()).toBe(1);
@@ -179,7 +175,7 @@ test('look resolves zoom and explicit fov and tolerates absent hypothesis', asyn
 // protects=original tool audit; fails_when=a rejected final is reported as a successful draft.
 test('audit preserves rejected final guess and checkpoint with structured reasoning', async () => {
   const audits: import('./queue.ts').ToolDispatchAudit[] = [];
-  const args = { lat: 1, lng: 2, facts: 'road', conclusion: 'country' };
+  const args = { lat: 1, lng: 2, finding: 'road' };
   const q = createBotToolQueue({
     moveLimit: 1,
     moveEnabled: true,

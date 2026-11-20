@@ -2,40 +2,50 @@
 
 Bots inspect the panorama through the local bridge. Reasoning and usage appear in the result card after the round; active-round views expose progress only.
 
-## Exploration and guesses
+## Exploration and the step journal
 
-| Tool           | Effect                                                | Paid turns   |
-| -------------- | ----------------------------------------------------- | ------------ |
-| `observe`      | Return the starting views                             | 0            |
-| `look`         | Change heading, pitch or field of view                | 1 on success |
-| `move`         | Move along the road when movement is enabled          | 1 on success |
-| `draft_guess`  | Replace the current checkpoint and continue exploring | 0            |
-| `final_guess`  | Freeze the final answer                               | 0            |
-| `submit_guess` | Deprecated alias of `final_guess`                     | 0            |
+| Tool          | Effect                                          | Paid turns   |
+| ------------- | ----------------------------------------------- | ------------ |
+| `observe`     | Return the four starting views (journal step 0) | 0            |
+| `look`        | Change heading, pitch or field of view          | 1 on success |
+| `move`        | Move along the road when movement is enabled    | 1 on success |
+| `final_guess` | Freeze the final answer                         | 0            |
 
-Failed calls do not spend a turn. A final submission remains available after the paid-turn limit. Final answers cannot be overwritten. If the process exits or time expires without a final answer, the latest draft is scored; without either, the bot has no guess. Process completion drains terminal usage without holding round completion for a price request.
+There is no `draft_guess` or `submit_guess`: both are unknown tools. Checkpoints come only from `current_guess` on `look` and `move`.
 
-Advertised draft and final schemas are strict. Their field order is `facts`, `rejected_guesses`, `conclusion`, `lat`, `lng`, then optional `quip`:
+Failed calls do not spend a turn. A final submission remains available after the paid-turn limit. Final answers cannot be overwritten. If the process exits or time expires without a final answer, the latest checkpoint is scored; with no checkpoint and no final answer the bot has no guess (no pin, zero points, "нет догадки"). Process completion drains terminal usage without holding round completion for a price request.
 
-- `facts`: nonempty text, at most 1,000 characters.
-- `rejected_guesses`: required for a final answer, optional for a draft; 0–3 objects with `guess` (1–120 characters) and `reason` (1–300 characters). An empty list explicitly means no alternatives could be ruled out from the visible evidence.
-- `conclusion`: nonempty text, at most 600 characters.
-- `lat`: finite number in `[-90, 90]`; `lng`: finite number, normalized to `[-180, 180]`.
-- `quip`: optional text, at most 120 characters.
+### Fields
 
-Ingress preserves valid coordinates even if reasoning is missing or malformed. Long text is truncated to its field limit, and valid rejected alternatives are retained independently. Legacy `explanation` fills the conclusion slot when no valid conclusion exists, including with partial structured blocks. Game finals require nonempty `facts` and `conclusion` and an explicit valid `rejected_guesses` list, which may be empty. An incomplete final saves a draft and returns a correction request without closing the session. Drafts remain tolerant; the vision-check queue and deprecated `submit_guess` retain their previous finalization behavior.
+Every step records the reason before the action and the finding after it. No extra model turn is spent: the finding about the previous frame travels with the next call.
 
-The prompt requests a short evidence-based draft immediately after viewing the initial frames, followed by a complete final explanation. Explanations must name visible details and connect them to a geographic deduction or a rejected alternative, acknowledging uncertainty rather than inventing clues. When no alternative can be ruled out, the bot supplies an empty list and the result card says so explicitly. File-based harnesses may use `read_file` only for game-provided images. These instructions do not guarantee a model's compliance or geographic accuracy.
+- `hypothesis` (`look`, `move`): why this next action is taken and what each outcome would mean; at most 300 characters. It becomes the step's reason.
+- `finding` (`look`, `move`, `final_guess`): what the PREVIOUS frame(s) showed and what that changes; at most 600 characters. The server attaches it to the previous step (the observe step for the first call). It is required once `observe` returned frames.
+- `shifts` (optional, at most 3, on `look`, `move` and `final_guess`): `{version, effect, because}` with `effect` one of `excluded`, `weaker`, `stronger`. They replace the old `rejected_guesses`.
+- `current_guess` `{lat, lng}` (`look`, `move`): the bot's best point after the previous frame. It is stored on that same step (with `movedKm`, the distance from the previous recorded point) and as a checkpoint, through the same path as the final answer with `finalized = false`.
+- `final_guess`: `lat` (finite, `[-90, 90]`), `lng` (finite, normalized to `[-180, 180]`), `finding`, `shifts`, required first-person `summary` (at most 600 characters) and optional `quip` (at most 120). `facts`, `rejected_guesses` and `conclusion` are gone.
+
+### One-time correction
+
+The allowance belongs to the pending step (the one whose finding is due), not to the call arguments. A `look`/`move` missing `finding` (when one is due) or `current_guess`, or a `final_guess` missing `summary` or `finding` (empty or whitespace-only counts as missing), is rejected with `isError: true` and one Russian message that lists all missing fields and ends with `[GEO_BOT_JOURNAL_FIELD_MISSING]` (see [errors](./errors.md#GEO_BOT_JOURNAL_FIELD_MISSING)). A rejected `look`/`move` persists nothing: no finding, no checkpoint, no frame and no turn. A rejected `final_guess` saves its coordinates as a checkpoint only. The next call for the same pending step is accepted even with fields still missing, whatever its camera arguments: a missing finding marks the step `missing` (card text «вывод не записан»), a missing `current_guess` leaves the checkpoint unchanged and marks the step «новая точка не записана». On acceptance the finding, shifts and point are written first, then the camera action runs; if the frame fetch fails, the journal write stays and a retry never duplicates it.
+
+If the round ends before the last step got its finding, that step is `round-ended` (card text «раунд закончился раньше вывода»). Steps start as `pending` while the bot is working.
+
+### Journal data
+
+`shared/bot-journal.ts` defines one shape (zod and types): steps `{index, kind: observe | look | move, reason?, frames, finding?, findingState: pending | recorded | missing | round-ended, shifts?, currentGuess?, pointMissing?, movedKm?, atMs}` plus `{summary?, finalFinding?}`. The engine event `bot_finding` attaches a finding, shifts and point to a step; the journal reaches clients as `journal` on the AI entry of the round results. Old results with `facts`, `conclusion` or `rejectedGuesses` and no journal still parse, and a record without a journal shows no steps.
+
+The prompt asks the bot to keep several region versions, record the reason before each action and the finding after it, add shifts that exclude or weaken a version, send the current point with every paid action and finish with a first-person summary. A clue counts only if it is tied to a frame and shifts the weight between versions. File-based harnesses may use `read_file` only for game-provided images. These instructions do not guarantee a model's compliance or geographic accuracy.
 
 The advertised time budget is capped by the round duration. Every tool response reports remaining time; at 15 seconds or less it requests a final answer, while the prompt asks the bot to reserve time for submission. An early end to the shared AI waiting window can still end the round before that personal budget.
 
-`look` accepts heading, optional pitch, optional `fov` and optional `zoom` in `1..9`. Explicit finite `fov` takes precedence and is clamped to `10..120`; otherwise `fov = clamp(round(90 / zoom), 10, 120)`, defaulting to 90. A field of view of 20–45 zooms in, while 120 is wide. Fake images use the same field-of-view projection. `look` and `move` advertise a nonempty hypothesis of at most 300 characters; older or incomplete calls can omit it. Successful step records preserve the effective parameters and valid hypothesis.
+`look` accepts heading, optional pitch, optional `fov` and optional `zoom` in `1..9`. Explicit finite `fov` takes precedence and is clamped to `10..120`; otherwise `fov = clamp(round(90 / zoom), 10, 120)`, defaulting to 90. A field of view of 20–45 zooms in, while 120 is wide. Fake images use the same field-of-view projection. Successful step records preserve the effective parameters and the valid hypothesis (the step's reason).
 
 ## Usage and price estimates
 
 Normalized `inputTokens` includes cached reads; `cachedInputTokens` is a subset. `totalTokens` is normalized input plus output. Claude input includes its separately reported cache creation and cache reads. Codex already includes cached reads in its input count. AGY's reported total determines whether its raw input already includes cache reads or reports them separately, so cached input is counted once. Ambiguous or contradictory AGY usage is unavailable. See its [official headless documentation](https://antigravity.google/docs/cli/headless/#read-the-results) for the raw counters. Terminal totals are used without also summing intermediate snapshots. Missing or invalid usage is unavailable. Codex skips unrelated oversized lines and discards accumulated counters when a malformed, truncated or oversized terminal event is identifiable in its bounded prefix.
 
-A paid game turn counts a successful `look` or `move`, not a model request. Observation, draft/final submissions and image-file reads can require further model exchanges and repeated input processing even when only one paid turn is used.
+A paid game turn counts a successful `look` or `move`, not a model request. Observation, checkpoint and final submissions and image-file reads can require further model exchanges and repeated input processing even when only one paid turn is used.
 
 The public [OpenRouter model list](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties) supplies USD-per-token prompt, completion and optional cache-read prices. The estimate is:
 
@@ -54,6 +64,7 @@ The cache lives at `{dataDir}/openrouter-models-cache.json`, is fresh for 24 hou
 The server writes daily JSON Lines files at `{dataDir}/logs/YYYY-MM-DD.jsonl` and prunes log files older than 14 days. Diagnostic records identify a bot run with `matchId`, `gen`, `roundNumber` and `slotId`; timestamps are UTC. Bot diagnostics are bounded and secret-redacted before they reach the log.
 
 - `bot_tool_call` records each requested game tool, including rejected calls and final-answer submissions. It includes bounded original arguments, result text and image metadata/counts (not image bytes), whether a checkpoint was saved, duration and `ok` status.
+- `bot_journal_correction` records each one-time correction with `harness`, `tool`, `missing` (field names) and the code, so the correction rate per harness can be counted. It never contains prompt text, environment values or file paths.
 - `harness_start` and `harness_end` record the selected model, context and process lifecycle. `harness_usage` records raw counters, usage status (`reported`, `missing`, `invalid` or `truncated`), normalized `tokenUsage` or `null`, the number of terminal usage records, and safe CLI metadata when available (`conversation_id`, `status`, `num_turns`, `duration_seconds`). `num_turns` is the CLI's counter; it is not a count of model generations. `rawCounterScope` is `terminal` for Claude and AGY and `last-turn` for Codex.
 - `harness_cost` records an asynchronous reference price estimate. It is not the provider's actual bill.
 - `harness_tool_call` copies AGY guard attempts with `phase: "attempt"`, observed time, tool and allow/deny decision; a record shows an attempted operation, not proof that it completed successfully. The hook journal is copied before the round's `workDir` is removed. Concurrent writes are serialized and capped at 256 KiB; collection accepts at most 512 records. Malformed, overflowing or dropped journal records produce `harness_monitor_error`, while permission decisions remain unchanged.

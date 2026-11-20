@@ -100,6 +100,7 @@ async function runLookTool(
   tracker: MoveTracker,
   turnNum: number,
   args: { heading: number; pitch: number; fov: number; hypothesis?: string },
+  signal: AbortSignal,
 ): Promise<ToolResponsePayload> {
   const pos = tracker.getPosition();
   try {
@@ -113,6 +114,7 @@ async function runLookTool(
       size: params.slot.imageSize,
       fakeSceneIndex: pos.fakeSceneIndex,
     });
+    if (signal.aborted) return { text: 'Раунд уже завершён.', isError: true };
     ctx.dispatch({
       type: 'bot_thumb_added',
       matchId: params.matchId,
@@ -140,6 +142,7 @@ async function runMoveTool(
   tracker: MoveTracker,
   turnNum: number,
   args: { heading: number; hypothesis?: string },
+  signal: AbortSignal,
 ): Promise<ToolResponsePayload> {
   const prevPos = tracker.getPosition();
   try {
@@ -155,6 +158,7 @@ async function runMoveTool(
         size: params.slot.imageSize,
         fakeSceneIndex: res.position.fakeSceneIndex,
       });
+      if (signal.aborted) throw new Error('Раунд уже завершён.');
       ctx.dispatch({
         type: 'bot_thumb_added',
         matchId: params.matchId,
@@ -207,8 +211,10 @@ function buildRoundHandlers(
         return { text: err instanceof Error ? err.message : String(err), isError: true };
       }
     },
-    executeLook: (args) => runLookTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args),
-    executeMove: (args) => runMoveTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args),
+    executeLook: (args, signal) =>
+      runLookTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args, signal),
+    executeMove: (args, signal) =>
+      runMoveTool(ctx, params, deps.tracker, deps.getTurnsUsed() + 1, args, signal),
     onGuess(guess, finalized) {
       deps.onSubmittedGuess();
       ctx.dispatch({
@@ -219,6 +225,17 @@ function buildRoundHandlers(
         botId: slot.id,
         guess,
         finalized,
+      });
+    },
+    onFinding: ({ turn, ...rest }) => {
+      ctx.dispatch({
+        type: 'bot_finding',
+        matchId,
+        gen,
+        roundNumber,
+        botId: slot.id,
+        turn,
+        ...rest,
       });
     },
     onTurnsChanged: (turnsUsed) => {
@@ -308,6 +325,16 @@ function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
     moveLimit: slot.moveLimit,
     moveEnabled,
     requireCompleteReasoning: true,
+    onCorrection: (info) => {
+      logBotDiagnostic(ctx.logger, 'bot_journal_correction', {
+        matchId,
+        gen,
+        roundNumber,
+        slotId: slot.id,
+        harness: slot.harness,
+        ...info,
+      });
+    },
     onDispatch: (audit) => {
       logBotDiagnostic(ctx.logger, 'bot_tool_call', {
         matchId,

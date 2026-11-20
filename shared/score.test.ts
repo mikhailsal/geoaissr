@@ -7,12 +7,7 @@ import {
   haversineDistanceKm,
   rankStandings,
 } from './score.ts';
-import {
-  normalizeSubmitGuessInput,
-  parseGuessInput,
-  personalityTextSchema,
-  submitGuessInputSchema,
-} from './bot-tools.ts';
+import { finalGuessInputSchema, parseGuessInput, personalityTextSchema } from './bot-tools.ts';
 
 test('calculateRoundScore awards 5000 under 25m and decays exponentially', () => {
   expect(calculateRoundScore(0, WORLD_DIAGONAL_KM)).toBe(5000);
@@ -81,36 +76,23 @@ test('computeHumanVsAiMatch hides when one side is absent and sums round means',
   expect(visible.aiTotal).toBe(7000);
 });
 
-// protects=strict advertised reasoning and tolerant legacy bounds; fails_when=invalid coordinates or empty conclusions pass, or legacy text exceeds its limit; no_claim=does not test model compliance
-test('strict final schema and tolerant legacy ingress retain coordinate and text bounds', () => {
-  const structured = {
-    facts: 'Road signs',
-    rejected_guesses: [{ guess: 'Belgium', reason: 'Wrong signs' }],
-    conclusion: 'France',
-    lat: 55,
-    lng: 190,
-  };
-  expect(submitGuessInputSchema.safeParse({ ...structured, lat: 91 }).success).toBe(false);
-  expect(submitGuessInputSchema.safeParse({ ...structured, conclusion: '   ' }).success).toBe(
-    false,
-  );
-  expect(submitGuessInputSchema.safeParse({ ...structured, explanation: 'legacy' }).success).toBe(
-    false,
-  );
-  const strict = normalizeSubmitGuessInput(submitGuessInputSchema.parse(structured));
-  expect(strict.lng).toBe(-170);
-  expect(strict.conclusion).toBe('France');
+// protects=strict final schema and tolerant ingress bounds; fails_when=invalid coordinates or empty summaries pass, or text exceeds its limit; no_claim=does not test model compliance
+test('strict final schema and tolerant ingress retain coordinate and text bounds', () => {
+  const structured = { summary: 'France', finding: 'Road signs', lat: 55, lng: 190 };
+  expect(finalGuessInputSchema.safeParse({ ...structured, lat: 91 }).success).toBe(false);
+  expect(finalGuessInputSchema.safeParse({ ...structured, summary: '   ' }).success).toBe(false);
+  expect(finalGuessInputSchema.safeParse({ ...structured, conclusion: 'old' }).success).toBe(false);
   const norm = parseGuessInput({
     lat: 55,
     lng: 190,
-    explanation: 'x'.repeat(700),
+    summary: 'x'.repeat(700),
     quip: 'q'.repeat(200),
   });
   expect(norm?.lng).toBe(-170);
-  expect(norm?.explanation).toHaveLength(600);
+  expect(norm?.summary).toHaveLength(600);
   expect(norm?.quip).toHaveLength(120);
-  expect(parseGuessInput({ lat: 91, lng: 0, explanation: 'legacy' })).toBeUndefined();
-  expect(parseGuessInput({ lat: 10, lng: 0, explanation: '   ' })?.explanation).toBe('');
+  expect(parseGuessInput({ lat: 91, lng: 0, summary: 'x' })).toBeUndefined();
+  expect(parseGuessInput({ lat: 10, lng: 0, summary: '   ' })?.explanation).toBe('');
 });
 
 test('personalityTextSchema rejects newlines and >200 chars', () => {
