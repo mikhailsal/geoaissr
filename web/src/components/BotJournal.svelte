@@ -12,30 +12,54 @@
 
   const listId = `journal-steps-${Math.random().toString(36).slice(2, 9)}`;
   let open = $state(false);
-  let preview = $state<{ frame: JournalFrame; fallback: boolean; failed: boolean } | null>(null);
+  interface PreviewState {
+    frame: JournalFrame;
+    /** The full image finished decoding; until then the cached thumbnail is shown. */
+    fullReady: boolean;
+    fullFailed: boolean;
+    thumbFailed: boolean;
+  }
+  let preview = $state<PreviewState | null>(null);
+  /** Bumped on every open, so a late decode cannot update a different preview. */
+  let previewSeq = 0;
   let trigger: HTMLElement | null = null;
 
   let journal = $derived(entry.journal);
   let summary = $derived(
     journal ? journal.summary : (entry.conclusion ?? entry.explanation ?? undefined),
   );
-  let previewSrc = $derived(
-    preview && !preview.failed
-      ? preview.fallback
-        ? preview.frame.thumbUrl
-        : (preview.frame.fullUrl ?? preview.frame.thumbUrl)
-      : null,
-  );
+  let previewSrc = $derived.by(() => {
+    if (!preview) return null;
+    const { frame, fullReady, fullFailed, thumbFailed } = preview;
+    if (frame.fullUrl && fullReady && !fullFailed) return frame.fullUrl;
+    if (!thumbFailed) return frame.thumbUrl;
+    if (frame.fullUrl && !fullFailed) return frame.fullUrl;
+    return null;
+  });
 
   function openPreview(frame: JournalFrame, button: HTMLElement): void {
     trigger = button;
-    preview = { frame, fallback: false, failed: false };
+    preview = { frame, fullReady: false, fullFailed: false, thumbFailed: false };
+    const seq = ++previewSeq;
+    const full = frame.fullUrl;
+    if (!full || full === frame.thumbUrl) return;
+    // Show the thumbnail the step already loaded; switch once the full image is decoded.
+    const image = new Image();
+    image.src = full;
+    void image.decode().then(
+      () => {
+        if (preview && seq === previewSeq) preview = { ...preview, fullReady: true };
+      },
+      () => {
+        if (preview && seq === previewSeq) preview = { ...preview, fullFailed: true };
+      },
+    );
   }
   function previewFailed(): void {
     if (!preview) return;
-    // Full image failed: try the thumbnail; both failed: say so inside the open dialog.
-    if (!preview.fallback && preview.frame.fullUrl) preview = { ...preview, fallback: true };
-    else preview = { ...preview, failed: true };
+    // A failed thumbnail falls through to the full image; both failed: «Кадр недоступен».
+    if (previewSrc === preview.frame.thumbUrl) preview = { ...preview, thumbFailed: true };
+    else preview = { ...preview, fullFailed: true };
   }
   async function closePreview(): Promise<void> {
     preview = null;
