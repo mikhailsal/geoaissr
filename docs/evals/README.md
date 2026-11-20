@@ -46,7 +46,12 @@ Each spot is four 1024x1024 JPEG perspective frames (90 degree field of view, ya
     "countryNameRu": "Польша",
     "lat": 52.2297,
     "lng": 21.0122,
-    "imagePaths": ["./01-0.jpg", "./01-90.jpg", "./01-180.jpg", "./01-270.jpg"],
+    "imagePaths": [
+      "./frames/spot-01-0.jpg",
+      "./frames/spot-01-1.jpg",
+      "./frames/spot-01-2.jpg",
+      "./frames/spot-01-3.jpg"
+    ],
     "headingDeg": 143.5,
     "source": {
       "title": "...",
@@ -66,7 +71,7 @@ Each spot is four 1024x1024 JPEG perspective frames (90 degree field of view, ya
 
 Without `--dataset`, `--dry` uses three built-in fake spots (`sample-warsaw`, `sample-tokyo`, `sample-milan`) with no frames. Live runs always need `--dataset`.
 
-The dataset itself is built separately under `docs/evals/dataset/`; this tool only reads the manifest format above. `imagePaths` are relative to the manifest directory and are resolved to absolute paths at load time. The sha256 of `manifest.json` and of every frame it names is recorded as `datasetHash`, so replacing a photo changes it even when the manifest stays the same.
+The committed dataset lives in `docs/evals/dataset/` (28 spots, frames in `frames/`, per-spot credits in [ATTRIBUTION.md](./dataset/ATTRIBUTION.md); its labels were made by a model and are unreviewed); this tool only reads the manifest format above. `imagePaths` are relative to the manifest directory and are resolved to absolute paths at load time. The sha256 of `manifest.json` and of every frame it names is recorded as `datasetHash`, so replacing a photo changes it even when the manifest stays the same.
 
 ### Headings and the unknown-compass limitation
 

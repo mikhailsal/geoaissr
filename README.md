@@ -64,7 +64,7 @@ After a round, open an AI's **«почему?»** card to inspect its step journ
 
 The token badge shows CLI-reported usage when available. Its tooltip separates input, output and cached input and identifies the matched OpenRouter model. The dollar value shows three decimal places with **«API-цена для справки»**, using OpenRouter reference prices rather than the host's subscription bill; approximate model matches are labelled. Missing usage, prices or a suitable match appear as **«н/д»**. The model-price list is cached for 24 hours in `openrouter-models-cache.json` in the data directory; failed refreshes use the last readable cache.
 
-The [bot tool and accounting reference](docs/bot-tools.md) describes draft/final submissions, camera parameters and token normalization. The offline evaluation exercises the runtime and scoring pipeline; it does not measure how well a live model follows the prompt.
+The [bot tool and accounting reference](docs/bot-tools.md) describes the step journal fields, checkpoints and final submissions, camera parameters and token normalization. The dry evaluation exercises the runtime and scoring pipeline with fake bots; a live `bun run eval:bots` run measures one real bot configuration on the licensed photo set ([details](docs/evals/README.md)), and neither guarantees how well a model follows the prompt.
 
 ---
 
