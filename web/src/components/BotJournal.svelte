@@ -12,7 +12,7 @@
 
   const listId = `journal-steps-${Math.random().toString(36).slice(2, 9)}`;
   let open = $state(false);
-  let preview = $state<{ frame: JournalFrame; fallback: boolean } | null>(null);
+  let preview = $state<{ frame: JournalFrame; fallback: boolean; failed: boolean } | null>(null);
   let trigger: HTMLElement | null = null;
 
   let journal = $derived(entry.journal);
@@ -20,7 +20,7 @@
     journal ? journal.summary : (entry.conclusion ?? entry.explanation ?? undefined),
   );
   let previewSrc = $derived(
-    preview
+    preview && !preview.failed
       ? preview.fallback
         ? preview.frame.thumbUrl
         : (preview.frame.fullUrl ?? preview.frame.thumbUrl)
@@ -29,12 +29,13 @@
 
   function openPreview(frame: JournalFrame, button: HTMLElement): void {
     trigger = button;
-    preview = { frame, fallback: false };
+    preview = { frame, fallback: false, failed: false };
   }
   function previewFailed(): void {
-    if (preview && !preview.fallback && preview.frame.fullUrl)
-      preview = { ...preview, fallback: true };
-    else preview = null;
+    if (!preview) return;
+    // Full image failed: try the thumbnail; both failed: say so inside the open dialog.
+    if (!preview.fallback && preview.frame.fullUrl) preview = { ...preview, fallback: true };
+    else preview = { ...preview, failed: true };
   }
   async function closePreview(): Promise<void> {
     preview = null;
@@ -82,7 +83,7 @@
   {/if}
 </section>
 
-{#if previewSrc}
+{#if preview}
   <ImagePreview src={previewSrc} onClose={closePreview} onError={previewFailed} />
 {/if}
 
@@ -135,6 +136,10 @@
     font: inherit;
     text-align: left;
     cursor: pointer;
+    transition: background-color 120ms ease-out;
+  }
+  .disclosure:hover {
+    background: var(--asphalt-700);
   }
   .steps-wrap {
     container-type: inline-size;

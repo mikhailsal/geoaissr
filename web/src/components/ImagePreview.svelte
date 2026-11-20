@@ -2,7 +2,8 @@
   import { X } from '@lucide/svelte';
 
   interface Props {
-    src: string;
+    /** null when neither the full image nor the thumbnail loaded. */
+    src: string | null;
     onClose: () => void;
     onError: () => void;
   }
@@ -44,7 +45,11 @@
       <X size={20} aria-hidden="true" />
     </button>
   </header>
-  <img {src} alt="Увеличенный снимок бота" onerror={onError} />
+  {#if src}
+    <img {src} alt="Увеличенный снимок бота" onerror={onError} />
+  {:else}
+    <p class="unavailable">Кадр недоступен</p>
+  {/if}
 </dialog>
 
 <style>
@@ -74,6 +79,12 @@
   .btn {
     min-width: var(--control-h);
     padding: 0;
+  }
+  .unavailable {
+    margin: 0;
+    padding: var(--sp-6) var(--sp-4);
+    color: var(--paper-dim);
+    text-align: center;
   }
   img {
     width: auto;

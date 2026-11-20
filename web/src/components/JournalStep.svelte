@@ -14,7 +14,7 @@
 </script>
 
 <li class="step" class:observe={step.kind === 'observe'} class:has-media={step.frames.length > 0}>
-  <h5 class="title">{stepTitle(step)}</h5>
+  <h4 class="title">{stepTitle(step)}</h4>
   {#if step.frames.length}
     <div class="media"><StepFrames {step} {onPreview} /></div>
   {/if}
@@ -70,11 +70,11 @@
     flex-direction: column;
     gap: var(--sp-1);
   }
-  h5,
+  h4,
   p {
     margin: 0;
   }
-  h5 {
+  h4 {
     font-size: 1rem;
   }
   p {

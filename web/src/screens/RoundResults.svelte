@@ -158,12 +158,31 @@
               <th>Участник</th>
               <th>Дистанция</th>
               <th class="num-col">Очки</th>
-              <th></th>
+              <th class="act-col"></th>
             </tr>
           </thead>
           <tbody>
             {#each res.entries as entry (entry.id)}
               {@const cardOpen = activeBotCard?.entry.id === entry.id}
+              {#snippet whyButton()}
+                <button
+                  type="button"
+                  class="btn why-btn"
+                  aria-expanded={cardOpen}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    selectedId = entry.id;
+                    if (cardOpen) {
+                      closeAndRestoreFocus();
+                    } else {
+                      lastTriggerBtn = e.currentTarget;
+                      onSelectBotCard(view.roundNumber, entry);
+                    }
+                  }}
+                >
+                  {cardOpen ? RU.results.hideWhyBtn : RU.results.whyBtn}
+                </button>
+              {/snippet}
               <tr
                 class:selected-row={selectedId === entry.id}
                 onclick={() => (selectedId = entry.id)}
@@ -180,6 +199,8 @@
                     />
                     <span class="p-name">{entry.name}</span>
                   </div>
+                  <!-- On a narrow table the trigger moves under the name so it is never off screen. -->
+                  {#if entry.isAi}<div class="why-inline">{@render whyButton()}</div>{/if}
                 </td>
                 <td>
                   {#if entry.distanceKm !== null}
@@ -195,25 +216,7 @@
                 </td>
                 <td class="num-col"><strong>{formatNumberRu(entry.roundScore)}</strong></td>
                 <td class="act-col">
-                  {#if entry.isAi}
-                    <button
-                      type="button"
-                      class="btn why-btn"
-                      aria-expanded={cardOpen}
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        selectedId = entry.id;
-                        if (cardOpen) {
-                          closeAndRestoreFocus();
-                        } else {
-                          lastTriggerBtn = e.currentTarget;
-                          onSelectBotCard(view.roundNumber, entry);
-                        }
-                      }}
-                    >
-                      {cardOpen ? RU.results.hideWhyBtn : RU.results.whyBtn}
-                    </button>
-                  {/if}
+                  {#if entry.isAi}{@render whyButton()}{/if}
                 </td>
               </tr>
 
@@ -388,6 +391,26 @@
     min-height: 44px;
     padding: 0 0.65rem;
     font-size: 0.85rem;
+  }
+
+  .why-inline {
+    display: none;
+    margin-top: var(--sp-1);
+  }
+
+  @container (max-width: 420px) {
+    .why-inline {
+      display: block;
+    }
+
+    .results-table .act-col {
+      display: none;
+    }
+
+    .results-table th,
+    .results-table td {
+      padding-inline: 0.3rem;
+    }
   }
 
   .bot-card-row td {
