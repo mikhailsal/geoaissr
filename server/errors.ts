@@ -29,6 +29,7 @@ export const ERROR_CODES = [
   'GEO_BOT_JOURNAL_FIELD_MISSING',
   'GEO_BOT_BRIDGE_UNREACHABLE',
   'GEO_CRASH',
+  'GEO_EVAL_HARNESS_FAILED',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -185,6 +186,14 @@ export const ERROR_REGISTRY: Record<ErrorCode, ErrorRegistryEntry> = {
     whatTemplate: 'непредвиденный сбой сервера',
     fixTemplate: 'запустите `bun run start` снова; партия потеряна, сыгранные раунды не записаны',
     docAnchor: 'docs/errors.md#GEO_CRASH',
+  },
+  GEO_EVAL_HARNESS_FAILED: {
+    code: 'GEO_EVAL_HARNESS_FAILED',
+    errorClass: 'dependency',
+    exitCode: 1,
+    whatTemplate: 'не удалось запустить CLI бота во время eval:bots',
+    fixTemplate: 'проверьте окружение: `bun run doctor`',
+    docAnchor: 'docs/errors.md#GEO_EVAL_HARNESS_FAILED',
   },
 };
 

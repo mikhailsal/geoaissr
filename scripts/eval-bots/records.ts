@@ -16,8 +16,23 @@ export interface StepText {
   finding: string | null;
 }
 
+/**
+ * `reason` of the `bot_finished` event the runner emits when no bot process could be started
+ * (see `dispatchBotLaunchFailure` in server/bots/process.ts). It is infrastructure, not a result.
+ */
+export const LAUNCH_FAILURE_REASON = 'сбой запуска';
+
+/** Tool-call audit counted from the runner's dispatch diagnostics; null when not observable. */
+export interface ToolAudit {
+  toolCalls: number;
+  /** Calls rejected with an `isError` result (a correction the bot had to react to). */
+  corrections: number;
+}
+
 export interface RoundRecord {
   spotId: string;
+  /** Opaque id used for every runtime path and match id of this round. */
+  executionId: string;
   repeat: number;
   harness: string;
   model: string;
@@ -42,6 +57,12 @@ export interface RoundRecord {
   stepsWithFinding: number | null;
   tokenUsage: BotTokenUsage | null;
   steps: StepText[];
+  /** Tool calls seen by the dispatch audit; null when the audit saw none. */
+  toolCalls: number | null;
+  /** Tool calls rejected with an isError correction; null when not observable. */
+  corrections: number | null;
+  /** Harness launch failure or setup failure: the round was not measured. */
+  infraError: string | null;
   error: string | null;
 }
 
@@ -118,6 +139,7 @@ function lastTokenUsage(events: readonly TimedEvent[]): BotTokenUsage | null {
 
 export interface RoundContext {
   spotId: string;
+  executionId: string;
   repeat: number;
   harness: string;
   model: string;
@@ -125,6 +147,7 @@ export interface RoundContext {
   moveLimit: number;
   truth: { lat: number; lng: number };
   timedOut: boolean;
+  audit?: ToolAudit | null;
 }
 
 const round1 = (v: number): number => Math.round(v * 10) / 10;
@@ -136,9 +159,11 @@ export function buildRoundRecord(ctx: RoundContext, events: readonly TimedEvent[
   const finishedEvent = events.find((e) => e.event.type === 'bot_finished')?.event;
   const finished = finishedEvent?.type === 'bot_finished' ? finishedEvent : null;
   const { steps, hasFindingField } = collectSteps(events);
+  const launchFailed = finished?.reason === LAUNCH_FAILURE_REASON;
   const pin = scored.guess ? { lat: scored.guess.lat, lng: scored.guess.lng } : null;
   return {
     spotId: ctx.spotId,
+    executionId: ctx.executionId,
     repeat: ctx.repeat,
     harness: ctx.harness,
     model: ctx.model,
@@ -162,6 +187,9 @@ export function buildRoundRecord(ctx: RoundContext, events: readonly TimedEvent[
     stepsWithFinding: hasFindingField ? steps.filter((s) => s.finding !== null).length : null,
     tokenUsage: lastTokenUsage(events),
     steps,
+    toolCalls: ctx.audit ? ctx.audit.toolCalls : null,
+    corrections: ctx.audit ? ctx.audit.corrections : null,
+    infraError: launchFailed ? (finished.diagnosticsTail ?? finished.reason) : null,
     error: null,
   };
 }
@@ -188,6 +216,9 @@ export function buildFailedRecord(
     stepsWithFinding: null,
     tokenUsage: null,
     steps: [],
+    toolCalls: null,
+    corrections: null,
+    infraError: error instanceof Error ? error.message : String(error),
     error: error instanceof Error ? error.message : String(error),
   };
 }

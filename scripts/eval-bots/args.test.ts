@@ -1,9 +1,17 @@
 import { expect, test } from 'bun:test';
-import { parseEvalArgs } from './args.ts';
+import {
+  closestFlag,
+  evalHelpText,
+  EvalArgsError,
+  formatEvalArgsError,
+  parseEvalArgs,
+} from './args.ts';
 
 test('parseEvalArgs applies the documented defaults', () => {
   expect(parseEvalArgs([])).toEqual({
     dry: false,
+    help: false,
+    spotIds: [],
     harness: 'claude',
     datasetDir: null,
     repeats: 3,
@@ -41,9 +49,14 @@ test('parseEvalArgs reads every flag', () => {
       '/tmp/out',
       '--limit',
       '5',
+      '--spot',
+      'a-1',
+      '--spot=b-2',
     ]),
   ).toEqual({
     dry: true,
+    help: false,
+    spotIds: ['a-1', 'b-2'],
     harness: 'codex',
     datasetDir: './ds',
     repeats: 2,
@@ -75,4 +88,57 @@ test('parseEvalArgs rejects out-of-range and malformed values', () => {
   for (const argv of bad) {
     expect(() => parseEvalArgs(argv)).toThrow();
   }
+});
+
+test('parseEvalArgs accepts --flag=value as well as --flag value', () => {
+  expect(parseEvalArgs(['--repeats=2', '--harness=agy', '--budget', '90'])).toMatchObject({
+    repeats: 2,
+    harness: 'agy',
+    budgetSec: 90,
+  });
+});
+
+function problem(argv: string[]): string {
+  try {
+    parseEvalArgs(argv);
+  } catch (err) {
+    expect(err).toBeInstanceOf(EvalArgsError);
+    return formatEvalArgsError(err as EvalArgsError);
+  }
+  throw new Error(`expected ${argv.join(' ')} to be rejected`);
+}
+
+test('unknown flags are rejected with a suggestion and the code', () => {
+  const line = problem(['--dyr']);
+  expect(line).toContain('unknown flag --dyr');
+  expect(line).toContain('did you mean --dry?');
+  expect(line.endsWith('(GEO_INVALID_ARGS)')).toBe(true);
+  expect(line.includes('\n')).toBe(false);
+  expect(problem(['--zzzzzzzzzzzz'])).toContain('see --help');
+  expect(problem(['--repeat', '2'])).toContain('--repeats');
+  expect(closestFlag('--dataste')).toBe('--dataset');
+});
+
+test('duplicate, malformed and stray flags are rejected', () => {
+  expect(problem(['--repeats', '1', '--repeats', '2'])).toContain('duplicate flag --repeats');
+  expect(problem(['--dry', '--dry'])).toContain('duplicate flag --dry');
+  expect(problem(['--spot', 'a', '--spot=a'])).toContain('duplicate flag --spot a');
+  expect(problem(['--dry=yes'])).toContain('takes no value');
+  expect(problem(['--repeats='])).toContain('non-empty value');
+  expect(problem(['--repeats'])).toContain('requires a value');
+  expect(problem(['--repeats', '--dry'])).toContain('requires a value');
+  expect(problem(['--repeats', '2.5'])).toContain('integer');
+  expect(problem(['--spot', 'Bad_Id'])).toContain('malformed spot id');
+  expect(problem(['stray'])).toContain('unexpected argument');
+  expect(problem(['-d'])).toContain('unexpected argument');
+});
+
+test('--help lists every flag with its default', () => {
+  expect(parseEvalArgs(['--help']).help).toBe(true);
+  const text = evalHelpText();
+  for (const flag of ['--dry', '--harness', '--spot', '--repeats', '--budget', '--concurrency']) {
+    expect(text).toContain(flag);
+  }
+  expect(text).toContain('(default: 3)');
+  expect(text).toContain('GEO_EVAL_HARNESS_FAILED');
 });

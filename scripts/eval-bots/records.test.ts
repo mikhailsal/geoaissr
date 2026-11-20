@@ -1,6 +1,8 @@
 import { expect, test } from 'bun:test';
 import {
+  buildFailedRecord,
   buildRoundRecord,
+  LAUNCH_FAILURE_REASON,
   pickScoredGuess,
   type RoundContext,
   type TimedEvent,
@@ -9,6 +11,7 @@ import {
 const IDS = { matchId: 'm', gen: 1, roundNumber: 1, botId: 'b' } as const;
 const CTX: RoundContext = {
   spotId: 's1',
+  executionId: 'abc1234567',
   repeat: 1,
   harness: 'claude',
   model: 'm',
@@ -94,4 +97,49 @@ test('buildRoundRecord marks a round without guesses as no pin', () => {
     pinMovementKm: null,
     hasFinalGuess: false,
   });
+});
+
+test('time to final is when the final guess was accepted, not when the process exited', () => {
+  const rec = buildRoundRecord(CTX, [guess(4200, 0, true), finished(58_000)]);
+  expect(rec.timeToFinalSec).toBe(4.2);
+});
+
+test('a harness launch failure is an infra error, not a measured timeout', () => {
+  const launchFailure: TimedEvent = {
+    tMs: 5,
+    event: {
+      type: 'bot_finished',
+      ...IDS,
+      aborted: true,
+      reason: LAUNCH_FAILURE_REASON,
+      diagnosticsTail: 'spawn claude ENOENT',
+    },
+  };
+  const rec = buildRoundRecord(CTX, [launchFailure]);
+  expect(rec.infraError).toBe('spawn claude ENOENT');
+  expect(rec.timedOut).toBe(false);
+  expect(rec.hasFinalGuess).toBe(false);
+});
+
+test('an ordinary abort or a timeout is a measured outcome, not an infra error', () => {
+  const crashed: TimedEvent = {
+    tMs: 9,
+    event: { type: 'bot_finished', ...IDS, aborted: true, reason: 'ошибка процесса (код 1)' },
+  };
+  expect(buildRoundRecord(CTX, [crashed]).infraError).toBeNull();
+  expect(buildRoundRecord({ ...CTX, timedOut: true }, [thumb(1, 1)]).infraError).toBeNull();
+});
+
+test('the dispatch audit is recorded, or null when not observable', () => {
+  expect(buildRoundRecord(CTX, [finished(1)])).toMatchObject({
+    toolCalls: null,
+    corrections: null,
+  });
+  const rec = buildRoundRecord({ ...CTX, audit: { toolCalls: 7, corrections: 2 } }, [finished(1)]);
+  expect(rec).toMatchObject({ toolCalls: 7, corrections: 2 });
+});
+
+test('a setup failure becomes an infra error record', () => {
+  const { truth: _truth, timedOut: _timedOut, ...base } = CTX;
+  expect(buildFailedRecord(base, new Error('no frames')).infraError).toBe('no frames');
 });

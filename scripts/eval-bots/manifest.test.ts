@@ -45,3 +45,14 @@ test('invalid entries are rejected', () => {
     evalDatasetManifestSchema.parse([{ ...OLD_ENTRY, signText: [{ frame: 4, text: 'x' }] }]),
   ).toThrow();
 });
+
+test('spot ids must be unique and path-safe', () => {
+  expect(() => evalDatasetManifestSchema.parse([OLD_ENTRY, OLD_ENTRY])).toThrow(/duplicate/);
+  for (const id of ['', 'A', '../x', 'a b', '-a', 'a_b', 'a'.repeat(65)]) {
+    expect(() => evalDatasetManifestSchema.parse([{ ...OLD_ENTRY, id }])).toThrow();
+  }
+  expect(() => evalDatasetManifestSchema.parse([{ ...OLD_ENTRY, id: 'pl-01' }])).not.toThrow();
+  expect(() =>
+    evalDatasetManifestSchema.parse([{ ...OLD_ENTRY, id: 'a'.repeat(64) }]),
+  ).not.toThrow();
+});
