@@ -138,6 +138,7 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
       [1280, 720],
       [390, 740],
       [844, 390],
+      [420, 320],
     ] as const) {
       await page.setViewportSize({ width, height });
       await expect.poll(async () => (await previewFrame(canvas)).aspectError).toBeLessThan(0.02);
@@ -148,6 +149,9 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
         await expect(
           dialog.getByRole('button', { name, exact: true, pressed: true }),
         ).toBeVisible();
+        await expect(dialog).toHaveAccessibleName(
+          name === 'Гардероб' ? 'Гардероб: Клод' : 'Настройки ИИ · Клод',
+        );
         expect(first.aspectError).toBeLessThan(0.02);
         expect(first.silhouette / before.silhouette).toBeCloseTo(1, 1);
         const settled = await previewFrame(canvas);

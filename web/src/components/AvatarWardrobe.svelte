@@ -41,9 +41,6 @@
     error = null,
   }: Props = $props();
   let tab = $state(untrack(() => initialTab));
-  const title = $derived(
-    tab === 'profile' ? 'Профиль' : tab === 'bot' ? 'Настройки ИИ · ' + name : 'Гардероб: ' + name,
-  );
   let dialog: HTMLDialogElement;
   let draft = $state(untrack(() => ({ ...appearance })));
   const look = $derived(readOnly ? appearance : draft);
@@ -76,7 +73,11 @@
   onclose={onClose}
 >
   <header>
-    <h2 id="wardrobe-heading">{title}</h2>
+    <h2 id="wardrobe-heading">
+      <span class:inactive={tab !== 'appearance'}>Гардероб: {name}</span>
+      {#if profile}<span class:inactive={tab !== 'profile'}>Профиль</span>{/if}
+      {#if botSettings}<span class:inactive={tab !== 'bot'}>Настройки ИИ · {name}</span>{/if}
+    </h2>
     {#if profile || botSettings}<CharacterTabs
         bind:tab
         showProfile={!!profile}
@@ -251,10 +252,18 @@
     border-bottom: 1px solid var(--line);
   }
   h2 {
+    display: grid;
     font-family: var(--font-display);
     font-size: clamp(1rem, 2vw, 1.4rem);
     margin: 0;
     overflow-wrap: anywhere;
+  }
+  /* Reserve the tallest wrapped title so switching tabs keeps the preview the same size. */
+  h2 span {
+    grid-area: 1 / 1;
+  }
+  h2 .inactive {
+    visibility: hidden;
   }
   .icon {
     padding: 0;
