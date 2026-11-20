@@ -4,7 +4,7 @@ Every command-line error is printed to `stderr` with a code from `server/errors.
 
 ## GEO_INVALID_ARGS
 
-Invalid arguments or incompatible flags (for example, `--public-url` together with `--no-tunnel`, or an invalid `--port`). Fix the flags and run again.
+Invalid arguments or incompatible flags (for example, `--public-url` together with `--no-tunnel`, or an invalid `--port`). Fix the flags and run again. `bun run eval:bots` also uses this code for unknown, duplicate or malformed flags and unknown `--spot` ids, and exits with `2` (see [docs/evals/README.md](./evals/README.md)).
 
 ## GEO_ENV_KEY_MISSING
 
@@ -65,3 +65,7 @@ Current usage plus the worst case of the new match exceeds the configured monthl
 ## GEO_CRASH
 
 Unexpected exception on the server. The full stack trace (without keys and tokens) is written to `<GEOAISSR_DATA_DIR>/logs/crash-<timestamp>.log`. Restart `bun run start`.
+
+## GEO_EVAL_HARNESS_FAILED
+
+`bun run eval:bots` could not start the bot CLI (missing executable, process failed to start, setup failure) in at least one round. Such rounds are recorded as infra errors in `rounds.jsonl` and are not counted as measured timeouts; the command exits `1`. Run `bun run doctor`, fix the harness, and run the evaluation again.

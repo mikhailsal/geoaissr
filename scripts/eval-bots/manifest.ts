@@ -1,9 +1,13 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 
+/** Spot ids end up in CLI flags and logs, so they are lowercase, path-safe and bounded. */
+export const SPOT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
 export const evalSampleSchema = z.object({
-  id: z.string().trim().min(1),
+  id: z.string().regex(SPOT_ID_PATTERN, 'spot id must match ^[a-z0-9][a-z0-9-]{0,63}$'),
   countryNameRu: z.string().trim().min(1),
   lat: z.number().finite().min(-90).max(90),
   lng: z.number().finite().min(-180).max(180),
@@ -30,7 +34,22 @@ export const evalSampleSchema = z.object({
   labelledBy: z.string().optional(),
 });
 
-export const evalDatasetManifestSchema = z.array(evalSampleSchema).min(1);
+export const evalDatasetManifestSchema = z
+  .array(evalSampleSchema)
+  .min(1)
+  .superRefine((items, ctx) => {
+    const seen = new Set<string>();
+    items.forEach((item, index) => {
+      if (seen.has(item.id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [index, 'id'],
+          message: `duplicate spot id "${item.id}"`,
+        });
+      }
+      seen.add(item.id);
+    });
+  });
 
 export type EvalSampleItem = z.infer<typeof evalSampleSchema>;
 
@@ -40,16 +59,23 @@ const BUILTIN_SAMPLES: EvalSampleItem[] = [
   { id: 'sample-milan', countryNameRu: 'Италия', lat: 45.4642, lng: 9.19 },
 ];
 
+export interface LoadedDataset {
+  samples: EvalSampleItem[];
+  /** First 12 hex of the sha256 of manifest.json; null for the built-in dry spots. */
+  datasetHash: string | null;
+}
+
 /** Loads and validates a dataset directory; without one, returns three frame-less dry samples. */
-export function loadDataset(datasetDir: string | null): EvalSampleItem[] {
-  if (datasetDir === null) return BUILTIN_SAMPLES;
+export function loadDatasetWithHash(datasetDir: string | null): LoadedDataset {
+  if (datasetDir === null) return { samples: BUILTIN_SAMPLES, datasetHash: null };
   const absDir = path.resolve(datasetDir);
   const manifestPath = path.join(absDir, 'manifest.json');
   if (!existsSync(manifestPath)) {
     throw new Error(`Dataset manifest not found: ${manifestPath}`);
   }
-  const parsed = evalDatasetManifestSchema.parse(JSON.parse(readFileSync(manifestPath, 'utf8')));
-  return parsed.map((item) => {
+  const bytes = readFileSync(manifestPath);
+  const parsed = evalDatasetManifestSchema.parse(JSON.parse(bytes.toString('utf8')));
+  const samples = parsed.map((item) => {
     if (!item.imagePaths) return item;
     const resolved = item.imagePaths.map((p) => {
       const absImg = path.resolve(absDir, p);
@@ -60,4 +86,9 @@ export function loadDataset(datasetDir: string | null): EvalSampleItem[] {
     }) as [string, string, string, string];
     return { ...item, imagePaths: resolved };
   });
+  return { samples, datasetHash: createHash('sha256').update(bytes).digest('hex').slice(0, 12) };
+}
+
+export function loadDataset(datasetDir: string | null): EvalSampleItem[] {
+  return loadDatasetWithHash(datasetDir).samples;
 }

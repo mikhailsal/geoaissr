@@ -9,6 +9,9 @@ import { createFakeLocationService } from '../../server/location.ts';
 import { createQuotaManager } from '../../server/storage/quota.ts';
 import type { HarnessId } from '../../shared/storage-schemas.ts';
 import type { EvalArgs } from './args.ts';
+import { createToolAuditLogger } from './audit.ts';
+import { executionPaths, makeExecutionId } from './exec-id.ts';
+import { EVAL_BOT_NAME } from './fingerprint.ts';
 import { createDatasetImageService } from './image-service.ts';
 import type { EvalSampleItem } from './manifest.ts';
 import {
@@ -21,6 +24,9 @@ import {
 /** Extra seconds granted after the bot budget before a round is declared timed out. */
 export const BUDGET_GRACE_SEC = 15;
 
+/** Reasoning effort of the eval bot slot; recorded in the summary. */
+export const EVAL_EFFORT = 'low' as const;
+
 export type RoundSettings = Pick<
   EvalArgs,
   'dry' | 'harness' | 'budgetSec' | 'moveLimit' | 'imageSize'
@@ -30,11 +36,11 @@ function makeEvalBotSlot(settings: RoundSettings) {
   const adapter = getHarnessAdapter(settings.harness);
   return {
     id: 'eval-bot',
-    name: 'EvalBot',
+    name: EVAL_BOT_NAME,
     color: 'p-4' as const,
     harness: settings.harness satisfies HarnessId,
     model: adapter.defaultModel,
-    effort: 'low' as const,
+    effort: EVAL_EFFORT,
     moveLimit: settings.moveLimit,
     imageSize: settings.imageSize,
     budgetSec: settings.budgetSec,
@@ -58,26 +64,41 @@ function makeImageService(root: string, sample: EvalSampleItem) {
   });
 }
 
-async function waitForFinish(events: readonly TimedEvent[], budgetSec: number): Promise<boolean> {
+/** Resolves `timedOut` once the bot finished (false), the budget ran out (true) or the run aborted. */
+async function waitForFinish(
+  events: readonly TimedEvent[],
+  budgetSec: number,
+  signal: AbortSignal,
+): Promise<{ timedOut: boolean; aborted: boolean }> {
   const deadline = Date.now() + (budgetSec + BUDGET_GRACE_SEC) * 1000;
   while (Date.now() < deadline) {
-    if (events.some((e) => e.event.type === 'bot_finished')) return false;
+    if (events.some((e) => e.event.type === 'bot_finished')) {
+      return { timedOut: false, aborted: false };
+    }
+    if (signal.aborted) return { timedOut: false, aborted: true };
     await Bun.sleep(25);
   }
-  return !events.some((e) => e.event.type === 'bot_finished');
+  return { timedOut: !events.some((e) => e.event.type === 'bot_finished'), aborted: false };
 }
 
-/** Runs one bot on one spot and returns its round record; never throws. */
+/**
+ * Runs one bot on one spot and returns its round record; never throws.
+ * Returns null when `signal` aborted the round (an interrupted round is not a measurement).
+ */
 export async function runEvalRound(opts: {
   root: string;
+  runName: string;
   settings: RoundSettings;
   sample: EvalSampleItem;
   repeat: number;
-}): Promise<RoundRecord> {
+  signal: AbortSignal;
+}): Promise<RoundRecord | null> {
   const { settings, sample } = opts;
   const slot = makeEvalBotSlot(settings);
+  const executionId = makeExecutionId(opts.runName, sample.id, opts.repeat);
   const baseCtx = {
     spotId: sample.id,
+    executionId,
     repeat: opts.repeat,
     harness: settings.harness,
     model: slot.model,
@@ -87,26 +108,25 @@ export async function runEvalRound(opts: {
   if (!settings.dry && !sample.imagePaths) {
     return buildFailedRecord(baseCtx, new Error(`Spot "${sample.id}" has no imagePaths`));
   }
-  const sub = path.join(
-    opts.root,
-    `${sample.id}-${opts.repeat}-${Math.random().toString(16).slice(2, 8)}`,
-  );
-  mkdirSync(sub, { recursive: true });
+  // Every path and the match id carry only the opaque execution id (see exec-id.ts).
+  const paths = executionPaths(opts.root, executionId);
+  mkdirSync(paths.dir, { recursive: true });
   const events: TimedEvent[] = [];
   let t0 = Date.now();
-  const img = makeImageService(sub, sample);
+  const img = makeImageService(paths.dir, sample);
+  const { logger, audit } = createToolAuditLogger();
   const runner = createBotRunner({
-    runDir: path.join(sub, 'run'),
-    childrenFile: path.join(sub, 'children.json'),
+    runDir: paths.runDir,
+    childrenFile: paths.childrenFile,
     fakeMode: settings.dry,
     fakeStepDelayMs: 10,
     imageService: img,
     locationService: createFakeLocationService(),
     dispatch: (event: EngineEvent) => events.push({ tMs: Date.now() - t0, event }),
+    logger,
   });
-  const matchId = `eval-${sample.id}-${opts.repeat}`;
   const target: RoundTarget = {
-    panoId: matchId,
+    panoId: paths.matchId,
     lat: sample.lat,
     lng: sample.lng,
     countryId: 'EVAL',
@@ -117,7 +137,7 @@ export async function runEvalRound(opts: {
   try {
     await img.prepareStartViews(target);
     runner.startRoundBots({
-      matchId,
+      matchId: paths.matchId,
       gen: 1,
       roundNumber: 1,
       target,
@@ -125,16 +145,17 @@ export async function runEvalRound(opts: {
       bots: [slot],
     });
     t0 = Date.now();
-    runner.releaseObserve(matchId, 1, 1);
-    const timedOut = await waitForFinish(events, settings.budgetSec);
+    runner.releaseObserve(paths.matchId, 1, 1);
+    const { timedOut, aborted } = await waitForFinish(events, settings.budgetSec, opts.signal);
+    if (aborted) return null;
     return buildRoundRecord(
-      { ...baseCtx, truth: { lat: sample.lat, lng: sample.lng }, timedOut },
+      { ...baseCtx, truth: { lat: sample.lat, lng: sample.lng }, timedOut, audit: audit() },
       events,
     );
   } catch (err) {
     return buildFailedRecord(baseCtx, err);
   } finally {
     await runner.close();
-    rmSync(sub, { recursive: true, force: true });
+    rmSync(paths.dir, { recursive: true, force: true });
   }
 }
