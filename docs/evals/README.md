@@ -25,6 +25,8 @@ Principles:
 
    `<id>` is a manifest id. If the harness cannot start, the command says so and exits 1 (see exit codes); run `bun run doctor`.
 
+   Time to a first result, measured on 2026-11-20 with the `claude` harness at the default 60 s budget: the final guess was accepted 12.4 s after the frames were released. A round never waits longer than its budget plus 15 s, so this step finishes in about a minute once dependencies are installed.
+
 3. The full run, named so its aggregate summary is copied into `docs/evals/results/`:
 
    ```bash
@@ -60,7 +62,7 @@ Each spot is four 1024x1024 JPEG perspective frames (90 degree field of view, ya
 ]
 ```
 
-`id` must be unique and match `^[a-z0-9][a-z0-9-]{0,63}$` (it is used in flags and logs, never shown to a bot). A manifest with a duplicate or unsafe id is rejected. Only `id`, `countryNameRu`, `lat`, `lng` and `imagePaths` are required; the other fields are optional, so older manifests keep working. `labels` holds the catalogue features (`driving_side`, `script`, `centre_line`, `pole_material`, `plate_colour`, `vegetation`, `soil_colour`, `roof_type`); their value ids are listed in `catalog.json` next to the manifest. The evaluator itself only reads `headingDeg`; the rest is for dataset review and later analysis.
+`id` must be unique and match `^[a-z0-9][a-z0-9-]{0,63}$` (it is used in flags and logs, never shown to a bot). A manifest with a duplicate or unsafe id is rejected. Only `id`, `countryNameRu`, `lat`, `lng` and `imagePaths` are required, plus the licence fields for every spot that has frames: `source.license` must be CC0, public domain, CC BY or CC BY-SA (version 1.0 to 4.0), and `source.licenseUrl`, `source.pageUrl` and `source.author` must be filled in. A manifest with a spot that ships frames without them is rejected before any round runs. The other fields are optional. `labels` holds the catalogue features (`driving_side`, `script`, `centre_line`, `pole_material`, `plate_colour`, `vegetation`, `soil_colour`, `roof_type`); their value ids are listed in `catalog.json` next to the manifest. The evaluator itself only reads `headingDeg`; the rest is for dataset review and later analysis.
 
 Without `--dataset`, `--dry` uses three built-in fake spots (`sample-warsaw`, `sample-tokyo`, `sample-milan`) with no frames. Live runs always need `--dataset`.
 

@@ -72,7 +72,19 @@ test('a missing harness CLI is an infra error: exit 1, GEO_EVAL_HARNESS_FAILED, 
     writeFileSync(
       path.join(dir, 'manifest.json'),
       JSON.stringify([
-        { id: 'spot-a', countryNameRu: 'Польша', lat: 1, lng: 2, imagePaths: names },
+        {
+          id: 'spot-a',
+          countryNameRu: 'Польша',
+          lat: 1,
+          lng: 2,
+          imagePaths: names,
+          source: {
+            pageUrl: 'https://example.org/p',
+            author: 'A',
+            license: 'CC0',
+            licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+          },
+        },
       ]),
     );
     const out = path.join(dir, 'out');

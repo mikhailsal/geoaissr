@@ -34,6 +34,25 @@ export const evalSampleSchema = z.object({
   labelledBy: z.string().optional(),
 });
 
+/** Licences that allow committing the frames with attribution (docs/evals/README.md). */
+export const ALLOWED_LICENSE_PATTERN = /^(?:CC0(?: 1\.0)?|public domain|CC BY(?:-SA)? [1-4]\.0)$/i;
+
+const HTTP_URL_PATTERN = /^https?:\/\/\S+$/;
+
+/** Names the missing or invalid attribution fields of an entry that ships frames. */
+function frameLicenceProblems(item: z.infer<typeof evalSampleSchema>): string[] {
+  if (!item.imagePaths) return [];
+  const source = item.source ?? {};
+  const problems: string[] = [];
+  if (!ALLOWED_LICENSE_PATTERN.test(source.license ?? '')) {
+    problems.push('source.license must be CC0, public domain, CC BY or CC BY-SA (1.0-4.0)');
+  }
+  if (!HTTP_URL_PATTERN.test(source.licenseUrl ?? '')) problems.push('source.licenseUrl');
+  if (!HTTP_URL_PATTERN.test(source.pageUrl ?? '')) problems.push('source.pageUrl');
+  if (!source.author?.trim()) problems.push('source.author');
+  return problems;
+}
+
 export const evalDatasetManifestSchema = z
   .array(evalSampleSchema)
   .min(1)
@@ -48,6 +67,14 @@ export const evalDatasetManifestSchema = z
         });
       }
       seen.add(item.id);
+      const problems = frameLicenceProblems(item);
+      if (problems.length > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [index, 'source'],
+          message: `spot "${item.id}" has frames without a checked licence: ${problems.join('; ')}`,
+        });
+      }
     });
   });
 

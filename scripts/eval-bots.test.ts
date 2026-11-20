@@ -30,6 +30,12 @@ test('loadDataset rejects missing manifest when --dataset is passed and resolves
           lat: 52.23,
           lng: 21.01,
           imagePaths: ['0.jpg', '90.jpg', '180.jpg', '270.jpg'],
+          source: {
+            pageUrl: 'https://example.org/p',
+            author: 'A',
+            license: 'CC0',
+            licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+          },
         },
       ]),
     );
@@ -99,6 +105,12 @@ test('eval-bots --dataset --dry handles valid dataset dir without hanging on get
           lat: 41.9,
           lng: 12.5,
           imagePaths: ['0.jpg', '90.jpg', '180.jpg', '270.jpg'],
+          source: {
+            pageUrl: 'https://example.org/p',
+            author: 'A',
+            license: 'CC0',
+            licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+          },
         },
       ]),
     );
