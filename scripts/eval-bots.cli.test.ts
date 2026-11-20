@@ -31,6 +31,26 @@ test('duplicate flags and unknown spots exit 2 before any launch', () => {
   expect(res.err).toContain('GEO_INVALID_ARGS');
 });
 
+// Value: protects=a dataset that breaks a manifest rule is refused with one readable stderr line and exit 2, before any output; fails_when=the refusal is a stack trace, another exit code or writes a run directory; why_new=only flag errors had a CLI test; seam=none; no_claim=which rule a real dataset breaks.
+test('a manifest without a frame licence exits 2 with one line naming the spot', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-eval-cli-'));
+  try {
+    const imagePaths = ['0.jpg', '1.jpg', '2.jpg', '3.jpg'];
+    const spot = { id: 'spot-a', countryNameRu: 'Польша', lat: 1, lng: 2, imagePaths };
+    writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify([spot]));
+    const out = path.join(dir, 'out');
+    const res = runCli(['--dataset', dir, '--repeats', '1', '--out', out]);
+    expect(res.code).toBe(2);
+    const lines = res.err.trim().split('\n');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('spot "spot-a" has frames without a checked licence');
+    expect(lines[0]).toContain('GEO_INVALID_ARGS');
+    expect(() => readFileSync(path.join(out, 'summary.json'))).toThrow();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('--help prints every flag with its default and exits 0', () => {
   const res = runCli(['--help']);
   expect(res.code).toBe(0);

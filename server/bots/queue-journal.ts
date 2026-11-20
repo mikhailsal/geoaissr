@@ -63,11 +63,19 @@ export function correctionText(tool: string, missing: readonly MissingField[]): 
 }
 
 /**
+ * What a call still owes. Once a call for the pending step was accepted, its step fields are
+ * written; a later call for the same step (its camera action failed) owes only the summary.
+ */
+export function owedFields(st: QueueState, missing: readonly MissingField[]): MissingField[] {
+  return st.closedStep === st.turnsUsed ? missing.filter((f) => f === 'summary') : [...missing];
+}
+
+/**
  * The correction allowance belongs to the pending step (the one whose finding is due), not to
  * the call's arguments. A call with missing fields is bounced once; the next call for the same
  * pending step is accepted whatever it carries, even with a different camera argument. The
  * allowance resets when the pending step closes, which is when a call is accepted.
- * Without `requireCompleteReasoning` nothing is bounced.
+ * Without `requireCompleteReasoning` nothing is bounced. `missing` is what `owedFields` returned.
  */
 export function gateStepCall(
   st: QueueState,
@@ -76,10 +84,7 @@ export function gateStepCall(
 ): 'accept' | 'bounce' {
   const pending = st.turnsUsed;
   const allowed =
-    missing.length === 0 ||
-    !st.requireCompleteReasoning ||
-    st.correctedStep === pending ||
-    st.closedStep === pending;
+    missing.length === 0 || !st.requireCompleteReasoning || st.correctedStep === pending;
   if (allowed) {
     st.correctedStep = null;
     st.closedStep = pending;
@@ -98,6 +103,8 @@ export function gateStepCall(
 export function recordStepFields(st: QueueState, fields: StepFields, withPoint: boolean): void {
   if (!st.observed || st.signal.aborted) return;
   const turn = st.turnsUsed;
+  if (!fields.finding && st.findingTurn === turn) return;
+  if (fields.finding) st.findingTurn = turn;
   const record = {
     turn,
     findingState: fields.finding ? 'recorded' : 'missing',

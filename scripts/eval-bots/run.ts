@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { getHarnessAdapter } from '../../server/bots/adapters/index.ts';
@@ -79,8 +79,8 @@ export async function runEval(
   mkdirSync(outDir, { recursive: true });
   const roundsFile = path.join(outDir, 'rounds.jsonl');
   writeFileSync(roundsFile, '', 'utf8');
-  const root = path.join(tmpdir(), `geo-eval-${Date.now()}`);
-  mkdirSync(root, { recursive: true });
+  // Unique and private (0700): bot tokens and decoded frames live under it.
+  const root = mkdtempSync(path.join(tmpdir(), 'geo-eval-'));
   let infraSeen = false;
   const jobs: Array<() => Promise<RoundRecord | null>> = [];
   for (let repeat = 1; repeat <= args.repeats; repeat += 1) {

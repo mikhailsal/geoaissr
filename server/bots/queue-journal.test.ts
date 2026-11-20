@@ -244,6 +244,23 @@ test('a frame-fetch failure after acceptance keeps the journal write and never d
   expect(seen.guesses).toHaveLength(1);
 });
 
+// Value: protects=a retry after a failed camera action may add a finding but never erases it, and final_guess still owes its summary; fails_when=the closed-step allowance waives the summary or a weaker retry overwrites the recorded finding; why_new=the fetch-failure test only retried with identical arguments; seam=none; no_claim=how models retry in practice.
+test('after a failed camera action the step keeps its finding and final_guess still owes a summary', async () => {
+  const seen: Seen = { guesses: [], findings: [], looks: 0, observes: 0 };
+  const { queue } = createQueue(seen, () => ({ text: 'нет кадра', isError: true }));
+  await queue.dispatch('observe', {});
+  expect((await queue.dispatch('look', FULL)).isError).toBe(true);
+  await queue.dispatch('look', { heading: 90, hypothesis: 'снова' });
+  expect(queue.getTurnsUsed()).toBe(0);
+  expect(seen.findings).toEqual([
+    { turn: 0, findingState: 'recorded', finding: 'Кириллица', currentGuess: POINT },
+  ]);
+  const noSummary = await queue.dispatch('final_guess', POINT);
+  expect(noSummary.isError).toBe(true);
+  expect(noSummary.text).toContain('[GEO_BOT_JOURNAL_FIELD_MISSING]');
+  expect(seen.guesses.at(-1)?.finalized).toBe(false);
+});
+
 test('a repeated observe returns the frames and writes nothing new', async () => {
   const { queue, seen } = setup();
   const first = await queue.dispatch('observe', {});

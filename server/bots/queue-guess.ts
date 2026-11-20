@@ -3,6 +3,7 @@ import {
   correctionText,
   gateStepCall,
   isBlindCall,
+  owedFields,
   recordBlindStep,
   recordStepFields,
   type MissingField,
@@ -27,10 +28,11 @@ export async function executeFinalGuess(
   if (!guess) return recordQueueFailure(st, 'Неверные координаты догадки.');
   if (!(await awaitRoundStart(st))) return { text: 'Раунд уже завершён.', isError: true };
 
-  const missing: MissingField[] = [];
+  const asked: MissingField[] = [];
   const blind = isBlindCall(st, enqueuedAt);
-  if (st.observed && !blind && !guess.finding) missing.push('finding');
-  if (!guess.summary) missing.push('summary');
+  if (st.observed && !blind && !guess.finding) asked.push('finding');
+  if (!guess.summary) asked.push('summary');
+  const missing = owedFields(st, asked);
   const verdict = gateStepCall(st, 'final_guess', missing);
   const finalized = verdict === 'accept';
 

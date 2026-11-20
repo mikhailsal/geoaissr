@@ -68,6 +68,8 @@ export interface QueueState {
   correctedStep: number | null;
   /** Pending step whose call was accepted: it gets no second correction. */
   closedStep: number | null;
+  /** Step that already has a recorded finding: a retry for it may add one, never erase it. */
+  findingTurn: number | null;
   /** Keys of the last journal write and checkpoint, so a retry never writes twice. */
   lastWrittenKey: string | null;
   lastCheckpointKey: string | null;

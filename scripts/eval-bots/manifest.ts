@@ -80,6 +80,30 @@ export const evalDatasetManifestSchema = z
 
 export type EvalSampleItem = z.infer<typeof evalSampleSchema>;
 
+/** A dataset the run refuses before any round: a missing file or a broken manifest rule. */
+export class DatasetError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DatasetError';
+  }
+}
+
+function parseManifest(
+  manifestPath: string,
+  bytes: Buffer,
+): z.infer<typeof evalDatasetManifestSchema> {
+  let json: unknown;
+  try {
+    json = JSON.parse(bytes.toString('utf8'));
+  } catch (err) {
+    throw new DatasetError(`${manifestPath} is not valid JSON: ${(err as Error).message}`);
+  }
+  const parsed = evalDatasetManifestSchema.safeParse(json);
+  if (parsed.success) return parsed.data;
+  const issues = parsed.error.issues.map((i) => `[${i.path.join('.')}] ${i.message}`);
+  throw new DatasetError(`${manifestPath} is invalid: ${issues.join('; ')}`);
+}
+
 const BUILTIN_SAMPLES: EvalSampleItem[] = [
   { id: 'sample-warsaw', countryNameRu: 'Польша', lat: 52.2297, lng: 21.0122 },
   { id: 'sample-tokyo', countryNameRu: 'Япония', lat: 35.6762, lng: 139.6503 },
@@ -98,16 +122,16 @@ export function loadDatasetWithHash(datasetDir: string | null): LoadedDataset {
   const absDir = path.resolve(datasetDir);
   const manifestPath = path.join(absDir, 'manifest.json');
   if (!existsSync(manifestPath)) {
-    throw new Error(`Dataset manifest not found: ${manifestPath}`);
+    throw new DatasetError(`Dataset manifest not found: ${manifestPath}`);
   }
   const bytes = readFileSync(manifestPath);
-  const parsed = evalDatasetManifestSchema.parse(JSON.parse(bytes.toString('utf8')));
+  const parsed = parseManifest(manifestPath, bytes);
   const samples = parsed.map((item) => {
     if (!item.imagePaths) return item;
     const resolved = item.imagePaths.map((p) => {
       const absImg = path.resolve(absDir, p);
       if (!existsSync(absImg)) {
-        throw new Error(`Dataset image not found (${item.id}): ${absImg}`);
+        throw new DatasetError(`Dataset image not found (${item.id}): ${absImg}`);
       }
       return absImg;
     }) as [string, string, string, string];

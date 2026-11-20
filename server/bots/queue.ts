@@ -10,6 +10,7 @@ import {
   gateStepCall,
   isBlindCall,
   missingStepFields,
+  owedFields,
   recordBlindStep,
   recordCheckpoint,
   recordStepFields,
@@ -89,7 +90,7 @@ function reviewStep(
   enqueuedAt: number,
 ): ToolResponsePayload | null {
   const blind = isBlindCall(st, enqueuedAt);
-  const missing = missingStepFields(st, fields, blind);
+  const missing = owedFields(st, missingStepFields(st, fields, blind));
   const verdict = gateStepCall(st, tool, missing);
   if (verdict === 'bounce') return recordQueueFailure(st, correctionText(tool, missing));
   if (blind) recordBlindStep(st);
@@ -204,6 +205,7 @@ function initialState(
     frameDeliveredAt: 0,
     correctedStep: null,
     closedStep: null,
+    findingTurn: null,
     lastWrittenKey: null,
     lastCheckpointKey: null,
     onCorrection: opts.onCorrection,

@@ -6,7 +6,7 @@ import {
   parseEvalArgs,
   type EvalArgs,
 } from './eval-bots/args.ts';
-import { loadDatasetWithHash } from './eval-bots/manifest.ts';
+import { DatasetError, loadDatasetWithHash } from './eval-bots/manifest.ts';
 import { writeRunOutputs } from './eval-bots/output.ts';
 import { firstInfraError, formatHarnessFailure } from './eval-bots/report.ts';
 import { runEval } from './eval-bots/run.ts';
@@ -72,6 +72,12 @@ async function main(): Promise<number> {
   } catch (err) {
     if (err instanceof EvalArgsError) {
       console.error(formatEvalArgsError(err));
+      return 2;
+    }
+    if (err instanceof DatasetError) {
+      console.error(
+        `eval:bots: ${err.message}; fix the dataset (rules: docs/evals/README.md) (GEO_INVALID_ARGS)`,
+      );
       return 2;
     }
     throw err;

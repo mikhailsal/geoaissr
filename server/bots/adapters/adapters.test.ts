@@ -303,6 +303,9 @@ test('round prompt describes checkpoints, exploration and image delivery', () =>
   }
   expect(mcp).toContain('прямо в ответе MCP');
   expect(file).toContain('прочитай их через read_file');
+  expect(file).toContain('read_file только для файлов изображений, полученных от игры');
+  expect(mcp).not.toContain('read_file только');
+  for (const prompt of [mcp, file]) expect(prompt).toContain('не выдумывай');
 });
 
 test('agy audit caps the journal and records truncation without denying a permitted call', () => {

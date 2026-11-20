@@ -39,3 +39,15 @@ test('ingress keeps coordinates and bounds the text', () => {
   expect(parseGuessInput({ lat: 91, lng: 0 })).toBeUndefined();
   expect(parseGuessInput({ lat: 0, lng: Infinity })).toBeUndefined();
 });
+
+// Value: protects=an over-long summary or finding from a model is truncated, not discarded; fails_when=ingress rejects or drops text past the cap; why_new=replaces the deleted reasoning regression test for facts and conclusion; seam=none; no_claim=whether the kept text is useful.
+test('ingress keeps over-long summary and finding text, cut to the cap', () => {
+  const parsed = parseGuessInput({
+    lat: 1,
+    lng: 2,
+    summary: 'я'.repeat(700),
+    finding: 'з'.repeat(700),
+  });
+  expect(parsed?.summary).toHaveLength(600);
+  expect(parsed?.finding).toHaveLength(600);
+});

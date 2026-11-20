@@ -108,7 +108,7 @@ The bot uses the neutral personality and the effort `low`.
 | ---- | ------------------------------------------------------------------------------------------------------------------- |
 | 0    | The run finished. Bot timeouts and rounds without a guess are measured outcomes and do not change the exit code.    |
 | 1    | `GEO_EVAL_HARNESS_FAILED`: at least one round could not start its bot CLI. Not measured. Fix with `bun run doctor`. |
-| 2    | `GEO_INVALID_ARGS`: invalid flags or spot ids. Nothing was launched.                                                |
+| 2    | `GEO_INVALID_ARGS`: invalid flags or spot ids, or a dataset that breaks a manifest rule. Nothing was launched.      |
 | 130  | Interrupted with Ctrl-C. A partial `summary.json` with `complete: false` was written.                               |
 
 A harness launch failure is recorded per round as an infra error (`infraError` in `rounds.jsonl`). Infra rounds are excluded from every rate, no new rounds are started after the first one, and at the end one stderr line gives the spot and attempt, the fix, the `rounds.jsonl` path and the code.
