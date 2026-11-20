@@ -39,3 +39,26 @@ test('runPool skips jobs that have not started once shouldStop turns true', asyn
   expect(started).toEqual([0, 1]);
   expect(results).toEqual([0, 1, undefined, undefined]);
 });
+
+// Value: protects=a job that throws stops new rounds and the pool rejects only after running jobs settle; fails_when=other workers keep launching paid rounds after a failure or the caller cleans up under a running job; why_new=only stop and order were tested; seam=none; no_claim=cancelling the running job.
+test('runPool stops starting jobs after a failure and rejects once running jobs settle', async () => {
+  const started: number[] = [];
+  let slowDone = false;
+  const jobs = [0, 1, 2, 3, 4].map((i) => async () => {
+    started.push(i);
+    if (i === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      slowDone = true;
+      return i;
+    }
+    if (i === 1) throw new Error('boom');
+    return i;
+  });
+  const error = await runPool(jobs, 2).then(
+    () => null,
+    (err: unknown) => err,
+  );
+  expect(error instanceof Error ? error.message : null).toBe('boom');
+  expect(slowDone).toBe(true);
+  expect(started).toEqual([0, 1]);
+});

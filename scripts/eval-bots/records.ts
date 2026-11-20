@@ -22,6 +22,13 @@ export interface StepText {
  */
 export const LAUNCH_FAILURE_REASON = 'сбой запуска';
 
+/**
+ * Start of the `bot_finished` reason for a CLI that exited with a non-zero code (see
+ * `reportBotExit` in server/bots/process.ts). With no tool call before it, the model never
+ * played (missing credentials, a bad launch option): infrastructure, not a result.
+ */
+export const PROCESS_ERROR_REASON_PREFIX = 'ошибка процесса';
+
 /** Tool-call audit counted from the runner's dispatch diagnostics; null when not observable. */
 export interface ToolAudit {
   toolCalls: number;
@@ -90,14 +97,35 @@ export function pickFinalGuess(events: readonly EngineEvent[]): BotGuessData | n
   return pickScoredGuess(events.map((event) => ({ event, tMs: 0 }))).guess;
 }
 
-function firstGuessBeforeFinish(
+/** The first checkpoint (non-final guess) before the bot finishes; a final-only round has none. */
+function firstCheckpoint(
   events: readonly TimedEvent[],
 ): { guess: BotGuessData; tMs: number } | null {
   for (const { event, tMs } of events) {
     if (event.type === 'bot_finished') return null;
-    if (event.type === 'bot_guess_recorded') return { guess: event.guess, tMs };
+    if (event.type !== 'bot_guess_recorded') continue;
+    return (event.finalized ?? true) ? null : { guess: event.guess, tMs };
   }
   return null;
+}
+
+/** Guesses after the budget would be refused in a real round, so they are not scored. */
+function withinBudget(events: readonly TimedEvent[], budgetSec: number): TimedEvent[] {
+  const limitMs = budgetSec * 1000;
+  return events.filter((e) => e.event.type !== 'bot_guess_recorded' || e.tMs <= limitMs);
+}
+
+function infraReason(
+  finished: Extract<EngineEvent, { type: 'bot_finished' }> | null,
+  audit: ToolAudit | null | undefined,
+): string | null {
+  if (!finished) return null;
+  const silentCrash =
+    finished.aborted &&
+    finished.reason.startsWith(PROCESS_ERROR_REASON_PREFIX) &&
+    (audit?.toolCalls ?? 0) === 0;
+  if (finished.reason !== LAUNCH_FAILURE_REASON && !silentCrash) return null;
+  return finished.diagnosticsTail ?? finished.reason;
 }
 
 /** Findings by step, from the journal's `bot_finding` events (the latest recorded one wins). */
@@ -161,12 +189,12 @@ const round1 = (v: number): number => Math.round(v * 10) / 10;
 
 /** Builds the per-round JSONL record from the event stream the bot runner already emits. */
 export function buildRoundRecord(ctx: RoundContext, events: readonly TimedEvent[]): RoundRecord {
-  const scored = pickScoredGuess(events);
-  const first = firstGuessBeforeFinish(events);
+  const scorable = withinBudget(events, ctx.budgetSec);
+  const scored = pickScoredGuess(scorable);
+  const first = firstCheckpoint(scorable);
   const finishedEvent = events.find((e) => e.event.type === 'bot_finished')?.event;
   const finished = finishedEvent?.type === 'bot_finished' ? finishedEvent : null;
   const { steps, hasFindingField } = collectSteps(events);
-  const launchFailed = finished?.reason === LAUNCH_FAILURE_REASON;
   const pin = scored.guess ? { lat: scored.guess.lat, lng: scored.guess.lng } : null;
   return {
     spotId: ctx.spotId,
@@ -196,7 +224,7 @@ export function buildRoundRecord(ctx: RoundContext, events: readonly TimedEvent[
     steps,
     toolCalls: ctx.audit ? ctx.audit.toolCalls : null,
     corrections: ctx.audit ? ctx.audit.corrections : null,
-    infraError: launchFailed ? (finished.diagnosticsTail ?? finished.reason) : null,
+    infraError: infraReason(finished, ctx.audit),
     error: null,
   };
 }

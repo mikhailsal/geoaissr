@@ -1,8 +1,8 @@
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { getHarnessAdapter } from '../../server/bots/adapters/index.ts';
-import type { EvalArgs } from './args.ts';
+import { EvalArgsError, type EvalArgs } from './args.ts';
 import { promptHash, toolSchemaHash } from './fingerprint.ts';
 import type { EvalSampleItem } from './manifest.ts';
 import { summarizeRounds, type EvalSummary, type RunConfig } from './metrics.ts';
@@ -28,6 +28,7 @@ export function buildRunConfig(
   args: EvalArgs,
   opts: {
     spots: number;
+    spotIds: string[];
     datasetHash: string | null;
     gitCommit: string;
     startedAt: Date;
@@ -45,6 +46,7 @@ export function buildRunConfig(
     concurrency: args.concurrency,
     repeats: args.repeats,
     spots: opts.spots,
+    spotIds: opts.spotIds,
     dry: args.dry,
     gitCommit: opts.gitCommit,
     date: opts.startedAt.toISOString(),
@@ -76,8 +78,13 @@ export async function runEval(
   const outDir = path.resolve(
     args.outDir ?? path.join(repoRoot, '.geoaissr-dev', 'evals', runName),
   );
-  mkdirSync(outDir, { recursive: true });
   const roundsFile = path.join(outDir, 'rounds.jsonl');
+  if (existsSync(roundsFile) || existsSync(path.join(outDir, 'summary.json'))) {
+    throw new EvalArgsError(
+      `output folder ${outDir} already holds an eval run; pass another --out or --label`,
+    );
+  }
+  mkdirSync(outDir, { recursive: true });
   writeFileSync(roundsFile, '', 'utf8');
   // Unique and private (0700): bot tokens and decoded frames live under it.
   const root = mkdtempSync(path.join(tmpdir(), 'geo-eval-'));
@@ -107,6 +114,7 @@ export async function runEval(
     const records = results.filter((r): r is RoundRecord => r !== undefined && r !== null);
     const config = buildRunConfig(args, {
       spots: samples.length,
+      spotIds: samples.map((sample) => sample.id),
       datasetHash,
       gitCommit: ctl.gitCommit,
       startedAt,

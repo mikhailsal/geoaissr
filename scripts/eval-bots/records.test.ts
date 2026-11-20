@@ -137,13 +137,49 @@ test('a harness launch failure is an infra error, not a measured timeout', () =>
   expect(rec.hasFinalGuess).toBe(false);
 });
 
-test('an ordinary abort or a timeout is a measured outcome, not an infra error', () => {
-  const crashed: TimedEvent = {
-    tMs: 9,
-    event: { type: 'bot_finished', ...IDS, aborted: true, reason: 'ошибка процесса (код 1)' },
-  };
-  expect(buildRoundRecord(CTX, [crashed]).infraError).toBeNull();
+const crashed: TimedEvent = {
+  tMs: 9,
+  event: {
+    type: 'bot_finished',
+    ...IDS,
+    aborted: true,
+    reason: 'ошибка процесса (код 1)',
+    diagnosticsTail: 'Invalid API key',
+  },
+};
+
+test('an abort after tool calls or a timeout is a measured outcome, not an infra error', () => {
+  const played = { ...CTX, audit: { toolCalls: 3, corrections: 0 } };
+  expect(buildRoundRecord(played, [crashed]).infraError).toBeNull();
   expect(buildRoundRecord({ ...CTX, timedOut: true }, [thumb(1, 1)]).infraError).toBeNull();
+});
+
+// Value: protects=a CLI that dies before its first tool call (credentials, a bad flag) is an infra error, not a measured no-finish; fails_when=such rounds count in the finish rate; why_new=only a spawn failure was classified as infra; seam=none; no_claim=which stderr text a CLI prints.
+test('a process error before any tool call is an infra error', () => {
+  expect(buildRoundRecord(CTX, [crashed]).infraError).toBe('Invalid API key');
+});
+
+// Value: protects=the finish rate and pin are measured inside the budget; fails_when=a final accepted during the post-budget grace counts as a finish; why_new=the grace window was scored like the budget; seam=none; no_claim=when the runner stops the CLI.
+test('guesses after the budget are not scored', () => {
+  const rec = buildRoundRecord(CTX, [
+    guess(30_000, 1, false),
+    guess(61_000, 2, true),
+    finished(62_000),
+  ]);
+  expect(rec).toMatchObject({
+    hasFinalGuess: false,
+    pinSource: 'checkpoint',
+    pin: { lat: 1, lng: 0 },
+  });
+  expect(rec.timeToFinalSec).toBeNull();
+});
+
+// Value: protects=pin movement is measured only from a real checkpoint; fails_when=a final-only round reports its final as the first checkpoint and 0 km movement; why_new=movement had no final-only case; seam=none; no_claim=how movement is aggregated.
+test('a final-only round has no first checkpoint and no movement', () => {
+  const rec = buildRoundRecord(CTX, [guess(4000, 2, true), finished(5000)]);
+  expect(rec.firstCheckpoint).toBeNull();
+  expect(rec.pinMovementKm).toBeNull();
+  expect(rec.hasFinalGuess).toBe(true);
 });
 
 test('the dispatch audit is recorded, or null when not observable', () => {

@@ -79,6 +79,23 @@ test('--dry with --spot runs only the selected spot and writes a dry summary', (
   }
 });
 
+// Value: protects=a second run into the same output folder is refused before it truncates the first run's rounds; fails_when=a reused --out or --label silently overwrites rounds.jsonl or summary.json; why_new=outputs were always truncated at start; seam=none; no_claim=two runs started at the same instant.
+test('a reused output folder exits 2 and keeps the earlier summary', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-eval-cli-'));
+  try {
+    const args = ['--dry', '--repeats', '1', '--spot', 'sample-tokyo', '--out', dir];
+    expect(runCli(args).code).toBe(0);
+    const first = readFileSync(path.join(dir, 'summary.json'), 'utf8');
+    const again = runCli(args);
+    expect(again.code).toBe(2);
+    expect(again.err).toContain('already holds an eval run');
+    expect(again.err).toContain('GEO_INVALID_ARGS');
+    expect(readFileSync(path.join(dir, 'summary.json'), 'utf8')).toBe(first);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a missing harness CLI is an infra error: exit 1, GEO_EVAL_HARNESS_FAILED, not a timeout', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-eval-cli-'));
   try {

@@ -112,7 +112,7 @@ const BUILTIN_SAMPLES: EvalSampleItem[] = [
 
 export interface LoadedDataset {
   samples: EvalSampleItem[];
-  /** First 12 hex of the sha256 of manifest.json; null for the built-in dry spots. */
+  /** First 12 hex of the sha256 of manifest.json and its frames; null for the built-in dry spots. */
   datasetHash: string | null;
 }
 
@@ -137,7 +137,12 @@ export function loadDatasetWithHash(datasetDir: string | null): LoadedDataset {
     }) as [string, string, string, string];
     return { ...item, imagePaths: resolved };
   });
-  return { samples, datasetHash: createHash('sha256').update(bytes).digest('hex').slice(0, 12) };
+  // The fingerprint covers the frames too: replacing a photo without editing the manifest changes it.
+  const hash = createHash('sha256').update(bytes);
+  for (const sample of samples) {
+    for (const framePath of sample.imagePaths ?? []) hash.update(readFileSync(framePath));
+  }
+  return { samples, datasetHash: hash.digest('hex').slice(0, 12) };
 }
 
 export function loadDataset(datasetDir: string | null): EvalSampleItem[] {

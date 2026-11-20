@@ -66,7 +66,7 @@ Each spot is four 1024x1024 JPEG perspective frames (90 degree field of view, ya
 
 Without `--dataset`, `--dry` uses three built-in fake spots (`sample-warsaw`, `sample-tokyo`, `sample-milan`) with no frames. Live runs always need `--dataset`.
 
-The dataset itself is built separately under `docs/evals/dataset/`; this tool only reads the manifest format above. `imagePaths` are relative to the manifest directory and are resolved to absolute paths at load time. The sha256 of `manifest.json` is recorded as `datasetHash`.
+The dataset itself is built separately under `docs/evals/dataset/`; this tool only reads the manifest format above. `imagePaths` are relative to the manifest directory and are resolved to absolute paths at load time. The sha256 of `manifest.json` and of every frame it names is recorded as `datasetHash`, so replacing a photo changes it even when the manifest stays the same.
 
 ### Headings and the unknown-compass limitation
 
@@ -78,7 +78,7 @@ A `look` crops the nearest of the four frames. The crop is offset by the differe
 
 ## Viewing protocol
 
-Each spot is four 90 degree frames (yaw 0, 90, 180, 270). `observe` shows all four. A `look` is a crop or zoom over those four frames, never a new photo, and costs one paid step; the number of paid steps is capped by `--move-limit`. `move` is unavailable. Time is capped by `--budget` seconds (a round is declared timed out at budget + 15 s).
+Each spot is four 90 degree frames (yaw 0, 90, 180, 270). `observe` shows all four. A `look` is a crop or zoom over those four frames, never a new photo, and costs one paid step; the number of paid steps is capped by `--move-limit`. `move` is unavailable. Time is capped by `--budget` seconds. Guesses accepted after the budget are not scored, as a real round would refuse them; the extra 15 s only let the bot process exit (a round is declared timed out at budget + 15 s).
 
 ## Flags
 
@@ -111,7 +111,7 @@ The bot uses the neutral personality and the effort `low`.
 | 2    | `GEO_INVALID_ARGS`: invalid flags or spot ids, or a dataset that breaks a manifest rule. Nothing was launched.      |
 | 130  | Interrupted with Ctrl-C. A partial `summary.json` with `complete: false` was written.                               |
 
-A harness launch failure is recorded per round as an infra error (`infraError` in `rounds.jsonl`). Infra rounds are excluded from every rate, no new rounds are started after the first one, and at the end one stderr line gives the spot and attempt, the fix, the `rounds.jsonl` path and the code.
+A harness launch failure, a CLI that exits with an error before its first tool call (missing credentials, a bad launch option) or a frame that does not decode is recorded per round as an infra error (`infraError` in `rounds.jsonl`). Infra rounds are excluded from every rate, no new rounds are started after the first one, and at the end one stderr line gives the spot and attempt, the fix, the `rounds.jsonl` path and the code.
 
 On Ctrl-C no new rounds start, running bots are killed, interrupted rounds are discarded (they are not measurements) and the summary is written with the counts so far. A second Ctrl-C exits immediately.
 
@@ -119,6 +119,7 @@ On Ctrl-C no new rounds start, running bots are killed, interrupted rounds are d
 
 - `rounds.jsonl` (raw, one record per round, under `.geoaissr-dev/`, which is gitignored): spot id, execution id, repeat, harness, model, outcome flags, time to final, scored pin and its source, error in km, first checkpoint, pin movement, paid looks, tool-call audit, `infraError`, token usage and step texts.
 - `summary.json`: aggregate only, written for every run, also partial ones.
+- An output folder that already holds `rounds.jsonl` or `summary.json`, or a `--label` whose `docs/evals/results/<label>.json` exists, is refused with exit 2 before any round starts; pass another `--out` or `--label`.
 - `docs/evals/results/<label>.json`: a copy of the summary, written only with `--label` and only for a run that is not dry, is complete, and has no infra errors. The committed file is aggregate-only and the writer refuses JSON that contains an absolute path (such as a home directory). Raw rounds are never committed.
 
 ## Summary fields
@@ -129,11 +130,11 @@ On Ctrl-C no new rounds start, running bots are killed, interrupted rounds are d
 | `harness`, `model`, `effort`                   | Bot CLI, its default model, reasoning effort                                                                                                                                                                                                                                 |
 | `budgetSec`, `moveLimit`, `imageSize`          | The configuration under test                                                                                                                                                                                                                                                 |
 | `concurrency`                                  | Rounds in parallel (at most 3)                                                                                                                                                                                                                                               |
-| `repeats`, `spots`                             | Rounds per spot, number of selected spots                                                                                                                                                                                                                                    |
+| `repeats`, `spots`, `spotIds`                  | Rounds per spot, number of selected spots and their ids in run order (compare two runs only when the ids match)                                                                                                                                                              |
 | `dry`                                          | Fake-bot run; never a measured result                                                                                                                                                                                                                                        |
 | `promptHash`                                   | First 12 hex of sha256 of the system prompt text sent to the bot                                                                                                                                                                                                             |
 | `toolSchemaHash`                               | First 12 hex of sha256 of the tool list JSON sent to the bot                                                                                                                                                                                                                 |
-| `datasetHash`                                  | First 12 hex of sha256 of `manifest.json`; `null` for the built-in dry spots                                                                                                                                                                                                 |
+| `datasetHash`                                  | First 12 hex of sha256 of `manifest.json` and its frames; `null` for the built-in dry spots                                                                                                                                                                                  |
 | `plannedRounds`                                | `spots x repeats`                                                                                                                                                                                                                                                            |
 | `completedRounds`, `rounds`                    | Rounds that ran (measured plus infra errors)                                                                                                                                                                                                                                 |
 | `infraErrorRounds`                             | Rounds that could not start the harness; excluded from all rates                                                                                                                                                                                                             |
@@ -141,11 +142,11 @@ On Ctrl-C no new rounds start, running bots are killed, interrupted rounds are d
 | `complete`                                     | `true` only if every planned round ran and the run was not interrupted                                                                                                                                                                                                       |
 | `interrupted`                                  | The run was cut by Ctrl-C                                                                                                                                                                                                                                                    |
 | `correctionCount`, `correctionRate`            | Tool calls rejected with `isError` (journal corrections, incomplete finals, invalid arguments, limit errors) and their share of audited tool calls; `null` when the dispatch audit saw no calls (fake bots). The definition is the same on both arms, so the numbers compare |
-| `finishRate`, `finishRateCi95`                 | Share of measured rounds with a final guess before the bot finished, and its Wilson 95% interval `{low, high}`                                                                                                                                                               |
+| `finishRate`, `finishRateCi95`                 | Share of measured rounds with a final guess accepted within the budget, and its Wilson 95% interval `{low, high}`                                                                                                                                                            |
 | `noPinRate`                                    | Share of measured rounds with no pin at all                                                                                                                                                                                                                                  |
 | `timeToFinalP50Sec`, `timeToFinalP95Sec`       | Time until the server accepted the final guess, measured from the release of the start frames (not process exit)                                                                                                                                                             |
 | `medianErrorKm`, `iqrErrorKm`                  | Distance from the scored pin to the truth                                                                                                                                                                                                                                    |
-| `medianPinMovementKm`, `shareMovementOver25Km` | How far the pin moved from the first checkpoint to the scored pin, and the share of rounds that moved more than 25 km                                                                                                                                                        |
+| `medianPinMovementKm`, `shareMovementOver25Km` | How far the pin moved from the first checkpoint (a non-final guess) to the scored pin, and the share of rounds that moved more than 25 km; a round whose first guess is the final has no movement                                                                            |
 | `medianPaidLooks`                              | Median paid steps per round                                                                                                                                                                                                                                                  |
 | `shareStepsWithFinding`                        | Share of paid steps whose journal finding was recorded (from `bot_finding` events); `null` for a bot contract without findings (the baseline arm)                                                                                                                            |
 

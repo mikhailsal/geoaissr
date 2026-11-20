@@ -50,7 +50,11 @@ export function createDatasetImageService(
     return raw;
   };
   return {
-    prepareStartViews: () => Promise.resolve(),
+    // Decode every frame before the bot starts: a corrupt frame fails the round as an infra
+    // error instead of reaching the bot as a failed observe and counting as a measured round.
+    prepareStartViews: async () => {
+      await Promise.all(frames.map((raw) => sharp(raw).raw().toBuffer()));
+    },
     getObserveViews: ({ size }) =>
       Promise.all(
         [0, 1, 2, 3].map((idx) =>

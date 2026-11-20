@@ -64,6 +64,8 @@ export interface RunConfig {
   concurrency: number;
   repeats: number;
   spots: number;
+  /** Ids of the selected spots, in run order: two runs compare only when these match. */
+  spotIds: string[];
   dry: boolean;
   gitCommit: string;
   date: string;
@@ -73,7 +75,7 @@ export interface RunConfig {
   promptHash: string;
   /** First 12 hex of the sha256 of the tool list JSON sent to the bots. */
   toolSchemaHash: string;
-  /** First 12 hex of the sha256 of the manifest file; null for the built-in dry spots. */
+  /** First 12 hex of the sha256 of the manifest file and every frame it names; null for the built-in dry spots. */
   datasetHash: string | null;
   /** spots x repeats the run intended to execute. */
   plannedRounds: number;

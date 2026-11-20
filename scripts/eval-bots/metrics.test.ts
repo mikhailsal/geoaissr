@@ -18,6 +18,7 @@ const CONFIG: RunConfig = {
   concurrency: 1,
   repeats: 1,
   spots: 1,
+  spotIds: ['s1'],
   dry: true,
   gitCommit: 'abc',
   date: '2026-01-01T00:00:00.000Z',

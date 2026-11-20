@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { createBotRunner } from '../server/bots/runner.ts';
 import type { EngineEvent } from '../server/engine/types.ts';
 import { createFakeLocationService } from '../server/location.ts';
-import { loadDataset } from './eval-bots/manifest.ts';
+import { loadDataset, loadDatasetWithHash } from './eval-bots/manifest.ts';
 import { pickFinalGuess } from './eval-bots/records.ts';
 
 test('loadDataset rejects missing manifest when --dataset is passed and resolves imagePaths', async () => {
@@ -42,6 +42,10 @@ test('loadDataset rejects missing manifest when --dataset is passed and resolves
     const items = loadDataset(dir);
     expect(items.length).toBe(1);
     expect(items[0]?.imagePaths?.[0]).toBe(path.join(dir, '0.jpg'));
+    // Value: protects=the dataset fingerprint changes when a frame is replaced without a manifest edit; fails_when=only manifest bytes are hashed; why_new=two runs over different photos looked identical; seam=none; no_claim=which frame changed.
+    const before = loadDatasetWithHash(dir).datasetHash;
+    writeFileSync(path.join(dir, '90.jpg'), Buffer.concat([imgBuf, Buffer.from([0])]));
+    expect(loadDatasetWithHash(dir).datasetHash).not.toBe(before);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

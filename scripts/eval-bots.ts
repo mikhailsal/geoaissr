@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import {
   evalHelpText,
@@ -32,9 +33,16 @@ function installSigint(controller: AbortController): void {
   });
 }
 
+const RESULTS_DIR = path.join(REPO_ROOT, 'docs', 'evals', 'results');
+
 async function execute(args: EvalArgs): Promise<number> {
   const loaded = loadDatasetWithHash(args.datasetDir);
   const samples = selectSamples(loaded.samples, args);
+  if (args.label !== null && existsSync(path.join(RESULTS_DIR, `${args.label}.json`))) {
+    throw new EvalArgsError(
+      `docs/evals/results/${args.label}.json already exists; choose another --label`,
+    );
+  }
   const controller = new AbortController();
   installSigint(controller);
   const result = await runEval(args, samples, loaded.datasetHash, REPO_ROOT, {
@@ -45,7 +53,7 @@ async function execute(args: EvalArgs): Promise<number> {
     outDir: result.outDir,
     summary: result.summary,
     label: args.label,
-    resultsDir: path.join(REPO_ROOT, 'docs', 'evals', 'results'),
+    resultsDir: RESULTS_DIR,
   });
   console.log(JSON.stringify(result.summary, null, 2));
   console.log(`Rounds: ${result.roundsFile}`);

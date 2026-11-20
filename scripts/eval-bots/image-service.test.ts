@@ -72,3 +72,47 @@ test('dataset service renders look crops and rejects move', async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+async function rejects(promise: Promise<unknown>): Promise<boolean> {
+  return promise.then(
+    () => false,
+    () => true,
+  );
+}
+
+// Value: protects=a corrupt dataset frame fails the round before the bot starts; fails_when=bad bytes reach the bot as a failed observe and the round counts as measured; why_new=frames were only read, never decoded, before the round; seam=none; no_claim=the round record wording.
+test('prepareStartViews rejects a frame that does not decode', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-eval-img-'));
+  try {
+    const good = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: { r: 1, g: 2, b: 3 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const paths = ['0', '1', '2', '3'].map((n) => path.join(dir, `${n}.jpg`)) as [
+      string,
+      string,
+      string,
+      string,
+    ];
+    for (const p of paths) writeFileSync(p, good);
+    const target = {
+      panoId: 'p',
+      lat: 0,
+      lng: 0,
+      countryId: 'X',
+      countryNameRu: 'Т',
+      region: 'world' as const,
+      fakeSceneIndex: 0,
+    };
+    await createDatasetImageService(paths, 0, createThumbStore()).prepareStartViews(target);
+    writeFileSync(paths[2], good.subarray(0, Math.floor(good.length / 2)));
+    const truncated = createDatasetImageService(paths, 0, createThumbStore());
+    expect(await rejects(truncated.prepareStartViews(target))).toBe(true);
+    writeFileSync(paths[2], 'not a jpeg');
+    const garbage = createDatasetImageService(paths, 0, createThumbStore());
+    expect(await rejects(garbage.prepareStartViews(target))).toBe(true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
