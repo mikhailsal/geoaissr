@@ -44,6 +44,7 @@ test('the describer prompt names the frames, the rules and every section', () =>
   const prompt = buildDescriberPrompt(sample);
   expect(prompt).toContain('- кадр 4: /d/d.jpg');
   expect(prompt).toContain('Не называй и не угадывай место');
+  expect(prompt).toContain('объект с полями text и frame');
   for (const section of REPORT_SECTIONS) expect(prompt).toContain(`- ${section.id} — `);
   expect(prompt).not.toContain(SAMPLE.countryNameRu);
   const reply = 'Вот: {"sections":{"road":[{"text":"жёлтая осевая","frame":1}]}}';

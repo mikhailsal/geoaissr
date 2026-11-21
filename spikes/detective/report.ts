@@ -138,5 +138,9 @@ export function reportSectionLines(): string[] {
   return REPORT_SECTIONS.map((s) => `- ${s.id} — ${s.hint}.`);
 }
 
+/** How a report is returned. Both sample lines are objects: a bare string is not a line. */
+export const REPORT_FORMAT_RU =
+  'Каждая строка любого раздела — объект с полями text и frame (номер одного кадра, числом); в text номер кадра не повторяй.';
+
 export const REPORT_JSON_EXAMPLE =
-  '{"sections":{"texts":[{"text":"«TAXI» — надпись на крыше жёлтой машины","frame":2}],"road":[],"vehicles":[],"poles_signs":[],"buildings":[],"nature":[],"unusual":[]}}';
+  '{"sections":{"texts":[{"text":"«TAXI» — надпись на крыше жёлтой машины","frame":2}],"road":[{"text":"серый асфальт без разметки","frame":1}],"vehicles":[],"poles_signs":[],"buildings":[],"nature":[],"unusual":[]}}';

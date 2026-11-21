@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
 import { extractJson } from './judge-call.ts';
 import {
+  REPORT_FORMAT_RU,
   REPORT_JSON_EXAMPLE,
   REPORT_RULES_RU,
   reportSchema,
@@ -21,7 +22,7 @@ export function buildDescriberPrompt(sample: EvalSampleItem): string {
     `Сначала открой все четыре снимка инструментом Read:\n${frames}`,
     `ПРАВИЛА:\n${REPORT_RULES_RU.map((rule, i) => `${i + 1}. ${rule}`).join('\n')}`,
     `РАЗДЕЛЫ (ключи JSON):\n${reportSectionLines().join('\n')}`,
-    `Ответь ТОЛЬКО JSON-объектом, без пояснений, в таком виде: ${REPORT_JSON_EXAMPLE}`,
+    `Ответь ТОЛЬКО JSON-объектом, без пояснений. ${REPORT_FORMAT_RU} Вид ответа: ${REPORT_JSON_EXAMPLE}`,
   ].join('\n\n');
 }
 

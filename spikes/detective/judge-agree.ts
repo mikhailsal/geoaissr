@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { argValue, optionalArg } from './judge-call.ts';
 import type { JudgeArm } from './judge-extract.ts';
@@ -15,6 +15,7 @@ import {
  *   bun run spikes/detective/judge-agree.ts --mode findings --runs <dirA>,<dirB> [--ref <dir>]
  *   bun run spikes/detective/judge-agree.ts --mode eyes --runs <dir> --ref <dir>
  * Add `--out <file>` to store the JSON. Runs are matched by content, not by the shuffled number.
+ * The report holds counts and shares only: no text of a finding, and a run is named by its folder.
  */
 
 export interface JudgedItem {
@@ -97,7 +98,7 @@ export function loadEyesRun(dir: string): JudgedItem[] {
 const r3 = (v: number): number => Math.round(v * 1000) / 1000;
 
 /** Reports name a run by its folder, never by a full local path. */
-const label = (dir: string | undefined): string => path.basename(dir ?? '');
+const label = (dir: string): string => path.basename(dir);
 
 /** Item-by-item agreement of two runs; `flag` is the verdict whose overlap is reported. */
 export function agreementOf(a: readonly JudgedItem[], b: readonly JudgedItem[], flag: string) {
@@ -120,6 +121,93 @@ export function agreementOf(a: readonly JudgedItem[], b: readonly JudgedItem[], 
   return { common, same, agreement: common === 0 ? null : r3(same / common), matrix, flagged };
 }
 
+/** `agreementOf` over every item of the first run, and again inside each of its groups. */
+export function agreementByGroup(a: readonly JudgedItem[], b: readonly JudgedItem[], flag: string) {
+  const groups = [...new Set(a.map((item) => item.group))].sort();
+  const inGroup = (group: string) =>
+    agreementOf(
+      a.filter((item) => item.group === group),
+      b,
+      flag,
+    );
+  return {
+    ...agreementOf(a, b, flag),
+    byGroup: Object.fromEntries(groups.map((group) => [group, inGroup(group)])),
+  };
+}
+
+/**
+ * Post-hoc split of the judge's claims by keyword (report of Part A in
+ * docs/evals/detective-spike-3.md). `not_seen`: the claim says that something is absent, not
+ * visible or unreadable. `frame`: the claim names a frame, a zoom or a heading. `seen`: every
+ * other claim. It reads the judge's wording of a claim, English or Russian. It is a heuristic,
+ * not a verdict of the judge: «white window frames» counts as `frame`, «без разметки» as `seen`.
+ */
+export type ClaimKind = 'seen' | 'not_seen' | 'frame';
+
+// `\b` knows only ASCII letters, so the word edges are spelled out for Cyrillic.
+const EDGE_BEFORE = '(?<![\\p{L}\\p{N}_])';
+const EDGE_AFTER = '(?![\\p{L}\\p{N}_])';
+const NOT_SEEN_WORDS = new RegExp(
+  `${EDGE_BEFORE}(?:no|not|none|нет)${EDGE_AFTER}|n't|unreadable|illegible|unclear|cannot|can't|absence|without|не вид|не чита|не разобр|не прочит|отсутств|нечитаем|неразборч|не удалось|не подтвержд|не замет|не найден|не обнаруж|не появ|не дал`,
+  'iu',
+);
+const FRAME_WORDS = new RegExp(`frame|кадр|${EDGE_BEFORE}look${EDGE_AFTER}|zoom|приближ|°`, 'iu');
+
+export function claimKind(text: string): ClaimKind {
+  if (NOT_SEEN_WORDS.test(text)) return 'not_seen';
+  return FRAME_WORDS.test(text) ? 'frame' : 'seen';
+}
+
+interface KindTally {
+  ok: number;
+  wrong: number;
+  unclear: number;
+}
+
+const withError = (t: KindTally) => ({
+  ...t,
+  errorRate: t.ok + t.wrong === 0 ? null : r3(t.wrong / (t.ok + t.wrong)),
+});
+
+/**
+ * The keyword split over the findings of one arm: marks per claim kind, and what the unsupported
+ * findings rest on. Null when the run has no claim marks (rubric v1).
+ */
+export function splitClaimsByKeyword(findings: ReadonlyArray<JudgedFinding | undefined>) {
+  const kinds: Record<ClaimKind, KindTally> = {
+    seen: { ok: 0, wrong: 0, unclear: 0 },
+    not_seen: { ok: 0, wrong: 0, unclear: 0 },
+    frame: { ok: 0, wrong: 0, unclear: 0 },
+  };
+  let claims = 0;
+  let findingsWithWrongSeenClaim = 0;
+  let findingsWrongOnlyByNotSeenOrFrame = 0;
+  for (const finding of findings) {
+    const wrongKinds = new Set<ClaimKind>();
+    for (const claim of finding?.claims ?? []) {
+      const kind = claimKind(claim.text);
+      claims += 1;
+      if (claim.mark === 'ok') kinds[kind].ok += 1;
+      else if (claim.mark === 'unclear') kinds[kind].unclear += 1;
+      else {
+        kinds[kind].wrong += 1;
+        wrongKinds.add(kind);
+      }
+    }
+    if (wrongKinds.has('seen')) findingsWithWrongSeenClaim += 1;
+    else if (wrongKinds.size > 0) findingsWrongOnlyByNotSeenOrFrame += 1;
+  }
+  if (claims === 0) return null;
+  return {
+    seen: withError(kinds.seen),
+    not_seen: withError(kinds.not_seen),
+    frame: withError(kinds.frame),
+    findingsWithWrongSeenClaim,
+    findingsWrongOnlyByNotSeenOrFrame,
+  };
+}
+
 /**
  * Shares pooled over several runs of the same findings. The interval of the difference uses the
  * number of distinct findings, not of verdicts: two verdicts on one finding are not independent.
@@ -127,8 +215,14 @@ export function agreementOf(a: readonly JudgedItem[], b: readonly JudgedItem[], 
 export function poolFindings(runs: ReadonlyArray<readonly FindingItem[]>) {
   const counts = { detective: emptyCounts(), single: emptyCounts() };
   for (const run of runs) for (const item of run) addVerdict(counts[item.group], item.finding);
-  const detective = withRates(counts.detective);
-  const single = withRates(counts.single);
+  const arm = (group: JudgeArm) => ({
+    ...withRates(counts[group]),
+    claimsByKeywordHeuristic: splitClaimsByKeyword(
+      runs.flatMap((run) => run.filter((item) => item.group === group).map((i) => i.finding)),
+    ),
+  });
+  const detective = arm('detective');
+  const single = arm('single');
   const n = Math.max(1, runs.length);
   const detectiveMinusSingle = newcombeDiff(
     detective.unsupported / n,
@@ -139,44 +233,64 @@ export function poolFindings(runs: ReadonlyArray<readonly FindingItem[]>) {
   return { runs: runs.length, detective, single, detectiveMinusSingle };
 }
 
+/** The summary the judge wrote next to its verdicts; null when the folder has none. */
+function storedSummary(dir: string, file: string): Record<string, unknown> | null {
+  const full = path.join(dir, file);
+  return existsSync(full) ? (readJson(full) as Record<string, unknown>) : null;
+}
+
+/** Model, seed and rubric of a findings run. Runs of spikes 1 and 2 stored no rubric: v1. */
+function findingsMeta(dir: string) {
+  const s = storedSummary(dir, 'judge-summary.json');
+  return {
+    run: label(dir),
+    judgeModel: s?.['judgeModel'] ?? null,
+    seed: s?.['seed'] ?? null,
+    rubric: s?.['rubric'] ?? 'v1',
+  };
+}
+
 function findingsReport(runDirs: readonly string[], refDir: string | null) {
-  const runs = runDirs.map(loadFindingRun);
-  const ref = refDir === null ? null : loadFindingRun(refDir);
-  const pairs = runs.flatMap((a, i) =>
-    runs.slice(i + 1).map((b, j) => ({
-      first: label(runDirs[i]),
-      second: label(runDirs[i + 1 + j]),
-      ...agreementOf(a, b, 'unsupported'),
+  const runs = runDirs.map((dir) => ({ dir, items: loadFindingRun(dir) }));
+  const ref = refDir === null ? null : { dir: refDir, items: loadFindingRun(refDir) };
+  const betweenRuns = runs.flatMap((a, i) =>
+    runs.slice(i + 1).map((b) => ({
+      first: label(a.dir),
+      second: label(b.dir),
+      ...agreementByGroup(a.items, b.items, 'unsupported'),
     })),
   );
-  const perRun = runs.map((run, i) => ({ run: label(runDirs[i]), ...poolFindings([run]) }));
-  const againstRef =
-    ref === null
-      ? []
-      : runs.map((run, i) => ({ run: label(runDirs[i]), ...agreementOf(ref, run, 'unsupported') }));
-  return { pooled: poolFindings(runs), perRun, betweenRuns: pairs, againstRef };
+  return {
+    pooled: poolFindings(runs.map((run) => run.items)),
+    perRun: runs.map((run) => ({ ...findingsMeta(run.dir), ...poolFindings([run.items]) })),
+    betweenRuns,
+    reference: ref === null ? null : { ...findingsMeta(ref.dir), ...poolFindings([ref.items]) },
+    againstRef:
+      ref === null
+        ? []
+        : runs.map((run) => ({
+            run: label(run.dir),
+            ...agreementByGroup(ref.items, run.items, 'unsupported'),
+          })),
+  };
 }
 
 function eyesReport(runDirs: readonly string[], refDir: string | null) {
-  const runs = runDirs.map(loadEyesRun);
+  const summaryOf = (dir: string) => ({
+    run: label(dir),
+    summary: storedSummary(dir, 'eyes-judge-summary.json'),
+  });
   const ref = refDir === null ? null : loadEyesRun(refDir);
-  if (ref === null) return { againstRef: [] };
-  const groups = [...new Set(ref.map((item) => item.group))].sort();
   return {
-    againstRef: runs.map((run, i) => ({
-      run: label(runDirs[i]),
-      ...agreementOf(ref, run, 'wrong'),
-      byGroup: Object.fromEntries(
-        groups.map((g) => [
-          g,
-          agreementOf(
-            ref.filter((item) => item.group === g),
-            run,
-            'wrong',
-          ),
-        ]),
-      ),
-    })),
+    runs: runDirs.map(summaryOf),
+    reference: refDir === null ? null : summaryOf(refDir),
+    againstRef:
+      ref === null
+        ? []
+        : runDirs.map((dir) => ({
+            run: label(dir),
+            ...agreementByGroup(ref, loadEyesRun(dir), 'wrong'),
+          })),
   };
 }
 
