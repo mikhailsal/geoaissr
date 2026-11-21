@@ -1,5 +1,6 @@
 import type { RoundResultEntryView } from '../../shared/protocol.ts';
 import { accountingFields } from './bot-accounting.ts';
+import { finalizeJournal } from './journal.ts';
 import {
   calculateRoundScore,
   computeHumanVsAiRound,
@@ -139,9 +140,7 @@ function scoreBotsForRound(
       roundScore,
       totalScore,
       explanation: guess?.explanation,
-      facts: guess?.facts,
-      rejectedGuesses: guess?.rejectedGuesses,
-      conclusion: guess?.conclusion,
+      journal: finalizeJournal(bot),
       usedDraft: guess !== null && bot.guessFinalized === false,
       ...accountingFields(bot),
       quip: guess?.quip,

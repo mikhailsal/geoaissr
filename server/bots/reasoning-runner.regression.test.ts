@@ -39,8 +39,8 @@ test('runner checkpoints incomplete final then accepts complete correction', asy
         const r = await fetch(base + '/tool/final_guess', {method:'POST', headers:{authorization:'Bearer '+token,'content-type':'application/json'}, body:JSON.stringify(body)});
         return await r.json();
       }
-      if (!(await call({lat:1,lng:2,facts:'clue'})).isError) process.exit(2);
-      if ((await call({lat:1,lng:2,facts:'clue',conclusion:'region',rejected_guesses:[]})).isError) process.exit(3);
+      if (!(await call({lat:1,lng:2,finding:'clue'})).isError) process.exit(2);
+      if ((await call({lat:1,lng:2,finding:'clue',summary:'region'})).isError) process.exit(3);
     `,
       ],
     }),

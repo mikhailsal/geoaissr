@@ -139,10 +139,10 @@ test('runner records paid tool parameters and requests effective fov', async () 
           const response = await fetch(base + '/tool/' + name, {method:'POST', headers:{authorization:'Bearer '+token,'content-type':'application/json'}, body:JSON.stringify(body)});
           if ((await response.json()).isError) process.exit(1);
         }
-        await call('look', {heading:359.6,pitch:4.6,zoom:3,hypothesis:'Проверяю знак'});
-        await call('move', {heading:90.4,hypothesis:'Проверяю дорогу'});
-        await fetch(base + '/tool/final_guess', {method:'POST', headers:{authorization:'Bearer '+token,'content-type':'application/json'}, body:JSON.stringify({lat:1,lng:2,facts:'secret-clue',conclusion:'Test',base64:'PRIVATE_IMAGE_DATA'})});
-        await call('final_guess', {lat:1,lng:2,facts:'Test clue',conclusion:'Test',rejected_guesses:[]});
+        await call('look', {heading:359.6,pitch:4.6,zoom:3,hypothesis:'Проверяю знак',current_guess:{lat:1,lng:2}});
+        await call('move', {heading:90.4,hypothesis:'Проверяю дорогу',current_guess:{lat:1,lng:2}});
+        await fetch(base + '/tool/final_guess', {method:'POST', headers:{authorization:'Bearer '+token,'content-type':'application/json'}, body:JSON.stringify({lat:1,lng:2,finding:'secret-clue',base64:'PRIVATE_IMAGE_DATA'})});
+        await call('final_guess', {lat:1,lng:2,finding:'Test clue',summary:'Test'});
       `,
       ],
     }),
@@ -199,6 +199,6 @@ function assertToolAudit(logger: ServerLogger): void {
     checkpointSaved: true,
     ok: false,
     result: { isError: true },
-    args: { facts: '[REDACTED]', conclusion: 'Test' },
+    args: { finding: '[REDACTED]' },
   });
 }

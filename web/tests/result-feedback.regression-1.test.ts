@@ -72,7 +72,8 @@ test('bot snapshots open within the viewport and close back to the thumbnail', a
   try {
     await openBotResults(page, server.hostUrl);
     const card = page.locator('.bot-card');
-    const thumbnail = card.locator('.thumb-btn').first();
+    await card.getByRole('button', { name: /Ход за ходом/ }).click();
+    const thumbnail = card.locator('.frame-btn').first();
     const modal = page.getByRole('dialog', { name: 'Снимок бота' });
     for (const width of [1280, 375]) {
       await page.setViewportSize({ width, height: 720 });

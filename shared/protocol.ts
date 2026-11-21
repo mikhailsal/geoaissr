@@ -19,6 +19,7 @@ import {
 } from './bot-tools.ts';
 import { PARTICIPANT_COLOR_IDS } from './colors.ts';
 import type { BotAccounting, BotReasoning, BotTurnThumbView } from './bot-results.ts';
+import type { BotJournal } from './bot-journal.ts';
 export type { BotTurnThumbView } from './bot-results.ts';
 import {
   type StoredProfile,
@@ -262,6 +263,7 @@ export interface BotRoundProgressView {
 }
 
 export interface RoundResultEntryView extends BotReasoning, BotAccounting {
+  journal?: BotJournal;
   usedDraft?: boolean;
   wins6h: number;
   id: string;

@@ -19,20 +19,15 @@ async function injectSnapshot(
         for (const entry of parsed.view.results.entries) {
           if (!entry.isAi || !entry.thumbs[0]) continue;
           if (legacy) {
-            delete entry.facts;
-            delete entry.rejectedGuesses;
-            delete entry.conclusion;
+            delete entry.journal;
             delete entry.tokenUsage;
             delete entry.costUsd;
             entry.explanation = 'Старая версия объяснения';
-            if (replacement?.partial) entry.facts = 'Частичные факты';
+            if (replacement?.partial) entry.conclusion = 'Частичный вывод';
             continue;
           }
           Object.assign(entry, {
-            conclusion: 'Вывод по уликам',
             explanation: 'Дублирующее старое объяснение',
-            rejectedGuesses: [{ guess: 'Версия', reason: 'Причина' }],
-            facts: 'Наблюдаемые факты',
             usedDraft: true,
             tokenUsage: {
               inputTokens: 1000,
@@ -44,24 +39,6 @@ async function injectSnapshot(
             matchedModelId: 'provider/model',
             isApproximateMatch: true,
           });
-          const base = entry.thumbs[0];
-          entry.thumbs = [
-            {
-              ...base,
-              action: 'look',
-              turn: 1,
-              params: { heading: 45, pitch: 10, fov: 35 },
-              hypothesis: 'Проверяю вывеску',
-            },
-            { ...base, action: 'observe', turn: 2, label: 'Поздний осмотр' },
-            {
-              ...base,
-              action: 'move',
-              turn: 2,
-              params: { heading: 90, fov: 90, step: 2 },
-              hypothesis: 'Проверяю дорогу',
-            },
-          ];
         }
       }
       if (replacement && parsed.type === 'state' && parsed.view.results) {
@@ -69,7 +46,7 @@ async function injectSnapshot(
           const entry = parsed.view.results?.entries.find((item) => item.isAi);
           if (entry) {
             entry.costUsd = 0.1234;
-            if (replacement.partial) entry.facts = 'Частичные факты';
+            if (replacement.partial) entry.conclusion = 'Частичный вывод';
           }
           socket.send(JSON.stringify(parsed));
         };
@@ -101,16 +78,15 @@ test('renders transparent bot snapshot and supports accounting interactions', as
     await page.setViewportSize({ width: 375, height: 800 });
     const card = page.locator('.bot-card');
     const text = await card.innerText();
-    expect(text.indexOf('Факты и улики')).toBeLessThan(text.indexOf('Исключённые версии'));
-    expect(text.indexOf('Исключённые версии')).toBeLessThan(text.indexOf('Итоговый вывод'));
+    expect(text.indexOf('Рассказ бота')).toBeLessThan(text.indexOf('Ход за ходом'));
+    const toggleBox = await card.getByRole('button', { name: /Ход за ходом/ }).boundingBox();
+    const accountingBox = await card.getByRole('group', { name: 'Расход бота' }).boundingBox();
+    expect(toggleBox?.y ?? 0).toBeLessThan(accountingBox?.y ?? 0);
     await expect(card.getByText('Черновик')).toBeVisible();
     await expect(card).not.toContainText('Дублирующее старое объяснение');
-    await expect(card.locator('.thumb-item').first()).toContainText('Поздний осмотр');
-    await expect(card).toContainText('зум 2.6× (fov 35°)');
-    await expect(card).toContainText('зум 1.0× (fov 90°)');
-    await expect(card).toContainText('Проверяю вывеску');
-    await expect(card).toContainText('шаг 2');
-    await card.locator('.thumb-btn').first().click();
+    await card.getByRole('button', { name: /Ход за ходом/ }).click();
+    await expect(card.getByRole('heading', { name: 'Первый взгляд' })).toBeVisible();
+    await card.locator('.frame-btn').first().click();
     await expect(card.locator('.zoomed-preview img')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(card.locator('.zoomed-preview')).toHaveCount(0);
@@ -148,6 +124,7 @@ test('renders legacy reasoning and unavailable accounting', async ({ page }) => 
     await openResults(page, server.hostUrl);
     const card = page.locator('.bot-card');
     await expect(card).toContainText('Старая версия объяснения');
+    await expect(card.getByRole('button', { name: /Ход за ходом/ })).toHaveCount(0);
     await expect(card).not.toContainText('нет догадки');
     const badge = card.getByRole('button', { name: 'Расход токенов и оценка стоимости' });
     await expect(badge).toContainText('н/д · н/д');
@@ -158,8 +135,8 @@ test('renders legacy reasoning and unavailable accounting', async ({ page }) => 
     replacement.partial = true;
     expect(replacement.send).toBeDefined();
     replacement.send?.();
-    await expect(card).toContainText('Частичные факты');
-    await expect(card).toContainText('Старая версия объяснения');
+    await expect(card).toContainText('Частичный вывод');
+    await expect(card).not.toContainText('Старая версия объяснения');
   } finally {
     await server.stop();
   }
@@ -179,7 +156,8 @@ test('hover details dismiss and a same-card update preserves open state', async 
     await expect(details).toBeVisible();
     await card.locator('h3').hover();
     await expect(details).toHaveCount(0);
-    await card.locator('.thumb-btn').first().click();
+    await card.getByRole('button', { name: /Ход за ходом/ }).click();
+    await card.locator('.frame-btn').first().click();
     await expect(card.locator('.zoomed-preview')).toBeVisible();
     const closeImage = page.getByRole('button', { name: 'Закрыть снимок' });
     await expect(closeImage).toBeFocused();

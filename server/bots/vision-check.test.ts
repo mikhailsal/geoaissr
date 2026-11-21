@@ -36,7 +36,7 @@ test('the vision check digits are visible at every slot image size', async () =>
 });
 
 // protects=vision conclusion and legacy code recognition; fails_when=wrong digits pass or structured conclusion is ignored; why_new=image tests alone do not exercise tool ingress; seam=none; no_claim=controlled executable does not establish model vision.
-test('vision check accepts matching structured and legacy text, rejects wrong digits', async () => {
+test('vision check accepts the matching summary, rejects wrong digits', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-vision-tool-'));
   const api = createBotToolApiServer();
   const random = spyOn(
@@ -69,9 +69,8 @@ test('vision check accepts matching structured and legacy text, rejects wrong di
   } as BotSlotConfig;
   try {
     for (const [body, expected] of [
-      [{ lat: 0, lng: 0, conclusion: '1234' }, true],
-      [{ lat: 0, lng: 0, conclusion: '9999' }, false],
-      [{ lat: 0, lng: 0, explanation: '1234' }, true],
+      [{ lat: 0, lng: 0, summary: '1234' }, true],
+      [{ lat: 0, lng: 0, summary: '9999' }, false],
     ] as const) {
       args = body;
       const result = await runVisionCheck({

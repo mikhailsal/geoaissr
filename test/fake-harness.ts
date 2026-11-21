@@ -63,26 +63,30 @@ function getText(res: McpToolCallResult): string {
     .join('\n');
 }
 
+const STEP = {
+  finding: 'На стартовых кадрах дорожная разметка и архитектура похожи на Россию.',
+  current_guess: { lat: 55.7, lng: 37.6 },
+};
+
 async function runNormalScenario(
   callTool: (n: string, a: Record<string, unknown>) => Promise<McpToolCallResult>,
 ): Promise<void> {
   await callTool('observe', {});
-  await callTool('draft_guess', {
-    lat: 55.7,
-    lng: 37.6,
-    facts: 'Архитектура',
-    conclusion: 'Предварительная версия',
-  });
-  await callTool('look', {
+  const look = {
     heading: 90,
     pitch: 0,
     fov: 60,
     hypothesis: 'Проверяю дорожные знаки.',
-  });
+  };
+  // The first attempt omits the finding once to exercise the correction path.
+  const bounced = await callTool('look', { ...look, current_guess: STEP.current_guess });
+  if (!bounced.isError) throw new Error('expected a correction for the missing finding');
+  await callTool('look', { ...look, ...STEP });
   await callTool('final_guess', {
     lat: 55.75,
     lng: 37.61,
-    explanation: 'Дорожные знаки и архитектура соответствуют центральной части страны.',
+    finding: 'Знаки на кириллице подтверждают версию.',
+    summary: 'Я увидел кириллические знаки и архитектуру центральной части страны.',
     quip: 'Уверенная догадка!',
   });
 }
@@ -91,22 +95,22 @@ async function runInvalidArgsScenario(
   callTool: (n: string, a: Record<string, unknown>) => Promise<McpToolCallResult>,
 ): Promise<void> {
   await callTool('observe', {});
-  const badLook = await callTool('look', { heading: 999, pitch: 0, fov: 60 });
+  const badLook = await callTool('look', { heading: 999, pitch: 0, fov: 60, ...STEP });
   if (!badLook.isError) throw new Error('expected isError on invalid heading');
-  const badLat = await callTool('submit_guess', {
+  const badLat = await callTool('final_guess', {
     lat: 120,
     lng: 10,
-    explanation: 'Плохая широта',
+    summary: 'Плохая широта',
+    finding: 'Нет',
   });
   if (!badLat.isError) throw new Error('expected isError on out-of-range lat');
 
-  const longExp = 'А'.repeat(700);
-  const longQuip = 'Б'.repeat(180);
-  const okGuess = await callTool('submit_guess', {
+  const okGuess = await callTool('final_guess', {
     lat: 50.1,
     lng: 14.4,
-    explanation: longExp,
-    quip: longQuip,
+    summary: 'А'.repeat(700),
+    finding: 'Б'.repeat(700),
+    quip: 'Б'.repeat(180),
   });
   if (okGuess.isError) throw new Error(`unexpected guess error: ${getText(okGuess)}`);
 }
@@ -116,15 +120,16 @@ async function runParallelScenario(
 ): Promise<void> {
   await callTool('observe', {});
   const [r1, r2] = await Promise.all([
-    callTool('look', { heading: 0, pitch: 0, fov: 60 }),
-    callTool('look', { heading: 180, pitch: 0, fov: 60 }),
+    callTool('look', { heading: 0, pitch: 0, fov: 60, ...STEP }),
+    callTool('look', { heading: 180, pitch: 0, fov: 60, ...STEP }),
   ]);
   const errs = [r1, r2].filter((r) => Boolean(r.isError)).length;
   if (errs !== 1) throw new Error(`expected 1 ok + 1 turn-limit error, got errors=${errs}`);
-  await callTool('submit_guess', {
+  await callTool('final_guess', {
     lat: 48.85,
     lng: 2.35,
-    explanation: 'Параллельные запросы корректно уперлись в лимит одного хода.',
+    finding: 'Параллельные запросы упёрлись в лимит.',
+    summary: 'Параллельные запросы корректно уперлись в лимит одного хода.',
   });
 }
 
@@ -147,10 +152,11 @@ export async function runFakeHarnessScenario(opts: {
     }
     if (opts.scenario === 'exit_after_guess') {
       await conn.callTool('observe', {});
-      await conn.callTool('submit_guess', {
+      await conn.callTool('final_guess', {
         lat: 52.52,
         lng: 13.4,
-        explanation: 'Успел отправить догадку до аварийного выхода.',
+        finding: 'Кадры показали городскую застройку.',
+        summary: 'Я успел отправить догадку до аварийного выхода.',
       });
       return 1;
     }

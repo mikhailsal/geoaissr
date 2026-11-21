@@ -10,7 +10,8 @@ import type {
 import type { AvatarAppearance } from '../../shared/avatar.ts';
 import type { RoundCompletion } from '../../shared/round-timing.ts';
 import type { LatLng } from '../../shared/score.ts';
-import type { BotAccounting, BotReasoning } from '../../shared/bot-results.ts';
+import type { BotAccounting } from '../../shared/bot-results.ts';
+import type { CurrentGuess, FindingState, JournalStep, Shift } from '../../shared/bot-journal.ts';
 import type {
   BotRoundTelemetry,
   BotSlotConfig,
@@ -52,10 +53,13 @@ export interface HumanGuessState {
   confirmedAt: number | null;
 }
 
-export interface BotGuessData extends BotReasoning {
+export interface BotGuessData {
   lat: number;
   lng: number;
+  /** Mirrors `summary`; kept so older result views keep reading it. */
   explanation: string;
+  /** First-person summary from `final_guess`; absent on checkpoints. */
+  summary?: string;
   quip?: string;
 }
 
@@ -76,6 +80,8 @@ export interface BotRoundState extends BotAccounting {
   lastGuessAt: number | null;
   guess: BotGuessData | null;
   thumbs: BotTurnThumbView[];
+  /** Step-by-step journal, built from thumbs, checkpoints and `bot_finding` events. */
+  journal?: JournalStep[];
   startedAt: number | null;
   finishedAt: number | null;
 }
@@ -247,6 +253,20 @@ export type EngineEvent =
       thumb: BotTurnThumbView;
     }
   | {
+      /** Attaches a finding (or its absence) to the step with index `turn`. */
+      type: 'bot_finding';
+      matchId: string;
+      gen: number;
+      roundNumber: number;
+      botId: string;
+      turn: number;
+      finding?: string;
+      findingState: Extract<FindingState, 'recorded' | 'missing'>;
+      pointMissing?: true;
+      shifts?: Shift[];
+      currentGuess?: CurrentGuess;
+    }
+  | {
       type: 'bot_guess_recorded';
       matchId: string;
       gen: number;
@@ -310,6 +330,14 @@ export type EngineEffect =
       moveEnabled: boolean;
     }
   | { type: 'release_bot_observe'; matchId: string; gen: number; roundNumber: number }
+  /** The engine moved the round end earlier (all humans confirmed); bots see the new deadline. */
+  | {
+      type: 'set_bot_round_deadline';
+      matchId: string;
+      gen: number;
+      roundNumber: number;
+      atMs: number;
+    }
   | {
       type: 'schedule_deadline';
       matchId: string;
