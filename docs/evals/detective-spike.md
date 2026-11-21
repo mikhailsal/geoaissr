@@ -2,6 +2,8 @@
 
 This file decides the gate in the bot-journal plan ("Gate: one-cycle spike on the eval photo set", amendments D-GATEBAR, D-REPEATS, D-TRANSCRIBE, and the delegated rows ASK-CUTOFF and EYES-DOWN). The pre-registration below was committed before any paid Detective round ran. The gate report is appended under it after the runs and does not change the pre-registration.
 
+A second spike tested this report's recommendation (brain-written choices, zoom before abstaining, a stronger brain model): see [detective-spike-2.md](./detective-spike-2.md).
+
 ## Pre-registration
 
 ### What runs

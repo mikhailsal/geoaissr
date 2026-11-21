@@ -1,0 +1,54 @@
+{
+  "label": "judge-eyes2-90",
+  "arm": "detective2-90 (84 rounds; every answered or abstained choice and transcription item)",
+  "note": "Model judge, not human. One claude -p call per spot with read access to the 4 full-resolution frames; items shuffled and numbered, round, time and cited frames hidden. Bar 3 uses choiceAnswered (an option or none_of_these); cannot_tell verdicts are left out of the rate.",
+  "judgeModel": "claude-sonnet-5-5",
+  "seed": 20261122,
+  "spots": 28,
+  "spotsJudged": 28,
+  "groups": {
+    "choiceAnswered": {
+      "correct": 465,
+      "wrong": 90,
+      "cannotTell": 15,
+      "missing": 0
+    },
+    "choiceAbstained": {
+      "correct": 119,
+      "wrong": 42,
+      "cannotTell": 1,
+      "missing": 0
+    },
+    "textAbstained": {
+      "correct": 105,
+      "wrong": 57,
+      "cannotTell": 0,
+      "missing": 0
+    },
+    "choiceNoneOfThese": {
+      "correct": 45,
+      "wrong": 9,
+      "cannotTell": 2,
+      "missing": 0
+    },
+    "textAnswered": {
+      "correct": 75,
+      "wrong": 3,
+      "cannotTell": 0,
+      "missing": 0
+    }
+  },
+  "choiceAnswered": {
+    "correct": 510,
+    "wrong": 99,
+    "cannotTell": 17,
+    "missing": 0,
+    "judged": 609,
+    "correctRate": 0.837,
+    "ci": {
+      "low": 0.806,
+      "high": 0.865
+    },
+    "barPassed": true
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "label": "detective2-90",
+  "arm": "detective",
+  "model": "claude-sonnet-5-5",
+  "eyesModel": "claude-haiku-5-5",
+  "protocol": "choice",
+  "requireZoom": true,
+  "effort": "low",
+  "budgetSec": 90,
+  "moveLimit": 4,
+  "imageSize": 640,
+  "concurrency": 2,
+  "repeats": 3,
+  "spots": 28,
+  "spotIds": [
+    "spot-01",
+    "spot-02",
+    "spot-03",
+    "spot-04",
+    "spot-05",
+    "spot-06",
+    "spot-07",
+    "spot-08",
+    "spot-09",
+    "spot-10",
+    "spot-11",
+    "spot-12",
+    "spot-13",
+    "spot-14",
+    "spot-15",
+    "spot-16",
+    "spot-17",
+    "spot-18",
+    "spot-19",
+    "spot-20",
+    "spot-21",
+    "spot-22",
+    "spot-23",
+    "spot-24",
+    "spot-25",
+    "spot-26",
+    "spot-27",
+    "spot-28"
+  ],
+  "plannedRounds": 84,
+  "dry": false,
+  "gitCommit": "5bba473",
+  "date": "2026-11-21T07:18:04.092Z",
+  "promptHash": "78e1131b1ba2",
+  "toolSchemaHash": "88d5b0f36d0f",
+  "datasetHash": "8599d87ad828",
+  "interrupted": false,
+  "completedRounds": 84,
+  "infraErrorRounds": 0,
+  "complete": true,
+  "measuredRounds": 84,
+  "finishRate": {
+    "hits": 84,
+    "total": 84,
+    "rate": 1,
+    "ci": {
+      "low": 0.956,
+      "high": 1
+    }
+  },
+  "noPinRate": {
+    "hits": 0,
+    "total": 84,
+    "rate": 0,
+    "ci": {
+      "low": 0,
+      "high": 0.044
+    }
+  },
+  "timeToFinalSec": {
+    "p50": 47.6,
+    "p95": 61.3
+  },
+  "errorKm": {
+    "median": 478.6,
+    "iqr": 8749.8
+  },
+  "accuracy": {
+    "within25Km": {
+      "hits": 24,
+      "total": 84,
+      "rate": 0.286,
+      "ci": {
+        "low": 0.2,
+        "high": 0.39
+      }
+    },
+    "within750Km": {
+      "hits": 43,
+      "total": 84,
+      "rate": 0.512,
+      "ci": {
+        "low": 0.407,
+        "high": 0.616
+      }
+    },
+    "scoreMedian": 3628
+  },
+  "exchangesMedian": 4,
+  "exchangesAtLeast3": {
+    "hits": 63,
+    "total": 84,
+    "rate": 0.75,
+    "ci": {
+      "low": 0.648,
+      "high": 0.83
+    }
+  },
+  "askCycleSec": {
+    "p50": 5.4,
+    "p95": 10.3,
+    "n": 284
+  },
+  "settledBy": {
+    "answer": 284,
+    "timeout": 0,
+    "eyesDown": 0,
+    "closed": 0
+  },
+  "findingsRecorded": {
+    "hits": 200,
+    "total": 200,
+    "rate": 1,
+    "ci": {
+      "low": 0.981,
+      "high": 1
+    }
+  },
+  "questionMix": {
+    "feature": 0,
+    "choice": 788,
+    "text": 240
+  },
+  "features": {
+    "asked": 0,
+    "answered": 0,
+    "abstained": 0,
+    "timeout": 0,
+    "eyesDown": 0,
+    "agreement": {
+      "hits": 0,
+      "total": 0,
+      "rate": null,
+      "ci": null
+    },
+    "perFeature": {}
+  },
+  "choices": {
+    "asked": 788,
+    "answered": 626,
+    "noneOfThese": 56,
+    "abstained": 162,
+    "timeout": 0,
+    "eyesDown": 0
+  },
+  "transcriptions": {
+    "asked": 240,
+    "answered": 78,
+    "abstained": 162,
+    "timeout": 0,
+    "eyesDown": 0,
+    "agreement": {
+      "hits": 57,
+      "total": 78,
+      "rate": 0.731,
+      "ci": {
+        "low": 0.623,
+        "high": 0.817
+      }
+    },
+    "inventedPlaceNames": 2,
+    "inventedPlaces": ["paris", "paris"]
+  },
+  "tokens": {
+    "brainMedian": 92657.5,
+    "eyesMedian": 143406,
+    "perRoundMedian": 232468.5,
+    "roundsWithUsage": 84
+  },
+  "corrections": 6,
+  "guardRejections": 41,
+  "optionRejections": 95,
+  "lateAnswers": 1,
+  "invalidAnswers": 0,
+  "zoomRefusals": 5,
+  "eyesLooksMedian": 3
+}
