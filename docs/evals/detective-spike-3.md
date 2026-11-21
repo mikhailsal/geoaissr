@@ -168,6 +168,12 @@ Baselines are the existing runs: `candidate-90` (single agent), `detective2-90` 
 
 ## Report
 
+**Summary of the three parts.**
+
+- **Part A.** A stronger judge does not clear spike 2: its conclusion stands, by a small margin.
+- **Part B.** A brain that sees no picture and reads a full description of the scene is within 750 km in 76% of rounds, against 51% for the live protocol of spike 2. The stop rule did not fire.
+- **Part C.** The live report protocol passes all six bars, three of them at their limit, so by the rule fixed before the run spike 3 supports building Stage 2. Detective still guesses much worse than the single agent: a median error of 140 km against 5.8 km.
+
 ### Part A: the opus re-judge of spike 2
 
 **Reading under the rule fixed in Part A: spike 2's bar-5 conclusion stands, by a much smaller margin.** Pooled over the two opus runs, 44.8% of Detective's findings are unsupported, against 31.5% of the single agent's. The difference is 13.3 points (Newcombe 1.0 to 24.4): above 10 points, with an interval that excludes 0. Under the sonnet judge of spike 2 it was 29.6 points (19.8 to 37.6).
@@ -384,3 +390,97 @@ Not changed: the guard's word list, which is frozen. In pilot 1 it masked «па
 **Pilot 2.** All three rounds ended with a final guess, at 36 to 55 s. Every report cites zoomed frames and has 20 or 21 lines, and the eyes used 6 or 7 of their 8 zooms. The brain sent 2, 3 and 2 asks and ran the control check in every round, once after the server's reminder. Of 11 answered requests 4 were marked `unsure`. Spot-02 moved from 10,020 km to 16 km, but no text was read there in either pilot: the brain went by the look of the street and called its answer a guess.
 
 No third pilot was run. The prompts of v3-90 are frozen at hash `e59b2fac7ca1`.
+
+### Part C: the live run (v3-90)
+
+**Reading under the rule fixed in Part C: all six bars pass, so spike 3 supports building Stage 2.** Three of the six pass at their limit, and Detective is still a much weaker guesser than the single agent: a median error of 140 km against 5.8 km. What the run shows is narrower than "Detective works": the dialogue now runs, and what the two roles write about the scene is mostly true.
+
+**Run.** One run on 2026-11-21, from 17:06 to 17:35 (+03), from commit `9d55152`.
+
+- 84 rounds, none with an infra error, none run again. Prompt hash `e59b2fac7ca1`, tool schema hash `d7dc442807ab`, data set hash `8599d87ad828`: the prompts of pilot 2. The baselines are the existing runs and were not played again.
+- 14.0 M tokens, 83% of them cached input: 3.8 M for the brain and 10.2 M for the eyes. A median round takes 163 thousand.
+- Another job loaded the machine during the run (load average 6 to 17 on 8 cores). The latest final guess came at 60 s, so the 90 s limit was not close.
+- Judges: 56 findings calls and 28 eyes calls on `claude-opus-5-5`, every spot judged, no verdict missing. One smoke call per judge was made before the run, on a round of pilot 2.
+- Spending against the cap: 6 pilot rounds of 9, 84 measured rounds, 56 and 28 judge calls, 2 smoke calls.
+- Aggregates: `detective3-90.json`, `judge3-90.json`, `judge-eyes3-90.json`, `whatif3-90.json` and `leak3-90.json` in `docs/evals/results/detective/`. The round records and the judges' sheets are not committed.
+
+**Bars.** Intervals are Wilson 95%, except for bar 5.
+
+| Bar                | Limit                                                          | v3-90                                                   | Result             |
+| ------------------ | -------------------------------------------------------------- | ------------------------------------------------------- | ------------------ |
+| 1. Finish          | at least 90% of rounds end with a final guess inside 90 s      | 84/84 = 100% (95.6–100%)                                | pass               |
+| 2. Dialogue        | median number of answered asks at least 2                      | 2: one ask in 34 rounds, two in 44, three in 6          | pass, at the limit |
+| 3. Eyes statements | at least 80% judged correct                                    | 1,779/1,905 = 93.4% (92.2–94.4%)                        | pass               |
+| 4. Copied texts    | at least 90% judged correct                                    | 175/193 = 90.7% (85.7–94.0%)                            | pass, at the limit |
+| 5. Findings        | error of `seen` claims at most 5 points above the single agent | 2.3% against 2.9%: −0.6 points (bootstrap −3.2 to +2.0) | pass               |
+| 6. Accuracy        | median error at most 750 km; at most 25% beyond 2,000 km       | 140.5 km; 18/84 = 21.4% (14.0–31.3%)                    | pass               |
+
+Bar 2 passes through the control reminder that the pilot added. In 37 rounds the brain sent a final guess before any control ask and the server sent it back once; in 22 of them it had sent no ask at all. Without those asks the median would be 1.
+
+**Accuracy.** The three last rows are existing runs.
+
+| Arm                                         | Median error | Within 25 km  | Within 750 km              | Beyond 2,000 km            |
+| ------------------------------------------- | ------------ | ------------- | -------------------------- | -------------------------- |
+| **v3-90**, live report protocol             | 140.5 km     | 30/84 = 35.7% | 56/84 = 66.7% (56.1–75.8%) | 18/84 = 21.4% (14.0–31.3%) |
+| Part B ceiling: sonnet reports, brain `low` | 121 km       | 34/84 = 40.5% | 64/84 = 76.2%              | 13/84 = 15.5%              |
+| `detective2-90`, spike 2                    | 479 km       | 24/84 = 28.6% | 43/84 = 51.2%              | 39/84 = 46.4%              |
+| `candidate-90`, single agent                | 5.8 km       | 57/84 = 67.9% | 80/84 = 95.2%              | 2/84 = 2.4%                |
+
+- **By the brain's confidence.** `country`: 33 rounds, median 3.7 km, 30 within 750 km, 3 beyond 2,000 km. `region`: 14 rounds, 45.9 km, 12 within 750 km, 1 beyond 2,000 km. `guess`: 37 rounds, 1,058 km, 14 within 750 km, 14 beyond 2,000 km.
+- **By text.** The eyes copied at least one text in 64 rounds: median 43.9 km, 49 within 750 km, 11 beyond 2,000 km. In the 20 rounds without text: median 1,058 km, 7 within 750 km, 7 beyond 2,000 km.
+- **By spot** (median of the three passes). Against `detective2-90`: closer on 21 of 28 spots, further on 3, 4 ties; the median of the spot medians is 91.6 km against 397 km. Against the single agent: closer on 10 spots, further on 18; 91.6 km against 4.9 km.
+- Nine spots have a median error above 750 km: spot-01 (Australia, 1,058 km), spot-02 (Argentina, 9,988 km), spot-05 and spot-06 (Georgia, 1,491 and 2,021 km), spot-08 (India, 1,236 km), spot-14 (New Zealand, 17,209 km), spot-15 (Puerto Rico, 5,935 km), spot-17 (USA, 3,735 km) and spot-27 (Japan, 968 km). The single agent has one, spot-14.
+
+**What the eyes wrote (bars 3 and 4).** One opus run, 2,031 items, the four start frames of a spot at full size.
+
+| Group                              | Correct | Wrong | Cannot tell | Correct of judged |
+| ---------------------------------- | ------- | ----- | ----------- | ----------------- |
+| Report lines without a copied text | 1,403   | 73    | 17          | 95.1%             |
+| Report lines with a copied text    | 136     | 15    | 4           | 90.1%             |
+| Answers to `describe` requests     | 201     | 35    | 3           | 85.2%             |
+| Answers to `text` requests         | 39      | 3     | 3           | 92.9%             |
+| Abstentions on `describe`          | 26      | 3     | 1           | 89.7%             |
+| Abstentions on `text`              | 56      | 13    | 0           | 81.2%             |
+
+- Bar 3 reads the first four rows, bar 4 the second and the fourth.
+- The judge is strict. It marks «FREEHAND PIERCING» wrong three times because the line says the letters stand in an arc and they stand in a line, and a line that calls one text the only readable one because a second can be read. Among the 18 wrong copied texts are «NEPAL» for a sign that reads «NEPARU» and «1,5 m» for a sign that reads about 1,90.
+- **The eyes' own confidence does not sort their answers.** Answers marked `sure` are correct in 127 of 146 (87.0%), answers marked `unsure` in 113 of 132 (85.6%).
+- The strict match with the labelled sign text, reported without a bar: 16 of 45 answered `text` requests (35.6%, 23.2–50.2%). The labels hold a median of one text per spot and none for 8 spots, so a correct copy of another sign counts as a miss, as in spike 2.
+
+**The brain's findings (bar 5).** Two opus runs with rubric v3, pooled: 140 findings of v3-90 and 89 of the single agent per run.
+
+|                                                      | v3-90          | Single agent   |
+| ---------------------------------------------------- | -------------- | -------------- |
+| `seen` claims wrong                                  | 17/732 = 2.3%  | 23/782 = 2.9%  |
+| `not_seen` claims wrong                              | 15/101 = 14.9% | 32/124 = 25.8% |
+| All claims wrong                                     | 32/833 = 3.8%  | 55/906 = 6.1%  |
+| Findings with a wrong `seen` claim                   | 17/256 = 6.6%  | 23/178 = 12.9% |
+| Findings with any wrong claim (reading of rubric v2) | 32/257 = 12.5% | 51/178 = 28.7% |
+| Stated rules: correct / wrong                        | 55 / 8         | 70 / 11        |
+
+- The two runs agree on 221 of 229 findings (96.5%). Of the 280 judged v3-90 findings 17 hold no visual claim and 7 are unclear.
+- By the reading of rubric v2 the share of v3-90 is 12.5%, under the 15% that this bar had before the amendment. In Part A `detective2-90` had 44.8% and the single agent 31.5%. The `seen` error of `detective2-90` was 17.3% by the keyword split of Part A.
+- The findings of v3-90 restate what the eyes wrote, so their accuracy follows that of the report.
+
+**Dialogue and the control check.**
+
+- 140 asks, all answered, none timed out; an ask takes 5.3 s at the median (8.8 s at the 95th percentile). 383 requests, 3 per ask at the median: 269 `describe` and 114 `text`.
+- `describe`: 239 answered (135 `sure`, 104 `unsure`), 30 abstained. `text`: 45 answered (13 `sure`, 32 `unsure`), 69 abstained, 54 of them as unreadable.
+- Every round has a control ask. 37 came after the server's reminder; in 13 more rounds the brain marked its first ask as the control check by itself. After the control answer the final pin moved more than 100 km in 8 rounds: closer to the spot in 5, further in 3.
+- **The brain stops early.** The report comes at 15.8 s (21.4 s at the 95th percentile), the first ask at 20.4 s (26.9 s), the final guess at 36.1 s (45.5 s; the latest at 59.9 s). At the median 54 s of the 90 are left unused.
+- The report has 20 lines at the median (12 to 29) and copies a text in 63 rounds. The eyes zoomed 3 times before the report in 67 rounds and twice in 17; the server refused no zoom there. A round has 5 zooms at the median (3 to 8).
+
+**Other reported numbers.**
+
+- **What-ifs** (nothing played again). If the single agent's pin replaces Detective's in the 20 rounds without text: median 73.7 km, 66/84 = 78.6% within 750 km, 13/84 = 15.5% beyond 2,000 km. If it replaces it in the 37 rounds where the brain says `guess`: 13.1 km, 75/84 = 89.3%, 6/84 = 7.1%. Neither mix reaches the single agent alone.
+- **Guard.** One request of the brain was refused for a place word («английском») and one for its question form. Six of the eyes' words were masked: «камерного» in a report, and «арабской», «косо», «тайский», «европейский» and «английские» in answers. «камерного» and «косо» are ordinary words, masked by mistake. The zoom-before-abstaining rule refused one answer.
+- **Leak check.** In 5 of 84 rounds the eyes' own words name the spot's country. All five are rounds on the two Thai spots and name the script («тайское письмо»), which the eyes may do; one use stood without a script noun and was masked.
+- The label-based detector of invented place names counts one, «NEPAL» on spot-12; it is the same misread sign as above.
+
+**What this run does and does not show.**
+
+- The report protocol removes what spikes 1 and 2 failed on. The eyes describe the scene before the brain asks, the brain's requests are topics instead of questions with an expected answer, and both the report and the findings hold up under a stricter judge than before.
+- **Detective does not guess as well as the single agent, and no reading of this run says it does.** The single agent is one `claude-haiku-5-5` process that answers in 13.5 s with a median error of 5.8 km. Detective is two `claude-sonnet-5-5` processes that answer in 36 s with 140 km. A reason to build it has to come from what the player sees, not from the score.
+- The brain's confidence is a usable signal: a round it calls `country` is within 750 km in 30 of 33 cases, a round it calls `guess` in 14 of 37.
+- The rounds that go far are mostly rounds without text, and the brain leaves more than half of the budget unused. Both point at the same next step: more of the round spent on finding text.
+- Limits of the evidence. One run. The 84 rounds are 28 spots played three times, so the intervals are too narrow. Both judges are a model, with no human check. The judges read the four start frames at full size and never see a zoomed frame. Bar 5 was re-anchored in the amendment, before the first paid call of this part. The pilot fixes include a server reply, and bar 2 passes through it.

@@ -71,6 +71,8 @@ function bootstrap(spots: readonly SpotTally[], resamples: number, seed: number)
 }
 
 export const BAR5_MAX_DIFFERENCE = 0.05;
+/** The bootstrap seed that the amendment of Part C fixes (item 10). */
+export const BAR5_BOOTSTRAP_SEED = 20261129;
 
 /** Null when the runs hold no `seen` claim, that is under rubrics v1 and v2. */
 export function seenClaimBar(
@@ -87,7 +89,7 @@ export function seenClaimBar(
     detectiveSeenError: r3(detective),
     singleSeenError: r3(single),
     detectiveMinusSingle: r3(diff),
-    ci: bootstrap(spots, opts.resamples ?? 2000, opts.seed ?? 20261126),
+    ci: bootstrap(spots, opts.resamples ?? 2000, opts.seed ?? BAR5_BOOTSTRAP_SEED),
     maxDifference: BAR5_MAX_DIFFERENCE,
     barPassed: diff <= BAR5_MAX_DIFFERENCE,
   };
