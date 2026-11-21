@@ -77,4 +77,81 @@ The judge is a model, not a person. It is a separate `claude -p` process (`claud
 
 ## Gate report
 
-_Appended after the runs._
+**Verdict: the gate fails.** Bars 1 and 2 pass. Bars 3, 4 and 5 fail. Under the plan's rule, Stage 1 ships alone and Detective stays an experiment.
+
+All three measured arms ran on 2026-11-21 from commit `233e7d4` with no code change between them: claude, `claude-haiku-5-5`, effort low, move limit 4, concurrency 2. None had an infra error, and all are complete. The aggregate results are in `docs/evals/results/detective/`: `detective-90.json`, `detective-60.json`, `labels-90.json`, `judge-90.json` and `leak-90.json`. The per-round files are not committed.
+
+### Bars (detective-90, 84 rounds)
+
+| #   | Bar                                           | Result                                        | 95% interval                                     | Verdict                         |
+| --- | --------------------------------------------- | --------------------------------------------- | ------------------------------------------------ | ------------------------------- |
+| 1   | ≥90% finish inside 90 s                       | 84/84 = 100%                                  | 95.6–100%                                        | **pass**                        |
+| 2   | median exchanges ≥3                           | 3 (77/84 rounds have ≥3)                      | 83.8–95.9% for ≥3                                | **pass** (at the bar)           |
+| 3   | feature agreement ≥80% of answered            | 297/440 = 67.5%                               | 63.0–71.7%                                       | **fail**                        |
+| 4   | transcription match ≥80% of answered          | 29/43 = 67.4%                                 | 52.5–79.5%                                       | **fail**                        |
+| 5   | unsupported findings ≥10 points below Stage 1 | Detective 39/206 = 18.9%; Stage 1 6/89 = 6.7% | difference −12.2 points (Newcombe −19.1 to −3.6) | **fail**: Detective is _higher_ |
+
+**60 s (detective-60, 28 rounds, reported only).**
+
+- Finish: 28/28 = 100% (87.9–100%). The median of exchanges is 3, but only 19 of 28 rounds reach 3.
+- Feature agreement: 93/132 = 70.5%. Transcription match: 5/8.
+- Median error: 2,365 km.
+
+**Details behind bars 3–5.**
+
+- **Features.**
+  - The eyes abstained on 444 of 884 feature questions (50%). No question timed out, and no eyes process went down.
+  - Per feature (agree/answered): script 63/69, vegetation 77/94, roof type 60/79, centre line 37/53, plate colour 14/26, pole material 33/68, driving side 7/17, soil colour 6/34.
+  - 61 of the 143 misses are an eyes value where the label says `not_visible` or `none_visible`. The largest group is `soil_colour: brown` against `not_visible`, 22 times. The labels are model-made and unreviewed, so part of bar 3 may be label error.
+  - A post-hoc reading that is not pre-registered and cannot pass the bar: on the 353 items whose label is a positive value, agreement is 279/353 = 79.0%.
+- **Transcriptions.**
+  - The brain asked 199 transcription questions, in 83 of 84 rounds. The eyes answered 43 and abstained on 156.
+  - Every pilot and measured round shows the eyes rarely zoom: 60 of 84 rounds made no `look` at all.
+  - Several misses are near-misses under the strict rule: «BULGARI» against «BVLGARI», «TAXIMETER» against «TAXI-METER», «km 3 / 9» against «39». A post-hoc lenient rule (spaces and punctuation removed, small edit distance) gives 35/43 = 81.4%. It was not pre-registered and does not change the verdict.
+  - Invented place names under the pre-registered detector: 0. Not counted by the detector: «NEPALI» and «NEPALO» for a sign labelled «NEPARU».
+- **Unsupported findings.**
+  - Judge: a model (`claude-sonnet-5-5`), not a person. It judged all 295 findings, and none was without a visual claim.
+  - The Detective brain cannot see, so its unsupported claims are mostly the eyes' wrong answers repeated. For example, on one spot it wrote "flat roofs" where the frames show pitched slate roofs, and on another "brown soil, deciduous forest" in an urban scene with palms.
+  - The geographic rules stated in the findings were wrong in 57 of 128 Detective findings that state one, against 3 of 25 for Stage 1.
+  - The interval treats findings as independent. Findings of one round are correlated, so the interval is optimistic in both directions.
+  - The blinding is partial: Stage 1 findings name frames by compass letter, and the two arms write in different styles.
+  - The blind sheet and the key are kept outside the repo for the owner's human review.
+
+### Accuracy and the leak comparison
+
+| Arm                                         | Median error | Rounds within 25 km | Rounds within 750 km | Time to final p50 / p95 |
+| ------------------------------------------- | ------------ | ------------------- | -------------------- | ----------------------- |
+| Stage 1 single agent, 90 s (`candidate-90`) | 5.8 km       | 57/84               | 80/84                | 13.5 / 18.1 s           |
+| detective-90 (brain fed the eyes)           | 3,484 km     | 12/84               | 28/84                | 25.0 / 33.8 s           |
+| detective-60                                | 2,365 km     | 4/28                | 9/28                 | 21.5 / 26.1 s           |
+| labels-90 (brain fed the human labels)      | 899 km       | 7/28                | 14/28                | 13.7 / 18.1 s           |
+
+Leak comparison, paired by spot (detective-90 median of 3 passes against labels-90):
+
+- The label-fed brain is closer on 20 spots, the eyes-fed brain on 5, and 3 are ties.
+- The median paired difference is 245 km in favour of the labels.
+
+There is no sign that the eyes carry place information beyond the labels: no invented place names, and the eyes-fed brain is worse, not better. The comparison also shows a second cost that does not depend on the eyes. Even with perfect catalog answers, the brain's median error is 899 km, while the single agent that sees the frames is at 5.8 km. Most of the place signal in these photos (architecture, landmarks, brands, the look of a street) never passes through eight catalog features and a few transcriptions.
+
+### Cost and timing
+
+- **Tokens.** The median per round is 145,622 (brain 55,802, eyes 89,109), against 41,820 for the Stage 1 single agent at 90 s: **3.5×**. At 60 s it is 130,632 against 41,702 (3.1×). The labels arm uses 53,376 tokens per round, brain only.
+- **ASK-CUTOFF.** A full ask cycle takes p50 2.3 s and p95 6.9 s (291 answered asks). Every ask was settled by an answer: 0 timeouts, 0 `eyes_down`, 1 late answer dropped, 1 invalid answer refused and corrected. If Detective is revisited, a cutoff of 15 s keeps more than twice the p95; the 30 s in the design is safe but loose.
+- **Journal.** 206 of 207 due asks carried a `finding` (99.5%). There were 6 corrections, and the guard rejected nothing.
+- **Pace.** The brain finishes early, around 25 s into a 90 s budget, even though the pilot-2 prompt fix tells it to keep asking while more than 25 s remain.
+
+### Open Question 1: closed catalog or values written by the brain
+
+The closed catalog did what it was chosen for. Every answer was measurable, it leaked no place names, and the guard was never needed. But it is the main reason Detective loses: perfect catalog answers still leave the brain at 899 km against 5.8 km for the single agent. Brain-written values would let the brain ask about what actually separates places here, such as an architectural style, a brand or the form of a sign. That would cost a labelling pass over the questions actually asked and the place-name guard on brain text, before any agreement or leak number could be claimed. Recommendation: do not ship the closed catalog as the Detective protocol. If Detective is revisited, test brain-written values with a stronger brain model (Open Question 5), and with eyes that are required to zoom before they abstain on text. Judge that test first on the accuracy gap to the single agent, because neither agreement nor finish rate caught the real problem.
+
+### Runs and deviations
+
+- **Paid rounds:** 146.
+  - 2 pilots × 3 rounds; detective-90 84; detective-60 28; labels-90 28.
+  - 118 of them are two-CLI Detective rounds.
+  - Judge: 28 `claude-sonnet-5-5` calls, about 0.57 M tokens, plus 1 smoke call on a pilot round to check the parser.
+  - Paid wall time from the first pilot to the end of the judge: about 40 minutes.
+- **Re-pilot.** Pilot 1 finished 3 of 3 rounds, but the runner killed both CLIs at the final guess, before `claude -p` printed its usage. That is a protocol bug, so there was one re-pilot under the pre-registered rule. The same fix commit (`233e7d4`) changed the brain prompt ("keep asking while more than 25 s remain; ask for literal text") and the eyes prompt ("zoom before abstaining on small details"). Pilot 2 finished 3 of 3 with 3, 4 and 4 exchanges. The prompts were frozen there.
+- **Prompt hashes.** The pre-registration asked for one `promptHash` across the measured arms. That cannot hold, because the hash covers the budget value and the eyes prompt. The arms carry `2486b60c4355` (90 s), `aacc0472791c` (60 s) and `4c076d0c1a57` (labels, brain only), all built from the same frozen templates at `233e7d4`. `toolSchemaHash` is `7058c794c8a8` for all three.
+- **Guard.** The script-name whitelist is not used for transcription targets (stated in the pre-registration). No question was rejected.
+- **Stage 1 baseline concurrency.** The Stage 1 baseline ran at concurrency 3. The Stage 1 numbers above are used only for findings, tokens and accuracy, not for a finish bar.

@@ -1,0 +1,38 @@
+{
+  "label": "judge-90",
+  "arms": {
+    "detective": "detective-90 (84 rounds, step findings from the second ask on)",
+    "single": "Stage 1 candidate-90 (84 rounds, look-step findings)"
+  },
+  "note": "Model judge, not human. One claude -p call per spot with read access to the 4 full-resolution frames; findings of both arms shuffled together with role words masked. Newcombe interval treats findings as independent although findings of one round are correlated.",
+  "judgeModel": "claude-sonnet-5-5",
+  "seed": 20261121,
+  "spots": 28,
+  "single": {
+    "supported": 83,
+    "unsupported": 6,
+    "noVisualClaim": 0,
+    "ruleOk": 22,
+    "ruleWrong": 3,
+    "missingVerdicts": 0,
+    "judged": 89,
+    "unsupportedRate": 0.067
+  },
+  "detective": {
+    "supported": 167,
+    "unsupported": 39,
+    "noVisualClaim": 0,
+    "ruleOk": 71,
+    "ruleWrong": 57,
+    "missingVerdicts": 0,
+    "judged": 206,
+    "unsupportedRate": 0.189
+  },
+  "difference": {
+    "diff": -0.122,
+    "low": -0.191,
+    "high": -0.036
+  },
+  "reading": "detective higher",
+  "barPassed": false
+}

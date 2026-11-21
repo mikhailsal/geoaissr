@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { leakComparison } from './compare.ts';
 import { buildBatches, maskRoleWords, type FindingItem } from './judge-extract.ts';
 import { newcombeDiff, summarizeJudgement } from './judge-stats.ts';
 
@@ -50,4 +51,24 @@ test('verdicts map back to arms; an interval touching 0 reads as no difference',
   const none = summarizeJudgement(batches, new Map());
   expect(none.single.missingVerdicts).toBe(2);
   expect(none.reading).toBe('no data');
+});
+
+test('the leak comparison pairs spot medians and scores a missing pin as the worst case', () => {
+  const det = [
+    { spotId: 'a', errorKm: 10, infraError: null },
+    { spotId: 'a', errorKm: 30, infraError: null },
+    { spotId: 'a', errorKm: 20, infraError: null },
+    { spotId: 'b', errorKm: null, infraError: null },
+    { spotId: 'c', errorKm: 1, infraError: 'boom' },
+  ];
+  const lab = [
+    { spotId: 'a', errorKm: 50, infraError: null },
+    { spotId: 'b', errorKm: 5, infraError: null },
+    { spotId: 'c', errorKm: 1, infraError: null },
+  ];
+  const cmp = leakComparison(det, lab);
+  expect(cmp.spots).toBe(2);
+  expect(cmp.detectiveCloser).toBe(1);
+  expect(cmp.labelsCloser).toBe(1);
+  expect(cmp.pairs[0]).toEqual({ spotId: 'a', detectiveKm: 20, labelsKm: 50 });
 });
