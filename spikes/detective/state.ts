@@ -5,6 +5,7 @@ import type { EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
 import { createBroker, type AskOutcome, type Broker, type Question } from './broker.ts';
 import type { CatalogFeature } from './catalog.ts';
 import { createPlaceGuard, type PlaceGuard } from './guard.ts';
+import type { Protocol } from './protocol.ts';
 
 /** Shared state of one Detective round: both roles' handlers read and write it. */
 
@@ -51,7 +52,8 @@ export interface FinalRecord extends LatLngPoint {
 export interface EyesAnswerLog {
   requestId: string;
   tMs: number;
-  result: 'settled' | 'late' | 'unknown' | 'invalid';
+  /** zoom: refused under requireZoom because it abstained without a look. */
+  result: 'settled' | 'late' | 'unknown' | 'invalid' | 'zoom';
 }
 
 export interface SessionOptions {
@@ -63,6 +65,9 @@ export interface SessionOptions {
   moveLimit: number;
   budgetSec: number;
   answerSource: AnswerSource;
+  protocol: Protocol;
+  /** The eyes must make a look during a request before they may abstain (spike 2). */
+  requireZoom: boolean;
   askTimeoutMs?: number;
   minRemainingMs?: number;
   nextRequestWaitMs?: number;
@@ -84,6 +89,12 @@ export interface SessionState {
   corrections: Array<{ role: 'brain' | 'eyes'; tool: string; reason: string }>;
   guardRejections: string[];
   eyesAnswers: EyesAnswerLog[];
+  /** Paid looks already used when each request was first delivered to the eyes. */
+  looksAtDelivery: Map<string, number>;
+  /** When the outstanding ask times out (server clock); null when none is open. */
+  askDeadlineAt: number | null;
+  /** Answers refused because they abstained without a look (requireZoom). */
+  zoomRefusals: number;
   toolCalls: { brain: number; eyes: number; brainErrors: number; eyesErrors: number };
   eyesDownAtMs: number | null;
   /** Set when the round runner ends the round (final, brain exit, budget or abort). */
@@ -94,6 +105,8 @@ export interface SessionState {
 export const ASK_TIMEOUT_MS = 30_000;
 export const MIN_REMAINING_MS = 10_000;
 export const NEXT_REQUEST_WAIT_MS = 20_000;
+/** With less than this left before the ask times out, the eyes may abstain without a look. */
+export const ZOOM_MIN_LEFT_MS = 12_000;
 
 export function createSessionState(opts: SessionOptions): SessionState {
   return {
@@ -111,6 +124,9 @@ export function createSessionState(opts: SessionOptions): SessionState {
     corrections: [],
     guardRejections: [],
     eyesAnswers: [],
+    looksAtDelivery: new Map(),
+    askDeadlineAt: null,
+    zoomRefusals: 0,
     toolCalls: { brain: 0, eyes: 0, brainErrors: 0, eyesErrors: 0 },
     eyesDownAtMs: null,
     ended: false,

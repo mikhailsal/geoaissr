@@ -35,11 +35,19 @@ function hashes(args: SpikeArgs, catalog: readonly CatalogFeature[]) {
     regionDiagonalKm: getRegionDiagonalKm('world'),
     budgetSec: args.budgetSec,
     catalog,
+    protocol: args.protocol,
   });
-  const eyes = args.arm === 'detective' ? buildEyesPrompt({ moveLimit: args.moveLimit }) : '';
+  const eyes =
+    args.arm === 'detective'
+      ? buildEyesPrompt({
+          moveLimit: args.moveLimit,
+          protocol: args.protocol,
+          requireZoom: args.requireZoom,
+        })
+      : '';
   const tools = JSON.stringify([
-    roleToolDefinitions('brain', catalog),
-    roleToolDefinitions('eyes', catalog),
+    roleToolDefinitions('brain', catalog, args.protocol),
+    roleToolDefinitions('eyes', catalog, args.protocol),
   ]);
   return { promptHash: shortHash(`${brain}\n---\n${eyes}`), toolSchemaHash: shortHash(tools) };
 }
@@ -57,13 +65,17 @@ async function runAll(
   roundsFile: string,
   signal: AbortSignal,
 ) {
+  const defaultModel = getHarnessAdapter('claude').defaultModel;
   const settings: DetectiveSettings = {
     arm: args.arm,
     budgetSec: args.budgetSec,
     moveLimit: args.moveLimit,
     imageSize: 640,
-    model: getHarnessAdapter('claude').defaultModel,
+    brainModel: args.brainModel ?? defaultModel,
+    eyesModel: args.eyesModel ?? defaultModel,
     effort: 'low',
+    protocol: args.protocol,
+    requireZoom: args.requireZoom,
     dry: args.dry,
   };
   const root = mkdtempSync(path.join(tmpdir(), 'geo-detective-'));
@@ -149,7 +161,10 @@ async function execute(args: SpikeArgs): Promise<number> {
     {
       label: args.label,
       arm: args.arm,
-      model: settings.model,
+      model: settings.brainModel,
+      eyesModel: args.arm === 'detective' ? settings.eyesModel : '',
+      protocol: args.protocol,
+      requireZoom: args.requireZoom,
       effort: settings.effort,
       budgetSec: args.budgetSec,
       moveLimit: args.moveLimit,

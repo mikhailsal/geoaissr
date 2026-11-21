@@ -2,6 +2,7 @@ import type { EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
 import type { BotTokenUsage } from '../../shared/bot-results.ts';
 import { haversineDistanceKm } from '../../shared/score.ts';
 import type { SettledBy } from './broker.ts';
+import type { Protocol } from './protocol.ts';
 import { scoreItem, type ScoredItem } from './scoring.ts';
 import type { SessionState } from './state.ts';
 
@@ -32,7 +33,11 @@ export interface DetectiveRoundRecord {
   executionId: string;
   repeat: number;
   arm: Arm;
+  /** The brain's model; `eyesModel` is the eyes' model. */
   model: string;
+  eyesModel: string;
+  protocol: Protocol;
+  requireZoom: boolean;
   budgetSec: number;
   moveLimit: number;
   hasFinalGuess: boolean;
@@ -52,6 +57,7 @@ export interface DetectiveRoundRecord {
   guardRejections: string[];
   lateAnswers: number;
   invalidAnswers: number;
+  zoomRefusals: number;
   toolCalls: SessionState['toolCalls'];
   eyesDownAtSec: number | null;
   brain: RoleExit | null;
@@ -98,6 +104,7 @@ export function buildDetectiveRecord(ctx: {
   repeat: number;
   arm: Arm;
   model: string;
+  eyesModel: string;
   budgetSec: number;
   moveLimit: number;
   state: SessionState;
@@ -113,6 +120,9 @@ export function buildDetectiveRecord(ctx: {
     repeat: ctx.repeat,
     arm: ctx.arm,
     model: ctx.model,
+    eyesModel: ctx.eyesModel,
+    protocol: s.opts.protocol,
+    requireZoom: s.opts.requireZoom,
     budgetSec: ctx.budgetSec,
     moveLimit: ctx.moveLimit,
     hasFinalGuess: s.final !== null,
@@ -134,6 +144,7 @@ export function buildDetectiveRecord(ctx: {
     guardRejections: s.guardRejections,
     lateAnswers: s.eyesAnswers.filter((a) => a.result === 'late').length,
     invalidAnswers: s.eyesAnswers.filter((a) => a.result === 'invalid').length,
+    zoomRefusals: s.zoomRefusals,
     toolCalls: s.toolCalls,
     eyesDownAtSec: s.eyesDownAtMs === null ? null : sec(s.eyesDownAtMs),
     brain: ctx.brain,

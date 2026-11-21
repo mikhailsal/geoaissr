@@ -37,3 +37,22 @@ test('place names in a transcription are found in Russian and in Latin script', 
   expect(placeNamesIn('WELCOME TO BANGKOK')).toEqual(['bangkok']);
   expect(placeNamesIn('KEEP CLEAR')).toEqual([]);
 });
+
+test('the guard blocks large cities and English names, and lets script names through', () => {
+  expect(guard.findPlaceWord('похоже на Париж')).toBe('париж');
+  expect(guard.findPlaceWord('такси как в Нью-Йорке')).toBe('нью');
+  expect(guard.findPlaceWord('Japanese sign')).toBe('japanese');
+  expect(guard.findPlaceWord('английский текст')).toBe('английский');
+  for (const text of [
+    'грузинское письмо',
+    'арабская вязь',
+    'японская кана',
+    'корейский хангыль',
+    'Thai script',
+    'канава у дороги',
+    'индикаторы на светофоре',
+    'пользуются ли мотоциклами',
+  ]) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
+});

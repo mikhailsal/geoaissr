@@ -1,11 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { buildSanitizedChildEnv } from '../../server/bots/adapters/shared.ts';
-import { spawnManaged } from '../../server/proc/spawn.ts';
 import { loadDatasetWithHash, type EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
-import { runPool } from '../../scripts/eval-bots/pool.ts';
+import { JUDGE_MODEL, argValue, extractJson, judgeEachSpot, runJudgeCall } from './judge-call.ts';
 import {
   buildBatches,
   detectiveFindings,
@@ -21,7 +18,6 @@ import { summarizeJudgement, type JudgedFinding } from './judge-stats.ts';
  * sheet (for the owner's human review), the key, the raw verdicts and judge-summary.json.
  */
 
-const JUDGE_MODEL = 'claude-sonnet-5-5';
 const SEED = 20261121;
 
 const verdictSchema = z.object({
@@ -52,64 +48,14 @@ export function buildJudgePrompt(sample: EvalSampleItem, batch: SpotBatch): stri
   ].join('\n\n');
 }
 
-function extractJson(text: string): unknown {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('judge reply has no JSON object');
-  return JSON.parse(text.slice(start, end + 1)) as unknown;
-}
-
 async function judgeSpot(
   sample: EvalSampleItem,
   batch: SpotBatch,
   datasetDir: string,
 ): Promise<{ verdicts: JudgedFinding[]; raw: string; usage: unknown }> {
-  const cwd = mkdtempSync(path.join(tmpdir(), 'geo-judge-'));
-  try {
-    const proc = spawnManaged({
-      cmd: [
-        'claude',
-        '-p',
-        buildJudgePrompt(sample, batch),
-        '--model',
-        JUDGE_MODEL,
-        '--tools',
-        'Read',
-        '--allowedTools',
-        'Read',
-        '--add-dir',
-        datasetDir,
-        '--strict-mcp-config',
-        '--permission-mode',
-        'bypassPermissions',
-        '--setting-sources',
-        '',
-        '--no-session-persistence',
-        '--disable-slash-commands',
-        '--output-format',
-        'json',
-      ],
-      cwd,
-      env: buildSanitizedChildEnv(),
-      kind: 'bot',
-    });
-    const exit = await proc.exited;
-    await proc.drained;
-    if (exit.code !== 0) throw new Error(`judge exited ${exit.code ?? 'null'}`);
-    const out = JSON.parse(proc.getStdout()) as { result?: string; usage?: unknown };
-    const raw = out.result ?? '';
-    const parsed = verdictSchema.parse(extractJson(raw));
-    return { verdicts: parsed.findings, raw, usage: out.usage ?? null };
-  } finally {
-    rmSync(cwd, { recursive: true, force: true });
-  }
-}
-
-function argValue(argv: readonly string[], flag: string): string {
-  const i = argv.indexOf(flag);
-  const v = i >= 0 ? argv[i + 1] : undefined;
-  if (!v) throw new Error(`missing ${flag}`);
-  return v;
+  const { text, usage } = await runJudgeCall(buildJudgePrompt(sample, batch), datasetDir);
+  const parsed = verdictSchema.parse(extractJson(text));
+  return { verdicts: parsed.findings, raw: text, usage };
 }
 
 function writeSheets(outDir: string, batches: readonly SpotBatch[]): void {
@@ -131,26 +77,21 @@ async function judgeAll(
   samples: Map<string, EvalSampleItem>,
   datasetDir: string,
 ) {
-  const verdicts = new Map<string, JudgedFinding[]>();
-  const raw: Record<string, unknown> = {};
-  const jobs = batches.map((batch) => async () => {
-    const sample = samples.get(batch.spotId);
-    if (!sample) throw new Error(`unknown spot ${batch.spotId}`);
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      try {
-        const res = await judgeSpot(sample, batch, datasetDir);
-        verdicts.set(batch.spotId, res.verdicts);
-        raw[batch.spotId] = { verdicts: res.verdicts, usage: res.usage };
-        console.log(
-          `[judge ${batch.spotId}] ${res.verdicts.length}/${batch.items.length} verdicts`,
-        );
-        return;
-      } catch (err) {
-        console.error(`[judge ${batch.spotId}] attempt ${attempt}: ${String(err)}`);
-      }
-    }
-  });
-  await runPool(jobs, 2, () => false);
+  const byId = new Map(batches.map((b) => [b.spotId, b]));
+  const results = await judgeEachSpot(
+    batches.map((b) => b.spotId),
+    (spotId) => {
+      const sample = samples.get(spotId);
+      const batch = byId.get(spotId);
+      if (!sample || !batch) throw new Error(`unknown spot ${spotId}`);
+      return judgeSpot(sample, batch, datasetDir);
+    },
+    (spotId, res) => `${res.verdicts.length}/${byId.get(spotId)?.items.length ?? 0} verdicts`,
+  );
+  const verdicts = new Map([...results].map(([id, res]) => [id, res.verdicts]));
+  const raw = Object.fromEntries(
+    [...results].map(([id, res]) => [id, { verdicts: res.verdicts, usage: res.usage }]),
+  );
   return { verdicts, raw };
 }
 

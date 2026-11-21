@@ -14,7 +14,10 @@ import { isAbstain } from './catalog.ts';
 
 export type QuestionStatus = 'answered' | 'abstained' | 'timeout' | 'eyes_down';
 
-export type Question = { kind: 'feature'; feature: string } | { kind: 'text'; target: string };
+export type Question =
+  | { kind: 'feature'; feature: string }
+  | { kind: 'choice'; question: string; options: string[] }
+  | { kind: 'text'; target: string };
 
 export interface AnswerItem {
   /** 1-based number of the question in the request. */

@@ -18,8 +18,11 @@ const SETTINGS: DetectiveSettings = {
   budgetSec: 90,
   moveLimit: 4,
   imageSize: 640,
-  model: 'claude-haiku-5-5',
+  brainModel: 'claude-haiku-5-5',
+  eyesModel: 'claude-haiku-5-5',
   effort: 'low',
+  protocol: 'catalog',
+  requireZoom: false,
   dry: true,
 };
 
@@ -28,6 +31,9 @@ function config(planned: number): DetectiveRunConfig {
     label: null,
     arm: 'detective',
     model: 'claude-haiku-5-5',
+    eyesModel: 'claude-haiku-5-5',
+    protocol: 'catalog',
+    requireZoom: false,
     effort: 'low',
     budgetSec: 90,
     moveLimit: 4,
@@ -84,4 +90,30 @@ test('a dry labels-arm round needs no eyes', async () => {
   });
   expect(record?.hasFinalGuess).toBe(true);
   expect(record?.toolCalls.eyes).toBe(0);
+});
+
+test('a dry choice round with the zoom rule runs end to end and reports accuracy bands', async () => {
+  const sample = loadDataset(null)[0];
+  if (!sample) throw new Error('no built-in sample');
+  const record = await runDetectiveRound({
+    root,
+    runName: 'test',
+    settings: { ...SETTINGS, protocol: 'choice', requireZoom: true },
+    sample,
+    repeat: 3,
+    catalog: loadCatalog(),
+    signal: new AbortController().signal,
+  });
+  expect(record?.hasFinalGuess).toBe(true);
+  expect(record?.protocol).toBe('choice');
+  expect(record?.exchanges).toBe(2);
+  expect(record?.zoomRefusals).toBe(0);
+  const summary = summarizeDetective(
+    { ...config(1), protocol: 'choice', requireZoom: true },
+    record ? [record] : [],
+  );
+  expect(summary.questionMix.choice).toBe(2);
+  expect(summary.choices.answered).toBe(2);
+  expect(summary.accuracy.within750Km.hits).toBe(1);
+  expect(summary.accuracy.scoreMedian).toBeGreaterThan(4500);
 });

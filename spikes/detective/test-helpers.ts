@@ -51,6 +51,8 @@ export function makeSession(overrides: Partial<SessionOptions> = {}): DetectiveS
     moveLimit: 2,
     budgetSec: 90,
     answerSource: 'eyes',
+    protocol: 'catalog',
+    requireZoom: false,
     askTimeoutMs: 2000,
     nextRequestWaitMs: 50,
     ...overrides,

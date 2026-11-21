@@ -1,5 +1,6 @@
 import { formatToolZodError, parseGuessInput } from '../../shared/bot-tools.ts';
 import { BrokerBusyError, type AskOutcome, type Question } from './broker.ts';
+import { duplicateOption } from './choice.ts';
 import { formatAskOutcome } from './format.ts';
 import { labelOutcome } from './labels.ts';
 import { buildBrainSchemas, type AskInput } from './protocol.ts';
@@ -19,15 +20,32 @@ import {
 
 const ROUND_OVER_TEXT = 'Раунд окончен: новые вызовы не принимаются.';
 
+/** The brain-written texts of one question that the eyes will read. */
+function questionTexts(q: Question): string[] {
+  if (q.kind === 'text') return [q.target];
+  if (q.kind === 'choice') return [q.question, ...q.options];
+  return [];
+}
+
+function placeWordReply(s: SessionState, text: string, word: string): ToolReply {
+  s.guardRejections.push(word);
+  return errorReply(
+    `[GEO_DETECTIVE_PLACE_WORD] Вопрос не отправлен: в тексте «${text}» есть название места или народа («${word}»). Правило: глазам нельзя подсказывать место. Перефразируй без названий мест и народов (названия письменностей можно: «грузинское письмо»), например «самая крупная вывеска». Отклонённый запрос не засчитывается в лимит 5 вопросов.`,
+  );
+}
+
 function guardQuestions(s: SessionState, questions: readonly Question[]): ToolReply | null {
   for (const q of questions) {
-    if (q.kind !== 'text') continue;
-    const word = s.guard.findPlaceWord(q.target);
-    if (word === null) continue;
-    s.guardRejections.push(word);
-    return errorReply(
-      `[GEO_DETECTIVE_PLACE_WORD] Вопрос не отправлен: в тексте запроса «${q.target}» есть название места или народа («${word}»). Правило: глазам нельзя подсказывать место. Перефразируй без названий мест и народов, например «самая крупная вывеска». Отклонённый запрос не засчитывается в лимит 5 вопросов.`,
-    );
+    for (const text of questionTexts(q)) {
+      const word = s.guard.findPlaceWord(text);
+      if (word !== null) return placeWordReply(s, text, word);
+    }
+    const dup = q.kind === 'choice' ? duplicateOption(q) : null;
+    if (dup !== null) {
+      return errorReply(
+        `Вопрос «${q.kind === 'choice' ? q.question : ''}» не отправлен: вариант «${dup}» повторяется. Варианты должны различаться. Запрос не засчитан.`,
+      );
+    }
   }
   return null;
 }
@@ -78,19 +96,22 @@ async function settleAsk(s: SessionState, questions: Question[]): Promise<AskOut
     );
   }
   if (s.opts.answerSource === 'labels') return labelOutcome(s.opts.sample, questions);
+  const busy = errorReply('Предыдущий запрос ещё не закрыт: дождись его ответа.');
+  if (s.broker.hasPending()) return busy;
+  s.askDeadlineAt = s.now() + waitMs;
   try {
     return await s.broker.ask(questions, waitMs);
   } catch (err) {
-    if (err instanceof BrokerBusyError) {
-      return errorReply('Предыдущий запрос ещё не закрыт: дождись его ответа.');
-    }
+    if (err instanceof BrokerBusyError) return busy;
     throw err;
+  } finally {
+    s.askDeadlineAt = null;
   }
 }
 
 export async function handleAsk(s: SessionState, args: unknown): Promise<ToolReply> {
   if (roundOver(s)) return errorReply(ROUND_OVER_TEXT);
-  const parsed = buildBrainSchemas(s.opts.catalog).ask.safeParse(args);
+  const parsed = buildBrainSchemas(s.opts.catalog, s.opts.protocol).ask.safeParse(args);
   if (!parsed.success) return errorReply(formatToolZodError(parsed.error));
   const blocked = guardQuestions(s, parsed.data.questions) ?? journalCorrection(s, parsed.data);
   if (blocked) return blocked;

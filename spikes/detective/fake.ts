@@ -1,9 +1,18 @@
+import type { Question } from './broker.ts';
+import { isAbstain } from './catalog.ts';
 import type { DetectiveSession } from './session.ts';
+import type { SessionState } from './state.ts';
 
 /**
  * In-process stand-ins for the two roles, used by `--dry` and the tests. They drive the same
  * session handlers the real processes reach over HTTP, at no cost.
  */
+
+function fakeValue(s: SessionState, q: Question): string {
+  if (q.kind === 'feature') return s.opts.sample.labels?.[q.feature] ?? 'not_visible';
+  if (q.kind === 'choice') return '1';
+  return s.opts.sample.signText?.[0]?.text ?? 'not_visible';
+}
 
 export async function runFakeEyes(session: DetectiveSession): Promise<void> {
   const s = session.state;
@@ -12,34 +21,62 @@ export async function runFakeEyes(session: DetectiveSession): Promise<void> {
     await session.call('eyes', 'next_request', {});
     const request = s.broker.current();
     if (!request) continue;
-    if (s.turnsUsed === 0) await session.call('eyes', 'look', { heading: 90, fov: 30 });
-    const answers = request.questions.map((q, idx) => {
-      const label =
-        q.kind === 'feature'
-          ? (s.opts.sample.labels?.[q.feature] ?? 'not_visible')
-          : (s.opts.sample.signText?.[0]?.text ?? 'not_visible');
-      return { n: idx + 1, value: label, frame: 1 };
-    });
+    const answers = request.questions.map((q, idx) => ({
+      n: idx + 1,
+      value: fakeValue(s, q),
+      frame: 1,
+    }));
+    const mustZoom =
+      s.opts.requireZoom &&
+      answers.some((a) => isAbstain(a.value)) &&
+      s.turnsUsed < s.opts.moveLimit;
+    if (s.turnsUsed === 0 || mustZoom) {
+      await session.call('eyes', 'look', { heading: 90, fov: 30 });
+    }
     await session.call('eyes', 'answer', { request_id: request.id, answers });
   }
 }
 
+const CATALOG_ASKS = [
+  [
+    { kind: 'feature', feature: 'driving_side' },
+    { kind: 'feature', feature: 'script' },
+  ],
+  [
+    { kind: 'text', target: 'самая крупная вывеска' },
+    { kind: 'feature', feature: 'roof_type' },
+  ],
+];
+
+const CHOICE_ASKS = [
+  [
+    {
+      kind: 'choice',
+      question: 'С какой стороны едут машины?',
+      options: ['по левой', 'по правой'],
+    },
+    { kind: 'text', target: 'все надписи на вывесках' },
+  ],
+  [
+    {
+      kind: 'choice',
+      question: 'Какие крыши у домов?',
+      options: ['скатная черепица', 'плоские бетонные', 'металл'],
+    },
+  ],
+];
+
 export async function runFakeBrain(session: DetectiveSession): Promise<void> {
   const s = session.state;
   const point = { lat: s.opts.sample.lat + 0.5, lng: s.opts.sample.lng + 0.5 };
+  const [first, second] = s.opts.protocol === 'choice' ? CHOICE_ASKS : CATALOG_ASKS;
   await session.call('brain', 'ask', {
     hypothesis: 'Сторона движения и письменность разделят основные версии.',
-    questions: [
-      { kind: 'feature', feature: 'driving_side' },
-      { kind: 'feature', feature: 'script' },
-    ],
+    questions: first,
   });
   await session.call('brain', 'ask', {
     hypothesis: 'Вывеска сузит регион.',
-    questions: [
-      { kind: 'text', target: 'самая крупная вывеска' },
-      { kind: 'feature', feature: 'roof_type' },
-    ],
+    questions: second,
     finding: 'Сторона движения и письменность получены; версии сузились.',
     current_guess: point,
   });

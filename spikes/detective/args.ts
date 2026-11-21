@@ -1,9 +1,15 @@
+import type { Protocol } from './protocol.ts';
 import type { Arm } from './records.ts';
 
 /** Flags of `bun run spike:detective`. Unknown, duplicate or malformed flags exit 2. */
 
 export interface SpikeArgs {
   arm: Arm;
+  protocol: Protocol;
+  /** Model ids per role; null means the claude harness default. */
+  brainModel: string | null;
+  eyesModel: string | null;
+  requireZoom: boolean;
   budgetSec: number;
   moveLimit: number;
   repeats: number;
@@ -26,6 +32,11 @@ export class SpikeArgsError extends Error {
 
 export const SPIKE_HELP = `Usage: bun run spike:detective -- [flags]
   --arm detective|labels  detective: brain + eyes; labels: brain fed the human labels (default detective)
+  --protocol catalog|choice  catalog: closed feature catalog (spike 1); choice: brain-written
+                          questions and options (spike 2). labels needs catalog (default catalog)
+  --brain-model <id>      the brain's claude model (default: the harness default)
+  --eyes-model <id>       the eyes' claude model (default: the harness default)
+  --require-zoom          the eyes must make a look in a request before they may abstain
   --budget <sec>          round budget, 30-600 (default 90)
   --move-limit <n>        eyes' paid looks, 0-10 (default 4)
   --repeats <n>           passes over the spots, 1-5 (default 1)
@@ -49,7 +60,23 @@ const INT_FLAGS: Record<
   '--limit': { key: 'limit', min: 1, max: 1000 },
 };
 
-const STRING_FLAGS = new Set(['--arm', '--spot', '--dataset', '--out', '--label']);
+const STRING_FLAGS = new Set([
+  '--arm',
+  '--protocol',
+  '--brain-model',
+  '--eyes-model',
+  '--spot',
+  '--dataset',
+  '--out',
+  '--label',
+]);
+
+const MODEL_RE = /^claude-[a-z0-9-]{1,60}$/;
+
+function modelId(flag: string, value: string): string {
+  if (!MODEL_RE.test(value)) throw new SpikeArgsError(`${flag} must match ${String(MODEL_RE)}`);
+  return value;
+}
 
 function parseInt10(flag: string, raw: string, min: number, max: number): number {
   if (!/^\d+$/.test(raw)) throw new SpikeArgsError(`${flag} needs an integer (got "${raw}")`);
@@ -59,7 +86,13 @@ function parseInt10(flag: string, raw: string, min: number, max: number): number
 }
 
 function applyString(out: SpikeArgs, flag: string, value: string): void {
-  if (flag === '--spot') out.spotIds.push(value);
+  if (flag === '--protocol') {
+    if (value !== 'catalog' && value !== 'choice')
+      throw new SpikeArgsError(`--protocol must be catalog or choice (got "${value}")`);
+    out.protocol = value;
+  } else if (flag === '--brain-model') out.brainModel = modelId(flag, value);
+  else if (flag === '--eyes-model') out.eyesModel = modelId(flag, value);
+  else if (flag === '--spot') out.spotIds.push(value);
   else if (flag === '--dataset') out.datasetDir = value;
   else if (flag === '--out') out.outDir = value;
   else if (flag === '--label') {
@@ -73,6 +106,10 @@ function applyString(out: SpikeArgs, flag: string, value: string): void {
 export function parseSpikeArgs(argv: readonly string[]): SpikeArgs {
   const out: SpikeArgs = {
     arm: 'detective',
+    protocol: 'catalog',
+    brainModel: null,
+    eyesModel: null,
+    requireZoom: false,
     budgetSec: 90,
     moveLimit: 4,
     repeats: 1,
@@ -88,8 +125,9 @@ export function parseSpikeArgs(argv: readonly string[]): SpikeArgs {
   const seen = new Set<string>();
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i] ?? '';
-    if (flag === '--dry' || flag === '--help') {
-      out[flag === '--dry' ? 'dry' : 'help'] = true;
+    if (flag === '--dry' || flag === '--help' || flag === '--require-zoom') {
+      if (flag === '--require-zoom') out.requireZoom = true;
+      else out[flag === '--dry' ? 'dry' : 'help'] = true;
       continue;
     }
     const intSpec = INT_FLAGS[flag];
@@ -103,6 +141,8 @@ export function parseSpikeArgs(argv: readonly string[]): SpikeArgs {
     if (intSpec) out[intSpec.key] = parseInt10(flag, value, intSpec.min, intSpec.max);
     else applyString(out, flag, value);
   }
+  if (out.arm === 'labels' && out.protocol !== 'catalog')
+    throw new SpikeArgsError('--arm labels needs --protocol catalog: choices have no labels');
   if (out.dry) out.datasetDir = null;
   return out;
 }

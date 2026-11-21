@@ -3,10 +3,12 @@ import { normalizeHeadingDeg } from '../../server/images/label.ts';
 import { formatToolZodError } from '../../shared/bot-tools.ts';
 import type { AnswerItem, BrokerRequest } from './broker.ts';
 import { allowedValues, findFeature, isAbstain } from './catalog.ts';
+import { normalizeChoiceValue } from './choice.ts';
 import { formatRequestForEyes } from './format.ts';
 import { answerSchema, eyesLookSchema, type AnswerInput } from './protocol.ts';
 import {
   NEXT_REQUEST_WAIT_MS,
+  ZOOM_MIN_LEFT_MS,
   elapsedMs,
   errorReply,
   roundOver,
@@ -87,14 +89,20 @@ export async function handleNextRequest(s: SessionState): Promise<ToolReply> {
   const request = await s.broker.nextRequest(s.opts.nextRequestWaitMs ?? NEXT_REQUEST_WAIT_MS);
   if (roundOver(s)) return { text: ROUND_OVER_TEXT };
   if (!request) return { text: 'Запросов пока нет. Вызови next_request снова.' };
+  if (!s.looksAtDelivery.has(request.id)) s.looksAtDelivery.set(request.id, s.turnsUsed);
   return {
-    text: formatRequestForEyes(
-      s.opts.catalog,
-      request,
-      s.frames,
-      Math.max(0, s.opts.moveLimit - s.turnsUsed),
-    ),
+    text: formatRequestForEyes(s.opts.catalog, request, s.frames, {
+      turnsLeft: Math.max(0, s.opts.moveLimit - s.turnsUsed),
+      requireZoom: s.opts.requireZoom,
+    }),
   };
+}
+
+function choiceProblem(request: BrokerRequest, item: AnswerItem): string | null {
+  const q = request.questions[item.n - 1];
+  if (q?.kind !== 'choice') return null;
+  if (normalizeChoiceValue(q, item.value) !== null) return null;
+  return `вопрос ${item.n}: «${item.value}» — не номер варианта (1–${q.options.length}), не none_of_these, not_visible или unreadable`;
 }
 
 /** Problems of one answer item against the request and the issued frames; empty when valid. */
@@ -102,6 +110,8 @@ function itemProblems(s: SessionState, request: BrokerRequest, item: AnswerItem)
   const q = request.questions[item.n - 1];
   if (!q) return [`вопроса ${item.n} нет в запросе`];
   const problems: string[] = [];
+  const choice = choiceProblem(request, item);
+  if (choice !== null) return [choice];
   if (q.kind === 'feature') {
     const feature = findFeature(s.opts.catalog, q.feature);
     if (feature && !allowedValues(feature).includes(item.value)) {
@@ -119,8 +129,25 @@ function itemProblems(s: SessionState, request: BrokerRequest, item: AnswerItem)
   return problems;
 }
 
-function toItems(input: AnswerInput): AnswerItem[] {
-  return input.answers.map((a) => ({ n: a.n, value: a.value, frame: a.frame ?? null }));
+/** Choice values become option numbers, so the record and the brain see one canonical form. */
+function toItems(input: AnswerInput, request: BrokerRequest | null): AnswerItem[] {
+  return input.answers.map((a) => {
+    const q = request?.questions[a.n - 1];
+    const value = q?.kind === 'choice' ? (normalizeChoiceValue(q, a.value) ?? a.value) : a.value;
+    return { n: a.n, value, frame: a.frame ?? null };
+  });
+}
+
+/**
+ * requireZoom: an answer that abstains is refused while the eyes still have paid looks, made no
+ * look since this request reached them, and the ask has time for one.
+ */
+function zoomProblem(s: SessionState, request: BrokerRequest, items: AnswerItem[]): string | null {
+  if (!s.opts.requireZoom || !items.some((i) => isAbstain(i.value))) return null;
+  if (s.turnsUsed >= s.opts.moveLimit) return null;
+  if ((s.looksAtDelivery.get(request.id) ?? s.turnsUsed) < s.turnsUsed) return null;
+  if (s.askDeadlineAt !== null && s.askDeadlineAt - s.now() < ZOOM_MIN_LEFT_MS) return null;
+  return 'перед not_visible или unreadable сделай хотя бы один look в этом запросе: приблизь (fov 20–40) место, где это вероятнее всего видно, потом отвечай. Ход спишется; без look отказ не принимается, пока ходы есть';
 }
 
 export function handleAnswer(
@@ -131,12 +158,18 @@ export function handleAnswer(
   if (roundOver(s)) return { text: ROUND_OVER_TEXT };
   const parsed = answerSchema.safeParse(args);
   if (!parsed.success) return errorReply(formatToolZodError(parsed.error));
-  const items = toItems(parsed.data);
+  const matching = current?.id === parsed.data.request_id ? current : null;
+  const items = toItems(parsed.data, matching);
   const log = { requestId: parsed.data.request_id, tMs: elapsedMs(s) };
-  if (current?.id === parsed.data.request_id) {
-    const problems = items.flatMap((item) => itemProblems(s, current, item));
+  if (matching) {
+    const problems = items.flatMap((item) => itemProblems(s, matching, item));
+    const zoom = problems.length === 0 ? zoomProblem(s, matching, items) : null;
+    if (zoom !== null) {
+      s.zoomRefusals += 1;
+      problems.push(zoom);
+    }
     if (problems.length > 0) {
-      s.eyesAnswers.push({ ...log, result: 'invalid' });
+      s.eyesAnswers.push({ ...log, result: zoom === null ? 'invalid' : 'zoom' });
       s.corrections.push({ role: 'eyes', tool: 'answer', reason: problems.join('; ') });
       return errorReply(
         `Ответ не принят:\n- ${problems.join('\n- ')}\nИсправь и вызови answer снова.`,

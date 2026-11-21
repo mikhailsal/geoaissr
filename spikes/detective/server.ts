@@ -58,7 +58,9 @@ export function startDetectiveToolServer(
         return Response.json({ text: 'Unauthorized', isError: true }, { status: 401 });
       }
       if (url.pathname === '/tools') {
-        return Response.json({ tools: roleToolDefinitions(role, catalog) });
+        return Response.json({
+          tools: roleToolDefinitions(role, catalog, session.state.opts.protocol),
+        });
       }
       if (!url.pathname.startsWith('/tool/')) return new Response('Not found', { status: 404 });
       const tool = url.pathname.slice('/tool/'.length);

@@ -14,6 +14,7 @@ import { createDatasetImageService } from '../../scripts/eval-bots/image-service
 import type { EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
 import type { CatalogFeature } from './catalog.ts';
 import { runFakeBrain, runFakeEyes } from './fake.ts';
+import type { Protocol } from './protocol.ts';
 import { launchRole, type RoleProcess } from './procs.ts';
 import { buildBrainPrompt, buildEyesPrompt } from './prompts.ts';
 import {
@@ -37,8 +38,11 @@ export interface DetectiveSettings {
   budgetSec: number;
   moveLimit: number;
   imageSize: BotImageSize;
-  model: string;
+  brainModel: string;
+  eyesModel: string;
   effort: EffortLevel;
+  protocol: Protocol;
+  requireZoom: boolean;
   dry: boolean;
 }
 
@@ -112,7 +116,6 @@ function launchRoles(
   }
   const common = {
     childrenFile: dirs.childrenFile,
-    model: settings.model,
     effort: settings.effort,
     apiUrl: server.baseUrl,
   };
@@ -121,9 +124,11 @@ function launchRoles(
     regionDiagonalKm: getRegionDiagonalKm('world'),
     budgetSec: settings.budgetSec,
     catalog,
+    protocol: settings.protocol,
   });
   const brain = launchRole({
     ...common,
+    model: settings.brainModel,
     role: 'brain',
     workDir: dirs.brain,
     prompt: brainPrompt,
@@ -133,9 +138,14 @@ function launchRoles(
     settings.arm === 'detective'
       ? launchRole({
           ...common,
+          model: settings.eyesModel,
           role: 'eyes',
           workDir: dirs.eyes,
-          prompt: buildEyesPrompt({ moveLimit: settings.moveLimit }),
+          prompt: buildEyesPrompt({
+            moveLimit: settings.moveLimit,
+            protocol: settings.protocol,
+            requireZoom: settings.requireZoom,
+          }),
           token: server.tokens.eyes,
         })
       : null;
@@ -204,6 +214,8 @@ export async function runDetectiveRound(opts: {
     moveLimit: settings.moveLimit,
     budgetSec: settings.budgetSec,
     answerSource: settings.arm === 'detective' ? 'eyes' : 'labels',
+    protocol: settings.protocol,
+    requireZoom: settings.requireZoom,
   });
   const server = startDetectiveToolServer(session, opts.catalog);
   try {
@@ -219,7 +231,8 @@ export async function runDetectiveRound(opts: {
       executionId,
       repeat: opts.repeat,
       arm: settings.arm,
-      model: settings.model,
+      model: settings.brainModel,
+      eyesModel: settings.arm === 'detective' ? settings.eyesModel : '',
       budgetSec: settings.budgetSec,
       moveLimit: settings.moveLimit,
       state: session.state,

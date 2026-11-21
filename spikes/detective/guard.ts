@@ -1,11 +1,12 @@
 import { REGION_COUNTRIES } from '../../shared/regions.ts';
 
 /**
- * Place-name and demonym guard for the brain's free text sent to the eyes (the target of a
- * transcription request). It is a heuristic: country names and their stems from shared/regions,
- * and a list of irregular demonyms. Script names made from demonyms («японская», «грузинская»)
- * are blocked too: the script is asked through the catalog feature, so a transcription target
- * never needs one. Catalog values are fixed ids and need no guard.
+ * Place-name and demonym guard for the brain's free text sent to the eyes: the target of a
+ * transcription request and, in the choice protocol, the question and its options. It is a
+ * heuristic: country names and their stems from shared/regions, irregular demonyms, large cities
+ * and English demonyms. A demonym right next to a script noun names a script the eyes can see
+ * («грузинское письмо», «арабская вязь») and passes: the plan's script-name whitelist. Catalog
+ * values are fixed ids and need no guard.
  */
 
 /** Words inside country names that are ordinary words, not places. */
@@ -75,9 +76,125 @@ const DEMONYM_STEMS = [
   'прибалт',
 ];
 
+/** Large cities in Russian, as stems; a few short names are matched as whole words only. */
+const CITY_STEMS = [
+  'токи',
+  'осак',
+  'киот',
+  'париж',
+  'лондон',
+  'берлин',
+  'мадрид',
+  'барселон',
+  'милан',
+  'москв',
+  'москов',
+  'петербург',
+  'пекин',
+  'шанха',
+  'гонконг',
+  'сеул',
+  'бангкок',
+  'тайбэ',
+  'мумба',
+  'катманд',
+  'коломб',
+  'тбилис',
+  'сидне',
+  'мельбурн',
+  'хобарт',
+  'окленд',
+  'веллингтон',
+  'буэнос',
+  'мендос',
+  'йоханнесбург',
+  'кейптаун',
+  'вашингтон',
+  'стамбул',
+  'каир',
+  'торонто',
+  'чикаго',
+];
+const CITY_WORDS = new Set(['дели', 'рим', 'рио', 'дубай', 'нью', 'лос']);
+
+/** English country names and demonyms, for a brain that writes in Latin script. */
+const LATIN_STEMS = [
+  'japan',
+  'chines',
+  'china',
+  'thai',
+  'korea',
+  'russia',
+  'german',
+  'french',
+  'france',
+  'spanish',
+  'spain',
+  'italian',
+  'italy',
+  'british',
+  'english',
+  'america',
+  'austral',
+  'brazil',
+  'mexic',
+  'india',
+  'nepal',
+  'georgia',
+  'taiwan',
+  'argentin',
+  'zealand',
+  'africa',
+  'europ',
+  'asian',
+  'lanka',
+  'sinhal',
+  'tamil',
+  'hindi',
+  'arab',
+];
+
+/** Nouns that turn a neighbouring demonym into a script name. */
+const SCRIPT_NOUN_STEMS = [
+  'письм',
+  'алфавит',
+  'шрифт',
+  'букв',
+  'вязь',
+  'иероглиф',
+  'слогов',
+  'цифр',
+  'кана',
+  'хангыл',
+  'script',
+  'alphabet',
+  'letter',
+  'character',
+];
+
+function isScriptName(ws: readonly string[], i: number): boolean {
+  const neighbours = [ws[i - 1] ?? '', ws[i + 1] ?? ''];
+  return neighbours.some((w) => SCRIPT_NOUN_STEMS.some((stem) => w.startsWith(stem)));
+}
+
 /** Common words that a country stem catches ("того" is Togo, "грузовик" starts like Georgia). */
-const COMMON_WORDS = new Set(['того', 'груз']);
-const COMMON_PREFIXES = ['грузов', 'грузч', 'костюм', 'костёр', 'костер'];
+const COMMON_WORDS = new Set(['того', 'груз', 'кана']);
+const COMMON_PREFIXES = [
+  'грузов',
+  'грузч',
+  'костюм',
+  'костёр',
+  'костер',
+  'канав',
+  'канал',
+  'индикат',
+  'индивид',
+  'индустр',
+  'польз',
+  'корен',
+  'малин',
+  'мальч',
+];
 
 function isCommonWord(word: string): boolean {
   return COMMON_WORDS.has(word) || COMMON_PREFIXES.some((p) => word.startsWith(p));
@@ -94,7 +211,7 @@ function stemOf(word: string): string {
 }
 
 function buildPlaceStems(): string[] {
-  const stems = new Set<string>(DEMONYM_STEMS);
+  const stems = new Set<string>([...DEMONYM_STEMS, ...CITY_STEMS, ...LATIN_STEMS]);
   for (const country of REGION_COUNTRIES) {
     for (const word of words(country.nameRu)) {
       if (word.length < 4 || GENERIC_NAME_WORDS.has(word)) continue;
@@ -113,9 +230,12 @@ export function createPlaceGuard(): PlaceGuard {
   const stems = buildPlaceStems();
   return {
     findPlaceWord(text) {
-      for (const word of words(text)) {
+      const ws = words(text);
+      for (const [i, word] of ws.entries()) {
+        if (CITY_WORDS.has(word)) return word;
         if (word.length < 3 || isCommonWord(word)) continue;
-        if (stems.some((stem) => word.startsWith(stem))) return word;
+        if (!stems.some((stem) => word.startsWith(stem))) continue;
+        if (!isScriptName(ws, i)) return word;
       }
       return null;
     },

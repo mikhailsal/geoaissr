@@ -1,4 +1,8 @@
 import { computeMedianAndIqr, quantile, wilsonInterval } from '../../scripts/eval-bots/metrics.ts';
+import { getRegionDiagonalKm } from '../../shared/regions.ts';
+import { calculateRoundScore } from '../../shared/score.ts';
+import { NONE_OF_THESE } from './choice.ts';
+import type { Protocol } from './protocol.ts';
 import type { DetectiveRoundRecord } from './records.ts';
 import type { ScoredItem } from './scoring.ts';
 
@@ -7,7 +11,11 @@ import type { ScoredItem } from './scoring.ts';
 export interface DetectiveRunConfig {
   label: string | null;
   arm: DetectiveRoundRecord['arm'];
+  /** The brain's model. */
   model: string;
+  eyesModel: string;
+  protocol: Protocol;
+  requireZoom: boolean;
   effort: string;
   budgetSec: number;
   moveLimit: number;
@@ -71,6 +79,33 @@ function perFeature(
   return out;
 }
 
+function choiceCounts(items: readonly ScoredItem[]) {
+  return {
+    asked: items.length,
+    answered: items.filter((i) => i.status === 'answered').length,
+    noneOfThese: items.filter((i) => i.value === NONE_OF_THESE).length,
+    abstained: items.filter((i) => i.status === 'abstained').length,
+    timeout: items.filter((i) => i.status === 'timeout').length,
+    eyesDown: items.filter((i) => i.status === 'eyes_down').length,
+  };
+}
+
+/** Error bands and the game score on the world map (spike 2's accuracy bar). */
+function accuracy(records: readonly DetectiveRoundRecord[]) {
+  const diagonal = getRegionDiagonalKm('world');
+  // A round without a pin scores 0 points and counts as outside every band.
+  const scores = records.map((r) =>
+    r.errorKm === null ? 0 : calculateRoundScore(r.errorKm, diagonal),
+  );
+  const within = (km: number) =>
+    rate(records.filter((r) => r.errorKm !== null && r.errorKm <= km).length, records.length);
+  return {
+    within25Km: within(25),
+    within750Km: within(750),
+    scoreMedian: quantile(scores, 0.5),
+  };
+}
+
 function tokenMedians(records: readonly DetectiveRoundRecord[]) {
   const brain = nums(records.map((r) => r.brain?.usage?.totalTokens ?? null));
   const eyes = nums(records.map((r) => r.eyes?.usage?.totalTokens ?? null));
@@ -119,6 +154,7 @@ export function summarizeDetective(
   const records = all.filter((r) => r.infraError === null);
   const features = itemsOf(records, 'feature');
   const texts = itemsOf(records, 'text');
+  const choices = itemsOf(records, 'choice');
   const inventedPlaces = texts.flatMap((t) => t.inventedPlaces);
   return {
     ...config,
@@ -133,8 +169,11 @@ export function summarizeDetective(
       p95: r1(quantile(nums(records.map((r) => r.timeToFinalSec)), 0.95)),
     },
     errorKm: computeMedianAndIqr(nums(records.map((r) => r.errorKm))),
+    accuracy: accuracy(records),
     ...askStats(records),
+    questionMix: { feature: features.length, choice: choices.length, text: texts.length },
     features: { ...itemCounts(features), perFeature: perFeature(features) },
+    choices: choiceCounts(choices),
     transcriptions: {
       ...itemCounts(texts),
       inventedPlaceNames: inventedPlaces.length,
@@ -145,6 +184,7 @@ export function summarizeDetective(
     guardRejections: records.reduce((n, r) => n + r.guardRejections.length, 0),
     lateAnswers: records.reduce((n, r) => n + r.lateAnswers, 0),
     invalidAnswers: records.reduce((n, r) => n + r.invalidAnswers, 0),
+    zoomRefusals: records.reduce((n, r) => n + r.zoomRefusals, 0),
     eyesLooksMedian: quantile(
       records.map((r) => r.eyesLooks),
       0.5,

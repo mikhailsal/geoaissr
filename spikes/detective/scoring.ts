@@ -5,8 +5,12 @@ import { placeNamesIn } from './guard.ts';
 /** Scores of one answered question against the human labels of the spot. */
 
 export interface ScoredItem {
-  kind: 'feature' | 'text';
+  kind: 'feature' | 'text' | 'choice';
   feature: string | null;
+  /** Choice: the brain's question; text: the transcription target. */
+  question?: string;
+  /** Choice only: the brain's options, numbered from 1. */
+  options?: string[];
   status: SettledItem['status'];
   value: string | null;
   frame: number | null;
@@ -55,12 +59,28 @@ export function scoreItem(sample: EvalSampleItem, item: SettledItem): ScoredItem
       inventedPlaces: [],
     };
   }
+  if (item.question.kind === 'choice') {
+    // Brain-written choices have no labels; the eyes-answer judge scores them.
+    return {
+      kind: 'choice',
+      feature: null,
+      question: item.question.question,
+      options: item.question.options,
+      status: item.status,
+      value: item.value,
+      frame: item.frame,
+      label: null,
+      agrees: null,
+      inventedPlaces: [],
+    };
+  }
   const texts = (sample.signText ?? []).map((s) => s.text);
   const labelPlaces = new Set(placeNamesIn(texts.join(' ')));
   const value = item.value ?? '';
   return {
     kind: 'text',
     feature: null,
+    question: item.question.target,
     status: item.status,
     value: item.value,
     frame: item.frame,

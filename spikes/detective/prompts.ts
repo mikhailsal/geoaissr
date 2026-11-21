@@ -1,5 +1,5 @@
 import type { CatalogFeature } from './catalog.ts';
-import { MAX_QUESTIONS } from './protocol.ts';
+import { MAX_OPTIONS, MAX_QUESTIONS, type Protocol } from './protocol.ts';
 
 /** Start texts of the two roles. The brain learns only the region, the scale and the budget. */
 
@@ -9,12 +9,29 @@ function catalogLines(catalog: readonly CatalogFeature[]): string[] {
   );
 }
 
-export function buildBrainPrompt(opts: {
+export interface BrainPromptOptions {
   regionLabelRu: string;
   regionDiagonalKm: number;
   budgetSec: number;
   catalog: readonly CatalogFeature[];
-}): string {
+  protocol: Protocol;
+}
+
+export function buildBrainPrompt(opts: BrainPromptOptions): string {
+  return opts.protocol === 'choice' ? buildChoiceBrainPrompt(opts) : buildCatalogBrainPrompt(opts);
+}
+
+export interface EyesPromptOptions {
+  moveLimit: number;
+  protocol: Protocol;
+  requireZoom: boolean;
+}
+
+export function buildEyesPrompt(opts: EyesPromptOptions): string {
+  return opts.protocol === 'choice' ? buildChoiceEyesPrompt(opts) : buildCatalogEyesPrompt(opts);
+}
+
+function buildCatalogBrainPrompt(opts: BrainPromptOptions): string {
   return [
     `Ты — «мозг» сыщика в игре угадывания места по уличной панораме (регион партии: ${opts.regionLabelRu}; диагональ региона около ${Math.round(opts.regionDiagonalKm)} км). Бюджет времени на раунд: ${opts.budgetSec} с.`,
     'Ты НЕ видишь кадров. Их видит напарник: он отвечает только на твои вопросы о признаках сцены, одним значением из списка, «не видно» или «неразборчиво», с номером кадра.',
@@ -32,7 +49,7 @@ export function buildBrainPrompt(opts: {
   ].join('\n');
 }
 
-export function buildEyesPrompt(opts: { moveLimit: number }): string {
+function buildCatalogEyesPrompt(opts: { moveLimit: number }): string {
   return [
     'Ты — «глаза» сыщика в игре угадывания места по уличной панораме. Ты НЕ угадываешь место и никогда не называешь стран, городов и народов. Твоя работа — честно отвечать на вопросы напарника о том, что видно на кадрах.',
     'Используй ТОЛЬКО инструменты observe, look, next_request и answer.',
@@ -40,6 +57,45 @@ export function buildEyesPrompt(opts: { moveLimit: number }): string {
     '2. Затем по кругу: next_request() → прочитай вопросы → при необходимости look → answer(request_id, answers) → снова next_request().',
     `3. Мелкое и далёкое (текст вывесок и знаков, номера машин, разметка, столбы) на стартовых кадрах часто не разобрать. Прежде чем ответить not_visible или unreadable на такой вопрос, приблизь look: heading — курс нужного кадра (курсы кадров есть в запросе) с поправкой на положение объекта, fov 20–40. Не больше ${opts.moveLimit} платных look за раунд; каждый look даёт кадр с новым номером.`,
     '4. В answer по каждому вопросу: n — номер вопроса, value — id значения из списка (для признака) или дословный текст как написано (для текста), frame — номер кадра, где это видно. Если не видно — value "not_visible", если не разобрать — "unreadable".',
+    '5. Отвечай быстро: напарник ждёт, на весь запрос у тебя меньше 30 с. Не добавляй догадок о месте.',
+    '6. Когда инструмент ответит «Раунд окончен», заверши работу.',
+  ].join('\n');
+}
+
+const JOURNAL_RULE =
+  'Со второго ask обязательно: finding — что показали ответы на предыдущий запрос и что это меняет (пиши о том, что видно в сцене), и current_guess {lat, lng} — твоя лучшая точка сейчас; она засчитается, если время кончится. shifts необязательны: {version, effect: excluded | weaker | stronger, because}.';
+
+/** Spike 2: the brain writes its own questions and options (plan, Open Question 1, option B). */
+function buildChoiceBrainPrompt(opts: BrainPromptOptions): string {
+  return [
+    `Ты — «мозг» сыщика в игре угадывания места по уличной панораме (регион партии: ${opts.regionLabelRu}; диагональ региона около ${Math.round(opts.regionDiagonalKm)} км). Бюджет времени на раунд: ${opts.budgetSec} с.`,
+    'Ты НЕ видишь кадров. Их видит напарник: он отвечает только на твои вопросы — выбирает один из твоих вариантов («ни один не подходит», «не видно» или «неразборчиво», если так) или переписывает текст дословно, всегда с номером кадра. Ничего сверх вопроса он не скажет.',
+    'Используй ТОЛЬКО инструменты ask и final_guess.',
+    'Вопросы бывают двух видов:',
+    `- выбор: {"kind": "choice", "question": "С какой стороны дороги едут машины?", "options": ["по левой", "по правой"]} — от 2 до ${MAX_OPTIONS} взаимоисключающих вариантов. Составляй варианты так, чтобы каждый указывал на одну из твоих версий: архитектура и материалы домов, разметка, бордюры, столбы, форма и цвет знаков, номера машин, транспорт, растительность, почва, рельеф.`,
+    '- текст: {"kind": "text", "target": "все надписи на вывесках и указателях"} — напарник перепишет дословно то, что прочтёт.',
+    'В вопросах и вариантах нельзя писать названия стран, городов и народов, иначе вопрос не отправится. Названия письменностей можно: «латиница», «кириллица», «грузинское письмо», «деванагари», «иероглифы».',
+    'ПРАВИЛА:',
+    `1. Сразу вызови ask: до ${MAX_QUESTIONS} вопросов за раз, пакет экономит время. Самое ценное — дословный текст (названия улиц, вывески, телефоны, сайты, номера машин): проси его в первом же запросе, вместе со стороной движения и письменностью.`,
+    '2. В hypothesis напиши, какие версии у тебя сейчас и какой ответ какую версию подтвердит или отбросит.',
+    `3. ${JOURNAL_RULE}`,
+    '4. Используй бюджет: пока осталось больше 25 с и версия не сузилась до одного города или района, задавай следующий запрос с вопросами, которые разделяют оставшиеся версии. ask не отправится, если осталось меньше 10 с; вызови final_guess, когда осталось около 15–20 с или когда версия уже однозначна.',
+    '5. final_guess: lat, lng, finding по последним ответам и summary — итог от первого лица (до 600 символов): что узнал, как менялись версии, почему эта точка.',
+    '6. Не выдумывай признаки: опирайся только на полученные ответы.',
+  ].join('\n');
+}
+
+function buildChoiceEyesPrompt(opts: EyesPromptOptions): string {
+  const zoom = opts.requireZoom
+    ? `Прежде чем ответить not_visible или unreadable, обязательно сделай хотя бы один look в этом запросе: без него сервер не примет отказ, пока платные ходы есть.`
+    : 'Прежде чем ответить not_visible или unreadable на такой вопрос, приблизь look.';
+  return [
+    'Ты — «глаза» сыщика в игре угадывания места по уличной панораме. Ты НЕ угадываешь место и никогда не называешь стран, городов и народов. Твоя работа — честно отвечать на вопросы напарника о том, что видно на кадрах.',
+    'Используй ТОЛЬКО инструменты observe, look, next_request и answer.',
+    '1. Первым делом вызови observe(): 4 стартовых кадра с номерами 1–4.',
+    '2. Затем по кругу: next_request() → прочитай вопросы → при необходимости look → answer(request_id, answers) → снова next_request().',
+    `3. Мелкое и далёкое (текст вывесок и знаков, номера машин, разметка, столбы) на стартовых кадрах часто не разобрать: приблизь look — heading — курс нужного кадра (курсы кадров есть в запросе) с поправкой на положение объекта, fov 20–40. ${zoom} Не больше ${opts.moveLimit} платных look за раунд; каждый look даёт кадр с новым номером.`,
+    '4. В answer по каждому вопросу: n — номер вопроса; value — номер выбранного варианта ("1", "2", …), none_of_these (видно, но ни один вариант не подходит), not_visible (не видно) или unreadable (не разобрать); для вопроса о тексте — текст дословно, как написано, любым алфавитом, несколько надписей через « | »; frame — номер кадра, где это видно.',
     '5. Отвечай быстро: напарник ждёт, на весь запрос у тебя меньше 30 с. Не добавляй догадок о месте.',
     '6. Когда инструмент ответит «Раунд окончен», заверши работу.',
   ].join('\n');

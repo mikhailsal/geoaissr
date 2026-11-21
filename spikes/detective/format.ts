@@ -6,6 +6,7 @@ import {
   valueLabelRu,
   type CatalogFeature,
 } from './catalog.ts';
+import { NONE_OF_THESE, choiceLabelRu } from './choice.ts';
 
 /** Russian texts the two roles read. Kept apart from the session logic so both stay small. */
 
@@ -17,6 +18,7 @@ export interface FrameRef {
 
 export function questionTitle(catalog: readonly CatalogFeature[], q: Question): string {
   if (q.kind === 'text') return `Текст «${q.target}»`;
+  if (q.kind === 'choice') return `«${q.question}»`;
   const feature = findFeature(catalog, q.feature);
   return feature ? `${feature.ru} (${feature.id})` : q.feature;
 }
@@ -34,6 +36,9 @@ function itemLine(catalog: readonly CatalogFeature[], item: SettledItem): string
     case 'answered': {
       const value = item.value ?? '';
       if (item.question.kind === 'text') return `${item.n}. ${title}: "${value}"${frame}`;
+      if (item.question.kind === 'choice') {
+        return `${item.n}. ${title}: ${choiceLabelRu(item.question, value)}${frame}`;
+      }
       const feature = findFeature(catalog, item.question.feature);
       const label = feature ? valueLabelRu(feature, value) : value;
       return `${item.n}. ${title}: ${label}${frame}`;
@@ -59,6 +64,10 @@ function questionForEyes(catalog: readonly CatalogFeature[], q: Question, n: num
   if (q.kind === 'text') {
     return `${n}. Прочитай дословно текст: «${q.target}». value — текст как написано (любой алфавит); или not_visible / unreadable.`;
   }
+  if (q.kind === 'choice') {
+    const options = q.options.map((o, i) => `${i + 1} — ${o}`).join('; ');
+    return `${n}. Вопрос: «${q.question}». Варианты: ${options}. value — номер варианта; или ${NONE_OF_THESE} (видно, но ни один не подходит) / not_visible / unreadable.`;
+  }
   const feature = findFeature(catalog, q.feature);
   if (!feature) return `${n}. ${q.feature}`;
   const values = feature.values.map((v) => `${v.id} — ${v.ru}`).join('; ');
@@ -77,12 +86,19 @@ export function formatRequestForEyes(
   catalog: readonly CatalogFeature[],
   request: BrokerRequest,
   frames: readonly FrameRef[],
-  turnsLeft: number,
+  opts: { turnsLeft: number; requireZoom: boolean },
 ): string {
+  const zoom =
+    opts.requireZoom && opts.turnsLeft > 0
+      ? [
+          'Перед not_visible или unreadable сначала сделай look (приближение): без него отказ не примут.',
+        ]
+      : [];
   return [
     `Запрос ${request.id}. Ответь через answer(request_id="${request.id}", answers=[{n, value, frame}]).`,
     ...request.questions.map((q, idx) => questionForEyes(catalog, q, idx + 1)),
     framesLine(frames),
-    `Осталось платных ходов look: ${turnsLeft}. Отвечай быстро: у мозга мало времени.`,
+    `Осталось платных ходов look: ${opts.turnsLeft}. Отвечай быстро: у мозга мало времени.`,
+    ...zoom,
   ].join('\n');
 }
