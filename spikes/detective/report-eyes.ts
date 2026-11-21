@@ -1,5 +1,6 @@
 import { formatToolZodError } from '../../shared/bot-tools.ts';
 import { maskReport, reportLines, reportSchema } from './report.ts';
+import { PRE_REPORT_LOOKS } from './report-protocol.ts';
 import {
   elapsedMs,
   errorReply,
@@ -12,6 +13,8 @@ import {
 /** The eyes' `report` tool of the report protocol: one scene report per round. */
 
 const ROUND_OVER_TEXT = 'Раунд окончен. Больше ничего не вызывай и заверши работу.';
+/** What follows `observe` under the report protocol: the text hunt, then the report. */
+export const AFTER_OBSERVE_TEXT = `Теперь охота за текстом: до ${PRE_REPORT_LOOKS} приближений look (fov 20–40) туда, где может быть текст, затем report.`;
 export const REPORT_FIRST_TEXT =
   'Сначала сдай отчёт о сцене: вызови report. Напарник ждёт его и без него не может начать.';
 

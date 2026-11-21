@@ -347,3 +347,40 @@ The opus judge also fails a finding on a small point: a real object named with a
 - The description does not carry what the single agent sees. With the same pictures the single agent is within 25 km in 68% of rounds, and the report brain in 40–44%.
 - It is an upper bound for the report, not a forecast of Part C. The describers read full-size frames at effort `medium` with no time limit. The live eyes get 640-pixel frames and zooms, work at effort `low`, share 90 s with the brain, and are told to write at most 4 lines per section. A live round has one thing the test lacks: the brain can ask for more after the report.
 - The three passes of a spot read the same report, so the 84 rounds of an arm are 28 reports read three times. The intervals treat the rounds as independent and are too narrow for that reason.
+
+### Part C: the pilots (written before the measured run)
+
+Two pilots of three rounds each: spots 01 to 03, one pass. Pilot rounds are not counted in any bar.
+
+| Pilot | Spot    | Error     | Final guess at | Report at | Report lines | Asks answered | Zooms | Control check                    |
+| ----- | ------- | --------- | -------------- | --------- | ------------ | ------------- | ----- | -------------------------------- |
+| 1     | spot-01 | 1,058 km  | 28.2 s         | 13.9 s    | 11           | 1             | 2     | no                               |
+| 1     | spot-02 | 10,020 km | 38.4 s         | 16.0 s    | 15           | 2             | 2     | yes                              |
+| 1     | spot-03 | 44 km     | 12.9 s         | 9.6 s     | 12           | 0             | 0     | no                               |
+| 2     | spot-01 | 1,058 km  | 42.5 s         | 19.7 s    | 21           | 2             | 7     | yes                              |
+| 2     | spot-02 | 16 km     | 54.8 s         | 20.7 s    | 20           | 3             | 7     | yes, after the server's reminder |
+| 2     | spot-03 | 55 km     | 35.9 s         | 16.2 s    | 21           | 2             | 6     | yes                              |
+
+Pilot 1 ran commit `4fd094a` with prompt hash `917d92e6179c`. Pilot 2 ran the working tree with the fixes below, which are committed together with this section; its prompt hash is `e59b2fac7ca1`. The tool schemas are the same in both (`d7dc442807ab`).
+
+**What pilot 1 showed.** All three rounds ended with a final guess. The protocol did not run as designed, though.
+
+- **No text hunt.** No report cited a zoomed frame. The zooms of spots 01 and 02 were made later, to answer requests. The cause is a protocol bug: the reply of `observe` still ended with «Теперь вызови next_request», a line of the earlier protocols, and it sent the eyes past the zooms. The report of spot-02 held no text, and the brain placed an Argentine street in Spain.
+- **Rounds ended early.** The final guess came at 13 to 38 s of 90, after 0, 1 and 2 asks. One round of three ran the control check.
+- **Every answer was marked `unsure`**, 7 of 7, plain descriptions of a balcony or a kerb among them, and the brain's rule told it not to rest a version on an unsure answer. The eyes also described small things from the start frames instead of zooming on them.
+
+The first point is a broken protocol in the sense of the pilot rule, so the fixes were followed by a second pilot.
+
+**Fixes between the pilots.** The pilot rule allows changes to prompts and to protocol bugs. Fix 4 is more than that: it adds a server reply.
+
+1. The reply of `observe` names the next step of the report protocol: the text hunt, then the report.
+2. Eyes prompt. The text hunt is a required step: 3 zooms, on text first, otherwise on road signs, poles and cars. The report should hold 3 to 4 lines per section where there is something to describe; the limits of the amendment are unchanged. `sure` means clearly seen and `unsure` means guessing. Small things are zoomed before they are described. The request header no longer tells the eyes to answer fast.
+3. Brain prompt. Do not end early: keep asking while more than 30 s are left, and after «не разобрать» ask for a zoom on a named object or change the topic (rule 7). An unsure answer is weak evidence, not none (rule 5). The control check names the place and the topic, not the clue itself (rule 6).
+4. **Control reminder (server).** A `final_guess` that comes before any control ask, with more than 30 s left and the eyes alive, is refused once with a reminder, and its point is kept as a fallback pin. A repeated `final_guess` is accepted. The report of the measured run states how many rounds got the reminder.
+5. The round record gained the number of zooms made before the report.
+
+Not changed: the guard's word list, which is frozen. In pilot 1 it masked «панамах» (hats, taken for Panama) in one report line.
+
+**Pilot 2.** All three rounds ended with a final guess, at 36 to 55 s. Every report cites zoomed frames and has 20 or 21 lines, and the eyes used 6 or 7 of their 8 zooms. The brain sent 2, 3 and 2 asks and ran the control check in every round, once after the server's reminder. Of 11 answered requests 4 were marked `unsure`. Spot-02 moved from 10,020 km to 16 km, but no text was read there in either pilot: the brain went by the look of the street and called its answer a guess.
+
+No third pilot was run. The prompts of v3-90 are frozen at hash `e59b2fac7ca1`.

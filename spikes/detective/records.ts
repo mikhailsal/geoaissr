@@ -39,6 +39,8 @@ export interface ReportRoundFields {
   briefingAtSec: number | null;
   /** Requests refused for their question form («?» or «ли»). */
   formRejections: number;
+  /** Zooms the eyes made before they filed the report; null without a report. */
+  looksBeforeReport: number | null;
   /** Zooms the server refused because the report was not filed yet. */
   earlyLookRefusals: number;
   /** Place words masked in the eyes' answers before the brain read them. */
@@ -123,6 +125,7 @@ function askRows(sample: EvalSampleItem, s: SessionState): AskRow[] {
 }
 
 function reportRoundFields(s: SessionState): ReportRoundFields {
+  const filedAtMs = s.report?.tMs ?? null;
   return {
     report: s.report
       ? {
@@ -134,6 +137,10 @@ function reportRoundFields(s: SessionState): ReportRoundFields {
       : null,
     briefingAtSec: s.briefingAtMs === null ? null : sec(s.briefingAtMs),
     formRejections: s.formRejections,
+    looksBeforeReport:
+      filedAtMs === null
+        ? null
+        : s.frames.filter((f) => f.action === 'look' && f.tMs <= filedAtMs).length,
     earlyLookRefusals: s.earlyLookRefusals,
     maskedInAnswers: s.maskedInAnswers,
   };

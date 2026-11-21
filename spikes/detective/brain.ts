@@ -5,6 +5,7 @@ import { mentionsScript } from './guard.ts';
 import { formatAskOutcome } from './format.ts';
 import { labelOutcome } from './labels.ts';
 import { buildBrainSchemas, classicProtocol, type AskInput } from './protocol.ts';
+import { controlReminder } from './report-final.ts';
 import { parseFinalExtras } from './report-protocol.ts';
 import {
   ASK_TIMEOUT_MS,
@@ -164,6 +165,8 @@ export function handleFinalGuess(s: SessionState, args: unknown): ToolReply {
   if (!guess) {
     return errorReply('final_guess: нужны числовые lat и lng. Догадка не записана.');
   }
+  const reminder = s.opts.protocol === 'report' ? controlReminder(s, guess) : null;
+  if (reminder) return reminder;
   // The report protocol also owes a confidence level and the deciding clue.
   const extras = s.opts.protocol === 'report' ? parseFinalExtras(args) : null;
   const missing = [

@@ -58,4 +58,6 @@ test('the report prompts tell the brain to ask for topics and the eyes never to 
   expect(eyes).toContain('не больше 8 look');
   expect(eyes).toContain('в texts — не больше 8');
   expect(eyes).toContain('не подтверждай из вежливости');
+  expect(eyes).toContain('Охота за текстом — обязательный шаг до отчёта');
+  expect(brain).toContain('Не заканчивай рано');
 });

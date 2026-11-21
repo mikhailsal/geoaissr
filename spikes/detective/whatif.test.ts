@@ -22,6 +22,7 @@ function round(
       report: { tSec: 20, lines: [line], maskedWords: [], unknownFrames: 0 },
       briefingAtSec: 21,
       formRejections: 0,
+      looksBeforeReport: 0,
       earlyLookRefusals: 0,
       maskedInAnswers: [],
     },

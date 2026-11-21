@@ -118,7 +118,9 @@ export function formatRequestForEyes(
     `Запрос ${request.id}. Ответь через answer(request_id="${request.id}", answers=[${fields}]).`,
     ...request.questions.map((q, idx) => questionForEyes(catalog, q, idx + 1)),
     framesLine(frames),
-    `Осталось платных ходов look: ${opts.turnsLeft}. Отвечай быстро: у мозга мало времени.`,
+    opts.confidence
+      ? `Осталось платных ходов look: ${opts.turnsLeft}. Мелкое сначала приблизь, потом отвечай; на запрос до 30 с.`
+      : `Осталось платных ходов look: ${opts.turnsLeft}. Отвечай быстро: у мозга мало времени.`,
     ...zoom,
   ].join('\n');
 }

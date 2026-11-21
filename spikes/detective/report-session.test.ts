@@ -42,7 +42,10 @@ async function answerCurrent(session: DetectiveSession, answers: unknown[]) {
 
 test('briefing waits for the report and returns it with place words masked', async () => {
   const session = reportSession({ briefingWaitMs: 2000 });
-  await session.call('eyes', 'observe', {});
+  // After the first frames the eyes are sent to the text hunt, not to next_request.
+  const seen = await session.call('eyes', 'observe', {});
+  expect(seen.text).toContain('охота за текстом');
+  expect(seen.text).not.toContain('next_request');
   const waiting = session.call('brain', 'briefing', {});
   const filed = await session.call('eyes', 'report', REPORT);
   expect(filed.isError).toBeUndefined();
@@ -160,6 +163,11 @@ test('the eyes answer in their own words with a confidence; the brain reads it m
 test('final_guess owes a confidence level and the deciding clue under the report protocol', async () => {
   const session = await briefed();
   const guess = { lat: 35, lng: 139, summary: 'Я прочитал отчёт.', finding: 'Вывеска решила.' };
+  // No control ask yet and time for one: the first final_guess is refused once with a reminder.
+  const early = await session.call('brain', 'final_guess', guess);
+  expect(early.isError).toBe(true);
+  expect(early.text).toContain('GEO_DETECTIVE_CONTROL_MISSING');
+  expect(session.state.final).toBeNull();
   const bare = await session.call('brain', 'final_guess', guess);
   expect(bare.isError).toBe(true);
   expect(bare.text).toContain('confidence');
@@ -173,6 +181,35 @@ test('final_guess owes a confidence level and the deciding clue under the report
   expect(full.isError).toBeUndefined();
   expect(session.state.final?.confidence).toBe('region');
   expect(session.state.final?.clue).toBe('Вывеска латиницей.');
+  expect(session.state.corrections.map((c) => c.reason)).toEqual([
+    'control',
+    'confidence (country | region | guess),clue',
+  ]);
+  // Both refused guesses left their point as a fallback pin.
+  expect(session.state.checkpoints.filter((p) => p.lat === 35 && p.lng === 139)).toHaveLength(2);
+});
+
+test('a final_guess after a control ask, or with little time left, gets no reminder', async () => {
+  const guess = {
+    lat: 35,
+    lng: 139,
+    summary: 'Я прочитал отчёт.',
+    finding: 'Вывеска решила.',
+    confidence: 'country',
+    clue: 'Вывеска.',
+  };
+  const checked = await briefed();
+  const asked = checked.call('brain', 'ask', { ...ASK, control: true });
+  await answerCurrent(checked, [
+    { n: 1, value: 'жёлтые номера', confidence: 'sure', frame: 2 },
+    { n: 2, value: 'not_visible' },
+  ]);
+  await asked;
+  expect((await checked.call('brain', 'final_guess', guess)).isError).toBeUndefined();
+  // 25 s of budget: a control ask no longer fits.
+  const late = await briefed({ budgetSec: 25 });
+  expect((await late.call('brain', 'final_guess', guess)).isError).toBeUndefined();
+  expect(late.state.corrections).toHaveLength(0);
 });
 
 test('a fourth zoom before the report is refused and costs no move', async () => {

@@ -137,6 +137,8 @@ test('a dry report round files the scene report, briefs the brain and keeps the 
   expect(record?.exchanges).toBe(2);
   expect(record?.reportRound?.report?.lines.length).toBeGreaterThanOrEqual(2);
   expect(record?.reportRound?.briefingAtSec).not.toBeNull();
+  // The fake eyes zoom once before the report; later zooms are not counted here.
+  expect(record?.reportRound?.looksBeforeReport).toBe(1);
   expect(record?.asks.map((a) => a.findingState)).toEqual(['recorded', 'recorded']);
   expect(record?.asks[1]?.control).toBe(true);
   expect(record?.final?.confidence).toBe('country');

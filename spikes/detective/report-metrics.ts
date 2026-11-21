@@ -88,6 +88,7 @@ function reportStats(records: readonly DetectiveRoundRecord[]) {
       reports.map((r) => r.lines.filter(isCopiedTextLine).length),
       0.5,
     ),
+    looksBeforeMedian: quantile(nums(records.map((r) => r.reportRound?.looksBeforeReport)), 0.5),
     unknownFrames: reports.reduce((n, r) => n + r.unknownFrames, 0),
     maskedWords: countWords(reports.flatMap((r) => r.maskedWords)),
   };

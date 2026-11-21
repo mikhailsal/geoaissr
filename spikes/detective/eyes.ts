@@ -6,7 +6,7 @@ import { allowedValues, findFeature, isAbstain } from './catalog.ts';
 import { normalizeChoiceValue } from './choice.ts';
 import { formatRequestForEyes } from './format.ts';
 import { answerSchema, eyesLookSchema, type AnswerInput } from './protocol.ts';
-import { REPORT_FIRST_TEXT } from './report-eyes.ts';
+import { AFTER_OBSERVE_TEXT, REPORT_FIRST_TEXT } from './report-eyes.ts';
 import { PRE_REPORT_LOOKS, reportAnswerSchema, type ReportAnswerInput } from './report-protocol.ts';
 import {
   NEXT_REQUEST_WAIT_MS,
@@ -42,8 +42,9 @@ export async function handleObserve(s: SessionState): Promise<ToolReply> {
       s.frames.push({ n: idx + 1, action: 'observe', heading, pitch: 0, fov: 90, tMs: 0 });
     });
   }
+  const next = s.opts.protocol === 'report' ? AFTER_OBSERVE_TEXT : 'Теперь вызови next_request.';
   return {
-    text: `Кадры 1–4: ${views.map((v, i) => `${i + 1} — ${v.label}`).join('; ')}. Теперь вызови next_request.`,
+    text: `Кадры 1–4: ${views.map((v, i) => `${i + 1} — ${v.label}`).join('; ')}. ${next}`,
     images: imageBlocks(views, 1),
   };
 }
