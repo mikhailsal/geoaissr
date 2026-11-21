@@ -189,7 +189,7 @@ export function mentionsScript(text: string): boolean {
 const ADJECTIVE_END = /(ая|ое|ий|ие|ый|ые|ой)$/u;
 
 /** Common words that a country stem catches ("того" is Togo, "грузовик" starts like Georgia). */
-const COMMON_WORDS = new Set(['того', 'груз', 'кана']);
+const COMMON_WORDS = new Set(['того', 'груз', 'кана', 'марок', 'лесом', 'лесок']);
 const COMMON_PREFIXES = [
   'грузов',
   'грузч',
@@ -205,10 +205,30 @@ const COMMON_PREFIXES = [
   'корен',
   'малин',
   'мальч',
+  // Words of a scene description (spike 3). The frames are named by compass points, and a
+  // compass adjective alone names no place: «Северная Корея» is still caught by «Корея».
+  'северн',
+  'восточн',
+  'южн',
+  'западн',
+  'центральн',
+  'катаф',
+  'катал',
+  'канат',
+  'сахарн',
+  'лесоп',
+  'лесос',
+  'россып',
+  'туник',
 ];
 
+/** «камера» in any case is the camera; «Камерун» is still caught. */
+const CAMERA = /^камер(а|ы|е|у|ой|ами|ах)?$/u;
+
 function isCommonWord(word: string): boolean {
-  return COMMON_WORDS.has(word) || COMMON_PREFIXES.some((p) => word.startsWith(p));
+  return (
+    COMMON_WORDS.has(word) || CAMERA.test(word) || COMMON_PREFIXES.some((p) => word.startsWith(p))
+  );
 }
 
 const LETTERS = /[a-zа-яё]+/gu;
@@ -257,6 +277,42 @@ export function createPlaceGuard(): PlaceGuard {
       return null;
     },
   };
+}
+
+/** What `maskPlaceWords` puts in place of a place word. */
+export const PLACE_MASK = '[…]';
+
+const QUOTED = /«[^»]*»/gu;
+
+function maskSegment(guard: PlaceGuard, segment: string, masked: string[]): string {
+  let out = segment;
+  // Each pass masks every occurrence of one word; the bound only guards against a loop.
+  for (let pass = 0; pass < 20; pass += 1) {
+    const word = guard.findPlaceWord(out);
+    if (word === null) break;
+    masked.push(word);
+    out = out.replace(new RegExp(`(?<![a-zа-яё])${word}(?![a-zа-яё])`, 'giu'), PLACE_MASK);
+  }
+  return out;
+}
+
+/**
+ * Masks place names and demonyms in a text the eyes wrote in their own words (spike 3). Text
+ * inside «…» is copied from the scene and stays as it is.
+ */
+export function maskPlaceWords(
+  guard: PlaceGuard,
+  text: string,
+): { text: string; masked: string[] } {
+  const masked: string[] = [];
+  let out = '';
+  let last = 0;
+  for (const match of text.matchAll(QUOTED)) {
+    out += maskSegment(guard, text.slice(last, match.index), masked) + match[0];
+    last = match.index + match[0].length;
+  }
+  out += maskSegment(guard, text.slice(last), masked);
+  return { text: out, masked };
 }
 
 /** English names of countries and large cities, for transcriptions written in Latin script. */

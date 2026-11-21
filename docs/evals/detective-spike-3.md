@@ -78,12 +78,12 @@ Reported:
 
 **Method.**
 
-- **Describers.** `claude-haiku-5-5` and `claude-sonnet-5-5` at effort `medium`, one call per spot each, with read-only access to the four full-size frames and no time limit. Each writes the scene report of Part C: text copied literally, the road and driving side, vehicles and plates, poles and signs, buildings, nature, and what is unusual. A describer never names or guesses a place. A report passes the place-name guard of the live protocol; text inside «…» is a transcription and is exempt. A report that fails is sent back once; lines that still fail are dropped and counted.
+- **Describers.** `claude-haiku-5-5` and `claude-sonnet-5-5` at effort `medium`, one call per spot each, with read-only access to the four full-size frames and no time limit. Each writes the scene report of Part C: text copied literally, the road and driving side, vehicles and plates, poles and signs, buildings, nature, and what is unusual. A describer never names or guesses a place. The server masks a place name or a demonym that a report holds outside «…» before the brain reads it (the word becomes `[…]`), and counts it. Text inside «…» is a transcription and is left as it is. Before the first paid call the guard's list of ordinary words was extended from the stored texts of spikes 1 and 2 and a hand-written list of scene words (compass adjectives, «лесополоса», «катафот», «камера»); it is not changed after that call.
 - **Brain.** `claude-sonnet-5-5`, no tools and no images. It gets the region, the scale and one report, and returns a point, a confidence and the deciding clue.
   - Three passes per spot and describer at effort `medium`: 168 calls.
   - Three more passes per spot at effort `low`, the live setting of spike 2, on the better describer's reports: 84 calls.
 
-**Reported, per describer:** median error, rounds within 25 km and within 750 km, rounds beyond 2,000 km, and the comparison by spot with `detective2-90` and `candidate-90`.
+**Reported, per describer:** median error, rounds within 25 km and within 750 km, rounds beyond 2,000 km, the masked words, and the comparison by spot with `detective2-90` and `candidate-90`.
 
 **Rules, fixed here.** The better describer is the one with the larger share of its 84 medium-effort rounds within 750 km; on a tie it is `claude-haiku-5-5`.
 
@@ -91,14 +91,14 @@ Reported:
 - **Eyes model for Part C.** `claude-haiku-5-5`, unless the sonnet describer's share within 750 km is at least 10 points higher; then `claude-sonnet-5-5`.
 - **Brain effort for Part C.** `low`, unless the low-effort share within 750 km is at least 10 points below the medium-effort share on the same reports; then `medium`.
 
-**Spending cap:** 56 describer calls plus at most 56 resends, and 252 brain calls.
+**Spending cap:** 56 describer calls and 252 brain calls, each with at most one retry.
 
 ### Part C: the live protocol (may be amended until its first paid call)
 
 **What changes against spike 2** (`--protocol report`). The round clock, the broker, the frame size (640), the data set and the infra rule stay.
 
 1. **Scene report first.** After `observe`, the eyes file a `report` with the fixed sections of Part B, each line with the number of the frame it was seen in. The brain's first call is `briefing`, which returns the report. The brain no longer opens with blind questions.
-2. **Facts in the eyes' words.** An `ask` holds up to 5 requests of two kinds: describe something, or copy text literally. Each names what to look at («люди на улице: одежда, чем заняты»), not what the brain expects to find. A request is a topic, not a question: the server refuses one that holds a «?» or the particle «ли», because an eyes model tends to confirm what it is asked about. The eyes answer with a short description and a confidence (`sure` or `unsure`), or abstain; they no longer choose among options written by the brain. The server refuses eyes text that holds a place name or a demonym outside «…». The brain's `finding` states only what the new answers change; it does not restate earlier facts.
+2. **Facts in the eyes' words.** An `ask` holds up to 5 requests of two kinds: describe something, or copy text literally. Each names what to look at («люди на улице: одежда, чем заняты»), not what the brain expects to find. A request is a topic, not a question: the server refuses one that holds a «?» or the particle «ли», because an eyes model tends to confirm what it is asked about. The eyes answer with a short description and a confidence (`sure` or `unsure`), or abstain; they no longer choose among options written by the brain. The server masks a place name or a demonym in the eyes' own words (outside «…») before the brain reads them, as in Part B, and counts it. The brain's `finding` states only what the new answers change; it does not restate earlier facts.
 3. **Text hunt.** The eyes get 8 zooms per round instead of 4 and are told to zoom on signs and plates before they file the report. The zoom-before-abstaining rule stays.
 4. **Control question and confidence.** The prompt tells the brain to have the fact its version rests on checked once more before the final guess. `final_guess` carries `confidence` (`country`, `region` or `guess`) and the deciding clue.
 5. **No hunch from the eyes (owner's decision, 2026-11-21).** A draft of this protocol had the eyes send their own best point to the server, hidden from the brain. The owner rejected it: an eyes process that has named a place attends to its own answer instead of the picture and may confirm what that place "should" show. The eyes never name or guess a place, as in spikes 1 and 2. The comparison with intuition uses the existing single-agent run, which is a separate process.

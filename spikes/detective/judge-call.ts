@@ -1,9 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { buildSanitizedChildEnv } from '../../server/bots/adapters/shared.ts';
-import { spawnManaged } from '../../server/proc/spawn.ts';
-import { runPool } from '../../scripts/eval-bots/pool.ts';
+import { runKeyedJobs, runModelCall } from './model-call.ts';
 
 /**
  * One model-judge call: `claude -p` with read-only access to the dataset frames and no MCP,
@@ -47,43 +42,7 @@ export async function runJudgeCall(
   datasetDir: string,
   model: string = DEFAULT_JUDGE_MODEL,
 ): Promise<{ text: string; usage: unknown }> {
-  const cwd = mkdtempSync(path.join(tmpdir(), 'geo-judge-'));
-  try {
-    const proc = spawnManaged({
-      cmd: [
-        'claude',
-        '-p',
-        prompt,
-        '--model',
-        model,
-        '--tools',
-        'Read',
-        '--allowedTools',
-        'Read',
-        '--add-dir',
-        datasetDir,
-        '--strict-mcp-config',
-        '--permission-mode',
-        'bypassPermissions',
-        '--setting-sources',
-        '',
-        '--no-session-persistence',
-        '--disable-slash-commands',
-        '--output-format',
-        'json',
-      ],
-      cwd,
-      env: buildSanitizedChildEnv(),
-      kind: 'bot',
-    });
-    const exit = await proc.exited;
-    await proc.drained;
-    if (exit.code !== 0) throw new Error(`judge exited ${exit.code ?? 'null'}`);
-    const out = JSON.parse(proc.getStdout()) as { result?: string; usage?: unknown };
-    return { text: out.result ?? '', usage: out.usage ?? null };
-  } finally {
-    rmSync(cwd, { recursive: true, force: true });
-  }
+  return runModelCall({ prompt, model, readDir: datasetDir });
 }
 
 /**
@@ -96,21 +55,5 @@ export async function judgeEachSpot<T>(
   describe: (spotId: string, result: T) => string,
   done: ReadonlyMap<string, T> = new Map(),
 ): Promise<Map<string, T>> {
-  const results = new Map<string, T>(done);
-  const jobs = spotIds
-    .filter((spotId) => !done.has(spotId))
-    .map((spotId) => async () => {
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
-        try {
-          const res = await judge(spotId);
-          results.set(spotId, res);
-          console.log(`[judge ${spotId}] ${describe(spotId, res)}`);
-          return;
-        } catch (err) {
-          console.error(`[judge ${spotId}] attempt ${attempt}: ${String(err)}`);
-        }
-      }
-    });
-  await runPool(jobs, 2, () => false);
-  return results;
+  return runKeyedJobs({ keys: spotIds, run: judge, describe, label: 'judge', done });
 }
