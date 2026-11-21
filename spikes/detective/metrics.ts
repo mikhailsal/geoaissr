@@ -182,6 +182,7 @@ export function summarizeDetective(
     tokens: tokenMedians(records),
     corrections: records.reduce((n, r) => n + r.corrections.length, 0),
     guardRejections: records.reduce((n, r) => n + r.guardRejections.length, 0),
+    optionRejections: records.reduce((n, r) => n + r.optionRejections, 0),
     lateAnswers: records.reduce((n, r) => n + r.lateAnswers, 0),
     invalidAnswers: records.reduce((n, r) => n + r.invalidAnswers, 0),
     zoomRefusals: records.reduce((n, r) => n + r.zoomRefusals, 0),

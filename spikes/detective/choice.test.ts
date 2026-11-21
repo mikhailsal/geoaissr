@@ -168,3 +168,42 @@ test('requireZoom lets an abstention through when the ask is about to time out',
   expect(reply.isError).toBeUndefined();
   await asked;
 });
+
+test('options that repeat a built-in answer are refused, and bare script adjectives pass in script questions', async () => {
+  const session = makeSession({ protocol: 'choice', answerSource: 'labels' });
+  const builtin = await session.call('brain', 'ask', {
+    hypothesis: 'h',
+    questions: [
+      {
+        kind: 'choice',
+        question: 'Где едут машины?',
+        options: ['слева', 'справа', 'машин не видно'],
+      },
+    ],
+  });
+  expect(builtin.text).toContain('«машин не видно» не нужен');
+  const other = await session.call('brain', 'ask', {
+    hypothesis: 'h',
+    questions: [{ kind: 'choice', question: 'Столбы?', options: ['бетон', 'другое'] }],
+  });
+  expect(other.isError).toBe(true);
+  expect(session.state.optionRejections).toBe(2);
+  const script = await session.call('brain', 'ask', {
+    hypothesis: 'h',
+    questions: [
+      {
+        kind: 'choice',
+        question: 'Какая письменность на вывесках?',
+        options: ['латиница', 'арабская', 'тайская', 'столбов нет'],
+      },
+    ],
+  });
+  expect(script.isError).toBeUndefined();
+  const notScript = await session.call('brain', 'ask', {
+    hypothesis: 'h',
+    finding: 'f',
+    current_guess: { lat: 1, lng: 2 },
+    questions: [{ kind: 'choice', question: 'Какие дома?', options: ['тайские', 'панельные'] }],
+  });
+  expect(notScript.text).toContain('GEO_DETECTIVE_PLACE_WORD');
+});

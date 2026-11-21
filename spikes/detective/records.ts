@@ -55,6 +55,7 @@ export interface DetectiveRoundRecord {
   eyesLooks: number;
   corrections: SessionState['corrections'];
   guardRejections: string[];
+  optionRejections: number;
   lateAnswers: number;
   invalidAnswers: number;
   zoomRefusals: number;
@@ -142,6 +143,7 @@ export function buildDetectiveRecord(ctx: {
     eyesLooks: s.turnsUsed,
     corrections: s.corrections,
     guardRejections: s.guardRejections,
+    optionRejections: s.optionRejections,
     lateAnswers: s.eyesAnswers.filter((a) => a.result === 'late').length,
     invalidAnswers: s.eyesAnswers.filter((a) => a.result === 'invalid').length,
     zoomRefusals: s.zoomRefusals,

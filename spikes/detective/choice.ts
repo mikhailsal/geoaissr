@@ -52,3 +52,27 @@ export function duplicateOption(q: ChoiceQuestion): string | null {
   }
   return null;
 }
+
+/** Options that repeat an answer the eyes always have: «не видно», «неразборчиво», «другое». */
+const BUILTIN_ANYWHERE = [
+  'не видно',
+  'не видны',
+  'не виден',
+  'не разобрать',
+  'неразборчив',
+  'не понять',
+  'не знаю',
+];
+const BUILTIN_PREFIXES = ['ничего из', 'ни один', 'ни одно', 'другое', 'другая', 'другой', 'иное'];
+
+/** The first option that duplicates a built-in answer of the eyes, or null. */
+export function builtinOption(q: ChoiceQuestion): string | null {
+  return (
+    q.options.find((o) => {
+      const t = norm(o);
+      return (
+        BUILTIN_ANYWHERE.some((p) => t.includes(p)) || BUILTIN_PREFIXES.some((p) => t.startsWith(p))
+      );
+    }) ?? null
+  );
+}

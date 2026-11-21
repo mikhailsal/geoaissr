@@ -88,6 +88,8 @@ export interface SessionState {
   correctionsUsed: Set<string>;
   corrections: Array<{ role: 'brain' | 'eyes'; tool: string; reason: string }>;
   guardRejections: string[];
+  /** Choice questions refused for repeated or built-in options. */
+  optionRejections: number;
   eyesAnswers: EyesAnswerLog[];
   /** Paid looks already used when each request was first delivered to the eyes. */
   looksAtDelivery: Map<string, number>;
@@ -123,6 +125,7 @@ export function createSessionState(opts: SessionOptions): SessionState {
     correctionsUsed: new Set(),
     corrections: [],
     guardRejections: [],
+    optionRejections: 0,
     eyesAnswers: [],
     looksAtDelivery: new Map(),
     askDeadlineAt: null,

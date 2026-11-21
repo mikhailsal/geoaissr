@@ -172,10 +172,21 @@ const SCRIPT_NOUN_STEMS = [
   'character',
 ];
 
-function isScriptName(ws: readonly string[], i: number): boolean {
-  const neighbours = [ws[i - 1] ?? '', ws[i + 1] ?? ''];
-  return neighbours.some((w) => SCRIPT_NOUN_STEMS.some((stem) => w.startsWith(stem)));
+function isScriptNoun(word: string): boolean {
+  return SCRIPT_NOUN_STEMS.some((stem) => word.startsWith(stem));
 }
+
+function isScriptName(ws: readonly string[], i: number): boolean {
+  return isScriptNoun(ws[i - 1] ?? '') || isScriptNoun(ws[i + 1] ?? '');
+}
+
+/** True when a text asks about a script («Какая письменность на вывесках?»). */
+export function mentionsScript(text: string): boolean {
+  return words(text).some((w) => isScriptNoun(w) || w.startsWith('письменн'));
+}
+
+/** An adjective form («арабская», «тайское»), not a country name («Таиланд»). */
+const ADJECTIVE_END = /(ая|ое|ий|ие|ый|ые|ой)$/u;
 
 /** Common words that a country stem catches ("того" is Togo, "грузовик" starts like Georgia). */
 const COMMON_WORDS = new Set(['того', 'груз', 'кана']);
@@ -223,19 +234,25 @@ function buildPlaceStems(): string[] {
 
 export interface PlaceGuard {
   /** The first word that looks like a place name or demonym, or null when the text is clean. */
-  findPlaceWord: (text: string) => string | null;
+  /**
+   * `scriptContext`: the text is an option of a question about scripts, so a bare demonym
+   * adjective («арабская») names a script and passes.
+   */
+  findPlaceWord: (text: string, opts?: { scriptContext?: boolean }) => string | null;
 }
 
 export function createPlaceGuard(): PlaceGuard {
   const stems = buildPlaceStems();
   return {
-    findPlaceWord(text) {
+    findPlaceWord(text, opts = {}) {
       const ws = words(text);
       for (const [i, word] of ws.entries()) {
         if (CITY_WORDS.has(word)) return word;
         if (word.length < 3 || isCommonWord(word)) continue;
         if (!stems.some((stem) => word.startsWith(stem))) continue;
-        if (!isScriptName(ws, i)) return word;
+        if (isScriptName(ws, i)) continue;
+        if (opts.scriptContext && ADJECTIVE_END.test(word)) continue;
+        return word;
       }
       return null;
     },

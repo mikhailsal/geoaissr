@@ -1,6 +1,7 @@
 import { formatToolZodError, parseGuessInput } from '../../shared/bot-tools.ts';
 import { BrokerBusyError, type AskOutcome, type Question } from './broker.ts';
-import { duplicateOption } from './choice.ts';
+import { builtinOption, duplicateOption, type ChoiceQuestion } from './choice.ts';
+import { mentionsScript } from './guard.ts';
 import { formatAskOutcome } from './format.ts';
 import { labelOutcome } from './labels.ts';
 import { buildBrainSchemas, type AskInput } from './protocol.ts';
@@ -21,10 +22,14 @@ import {
 const ROUND_OVER_TEXT = 'Раунд окончен: новые вызовы не принимаются.';
 
 /** The brain-written texts of one question that the eyes will read. */
-function questionTexts(q: Question): string[] {
-  if (q.kind === 'text') return [q.target];
-  if (q.kind === 'choice') return [q.question, ...q.options];
-  return [];
+function questionTexts(q: Question): Array<{ text: string; scriptContext: boolean }> {
+  if (q.kind === 'text') return [{ text: q.target, scriptContext: false }];
+  if (q.kind !== 'choice') return [];
+  const scriptContext = mentionsScript(q.question);
+  return [
+    { text: q.question, scriptContext: false },
+    ...q.options.map((text) => ({ text, scriptContext })),
+  ];
 }
 
 function placeWordReply(s: SessionState, text: string, word: string): ToolReply {
@@ -34,17 +39,27 @@ function placeWordReply(s: SessionState, text: string, word: string): ToolReply 
   );
 }
 
+/** Problems of one choice question's options; null when they are fine. */
+function optionProblem(q: ChoiceQuestion): string | null {
+  const dup = duplicateOption(q);
+  if (dup !== null) return `вариант «${dup}» повторяется. Варианты должны различаться.`;
+  const builtin = builtinOption(q);
+  if (builtin !== null) {
+    return `вариант «${builtin}» не нужен: «не видно», «неразборчиво» и «ни один не подходит» глаза могут ответить всегда. Убери его и оставь только варианты того, что можно увидеть.`;
+  }
+  return null;
+}
+
 function guardQuestions(s: SessionState, questions: readonly Question[]): ToolReply | null {
   for (const q of questions) {
-    for (const text of questionTexts(q)) {
-      const word = s.guard.findPlaceWord(text);
+    for (const { text, scriptContext } of questionTexts(q)) {
+      const word = s.guard.findPlaceWord(text, { scriptContext });
       if (word !== null) return placeWordReply(s, text, word);
     }
-    const dup = q.kind === 'choice' ? duplicateOption(q) : null;
-    if (dup !== null) {
-      return errorReply(
-        `Вопрос «${q.kind === 'choice' ? q.question : ''}» не отправлен: вариант «${dup}» повторяется. Варианты должны различаться. Запрос не засчитан.`,
-      );
+    const problem = q.kind === 'choice' ? optionProblem(q) : null;
+    if (problem !== null && q.kind === 'choice') {
+      s.optionRejections += 1;
+      return errorReply(`Вопрос «${q.question}» не отправлен: ${problem} Запрос не засчитан.`);
     }
   }
   return null;
