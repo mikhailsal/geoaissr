@@ -86,6 +86,8 @@ export interface SessionState {
   eyesAnswers: EyesAnswerLog[];
   toolCalls: { brain: number; eyes: number; brainErrors: number; eyesErrors: number };
   eyesDownAtMs: number | null;
+  /** Set when the round runner ends the round (final, brain exit, budget or abort). */
+  ended: boolean;
   finalListeners: Array<() => void>;
 }
 
@@ -111,6 +113,7 @@ export function createSessionState(opts: SessionOptions): SessionState {
     eyesAnswers: [],
     toolCalls: { brain: 0, eyes: 0, brainErrors: 0, eyesErrors: 0 },
     eyesDownAtMs: null,
+    ended: false,
     finalListeners: [],
   };
 }
@@ -125,7 +128,7 @@ export function remainingMs(s: SessionState): number {
 }
 
 export function roundOver(s: SessionState): boolean {
-  return s.final !== null || (s.t0 !== null && remainingMs(s) <= 0);
+  return s.ended || s.final !== null || (s.t0 !== null && remainingMs(s) <= 0);
 }
 
 export function errorReply(text: string): ToolReply {

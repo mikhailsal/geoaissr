@@ -146,3 +146,12 @@ test('final_guess asks once for missing fields, then closes the round for both r
   expect((await session.call('eyes', 'next_request', {})).text).toContain('Раунд окончен');
   expect((await session.call('brain', 'ask', FIRST_ASK)).isError).toBe(true);
 });
+
+test('after the runner ends the round, both roles are told so and the eyes exit is not a failure', async () => {
+  const session = makeSession();
+  session.end();
+  expect((await session.call('eyes', 'next_request', {})).text).toContain('Раунд окончен');
+  expect((await session.call('brain', 'ask', FIRST_ASK)).text).toContain('Раунд окончен');
+  session.eyesExited();
+  expect(session.state.eyesDownAtMs).toBeNull();
+});

@@ -5,6 +5,7 @@ import {
   createSessionState,
   elapsedMs,
   errorReply,
+  roundOver,
   type SessionOptions,
   type SessionState,
   type ToolReply,
@@ -72,10 +73,12 @@ export function createDetectiveSession(opts: SessionOptions): DetectiveSession {
       return reply;
     },
     eyesExited() {
-      if (s.eyesDownAtMs === null) s.eyesDownAtMs = elapsedMs(s);
+      // An exit after the round ended is the normal shutdown, not an eyes failure.
+      if (s.eyesDownAtMs === null && !roundOver(s)) s.eyesDownAtMs = elapsedMs(s);
       s.broker.eyesDown();
     },
     end() {
+      s.ended = true;
       s.broker.close();
     },
     onFinal(listener) {

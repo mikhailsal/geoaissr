@@ -146,10 +146,25 @@ function launchRoles(
   return { brain, eyes, fakeDone: null };
 }
 
+/**
+ * After the round ends each CLI is told so by its next tool reply and finishes its turn; only
+ * then does `claude -p` print the result JSON that carries the token usage. A CLI still running
+ * after the grace period is stopped and reports no usage.
+ */
+const EXIT_GRACE_MS = 25_000;
+
 async function stopRoles(
   launched: Launched,
 ): Promise<{ brain: RoleExit | null; eyes: RoleExit | null }> {
   const procs = [launched.brain, launched.eyes].filter((p): p is RoleProcess => p !== null);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    Promise.allSettled(procs.map((p) => p.done)),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, EXIT_GRACE_MS);
+    }),
+  ]);
+  clearTimeout(timer);
   await Promise.allSettled(procs.map((p) => p.proc.stop(500)));
   await launched.fakeDone;
   return {
