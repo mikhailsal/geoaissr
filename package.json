@@ -12,13 +12,14 @@
     "doctor": "bun run server/cli/doctor.ts",
     "build": "vite build",
     "check": "bun run scripts/check.ts",
-    "test": "bun test ./shared/ ./server/ ./test/ ./web/src/ ./scripts/",
+    "test": "bun test ./shared/ ./server/ ./test/ ./web/src/ ./scripts/ ./spikes/",
     "test:e2e": "bunx playwright test",
     "test:harness": "bun run scripts/test-harness.ts",
     "test:tunnel": "bun run scripts/test-tunnel.ts",
     "hooks:install": "bun run scripts/install-hooks.ts",
     "setup:dev": "bun run scripts/setup-dev.ts",
     "eval:bots": "bun run scripts/eval-bots.ts",
+    "spike:detective": "bun run spikes/detective/main.ts",
     "build:regions": "bun run scripts/build-regions.ts"
   },
   "dependencies": {

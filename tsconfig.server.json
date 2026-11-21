@@ -24,6 +24,7 @@
     "server/**/*.ts",
     "bot-tools/**/*.ts",
     "scripts/**/*.ts",
+    "spikes/**/*.ts",
     "test/**/*.ts",
     "playwright.config.ts",
     "web/tests/**/*.ts",
