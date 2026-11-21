@@ -1,0 +1,461 @@
+{
+  "label": "judge3-90",
+  "arms": {
+    "detective": "detective3-90 (84 rounds, the finding of every ask)",
+    "single": "Stage 1 candidate-90 (84 rounds, look-step findings)"
+  },
+  "note": "Model judge, not human. Part C of docs/evals/detective-spike-3.md, bar 5: two runs of claude-opus-5-5 with rubric v3 (seeds 20261126 and 20261127). Each claim carries a kind, seen or not_seen; under v3 a finding is unsupported only for a wrong seen claim, and the v2 fields count a wrong claim of either kind. The interval of seenClaimBar is a spot-level percentile bootstrap (2,000 resamples, seed 20261129).",
+  "mode": "findings",
+  "pooled": {
+    "runs": 2,
+    "detective": {
+      "supported": 239,
+      "unsupported": 17,
+      "unclear": 7,
+      "noVisualClaim": 17,
+      "ruleOk": 55,
+      "ruleWrong": 8,
+      "missingVerdicts": 0,
+      "claims": {
+        "ok": 801,
+        "contradicted": 32,
+        "absent": 0,
+        "unclear": 61
+      },
+      "seenClaims": {
+        "ok": 715,
+        "contradicted": 17,
+        "absent": 0,
+        "unclear": 57
+      },
+      "notSeenClaims": {
+        "ok": 86,
+        "contradicted": 15,
+        "absent": 0,
+        "unclear": 4
+      },
+      "v2Supported": 225,
+      "v2Unsupported": 32,
+      "judged": 256,
+      "unsupportedRate": 0.066,
+      "v2UnsupportedRate": 0.125,
+      "claimErrorRate": 0.038,
+      "seenClaimErrorRate": 0.023,
+      "notSeenClaimErrorRate": 0.149,
+      "claimsByKeywordHeuristic": {
+        "seen": {
+          "ok": 714,
+          "wrong": 17,
+          "unclear": 57,
+          "errorRate": 0.023
+        },
+        "not_seen": {
+          "ok": 87,
+          "wrong": 15,
+          "unclear": 4,
+          "errorRate": 0.147
+        },
+        "frame": {
+          "ok": 0,
+          "wrong": 0,
+          "unclear": 0,
+          "errorRate": null
+        },
+        "findingsWithWrongSeenClaim": 17,
+        "findingsWrongOnlyByNotSeenOrFrame": 15
+      }
+    },
+    "single": {
+      "supported": 155,
+      "unsupported": 23,
+      "unclear": 0,
+      "noVisualClaim": 0,
+      "ruleOk": 70,
+      "ruleWrong": 11,
+      "missingVerdicts": 0,
+      "claims": {
+        "ok": 851,
+        "contradicted": 55,
+        "absent": 0,
+        "unclear": 47
+      },
+      "seenClaims": {
+        "ok": 759,
+        "contradicted": 23,
+        "absent": 0,
+        "unclear": 38
+      },
+      "notSeenClaims": {
+        "ok": 92,
+        "contradicted": 32,
+        "absent": 0,
+        "unclear": 9
+      },
+      "v2Supported": 127,
+      "v2Unsupported": 51,
+      "judged": 178,
+      "unsupportedRate": 0.129,
+      "v2UnsupportedRate": 0.287,
+      "claimErrorRate": 0.061,
+      "seenClaimErrorRate": 0.029,
+      "notSeenClaimErrorRate": 0.258,
+      "claimsByKeywordHeuristic": {
+        "seen": {
+          "ok": 758,
+          "wrong": 26,
+          "unclear": 38,
+          "errorRate": 0.033
+        },
+        "not_seen": {
+          "ok": 86,
+          "wrong": 28,
+          "unclear": 9,
+          "errorRate": 0.246
+        },
+        "frame": {
+          "ok": 7,
+          "wrong": 1,
+          "unclear": 0,
+          "errorRate": 0.125
+        },
+        "findingsWithWrongSeenClaim": 26,
+        "findingsWrongOnlyByNotSeenOrFrame": 25
+      }
+    },
+    "detectiveMinusSingle": {
+      "diff": -0.063,
+      "low": -0.154,
+      "high": 0.016
+    }
+  },
+  "seenClaimBar": {
+    "spots": 28,
+    "detectiveSeenError": 0.023,
+    "singleSeenError": 0.029,
+    "detectiveMinusSingle": -0.006,
+    "ci": {
+      "low": -0.032,
+      "high": 0.02
+    },
+    "maxDifference": 0.05,
+    "barPassed": true
+  },
+  "perRun": [
+    {
+      "run": "judge-a",
+      "judgeModel": "claude-opus-5-5",
+      "seed": 20261126,
+      "rubric": "v3",
+      "runs": 1,
+      "detective": {
+        "supported": 119,
+        "unsupported": 9,
+        "unclear": 3,
+        "noVisualClaim": 9,
+        "ruleOk": 29,
+        "ruleWrong": 4,
+        "missingVerdicts": 0,
+        "claims": {
+          "ok": 401,
+          "contradicted": 16,
+          "absent": 0,
+          "unclear": 29
+        },
+        "seenClaims": {
+          "ok": 359,
+          "contradicted": 9,
+          "absent": 0,
+          "unclear": 27
+        },
+        "notSeenClaims": {
+          "ok": 42,
+          "contradicted": 7,
+          "absent": 0,
+          "unclear": 2
+        },
+        "v2Supported": 113,
+        "v2Unsupported": 16,
+        "judged": 128,
+        "unsupportedRate": 0.07,
+        "v2UnsupportedRate": 0.124,
+        "claimErrorRate": 0.038,
+        "seenClaimErrorRate": 0.024,
+        "notSeenClaimErrorRate": 0.143,
+        "claimsByKeywordHeuristic": {
+          "seen": {
+            "ok": 359,
+            "wrong": 9,
+            "unclear": 27,
+            "errorRate": 0.024
+          },
+          "not_seen": {
+            "ok": 42,
+            "wrong": 7,
+            "unclear": 2,
+            "errorRate": 0.143
+          },
+          "frame": {
+            "ok": 0,
+            "wrong": 0,
+            "unclear": 0,
+            "errorRate": null
+          },
+          "findingsWithWrongSeenClaim": 9,
+          "findingsWrongOnlyByNotSeenOrFrame": 7
+        }
+      },
+      "single": {
+        "supported": 76,
+        "unsupported": 13,
+        "unclear": 0,
+        "noVisualClaim": 0,
+        "ruleOk": 34,
+        "ruleWrong": 5,
+        "missingVerdicts": 0,
+        "claims": {
+          "ok": 422,
+          "contradicted": 31,
+          "absent": 0,
+          "unclear": 25
+        },
+        "seenClaims": {
+          "ok": 381,
+          "contradicted": 13,
+          "absent": 0,
+          "unclear": 18
+        },
+        "notSeenClaims": {
+          "ok": 41,
+          "contradicted": 18,
+          "absent": 0,
+          "unclear": 7
+        },
+        "v2Supported": 60,
+        "v2Unsupported": 29,
+        "judged": 89,
+        "unsupportedRate": 0.146,
+        "v2UnsupportedRate": 0.326,
+        "claimErrorRate": 0.068,
+        "seenClaimErrorRate": 0.033,
+        "notSeenClaimErrorRate": 0.305,
+        "claimsByKeywordHeuristic": {
+          "seen": {
+            "ok": 380,
+            "wrong": 15,
+            "unclear": 18,
+            "errorRate": 0.038
+          },
+          "not_seen": {
+            "ok": 39,
+            "wrong": 16,
+            "unclear": 7,
+            "errorRate": 0.291
+          },
+          "frame": {
+            "ok": 3,
+            "wrong": 0,
+            "unclear": 0,
+            "errorRate": 0
+          },
+          "findingsWithWrongSeenClaim": 15,
+          "findingsWrongOnlyByNotSeenOrFrame": 14
+        }
+      },
+      "detectiveMinusSingle": {
+        "diff": -0.076,
+        "low": -0.17,
+        "high": 0.007
+      }
+    },
+    {
+      "run": "judge-b",
+      "judgeModel": "claude-opus-5-5",
+      "seed": 20261127,
+      "rubric": "v3",
+      "runs": 1,
+      "detective": {
+        "supported": 120,
+        "unsupported": 8,
+        "unclear": 4,
+        "noVisualClaim": 8,
+        "ruleOk": 26,
+        "ruleWrong": 4,
+        "missingVerdicts": 0,
+        "claims": {
+          "ok": 400,
+          "contradicted": 16,
+          "absent": 0,
+          "unclear": 32
+        },
+        "seenClaims": {
+          "ok": 356,
+          "contradicted": 8,
+          "absent": 0,
+          "unclear": 30
+        },
+        "notSeenClaims": {
+          "ok": 44,
+          "contradicted": 8,
+          "absent": 0,
+          "unclear": 2
+        },
+        "v2Supported": 112,
+        "v2Unsupported": 16,
+        "judged": 128,
+        "unsupportedRate": 0.063,
+        "v2UnsupportedRate": 0.125,
+        "claimErrorRate": 0.038,
+        "seenClaimErrorRate": 0.022,
+        "notSeenClaimErrorRate": 0.154,
+        "claimsByKeywordHeuristic": {
+          "seen": {
+            "ok": 355,
+            "wrong": 8,
+            "unclear": 30,
+            "errorRate": 0.022
+          },
+          "not_seen": {
+            "ok": 45,
+            "wrong": 8,
+            "unclear": 2,
+            "errorRate": 0.151
+          },
+          "frame": {
+            "ok": 0,
+            "wrong": 0,
+            "unclear": 0,
+            "errorRate": null
+          },
+          "findingsWithWrongSeenClaim": 8,
+          "findingsWrongOnlyByNotSeenOrFrame": 8
+        }
+      },
+      "single": {
+        "supported": 79,
+        "unsupported": 10,
+        "unclear": 0,
+        "noVisualClaim": 0,
+        "ruleOk": 36,
+        "ruleWrong": 6,
+        "missingVerdicts": 0,
+        "claims": {
+          "ok": 429,
+          "contradicted": 24,
+          "absent": 0,
+          "unclear": 22
+        },
+        "seenClaims": {
+          "ok": 378,
+          "contradicted": 10,
+          "absent": 0,
+          "unclear": 20
+        },
+        "notSeenClaims": {
+          "ok": 51,
+          "contradicted": 14,
+          "absent": 0,
+          "unclear": 2
+        },
+        "v2Supported": 67,
+        "v2Unsupported": 22,
+        "judged": 89,
+        "unsupportedRate": 0.112,
+        "v2UnsupportedRate": 0.247,
+        "claimErrorRate": 0.053,
+        "seenClaimErrorRate": 0.026,
+        "notSeenClaimErrorRate": 0.215,
+        "claimsByKeywordHeuristic": {
+          "seen": {
+            "ok": 378,
+            "wrong": 11,
+            "unclear": 20,
+            "errorRate": 0.028
+          },
+          "not_seen": {
+            "ok": 47,
+            "wrong": 12,
+            "unclear": 2,
+            "errorRate": 0.203
+          },
+          "frame": {
+            "ok": 4,
+            "wrong": 1,
+            "unclear": 0,
+            "errorRate": 0.2
+          },
+          "findingsWithWrongSeenClaim": 11,
+          "findingsWrongOnlyByNotSeenOrFrame": 11
+        }
+      },
+      "detectiveMinusSingle": {
+        "diff": -0.05,
+        "low": -0.138,
+        "high": 0.025
+      }
+    }
+  ],
+  "betweenRuns": [
+    {
+      "first": "judge-a",
+      "second": "judge-b",
+      "common": 229,
+      "same": 221,
+      "agreement": 0.965,
+      "matrix": {
+        "supported->supported": 194,
+        "unclear->unclear": 2,
+        "no_visual_claim->no_visual_claim": 7,
+        "unsupported->supported": 3,
+        "unclear->supported": 1,
+        "unsupported->unsupported": 18,
+        "unsupported->unclear": 1,
+        "no_visual_claim->unclear": 1,
+        "no_visual_claim->supported": 1,
+        "supported->no_visual_claim": 1
+      },
+      "flagged": {
+        "first": 22,
+        "second": 18,
+        "both": 18
+      },
+      "byGroup": {
+        "detective": {
+          "common": 140,
+          "same": 135,
+          "agreement": 0.964,
+          "matrix": {
+            "supported->supported": 118,
+            "unclear->unclear": 2,
+            "no_visual_claim->no_visual_claim": 7,
+            "unclear->supported": 1,
+            "unsupported->unsupported": 8,
+            "unsupported->unclear": 1,
+            "no_visual_claim->unclear": 1,
+            "no_visual_claim->supported": 1,
+            "supported->no_visual_claim": 1
+          },
+          "flagged": {
+            "first": 9,
+            "second": 8,
+            "both": 8
+          }
+        },
+        "single": {
+          "common": 89,
+          "same": 86,
+          "agreement": 0.966,
+          "matrix": {
+            "supported->supported": 76,
+            "unsupported->supported": 3,
+            "unsupported->unsupported": 10
+          },
+          "flagged": {
+            "first": 13,
+            "second": 10,
+            "both": 10
+          }
+        }
+      }
+    }
+  ]
+}

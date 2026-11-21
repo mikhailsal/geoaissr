@@ -1,0 +1,1331 @@
+{
+  "arms": {
+    "haikuMedium": {
+      "describer": "claude-haiku-5-5",
+      "brainModel": "claude-sonnet-5-5",
+      "effort": "medium",
+      "rounds": 84,
+      "medianErrorKm": 203.1,
+      "within25": {
+        "hits": 30,
+        "total": 84,
+        "rate": 0.357,
+        "ci": {
+          "low": 0.263,
+          "high": 0.464
+        }
+      },
+      "within750": {
+        "hits": 55,
+        "total": 84,
+        "rate": 0.655,
+        "ci": {
+          "low": 0.548,
+          "high": 0.748
+        }
+      },
+      "beyond2000": {
+        "hits": 23,
+        "total": 84,
+        "rate": 0.274,
+        "ci": {
+          "low": 0.19,
+          "high": 0.377
+        }
+      },
+      "spots": 28,
+      "meanScore": 3242,
+      "byConfidence": {
+        "country": {
+          "rounds": 49,
+          "medianErrorKm": 14.8,
+          "within25": {
+            "hits": 29,
+            "total": 49,
+            "rate": 0.592,
+            "ci": {
+              "low": 0.452,
+              "high": 0.718
+            }
+          },
+          "within750": {
+            "hits": 45,
+            "total": 49,
+            "rate": 0.918,
+            "ci": {
+              "low": 0.808,
+              "high": 0.968
+            }
+          },
+          "beyond2000": {
+            "hits": 4,
+            "total": 49,
+            "rate": 0.082,
+            "ci": {
+              "low": 0.032,
+              "high": 0.192
+            }
+          }
+        },
+        "region": {
+          "rounds": 5,
+          "medianErrorKm": 878.1,
+          "within25": {
+            "hits": 1,
+            "total": 5,
+            "rate": 0.2,
+            "ci": {
+              "low": 0.036,
+              "high": 0.624
+            }
+          },
+          "within750": {
+            "hits": 2,
+            "total": 5,
+            "rate": 0.4,
+            "ci": {
+              "low": 0.118,
+              "high": 0.769
+            }
+          },
+          "beyond2000": {
+            "hits": 0,
+            "total": 5,
+            "rate": 0,
+            "ci": {
+              "low": 0,
+              "high": 0.434
+            }
+          }
+        },
+        "guess": {
+          "rounds": 30,
+          "medianErrorKm": 5798.9,
+          "within25": {
+            "hits": 0,
+            "total": 30,
+            "rate": 0,
+            "ci": {
+              "low": 0,
+              "high": 0.114
+            }
+          },
+          "within750": {
+            "hits": 8,
+            "total": 30,
+            "rate": 0.267,
+            "ci": {
+              "low": 0.142,
+              "high": 0.444
+            }
+          },
+          "beyond2000": {
+            "hits": 19,
+            "total": 30,
+            "rate": 0.633,
+            "ci": {
+              "low": 0.455,
+              "high": 0.781
+            }
+          }
+        }
+      },
+      "maskedWords": {},
+      "againstDetective2": {
+        "spots": 28,
+        "aCloser": 16,
+        "bCloser": 11,
+        "ties": 1,
+        "medianOfSpotMediansKm": {
+          "a": 181,
+          "b": 397.2
+        },
+        "medianPairedDifferenceKm": -21.9,
+        "pairs": [
+          {
+            "spotId": "spot-01",
+            "aKm": 16611.6,
+            "bKm": 14882.8
+          },
+          {
+            "spotId": "spot-02",
+            "aKm": 10005.4,
+            "bKm": 10175.6
+          },
+          {
+            "spotId": "spot-03",
+            "aKm": 46.2,
+            "bKm": 257.1
+          },
+          {
+            "spotId": "spot-04",
+            "aKm": 874.5,
+            "bKm": 401.8
+          },
+          {
+            "spotId": "spot-05",
+            "aKm": 11.2,
+            "bKm": 2496.1
+          },
+          {
+            "spotId": "spot-06",
+            "aKm": 6348.8,
+            "bKm": 2707.5
+          },
+          {
+            "spotId": "spot-07",
+            "aKm": 437.3,
+            "bKm": 2987.6
+          },
+          {
+            "spotId": "spot-08",
+            "aKm": 1804.9,
+            "bKm": 8283.8
+          },
+          {
+            "spotId": "spot-09",
+            "aKm": 235.5,
+            "bKm": 392.6
+          },
+          {
+            "spotId": "spot-10",
+            "aKm": 73.2,
+            "bKm": 277.2
+          },
+          {
+            "spotId": "spot-11",
+            "aKm": 233.3,
+            "bKm": 366.8
+          },
+          {
+            "spotId": "spot-12",
+            "aKm": 10.4,
+            "bKm": 8725.7
+          },
+          {
+            "spotId": "spot-13",
+            "aKm": 10.3,
+            "bKm": 3.8
+          },
+          {
+            "spotId": "spot-14",
+            "aKm": 9508.6,
+            "bKm": 10022.4
+          },
+          {
+            "spotId": "spot-15",
+            "aKm": 5771.6,
+            "bKm": 10499.2
+          },
+          {
+            "spotId": "spot-16",
+            "aKm": 14.8,
+            "bKm": 14.8
+          },
+          {
+            "spotId": "spot-17",
+            "aKm": 3735.1,
+            "bKm": 3777.3
+          },
+          {
+            "spotId": "spot-18",
+            "aKm": 1.6,
+            "bKm": 0.2
+          },
+          {
+            "spotId": "spot-19",
+            "aKm": 1.5,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-20",
+            "aKm": 128.6,
+            "bKm": 4.9
+          },
+          {
+            "spotId": "spot-21",
+            "aKm": 77.3,
+            "bKm": 75.9
+          },
+          {
+            "spotId": "spot-22",
+            "aKm": 0.5,
+            "bKm": 2.1
+          },
+          {
+            "spotId": "spot-23",
+            "aKm": 19.5,
+            "bKm": 13.9
+          },
+          {
+            "spotId": "spot-24",
+            "aKm": 7027.1,
+            "bKm": 17110.1
+          },
+          {
+            "spotId": "spot-25",
+            "aKm": 0.4,
+            "bKm": 1
+          },
+          {
+            "spotId": "spot-26",
+            "aKm": 2.1,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-27",
+            "aKm": 11063.7,
+            "bKm": 8880.2
+          },
+          {
+            "spotId": "spot-28",
+            "aKm": 310.5,
+            "bKm": 7668.2
+          }
+        ]
+      },
+      "againstSingle": {
+        "spots": 28,
+        "aCloser": 3,
+        "bCloser": 24,
+        "ties": 1,
+        "medianOfSpotMediansKm": {
+          "a": 181,
+          "b": 4.9
+        },
+        "medianPairedDifferenceKm": 93.4,
+        "pairs": [
+          {
+            "spotId": "spot-01",
+            "aKm": 16611.6,
+            "bKm": 0.6
+          },
+          {
+            "spotId": "spot-02",
+            "aKm": 10005.4,
+            "bKm": 653.6
+          },
+          {
+            "spotId": "spot-03",
+            "aKm": 46.2,
+            "bKm": 0.2
+          },
+          {
+            "spotId": "spot-04",
+            "aKm": 874.5,
+            "bKm": 2.5
+          },
+          {
+            "spotId": "spot-05",
+            "aKm": 11.2,
+            "bKm": 12.9
+          },
+          {
+            "spotId": "spot-06",
+            "aKm": 6348.8,
+            "bKm": 352.3
+          },
+          {
+            "spotId": "spot-07",
+            "aKm": 437.3,
+            "bKm": 414.2
+          },
+          {
+            "spotId": "spot-08",
+            "aKm": 1804.9,
+            "bKm": 4.1
+          },
+          {
+            "spotId": "spot-09",
+            "aKm": 235.5,
+            "bKm": 43.4
+          },
+          {
+            "spotId": "spot-10",
+            "aKm": 73.2,
+            "bKm": 9.9
+          },
+          {
+            "spotId": "spot-11",
+            "aKm": 233.3,
+            "bKm": 18.6
+          },
+          {
+            "spotId": "spot-12",
+            "aKm": 10.4,
+            "bKm": 0.3
+          },
+          {
+            "spotId": "spot-13",
+            "aKm": 10.3,
+            "bKm": 4.6
+          },
+          {
+            "spotId": "spot-14",
+            "aKm": 9508.6,
+            "bKm": 8764.3
+          },
+          {
+            "spotId": "spot-15",
+            "aKm": 5771.6,
+            "bKm": 104.8
+          },
+          {
+            "spotId": "spot-16",
+            "aKm": 14.8,
+            "bKm": 23.2
+          },
+          {
+            "spotId": "spot-17",
+            "aKm": 3735.1,
+            "bKm": 0.4
+          },
+          {
+            "spotId": "spot-18",
+            "aKm": 1.6,
+            "bKm": 1.5
+          },
+          {
+            "spotId": "spot-19",
+            "aKm": 1.5,
+            "bKm": 0.8
+          },
+          {
+            "spotId": "spot-20",
+            "aKm": 128.6,
+            "bKm": 5.2
+          },
+          {
+            "spotId": "spot-21",
+            "aKm": 77.3,
+            "bKm": 62.8
+          },
+          {
+            "spotId": "spot-22",
+            "aKm": 0.5,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-23",
+            "aKm": 19.5,
+            "bKm": 3.1
+          },
+          {
+            "spotId": "spot-24",
+            "aKm": 7027.1,
+            "bKm": 4.3
+          },
+          {
+            "spotId": "spot-25",
+            "aKm": 0.4,
+            "bKm": 0.9
+          },
+          {
+            "spotId": "spot-26",
+            "aKm": 2.1,
+            "bKm": 1.7
+          },
+          {
+            "spotId": "spot-27",
+            "aKm": 11063.7,
+            "bKm": 363.5
+          },
+          {
+            "spotId": "spot-28",
+            "aKm": 310.5,
+            "bKm": 76.2
+          }
+        ]
+      }
+    },
+    "sonnetMedium": {
+      "describer": "claude-sonnet-5-5",
+      "brainModel": "claude-sonnet-5-5",
+      "effort": "medium",
+      "rounds": 84,
+      "medianErrorKm": 122.4,
+      "within25": {
+        "hits": 37,
+        "total": 84,
+        "rate": 0.44,
+        "ci": {
+          "low": 0.339,
+          "high": 0.547
+        }
+      },
+      "within750": {
+        "hits": 64,
+        "total": 84,
+        "rate": 0.762,
+        "ci": {
+          "low": 0.661,
+          "high": 0.84
+        }
+      },
+      "beyond2000": {
+        "hits": 10,
+        "total": 84,
+        "rate": 0.119,
+        "ci": {
+          "low": 0.066,
+          "high": 0.205
+        }
+      },
+      "spots": 28,
+      "meanScore": 3819,
+      "byConfidence": {
+        "country": {
+          "rounds": 46,
+          "medianErrorKm": 8.6,
+          "within25": {
+            "hits": 32,
+            "total": 46,
+            "rate": 0.696,
+            "ci": {
+              "low": 0.552,
+              "high": 0.809
+            }
+          },
+          "within750": {
+            "hits": 42,
+            "total": 46,
+            "rate": 0.913,
+            "ci": {
+              "low": 0.797,
+              "high": 0.966
+            }
+          },
+          "beyond2000": {
+            "hits": 4,
+            "total": 46,
+            "rate": 0.087,
+            "ci": {
+              "low": 0.034,
+              "high": 0.203
+            }
+          }
+        },
+        "region": {
+          "rounds": 10,
+          "medianErrorKm": 227.7,
+          "within25": {
+            "hits": 2,
+            "total": 10,
+            "rate": 0.2,
+            "ci": {
+              "low": 0.057,
+              "high": 0.51
+            }
+          },
+          "within750": {
+            "hits": 7,
+            "total": 10,
+            "rate": 0.7,
+            "ci": {
+              "low": 0.397,
+              "high": 0.892
+            }
+          },
+          "beyond2000": {
+            "hits": 1,
+            "total": 10,
+            "rate": 0.1,
+            "ci": {
+              "low": 0.018,
+              "high": 0.404
+            }
+          }
+        },
+        "guess": {
+          "rounds": 28,
+          "medianErrorKm": 673.4,
+          "within25": {
+            "hits": 3,
+            "total": 28,
+            "rate": 0.107,
+            "ci": {
+              "low": 0.037,
+              "high": 0.272
+            }
+          },
+          "within750": {
+            "hits": 15,
+            "total": 28,
+            "rate": 0.536,
+            "ci": {
+              "low": 0.358,
+              "high": 0.705
+            }
+          },
+          "beyond2000": {
+            "hits": 5,
+            "total": 28,
+            "rate": 0.179,
+            "ci": {
+              "low": 0.079,
+              "high": 0.356
+            }
+          }
+        }
+      },
+      "maskedWords": {
+        "косой": 1,
+        "катакана": 1
+      },
+      "againstDetective2": {
+        "spots": 28,
+        "aCloser": 21,
+        "bCloser": 6,
+        "ties": 1,
+        "medianOfSpotMediansKm": {
+          "a": 91.5,
+          "b": 397.2
+        },
+        "medianPairedDifferenceKm": -220.5,
+        "pairs": [
+          {
+            "spotId": "spot-01",
+            "aKm": 1057.8,
+            "bKm": 14882.8
+          },
+          {
+            "spotId": "spot-02",
+            "aKm": 204.8,
+            "bKm": 10175.6
+          },
+          {
+            "spotId": "spot-03",
+            "aKm": 46.6,
+            "bKm": 257.1
+          },
+          {
+            "spotId": "spot-04",
+            "aKm": 644.5,
+            "bKm": 401.8
+          },
+          {
+            "spotId": "spot-05",
+            "aKm": 11.7,
+            "bKm": 2496.1
+          },
+          {
+            "spotId": "spot-06",
+            "aKm": 1250.1,
+            "bKm": 2707.5
+          },
+          {
+            "spotId": "spot-07",
+            "aKm": 228,
+            "bKm": 2987.6
+          },
+          {
+            "spotId": "spot-08",
+            "aKm": 1733.8,
+            "bKm": 8283.8
+          },
+          {
+            "spotId": "spot-09",
+            "aKm": 41.6,
+            "bKm": 392.6
+          },
+          {
+            "spotId": "spot-10",
+            "aKm": 144.7,
+            "bKm": 277.2
+          },
+          {
+            "spotId": "spot-11",
+            "aKm": 136.3,
+            "bKm": 366.8
+          },
+          {
+            "spotId": "spot-12",
+            "aKm": 10.4,
+            "bKm": 8725.7
+          },
+          {
+            "spotId": "spot-13",
+            "aKm": 3.6,
+            "bKm": 3.8
+          },
+          {
+            "spotId": "spot-14",
+            "aKm": 9469.7,
+            "bKm": 10022.4
+          },
+          {
+            "spotId": "spot-15",
+            "aKm": 5771.6,
+            "bKm": 10499.2
+          },
+          {
+            "spotId": "spot-16",
+            "aKm": 18.6,
+            "bKm": 14.8
+          },
+          {
+            "spotId": "spot-17",
+            "aKm": 3735.1,
+            "bKm": 3777.3
+          },
+          {
+            "spotId": "spot-18",
+            "aKm": 0.3,
+            "bKm": 0.2
+          },
+          {
+            "spotId": "spot-19",
+            "aKm": 0.6,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-20",
+            "aKm": 5.2,
+            "bKm": 4.9
+          },
+          {
+            "spotId": "spot-21",
+            "aKm": 233.1,
+            "bKm": 75.9
+          },
+          {
+            "spotId": "spot-22",
+            "aKm": 0.5,
+            "bKm": 2.1
+          },
+          {
+            "spotId": "spot-23",
+            "aKm": 3.1,
+            "bKm": 13.9
+          },
+          {
+            "spotId": "spot-24",
+            "aKm": 10.4,
+            "bKm": 17110.1
+          },
+          {
+            "spotId": "spot-25",
+            "aKm": 0.4,
+            "bKm": 1
+          },
+          {
+            "spotId": "spot-26",
+            "aKm": 0.5,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-27",
+            "aKm": 827.2,
+            "bKm": 8880.2
+          },
+          {
+            "spotId": "spot-28",
+            "aKm": 572.4,
+            "bKm": 7668.2
+          }
+        ]
+      },
+      "againstSingle": {
+        "spots": 28,
+        "aCloser": 10,
+        "bCloser": 15,
+        "ties": 3,
+        "medianOfSpotMediansKm": {
+          "a": 91.5,
+          "b": 4.9
+        },
+        "medianPairedDifferenceKm": 8.1,
+        "pairs": [
+          {
+            "spotId": "spot-01",
+            "aKm": 1057.8,
+            "bKm": 0.6
+          },
+          {
+            "spotId": "spot-02",
+            "aKm": 204.8,
+            "bKm": 653.6
+          },
+          {
+            "spotId": "spot-03",
+            "aKm": 46.6,
+            "bKm": 0.2
+          },
+          {
+            "spotId": "spot-04",
+            "aKm": 644.5,
+            "bKm": 2.5
+          },
+          {
+            "spotId": "spot-05",
+            "aKm": 11.7,
+            "bKm": 12.9
+          },
+          {
+            "spotId": "spot-06",
+            "aKm": 1250.1,
+            "bKm": 352.3
+          },
+          {
+            "spotId": "spot-07",
+            "aKm": 228,
+            "bKm": 414.2
+          },
+          {
+            "spotId": "spot-08",
+            "aKm": 1733.8,
+            "bKm": 4.1
+          },
+          {
+            "spotId": "spot-09",
+            "aKm": 41.6,
+            "bKm": 43.4
+          },
+          {
+            "spotId": "spot-10",
+            "aKm": 144.7,
+            "bKm": 9.9
+          },
+          {
+            "spotId": "spot-11",
+            "aKm": 136.3,
+            "bKm": 18.6
+          },
+          {
+            "spotId": "spot-12",
+            "aKm": 10.4,
+            "bKm": 0.3
+          },
+          {
+            "spotId": "spot-13",
+            "aKm": 3.6,
+            "bKm": 4.6
+          },
+          {
+            "spotId": "spot-14",
+            "aKm": 9469.7,
+            "bKm": 8764.3
+          },
+          {
+            "spotId": "spot-15",
+            "aKm": 5771.6,
+            "bKm": 104.8
+          },
+          {
+            "spotId": "spot-16",
+            "aKm": 18.6,
+            "bKm": 23.2
+          },
+          {
+            "spotId": "spot-17",
+            "aKm": 3735.1,
+            "bKm": 0.4
+          },
+          {
+            "spotId": "spot-18",
+            "aKm": 0.3,
+            "bKm": 1.5
+          },
+          {
+            "spotId": "spot-19",
+            "aKm": 0.6,
+            "bKm": 0.8
+          },
+          {
+            "spotId": "spot-20",
+            "aKm": 5.2,
+            "bKm": 5.2
+          },
+          {
+            "spotId": "spot-21",
+            "aKm": 233.1,
+            "bKm": 62.8
+          },
+          {
+            "spotId": "spot-22",
+            "aKm": 0.5,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-23",
+            "aKm": 3.1,
+            "bKm": 3.1
+          },
+          {
+            "spotId": "spot-24",
+            "aKm": 10.4,
+            "bKm": 4.3
+          },
+          {
+            "spotId": "spot-25",
+            "aKm": 0.4,
+            "bKm": 0.9
+          },
+          {
+            "spotId": "spot-26",
+            "aKm": 0.5,
+            "bKm": 1.7
+          },
+          {
+            "spotId": "spot-27",
+            "aKm": 827.2,
+            "bKm": 363.5
+          },
+          {
+            "spotId": "spot-28",
+            "aKm": 572.4,
+            "bKm": 76.2
+          }
+        ]
+      }
+    },
+    "betterLow": {
+      "describer": "claude-sonnet-5-5",
+      "brainModel": "claude-sonnet-5-5",
+      "effort": "low",
+      "rounds": 84,
+      "medianErrorKm": 120.5,
+      "within25": {
+        "hits": 34,
+        "total": 84,
+        "rate": 0.405,
+        "ci": {
+          "low": 0.306,
+          "high": 0.512
+        }
+      },
+      "within750": {
+        "hits": 64,
+        "total": 84,
+        "rate": 0.762,
+        "ci": {
+          "low": 0.661,
+          "high": 0.84
+        }
+      },
+      "beyond2000": {
+        "hits": 13,
+        "total": 84,
+        "rate": 0.155,
+        "ci": {
+          "low": 0.093,
+          "high": 0.247
+        }
+      },
+      "spots": 28,
+      "meanScore": 3759,
+      "byConfidence": {
+        "country": {
+          "rounds": 54,
+          "medianErrorKm": 13.2,
+          "within25": {
+            "hits": 31,
+            "total": 54,
+            "rate": 0.574,
+            "ci": {
+              "low": 0.442,
+              "high": 0.697
+            }
+          },
+          "within750": {
+            "hits": 49,
+            "total": 54,
+            "rate": 0.907,
+            "ci": {
+              "low": 0.801,
+              "high": 0.96
+            }
+          },
+          "beyond2000": {
+            "hits": 3,
+            "total": 54,
+            "rate": 0.056,
+            "ci": {
+              "low": 0.019,
+              "high": 0.151
+            }
+          }
+        },
+        "region": {
+          "rounds": 2,
+          "medianErrorKm": 1983.8,
+          "within25": {
+            "hits": 0,
+            "total": 2,
+            "rate": 0,
+            "ci": {
+              "low": 0,
+              "high": 0.658
+            }
+          },
+          "within750": {
+            "hits": 1,
+            "total": 2,
+            "rate": 0.5,
+            "ci": {
+              "low": 0.095,
+              "high": 0.905
+            }
+          },
+          "beyond2000": {
+            "hits": 1,
+            "total": 2,
+            "rate": 0.5,
+            "ci": {
+              "low": 0.095,
+              "high": 0.905
+            }
+          }
+        },
+        "guess": {
+          "rounds": 28,
+          "medianErrorKm": 736.3,
+          "within25": {
+            "hits": 3,
+            "total": 28,
+            "rate": 0.107,
+            "ci": {
+              "low": 0.037,
+              "high": 0.272
+            }
+          },
+          "within750": {
+            "hits": 14,
+            "total": 28,
+            "rate": 0.5,
+            "ci": {
+              "low": 0.326,
+              "high": 0.674
+            }
+          },
+          "beyond2000": {
+            "hits": 9,
+            "total": 28,
+            "rate": 0.321,
+            "ci": {
+              "low": 0.179,
+              "high": 0.507
+            }
+          }
+        }
+      },
+      "maskedWords": {
+        "косой": 1,
+        "катакана": 1
+      },
+      "againstDetective2": {
+        "spots": 28,
+        "aCloser": 20,
+        "bCloser": 7,
+        "ties": 1,
+        "medianOfSpotMediansKm": {
+          "a": 90.4,
+          "b": 397.2
+        },
+        "medianPairedDifferenceKm": -195.7,
+        "pairs": [
+          {
+            "spotId": "spot-01",
+            "aKm": 1055.1,
+            "bKm": 14882.8
+          },
+          {
+            "spotId": "spot-02",
+            "aKm": 207.6,
+            "bKm": 10175.6
+          },
+          {
+            "spotId": "spot-03",
+            "aKm": 46.6,
+            "bKm": 257.1
+          },
+          {
+            "spotId": "spot-04",
+            "aKm": 644.6,
+            "bKm": 401.8
+          },
+          {
+            "spotId": "spot-05",
+            "aKm": 10.9,
+            "bKm": 2496.1
+          },
+          {
+            "spotId": "spot-06",
+            "aKm": 2020.9,
+            "bKm": 2707.5
+          },
+          {
+            "spotId": "spot-07",
+            "aKm": 280.2,
+            "bKm": 2987.6
+          },
+          {
+            "spotId": "spot-08",
+            "aKm": 504.8,
+            "bKm": 8283.8
+          },
+          {
+            "spotId": "spot-09",
+            "aKm": 48.1,
+            "bKm": 392.6
+          },
+          {
+            "spotId": "spot-10",
+            "aKm": 96.2,
+            "bKm": 277.2
+          },
+          {
+            "spotId": "spot-11",
+            "aKm": 233.1,
+            "bKm": 366.8
+          },
+          {
+            "spotId": "spot-12",
+            "aKm": 10.4,
+            "bKm": 8725.7
+          },
+          {
+            "spotId": "spot-13",
+            "aKm": 4.7,
+            "bKm": 3.8
+          },
+          {
+            "spotId": "spot-14",
+            "aKm": 9488.3,
+            "bKm": 10022.4
+          },
+          {
+            "spotId": "spot-15",
+            "aKm": 5720.9,
+            "bKm": 10499.2
+          },
+          {
+            "spotId": "spot-16",
+            "aKm": 20.7,
+            "bKm": 14.8
+          },
+          {
+            "spotId": "spot-17",
+            "aKm": 3734.5,
+            "bKm": 3777.3
+          },
+          {
+            "spotId": "spot-18",
+            "aKm": 0.3,
+            "bKm": 0.2
+          },
+          {
+            "spotId": "spot-19",
+            "aKm": 0.5,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-20",
+            "aKm": 84.6,
+            "bKm": 4.9
+          },
+          {
+            "spotId": "spot-21",
+            "aKm": 233.1,
+            "bKm": 75.9
+          },
+          {
+            "spotId": "spot-22",
+            "aKm": 1.9,
+            "bKm": 2.1
+          },
+          {
+            "spotId": "spot-23",
+            "aKm": 4.2,
+            "bKm": 13.9
+          },
+          {
+            "spotId": "spot-24",
+            "aKm": 15.8,
+            "bKm": 17110.1
+          },
+          {
+            "spotId": "spot-25",
+            "aKm": 0.3,
+            "bKm": 1
+          },
+          {
+            "spotId": "spot-26",
+            "aKm": 0.6,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-27",
+            "aKm": 827.2,
+            "bKm": 8880.2
+          },
+          {
+            "spotId": "spot-28",
+            "aKm": 829,
+            "bKm": 7668.2
+          }
+        ]
+      },
+      "againstSingle": {
+        "spots": 28,
+        "aCloser": 8,
+        "bCloser": 20,
+        "ties": 0,
+        "medianOfSpotMediansKm": {
+          "a": 90.4,
+          "b": 4.9
+        },
+        "medianPairedDifferenceKm": 29,
+        "pairs": [
+          {
+            "spotId": "spot-01",
+            "aKm": 1055.1,
+            "bKm": 0.6
+          },
+          {
+            "spotId": "spot-02",
+            "aKm": 207.6,
+            "bKm": 653.6
+          },
+          {
+            "spotId": "spot-03",
+            "aKm": 46.6,
+            "bKm": 0.2
+          },
+          {
+            "spotId": "spot-04",
+            "aKm": 644.6,
+            "bKm": 2.5
+          },
+          {
+            "spotId": "spot-05",
+            "aKm": 10.9,
+            "bKm": 12.9
+          },
+          {
+            "spotId": "spot-06",
+            "aKm": 2020.9,
+            "bKm": 352.3
+          },
+          {
+            "spotId": "spot-07",
+            "aKm": 280.2,
+            "bKm": 414.2
+          },
+          {
+            "spotId": "spot-08",
+            "aKm": 504.8,
+            "bKm": 4.1
+          },
+          {
+            "spotId": "spot-09",
+            "aKm": 48.1,
+            "bKm": 43.4
+          },
+          {
+            "spotId": "spot-10",
+            "aKm": 96.2,
+            "bKm": 9.9
+          },
+          {
+            "spotId": "spot-11",
+            "aKm": 233.1,
+            "bKm": 18.6
+          },
+          {
+            "spotId": "spot-12",
+            "aKm": 10.4,
+            "bKm": 0.3
+          },
+          {
+            "spotId": "spot-13",
+            "aKm": 4.7,
+            "bKm": 4.6
+          },
+          {
+            "spotId": "spot-14",
+            "aKm": 9488.3,
+            "bKm": 8764.3
+          },
+          {
+            "spotId": "spot-15",
+            "aKm": 5720.9,
+            "bKm": 104.8
+          },
+          {
+            "spotId": "spot-16",
+            "aKm": 20.7,
+            "bKm": 23.2
+          },
+          {
+            "spotId": "spot-17",
+            "aKm": 3734.5,
+            "bKm": 0.4
+          },
+          {
+            "spotId": "spot-18",
+            "aKm": 0.3,
+            "bKm": 1.5
+          },
+          {
+            "spotId": "spot-19",
+            "aKm": 0.5,
+            "bKm": 0.8
+          },
+          {
+            "spotId": "spot-20",
+            "aKm": 84.6,
+            "bKm": 5.2
+          },
+          {
+            "spotId": "spot-21",
+            "aKm": 233.1,
+            "bKm": 62.8
+          },
+          {
+            "spotId": "spot-22",
+            "aKm": 1.9,
+            "bKm": 0.5
+          },
+          {
+            "spotId": "spot-23",
+            "aKm": 4.2,
+            "bKm": 3.1
+          },
+          {
+            "spotId": "spot-24",
+            "aKm": 15.8,
+            "bKm": 4.3
+          },
+          {
+            "spotId": "spot-25",
+            "aKm": 0.3,
+            "bKm": 0.9
+          },
+          {
+            "spotId": "spot-26",
+            "aKm": 0.6,
+            "bKm": 1.7
+          },
+          {
+            "spotId": "spot-27",
+            "aKm": 827.2,
+            "bKm": 363.5
+          },
+          {
+            "spotId": "spot-28",
+            "aKm": 829,
+            "bKm": 76.2
+          }
+        ]
+      }
+    }
+  },
+  "decision": {
+    "betterDescriber": "claude-sonnet-5-5",
+    "betterShare": 0.762,
+    "stop": false,
+    "eyesModel": "claude-sonnet-5-5",
+    "brainEffort": "low"
+  }
+}

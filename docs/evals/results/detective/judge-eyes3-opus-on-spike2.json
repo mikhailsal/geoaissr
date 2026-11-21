@@ -1,0 +1,213 @@
+{
+  "label": "judge-eyes3-opus-on-spike2",
+  "arm": "detective2-90 (84 rounds; every answered or abstained choice and transcription item)",
+  "note": "Model judge, not human. Part A of docs/evals/detective-spike-3.md: the 1,028 eyes answers that the judge of spike 2 read (reference), judged again by claude-opus-5-5 with the same rubric in one run. Each summary is the eyes-judge-summary.json of that run. In againstRef, first is the reference run and second is the opus run, and flagged counts the verdict wrong. Made by spikes/detective/judge-agree.ts.",
+  "mode": "eyes",
+  "runs": [
+    {
+      "run": "judge-eyes-opus",
+      "summary": {
+        "judgeModel": "claude-opus-5-5",
+        "seed": 20261125,
+        "spots": 28,
+        "spotsJudged": 28,
+        "groups": {
+          "choiceNoneOfThese": {
+            "correct": 41,
+            "wrong": 15,
+            "cannotTell": 0,
+            "missing": 0
+          },
+          "choiceAnswered": {
+            "correct": 482,
+            "wrong": 79,
+            "cannotTell": 9,
+            "missing": 0
+          },
+          "textAbstained": {
+            "correct": 109,
+            "wrong": 53,
+            "cannotTell": 0,
+            "missing": 0
+          },
+          "choiceAbstained": {
+            "correct": 128,
+            "wrong": 31,
+            "cannotTell": 3,
+            "missing": 0
+          },
+          "textAnswered": {
+            "correct": 72,
+            "wrong": 6,
+            "cannotTell": 0,
+            "missing": 0
+          }
+        },
+        "choiceAnswered": {
+          "correct": 523,
+          "wrong": 94,
+          "cannotTell": 9,
+          "missing": 0,
+          "judged": 617,
+          "correctRate": 0.848,
+          "ci": {
+            "low": 0.817,
+            "high": 0.874
+          },
+          "barPassed": true
+        }
+      }
+    }
+  ],
+  "reference": {
+    "run": "judge-eyes",
+    "summary": {
+      "judgeModel": "claude-sonnet-5-5",
+      "seed": 20261122,
+      "spots": 28,
+      "spotsJudged": 28,
+      "groups": {
+        "choiceAnswered": {
+          "correct": 465,
+          "wrong": 90,
+          "cannotTell": 15,
+          "missing": 0
+        },
+        "choiceAbstained": {
+          "correct": 119,
+          "wrong": 42,
+          "cannotTell": 1,
+          "missing": 0
+        },
+        "textAbstained": {
+          "correct": 105,
+          "wrong": 57,
+          "cannotTell": 0,
+          "missing": 0
+        },
+        "choiceNoneOfThese": {
+          "correct": 45,
+          "wrong": 9,
+          "cannotTell": 2,
+          "missing": 0
+        },
+        "textAnswered": {
+          "correct": 75,
+          "wrong": 3,
+          "cannotTell": 0,
+          "missing": 0
+        }
+      },
+      "choiceAnswered": {
+        "correct": 510,
+        "wrong": 99,
+        "cannotTell": 17,
+        "missing": 0,
+        "judged": 609,
+        "correctRate": 0.837,
+        "ci": {
+          "low": 0.806,
+          "high": 0.865
+        },
+        "barPassed": true
+      }
+    }
+  },
+  "againstRef": [
+    {
+      "run": "judge-eyes-opus",
+      "common": 1028,
+      "same": 896,
+      "agreement": 0.872,
+      "matrix": {
+        "correct->correct": 761,
+        "wrong->correct": 60,
+        "wrong->wrong": 134,
+        "correct->wrong": 44,
+        "wrong->cannot_tell": 7,
+        "cannot_tell->wrong": 6,
+        "cannot_tell->correct": 11,
+        "correct->cannot_tell": 4,
+        "cannot_tell->cannot_tell": 1
+      },
+      "flagged": {
+        "first": 201,
+        "second": 184,
+        "both": 134
+      },
+      "byGroup": {
+        "choice:abstained": {
+          "common": 162,
+          "same": 137,
+          "agreement": 0.846,
+          "matrix": {
+            "wrong->correct": 15,
+            "wrong->wrong": 24,
+            "correct->wrong": 6,
+            "correct->correct": 113,
+            "cannot_tell->wrong": 1,
+            "wrong->cannot_tell": 3
+          },
+          "flagged": {
+            "first": 42,
+            "second": 31,
+            "both": 24
+          }
+        },
+        "choice:answered": {
+          "common": 626,
+          "same": 536,
+          "agreement": 0.856,
+          "matrix": {
+            "correct->correct": 476,
+            "wrong->wrong": 59,
+            "wrong->cannot_tell": 4,
+            "cannot_tell->wrong": 5,
+            "wrong->correct": 36,
+            "correct->wrong": 30,
+            "cannot_tell->correct": 11,
+            "correct->cannot_tell": 4,
+            "cannot_tell->cannot_tell": 1
+          },
+          "flagged": {
+            "first": 99,
+            "second": 94,
+            "both": 59
+          }
+        },
+        "text:abstained": {
+          "common": 162,
+          "same": 150,
+          "agreement": 0.926,
+          "matrix": {
+            "wrong->correct": 8,
+            "correct->correct": 101,
+            "wrong->wrong": 49,
+            "correct->wrong": 4
+          },
+          "flagged": {
+            "first": 57,
+            "second": 53,
+            "both": 49
+          }
+        },
+        "text:answered": {
+          "common": 78,
+          "same": 73,
+          "agreement": 0.936,
+          "matrix": {
+            "correct->correct": 71,
+            "correct->wrong": 4,
+            "wrong->wrong": 2,
+            "wrong->correct": 1
+          },
+          "flagged": {
+            "first": 3,
+            "second": 6,
+            "both": 2
+          }
+        }
+      }
+    }
+  ]
+}

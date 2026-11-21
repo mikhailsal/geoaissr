@@ -1,0 +1,511 @@
+{
+  "label": "compare2-90",
+  "note": "Score is the game world-map score 5000*exp(-10*d/14916.862); no round lacked a pin. Paired comparisons use the median of each spot's passes; candidate-90 is the Stage 1 single agent, detective-90 is spike 1.",
+  "accuracy": {
+    "detective2-90": {
+      "rounds": 84,
+      "medianKm": 478.6,
+      "q1Km": 14.6,
+      "q3Km": 8764.3,
+      "within25Km": 24,
+      "within750Km": 43,
+      "scoreMedian": 3628.0,
+      "scoreMean": 2520,
+      "noPin": 0
+    },
+    "detective2-haiku-90": {
+      "rounds": 28,
+      "medianKm": 1620.5,
+      "q1Km": 130.9,
+      "q3Km": 8501.6,
+      "within25Km": 5,
+      "within750Km": 12,
+      "scoreMedian": 1691.0,
+      "scoreMean": 2293,
+      "noPin": 0
+    },
+    "detective-90": {
+      "rounds": 84,
+      "medianKm": 3483.9,
+      "q1Km": 358.8,
+      "q3Km": 9960.3,
+      "within25Km": 12,
+      "within750Km": 28,
+      "scoreMedian": 490.5,
+      "scoreMean": 1753,
+      "noPin": 0
+    },
+    "candidate-90": {
+      "rounds": 84,
+      "medianKm": 5.8,
+      "q1Km": 0.9,
+      "q3Km": 66.2,
+      "within25Km": 57,
+      "within750Km": 80,
+      "scoreMedian": 4981.0,
+      "scoreMean": 4632,
+      "noPin": 0
+    }
+  },
+  "paired": {
+    "detective2-90_vs_candidate-90": {
+      "spots": 28,
+      "aCloser": 6,
+      "bCloser": 22,
+      "ties": 0,
+      "medianOfSpotMediansKm": {
+        "a": 397.2,
+        "b": 4.9
+      },
+      "medianPairedDifferenceKm": 374.3,
+      "pairs": [
+        {
+          "spotId": "spot-01",
+          "aKm": 14882.8,
+          "bKm": 0.6
+        },
+        {
+          "spotId": "spot-02",
+          "aKm": 10175.6,
+          "bKm": 653.6
+        },
+        {
+          "spotId": "spot-03",
+          "aKm": 257.1,
+          "bKm": 0.2
+        },
+        {
+          "spotId": "spot-04",
+          "aKm": 401.8,
+          "bKm": 2.5
+        },
+        {
+          "spotId": "spot-05",
+          "aKm": 2496.1,
+          "bKm": 12.9
+        },
+        {
+          "spotId": "spot-06",
+          "aKm": 2707.5,
+          "bKm": 352.3
+        },
+        {
+          "spotId": "spot-07",
+          "aKm": 2987.6,
+          "bKm": 414.2
+        },
+        {
+          "spotId": "spot-08",
+          "aKm": 8283.8,
+          "bKm": 4.1
+        },
+        {
+          "spotId": "spot-09",
+          "aKm": 392.6,
+          "bKm": 43.4
+        },
+        {
+          "spotId": "spot-10",
+          "aKm": 277.2,
+          "bKm": 9.9
+        },
+        {
+          "spotId": "spot-11",
+          "aKm": 366.8,
+          "bKm": 18.6
+        },
+        {
+          "spotId": "spot-12",
+          "aKm": 8725.7,
+          "bKm": 0.3
+        },
+        {
+          "spotId": "spot-13",
+          "aKm": 3.8,
+          "bKm": 4.6
+        },
+        {
+          "spotId": "spot-14",
+          "aKm": 10022.4,
+          "bKm": 8764.3
+        },
+        {
+          "spotId": "spot-15",
+          "aKm": 10499.2,
+          "bKm": 104.8
+        },
+        {
+          "spotId": "spot-16",
+          "aKm": 14.8,
+          "bKm": 23.2
+        },
+        {
+          "spotId": "spot-17",
+          "aKm": 3777.3,
+          "bKm": 0.4
+        },
+        {
+          "spotId": "spot-18",
+          "aKm": 0.2,
+          "bKm": 1.5
+        },
+        {
+          "spotId": "spot-19",
+          "aKm": 0.5,
+          "bKm": 0.8
+        },
+        {
+          "spotId": "spot-20",
+          "aKm": 4.9,
+          "bKm": 5.2
+        },
+        {
+          "spotId": "spot-21",
+          "aKm": 75.9,
+          "bKm": 62.8
+        },
+        {
+          "spotId": "spot-22",
+          "aKm": 2.1,
+          "bKm": 0.5
+        },
+        {
+          "spotId": "spot-23",
+          "aKm": 13.9,
+          "bKm": 3.1
+        },
+        {
+          "spotId": "spot-24",
+          "aKm": 17110.1,
+          "bKm": 4.3
+        },
+        {
+          "spotId": "spot-25",
+          "aKm": 1,
+          "bKm": 0.9
+        },
+        {
+          "spotId": "spot-26",
+          "aKm": 0.5,
+          "bKm": 1.7
+        },
+        {
+          "spotId": "spot-27",
+          "aKm": 8880.2,
+          "bKm": 363.5
+        },
+        {
+          "spotId": "spot-28",
+          "aKm": 7668.2,
+          "bKm": 76.2
+        }
+      ]
+    },
+    "detective2-90_vs_detective-90": {
+      "spots": 28,
+      "aCloser": 19,
+      "bCloser": 6,
+      "ties": 3,
+      "medianOfSpotMediansKm": {
+        "a": 397.2,
+        "b": 3493.5
+      },
+      "medianPairedDifferenceKm": -222.1,
+      "pairs": [
+        {
+          "spotId": "spot-01",
+          "aKm": 14882.8,
+          "bKm": 16681.8
+        },
+        {
+          "spotId": "spot-02",
+          "aKm": 10175.6,
+          "bKm": 12091
+        },
+        {
+          "spotId": "spot-03",
+          "aKm": 257.1,
+          "bKm": 8559.7
+        },
+        {
+          "spotId": "spot-04",
+          "aKm": 401.8,
+          "bKm": 446.2
+        },
+        {
+          "spotId": "spot-05",
+          "aKm": 2496.1,
+          "bKm": 9951.6
+        },
+        {
+          "spotId": "spot-06",
+          "aKm": 2707.5,
+          "bKm": 10240.6
+        },
+        {
+          "spotId": "spot-07",
+          "aKm": 2987.6,
+          "bKm": 2934.6
+        },
+        {
+          "spotId": "spot-08",
+          "aKm": 8283.8,
+          "bKm": 16599.8
+        },
+        {
+          "spotId": "spot-09",
+          "aKm": 392.6,
+          "bKm": 358.8
+        },
+        {
+          "spotId": "spot-10",
+          "aKm": 277.2,
+          "bKm": 359.5
+        },
+        {
+          "spotId": "spot-11",
+          "aKm": 366.8,
+          "bKm": 377.6
+        },
+        {
+          "spotId": "spot-12",
+          "aKm": 8725.7,
+          "bKm": 4.7
+        },
+        {
+          "spotId": "spot-13",
+          "aKm": 3.8,
+          "bKm": 1014.8
+        },
+        {
+          "spotId": "spot-14",
+          "aKm": 10022.4,
+          "bKm": 9465.8
+        },
+        {
+          "spotId": "spot-15",
+          "aKm": 10499.2,
+          "bKm": 4052.3
+        },
+        {
+          "spotId": "spot-16",
+          "aKm": 14.8,
+          "bKm": 14.8
+        },
+        {
+          "spotId": "spot-17",
+          "aKm": 3777.3,
+          "bKm": 1729.3
+        },
+        {
+          "spotId": "spot-18",
+          "aKm": 0.2,
+          "bKm": 0.2
+        },
+        {
+          "spotId": "spot-19",
+          "aKm": 0.5,
+          "bKm": 0.5
+        },
+        {
+          "spotId": "spot-20",
+          "aKm": 4.9,
+          "bKm": 861.7
+        },
+        {
+          "spotId": "spot-21",
+          "aKm": 75.9,
+          "bKm": 1546
+        },
+        {
+          "spotId": "spot-22",
+          "aKm": 2.1,
+          "bKm": 6417.1
+        },
+        {
+          "spotId": "spot-23",
+          "aKm": 13.9,
+          "bKm": 16857.1
+        },
+        {
+          "spotId": "spot-24",
+          "aKm": 17110.1,
+          "bKm": 17278.4
+        },
+        {
+          "spotId": "spot-25",
+          "aKm": 1,
+          "bKm": 8549.6
+        },
+        {
+          "spotId": "spot-26",
+          "aKm": 0.5,
+          "bKm": 7.1
+        },
+        {
+          "spotId": "spot-27",
+          "aKm": 8880.2,
+          "bKm": 9156
+        },
+        {
+          "spotId": "spot-28",
+          "aKm": 7668.2,
+          "bKm": 8994.6
+        }
+      ]
+    },
+    "detective2-haiku-90_vs_detective2-90": {
+      "spots": 28,
+      "aCloser": 13,
+      "bCloser": 13,
+      "ties": 2,
+      "medianOfSpotMediansKm": {
+        "a": 1620.6,
+        "b": 397.2
+      },
+      "medianPairedDifferenceKm": 0,
+      "pairs": [
+        {
+          "spotId": "spot-01",
+          "aKm": 15377.7,
+          "bKm": 14882.8
+        },
+        {
+          "spotId": "spot-02",
+          "aKm": 16862.8,
+          "bKm": 10175.6
+        },
+        {
+          "spotId": "spot-03",
+          "aKm": 229.8,
+          "bKm": 257.1
+        },
+        {
+          "spotId": "spot-04",
+          "aKm": 111.6,
+          "bKm": 401.8
+        },
+        {
+          "spotId": "spot-05",
+          "aKm": 2051.1,
+          "bKm": 2496.1
+        },
+        {
+          "spotId": "spot-06",
+          "aKm": 1522.5,
+          "bKm": 2707.5
+        },
+        {
+          "spotId": "spot-07",
+          "aKm": 1718.6,
+          "bKm": 2987.6
+        },
+        {
+          "spotId": "spot-08",
+          "aKm": 5266.6,
+          "bKm": 8283.8
+        },
+        {
+          "spotId": "spot-09",
+          "aKm": 358.8,
+          "bKm": 392.6
+        },
+        {
+          "spotId": "spot-10",
+          "aKm": 137.4,
+          "bKm": 277.2
+        },
+        {
+          "spotId": "spot-11",
+          "aKm": 298.9,
+          "bKm": 366.8
+        },
+        {
+          "spotId": "spot-12",
+          "aKm": 3.7,
+          "bKm": 8725.7
+        },
+        {
+          "spotId": "spot-13",
+          "aKm": 803.2,
+          "bKm": 3.8
+        },
+        {
+          "spotId": "spot-14",
+          "aKm": 16407.3,
+          "bKm": 10022.4
+        },
+        {
+          "spotId": "spot-15",
+          "aKm": 10794.6,
+          "bKm": 10499.2
+        },
+        {
+          "spotId": "spot-16",
+          "aKm": 14.8,
+          "bKm": 14.8
+        },
+        {
+          "spotId": "spot-17",
+          "aKm": 1808.5,
+          "bKm": 3777.3
+        },
+        {
+          "spotId": "spot-18",
+          "aKm": 7064.4,
+          "bKm": 0.2
+        },
+        {
+          "spotId": "spot-19",
+          "aKm": 0.5,
+          "bKm": 0.5
+        },
+        {
+          "spotId": "spot-20",
+          "aKm": 4,
+          "bKm": 4.9
+        },
+        {
+          "spotId": "spot-21",
+          "aKm": 76.5,
+          "bKm": 75.9
+        },
+        {
+          "spotId": "spot-22",
+          "aKm": 436.4,
+          "bKm": 2.1
+        },
+        {
+          "spotId": "spot-23",
+          "aKm": 13798.4,
+          "bKm": 13.9
+        },
+        {
+          "spotId": "spot-24",
+          "aKm": 17440.1,
+          "bKm": 17110.1
+        },
+        {
+          "spotId": "spot-25",
+          "aKm": 8201.9,
+          "bKm": 1
+        },
+        {
+          "spotId": "spot-26",
+          "aKm": 2.3,
+          "bKm": 0.5
+        },
+        {
+          "spotId": "spot-27",
+          "aKm": 8316.7,
+          "bKm": 8880.2
+        },
+        {
+          "spotId": "spot-28",
+          "aKm": 9056.3,
+          "bKm": 7668.2
+        }
+      ]
+    }
+  }
+}

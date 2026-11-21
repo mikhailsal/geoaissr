@@ -1,0 +1,490 @@
+{
+  "label": "judge3-opus-on-spike2",
+  "arms": {
+    "detective": "detective2-90 (84 rounds, step findings from the second ask on)",
+    "single": "Stage 1 candidate-90 (84 rounds, look-step findings)"
+  },
+  "note": "Model judge, not human. Part A of docs/evals/detective-spike-3.md: the 289 findings that the judge of spike 2 read (reference), judged again by claude-opus-5-5 under rubric v2 in two runs with different shuffles. pooled sums both runs, and the interval of detectiveMinusSingle uses the number of distinct findings. claimsByKeywordHeuristic is a post-hoc keyword split of the judge's claim texts, not a verdict of the judge. In betweenRuns and againstRef, flagged counts the verdict unsupported; in againstRef, first is the reference run and second is the opus run. Made by spikes/detective/judge-agree.ts.",
+  "mode": "findings",
+  "pooled": {
+    "runs": 2,
+    "detective": {
+      "supported": 221,
+      "unsupported": 179,
+      "unclear": 0,
+      "noVisualClaim": 0,
+      "ruleOk": 101,
+      "ruleWrong": 65,
+      "missingVerdicts": 0,
+      "claims": {
+        "ok": 1013,
+        "contradicted": 186,
+        "absent": 50,
+        "unclear": 95
+      },
+      "judged": 400,
+      "unsupportedRate": 0.448,
+      "claimErrorRate": 0.189,
+      "claimsByKeywordHeuristic": {
+        "seen": {
+          "ok": 860,
+          "wrong": 180,
+          "unclear": 90,
+          "errorRate": 0.173
+        },
+        "not_seen": {
+          "ok": 151,
+          "wrong": 56,
+          "unclear": 5,
+          "errorRate": 0.271
+        },
+        "frame": {
+          "ok": 2,
+          "wrong": 0,
+          "unclear": 0,
+          "errorRate": 0
+        },
+        "findingsWithWrongSeenClaim": 149,
+        "findingsWrongOnlyByNotSeenOrFrame": 30
+      }
+    },
+    "single": {
+      "supported": 122,
+      "unsupported": 56,
+      "unclear": 0,
+      "noVisualClaim": 0,
+      "ruleOk": 70,
+      "ruleWrong": 11,
+      "missingVerdicts": 0,
+      "claims": {
+        "ok": 844,
+        "contradicted": 57,
+        "absent": 10,
+        "unclear": 38
+      },
+      "judged": 178,
+      "unsupportedRate": 0.315,
+      "claimErrorRate": 0.074,
+      "claimsByKeywordHeuristic": {
+        "seen": {
+          "ok": 741,
+          "wrong": 29,
+          "unclear": 31,
+          "errorRate": 0.038
+        },
+        "not_seen": {
+          "ok": 84,
+          "wrong": 30,
+          "unclear": 7,
+          "errorRate": 0.263
+        },
+        "frame": {
+          "ok": 19,
+          "wrong": 8,
+          "unclear": 0,
+          "errorRate": 0.296
+        },
+        "findingsWithWrongSeenClaim": 28,
+        "findingsWrongOnlyByNotSeenOrFrame": 28
+      }
+    },
+    "detectiveMinusSingle": {
+      "diff": 0.133,
+      "low": 0.01,
+      "high": 0.244
+    }
+  },
+  "perRun": [
+    {
+      "run": "judge-opus-a",
+      "judgeModel": "claude-opus-5-5",
+      "seed": 20261123,
+      "rubric": "v2",
+      "runs": 1,
+      "detective": {
+        "supported": 105,
+        "unsupported": 95,
+        "unclear": 0,
+        "noVisualClaim": 0,
+        "ruleOk": 49,
+        "ruleWrong": 34,
+        "missingVerdicts": 0,
+        "claims": {
+          "ok": 507,
+          "contradicted": 103,
+          "absent": 25,
+          "unclear": 39
+        },
+        "judged": 200,
+        "unsupportedRate": 0.475,
+        "claimErrorRate": 0.202,
+        "claimsByKeywordHeuristic": {
+          "seen": {
+            "ok": 431,
+            "wrong": 98,
+            "unclear": 39,
+            "errorRate": 0.185
+          },
+          "not_seen": {
+            "ok": 75,
+            "wrong": 30,
+            "unclear": 0,
+            "errorRate": 0.286
+          },
+          "frame": {
+            "ok": 1,
+            "wrong": 0,
+            "unclear": 0,
+            "errorRate": 0
+          },
+          "findingsWithWrongSeenClaim": 79,
+          "findingsWrongOnlyByNotSeenOrFrame": 16
+        }
+      },
+      "single": {
+        "supported": 62,
+        "unsupported": 27,
+        "unclear": 0,
+        "noVisualClaim": 0,
+        "ruleOk": 38,
+        "ruleWrong": 6,
+        "missingVerdicts": 0,
+        "claims": {
+          "ok": 422,
+          "contradicted": 27,
+          "absent": 4,
+          "unclear": 20
+        },
+        "judged": 89,
+        "unsupportedRate": 0.303,
+        "claimErrorRate": 0.068,
+        "claimsByKeywordHeuristic": {
+          "seen": {
+            "ok": 367,
+            "wrong": 14,
+            "unclear": 17,
+            "errorRate": 0.037
+          },
+          "not_seen": {
+            "ok": 44,
+            "wrong": 13,
+            "unclear": 3,
+            "errorRate": 0.228
+          },
+          "frame": {
+            "ok": 11,
+            "wrong": 4,
+            "unclear": 0,
+            "errorRate": 0.267
+          },
+          "findingsWithWrongSeenClaim": 14,
+          "findingsWrongOnlyByNotSeenOrFrame": 13
+        }
+      },
+      "detectiveMinusSingle": {
+        "diff": 0.172,
+        "low": 0.049,
+        "high": 0.282
+      }
+    },
+    {
+      "run": "judge-opus-b",
+      "judgeModel": "claude-opus-5-5",
+      "seed": 20261124,
+      "rubric": "v2",
+      "runs": 1,
+      "detective": {
+        "supported": 116,
+        "unsupported": 84,
+        "unclear": 0,
+        "noVisualClaim": 0,
+        "ruleOk": 52,
+        "ruleWrong": 31,
+        "missingVerdicts": 0,
+        "claims": {
+          "ok": 506,
+          "contradicted": 83,
+          "absent": 25,
+          "unclear": 56
+        },
+        "judged": 200,
+        "unsupportedRate": 0.42,
+        "claimErrorRate": 0.176,
+        "claimsByKeywordHeuristic": {
+          "seen": {
+            "ok": 429,
+            "wrong": 82,
+            "unclear": 51,
+            "errorRate": 0.16
+          },
+          "not_seen": {
+            "ok": 76,
+            "wrong": 26,
+            "unclear": 5,
+            "errorRate": 0.255
+          },
+          "frame": {
+            "ok": 1,
+            "wrong": 0,
+            "unclear": 0,
+            "errorRate": 0
+          },
+          "findingsWithWrongSeenClaim": 70,
+          "findingsWrongOnlyByNotSeenOrFrame": 14
+        }
+      },
+      "single": {
+        "supported": 60,
+        "unsupported": 29,
+        "unclear": 0,
+        "noVisualClaim": 0,
+        "ruleOk": 32,
+        "ruleWrong": 5,
+        "missingVerdicts": 0,
+        "claims": {
+          "ok": 422,
+          "contradicted": 30,
+          "absent": 6,
+          "unclear": 18
+        },
+        "judged": 89,
+        "unsupportedRate": 0.326,
+        "claimErrorRate": 0.079,
+        "claimsByKeywordHeuristic": {
+          "seen": {
+            "ok": 374,
+            "wrong": 15,
+            "unclear": 14,
+            "errorRate": 0.039
+          },
+          "not_seen": {
+            "ok": 40,
+            "wrong": 17,
+            "unclear": 4,
+            "errorRate": 0.298
+          },
+          "frame": {
+            "ok": 8,
+            "wrong": 4,
+            "unclear": 0,
+            "errorRate": 0.333
+          },
+          "findingsWithWrongSeenClaim": 14,
+          "findingsWrongOnlyByNotSeenOrFrame": 15
+        }
+      },
+      "detectiveMinusSingle": {
+        "diff": 0.094,
+        "low": -0.028,
+        "high": 0.206
+      }
+    }
+  ],
+  "betweenRuns": [
+    {
+      "first": "judge-opus-a",
+      "second": "judge-opus-b",
+      "common": 289,
+      "same": 256,
+      "agreement": 0.886,
+      "matrix": {
+        "supported->supported": 155,
+        "unsupported->unsupported": 101,
+        "supported->unsupported": 12,
+        "unsupported->supported": 21
+      },
+      "flagged": {
+        "first": 122,
+        "second": 113,
+        "both": 101
+      },
+      "byGroup": {
+        "detective": {
+          "common": 200,
+          "same": 179,
+          "agreement": 0.895,
+          "matrix": {
+            "supported->supported": 100,
+            "unsupported->unsupported": 79,
+            "supported->unsupported": 5,
+            "unsupported->supported": 16
+          },
+          "flagged": {
+            "first": 95,
+            "second": 84,
+            "both": 79
+          }
+        },
+        "single": {
+          "common": 89,
+          "same": 77,
+          "agreement": 0.865,
+          "matrix": {
+            "supported->supported": 55,
+            "unsupported->unsupported": 22,
+            "supported->unsupported": 7,
+            "unsupported->supported": 5
+          },
+          "flagged": {
+            "first": 27,
+            "second": 29,
+            "both": 22
+          }
+        }
+      }
+    }
+  ],
+  "reference": {
+    "run": "judge-findings",
+    "judgeModel": "claude-sonnet-5-5",
+    "seed": 20261121,
+    "rubric": "v1",
+    "runs": 1,
+    "detective": {
+      "supported": 125,
+      "unsupported": 75,
+      "unclear": 0,
+      "noVisualClaim": 0,
+      "ruleOk": 21,
+      "ruleWrong": 8,
+      "missingVerdicts": 0,
+      "claims": {
+        "ok": 0,
+        "contradicted": 0,
+        "absent": 0,
+        "unclear": 0
+      },
+      "judged": 200,
+      "unsupportedRate": 0.375,
+      "claimErrorRate": null,
+      "claimsByKeywordHeuristic": null
+    },
+    "single": {
+      "supported": 82,
+      "unsupported": 7,
+      "unclear": 0,
+      "noVisualClaim": 0,
+      "ruleOk": 10,
+      "ruleWrong": 3,
+      "missingVerdicts": 0,
+      "claims": {
+        "ok": 0,
+        "contradicted": 0,
+        "absent": 0,
+        "unclear": 0
+      },
+      "judged": 89,
+      "unsupportedRate": 0.079,
+      "claimErrorRate": null,
+      "claimsByKeywordHeuristic": null
+    },
+    "detectiveMinusSingle": {
+      "diff": 0.296,
+      "low": 0.198,
+      "high": 0.376
+    }
+  },
+  "againstRef": [
+    {
+      "run": "judge-opus-a",
+      "common": 289,
+      "same": 223,
+      "agreement": 0.772,
+      "matrix": {
+        "supported->supported": 154,
+        "supported->unsupported": 53,
+        "unsupported->unsupported": 69,
+        "unsupported->supported": 13
+      },
+      "flagged": {
+        "first": 82,
+        "second": 122,
+        "both": 69
+      },
+      "byGroup": {
+        "detective": {
+          "common": 200,
+          "same": 154,
+          "agreement": 0.77,
+          "matrix": {
+            "supported->unsupported": 33,
+            "unsupported->unsupported": 62,
+            "supported->supported": 92,
+            "unsupported->supported": 13
+          },
+          "flagged": {
+            "first": 75,
+            "second": 95,
+            "both": 62
+          }
+        },
+        "single": {
+          "common": 89,
+          "same": 69,
+          "agreement": 0.775,
+          "matrix": {
+            "supported->supported": 62,
+            "supported->unsupported": 20,
+            "unsupported->unsupported": 7
+          },
+          "flagged": {
+            "first": 7,
+            "second": 27,
+            "both": 7
+          }
+        }
+      }
+    },
+    {
+      "run": "judge-opus-b",
+      "common": 289,
+      "same": 228,
+      "agreement": 0.789,
+      "matrix": {
+        "supported->supported": 161,
+        "supported->unsupported": 46,
+        "unsupported->unsupported": 67,
+        "unsupported->supported": 15
+      },
+      "flagged": {
+        "first": 82,
+        "second": 113,
+        "both": 67
+      },
+      "byGroup": {
+        "detective": {
+          "common": 200,
+          "same": 163,
+          "agreement": 0.815,
+          "matrix": {
+            "supported->unsupported": 23,
+            "unsupported->unsupported": 61,
+            "supported->supported": 102,
+            "unsupported->supported": 14
+          },
+          "flagged": {
+            "first": 75,
+            "second": 84,
+            "both": 61
+          }
+        },
+        "single": {
+          "common": 89,
+          "same": 65,
+          "agreement": 0.73,
+          "matrix": {
+            "supported->supported": 59,
+            "supported->unsupported": 23,
+            "unsupported->unsupported": 6,
+            "unsupported->supported": 1
+          },
+          "flagged": {
+            "first": 7,
+            "second": 29,
+            "both": 6
+          }
+        }
+      }
+    }
+  ]
+}

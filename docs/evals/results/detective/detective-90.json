@@ -1,0 +1,189 @@
+{
+  "label": "detective-90",
+  "arm": "detective",
+  "model": "claude-haiku-5-5",
+  "effort": "low",
+  "budgetSec": 90,
+  "moveLimit": 4,
+  "imageSize": 640,
+  "concurrency": 2,
+  "repeats": 3,
+  "spots": 28,
+  "spotIds": [
+    "spot-01",
+    "spot-02",
+    "spot-03",
+    "spot-04",
+    "spot-05",
+    "spot-06",
+    "spot-07",
+    "spot-08",
+    "spot-09",
+    "spot-10",
+    "spot-11",
+    "spot-12",
+    "spot-13",
+    "spot-14",
+    "spot-15",
+    "spot-16",
+    "spot-17",
+    "spot-18",
+    "spot-19",
+    "spot-20",
+    "spot-21",
+    "spot-22",
+    "spot-23",
+    "spot-24",
+    "spot-25",
+    "spot-26",
+    "spot-27",
+    "spot-28"
+  ],
+  "plannedRounds": 84,
+  "dry": false,
+  "gitCommit": "233e7d4",
+  "date": "2026-11-21T00:08:50.768Z",
+  "promptHash": "2486b60c4355",
+  "toolSchemaHash": "7058c794c8a8",
+  "datasetHash": "8599d87ad828",
+  "interrupted": false,
+  "completedRounds": 84,
+  "infraErrorRounds": 0,
+  "complete": true,
+  "measuredRounds": 84,
+  "finishRate": {
+    "hits": 84,
+    "total": 84,
+    "rate": 1,
+    "ci": {
+      "low": 0.956,
+      "high": 1
+    }
+  },
+  "noPinRate": {
+    "hits": 0,
+    "total": 84,
+    "rate": 0,
+    "ci": {
+      "low": 0,
+      "high": 0.044
+    }
+  },
+  "timeToFinalSec": {
+    "p50": 25,
+    "p95": 33.8
+  },
+  "errorKm": {
+    "median": 3484,
+    "iqr": 9601.5
+  },
+  "exchangesMedian": 3,
+  "exchangesAtLeast3": {
+    "hits": 77,
+    "total": 84,
+    "rate": 0.917,
+    "ci": {
+      "low": 0.838,
+      "high": 0.959
+    }
+  },
+  "askCycleSec": {
+    "p50": 2.3,
+    "p95": 6.9,
+    "n": 291
+  },
+  "settledBy": {
+    "answer": 291,
+    "timeout": 0,
+    "eyesDown": 0,
+    "closed": 0
+  },
+  "findingsRecorded": {
+    "hits": 206,
+    "total": 207,
+    "rate": 0.995,
+    "ci": {
+      "low": 0.973,
+      "high": 0.999
+    }
+  },
+  "features": {
+    "asked": 884,
+    "answered": 440,
+    "abstained": 444,
+    "timeout": 0,
+    "eyesDown": 0,
+    "agreement": {
+      "hits": 297,
+      "total": 440,
+      "rate": 0.675,
+      "ci": {
+        "low": 0.63,
+        "high": 0.717
+      }
+    },
+    "perFeature": {
+      "vegetation": {
+        "answered": 94,
+        "agree": 77
+      },
+      "pole_material": {
+        "answered": 68,
+        "agree": 33
+      },
+      "roof_type": {
+        "answered": 79,
+        "agree": 60
+      },
+      "script": {
+        "answered": 69,
+        "agree": 63
+      },
+      "plate_colour": {
+        "answered": 26,
+        "agree": 14
+      },
+      "centre_line": {
+        "answered": 53,
+        "agree": 37
+      },
+      "soil_colour": {
+        "answered": 34,
+        "agree": 6
+      },
+      "driving_side": {
+        "answered": 17,
+        "agree": 7
+      }
+    }
+  },
+  "transcriptions": {
+    "asked": 199,
+    "answered": 43,
+    "abstained": 156,
+    "timeout": 0,
+    "eyesDown": 0,
+    "agreement": {
+      "hits": 29,
+      "total": 43,
+      "rate": 0.674,
+      "ci": {
+        "low": 0.525,
+        "high": 0.795
+      }
+    },
+    "inventedPlaceNames": 0,
+    "inventedPlaces": []
+  },
+  "tokens": {
+    "brainMedian": 55802,
+    "eyesMedian": 89109,
+    "perRoundMedian": 145621.5,
+    "roundsWithUsage": 84
+  },
+  "corrections": 6,
+  "guardRejections": 0,
+  "lateAnswers": 1,
+  "invalidAnswers": 1,
+  "eyesLooksMedian": 0
+}
