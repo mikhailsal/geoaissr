@@ -2,12 +2,29 @@ import type { JudgeArm, SpotBatch } from './judge-extract.ts';
 
 /** Verdict aggregation and the Newcombe interval for the unsupported-finding bar. */
 
-export type Verdict = 'supported' | 'unsupported' | 'no_visual_claim';
+export type Verdict = 'supported' | 'unsupported' | 'no_visual_claim' | 'unclear';
+
+/** Rubric v2 (docs/evals/detective-spike-3.md, Part A): the judge marks each visual claim. */
+export type ClaimMark = 'ok' | 'contradicted' | 'absent' | 'unclear';
+
+export interface JudgedClaim {
+  text: string;
+  mark: ClaimMark;
+}
 
 export interface JudgedFinding {
   n: number;
   verdict: Verdict;
   rule_ok: boolean | null;
+  /** Present only under rubric v2. */
+  claims?: JudgedClaim[];
+}
+
+/** Rubric v2: the script, not the judge, turns the claim marks into the verdict of a finding. */
+export function verdictFromClaims(claims: readonly JudgedClaim[]): Verdict {
+  if (claims.length === 0) return 'no_visual_claim';
+  if (claims.some((c) => c.mark === 'contradicted' || c.mark === 'absent')) return 'unsupported';
+  return claims.some((c) => c.mark === 'ok') ? 'supported' : 'unclear';
 }
 
 const Z = 1.959964;
@@ -41,36 +58,57 @@ export function newcombeDiff(
   return { diff: r3(diff), low: r3(low), high: r3(high) };
 }
 
-interface ArmCounts {
+export interface ArmCounts {
   supported: number;
   unsupported: number;
+  /** Rubric v2 only: every visual claim of the finding was marked `unclear`. */
+  unclear: number;
   noVisualClaim: number;
   ruleOk: number;
   ruleWrong: number;
   missingVerdicts: number;
+  /** Rubric v2 only: marks over all visual claims of the arm. */
+  claims: Record<ClaimMark, number>;
 }
 
-function emptyCounts(): ArmCounts {
+export function emptyCounts(): ArmCounts {
   return {
     supported: 0,
     unsupported: 0,
+    unclear: 0,
     noVisualClaim: 0,
     ruleOk: 0,
     ruleWrong: 0,
     missingVerdicts: 0,
+    claims: { ok: 0, contradicted: 0, absent: 0, unclear: 0 },
   };
 }
 
-function addVerdict(c: ArmCounts, v: JudgedFinding | undefined): void {
+export function addVerdict(c: ArmCounts, v: JudgedFinding | undefined): void {
   if (!v) {
     c.missingVerdicts += 1;
     return;
   }
   if (v.verdict === 'supported') c.supported += 1;
   else if (v.verdict === 'unsupported') c.unsupported += 1;
+  else if (v.verdict === 'unclear') c.unclear += 1;
   else c.noVisualClaim += 1;
   if (v.rule_ok === true) c.ruleOk += 1;
   if (v.rule_ok === false) c.ruleWrong += 1;
+  for (const claim of v.claims ?? []) c.claims[claim.mark] += 1;
+}
+
+/** Shares of an arm: unsupported findings over judged ones, wrong claims over settled ones. */
+export function withRates(c: ArmCounts) {
+  const judged = c.supported + c.unsupported;
+  const wrongClaims = c.claims.contradicted + c.claims.absent;
+  const settledClaims = wrongClaims + c.claims.ok;
+  return {
+    ...c,
+    judged,
+    unsupportedRate: judged === 0 ? null : r3(c.unsupported / judged),
+    claimErrorRate: settledClaims === 0 ? null : r3(wrongClaims / settledClaims),
+  };
 }
 
 export function summarizeJudgement(
@@ -82,12 +120,8 @@ export function summarizeJudgement(
     const byN = new Map((verdicts.get(batch.spotId) ?? []).map((v) => [v.n, v]));
     for (const [n, item] of batch.key) addVerdict(counts[item.arm], byN.get(n));
   }
-  const rateOf = (c: ArmCounts) => {
-    const judged = c.supported + c.unsupported;
-    return { ...c, judged, unsupportedRate: judged === 0 ? null : r3(c.unsupported / judged) };
-  };
-  const single = rateOf(counts.single);
-  const detective = rateOf(counts.detective);
+  const single = withRates(counts.single);
+  const detective = withRates(counts.detective);
   // Positive difference: the single agent has more unsupported findings than Detective.
   const difference = newcombeDiff(
     single.unsupported,

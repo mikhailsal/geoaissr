@@ -1,10 +1,17 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { loadDatasetWithHash, type EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
 import { wilsonInterval } from '../../scripts/eval-bots/metrics.ts';
 import { NONE_OF_THESE } from './choice.ts';
-import { JUDGE_MODEL, argValue, extractJson, judgeEachSpot, runJudgeCall } from './judge-call.ts';
+import {
+  argValue,
+  extractJson,
+  judgeEachSpot,
+  judgeSettings,
+  optionalArg,
+  runJudgeCall,
+} from './judge-call.ts';
 import {
   buildEyesBatches,
   eyesItems,
@@ -15,11 +22,12 @@ import {
 /**
  * Model judge for the eyes' answers (docs/evals/detective-spike-2.md, bar 3):
  *   bun run spikes/detective/judge-eyes.ts --rounds <rounds.jsonl> --out <dir>
+ *     [--judge-model <id>] [--seed <n>] [--resume] [--sheet-only]
  * One `claude -p` call per spot with read-only access to the dataset frames. Writes the sheet
  * (for the owner's human review), the key, the raw verdicts and eyes-judge-summary.json.
  */
 
-const SEED = 20261122;
+const DEFAULT_SEED = 20261122;
 
 export type EyesVerdict = 'correct' | 'wrong' | 'cannot_tell';
 
@@ -99,40 +107,55 @@ export function summarizeEyesJudgement(
   };
 }
 
-async function main(): Promise<number> {
-  const argv = Bun.argv.slice(2);
-  const outDir = path.resolve(argValue(argv, '--out'));
-  const datasetDir = path.resolve(
-    argv.includes('--dataset') ? argValue(argv, '--dataset') : 'docs/evals/dataset',
-  );
-  mkdirSync(outDir, { recursive: true });
-  const batches = buildEyesBatches(eyesItems(argValue(argv, '--rounds')), SEED);
+interface SpotResult {
+  verdicts: Array<{ n: number; verdict: EyesVerdict; reason?: string | undefined }>;
+  usage: unknown;
+}
+
+/** Spots judged by an earlier, interrupted run of the same sheet (`--resume`). */
+function loadDone(file: string, resume: boolean): Map<string, SpotResult> {
+  if (!resume || !existsSync(file)) return new Map();
+  const stored = JSON.parse(readFileSync(file, 'utf8')) as Record<string, SpotResult>;
+  return new Map(Object.entries(stored));
+}
+
+function writeSheets(outDir: string, batches: readonly EyesBatch[]): void {
   const sheet = batches.flatMap((b) => b.items.map((it) => ({ spotId: b.spotId, ...it })));
   const key = batches.flatMap((b) => [...b.key].map(([n, item]) => ({ n, ...item })));
   writeFileSync(path.join(outDir, 'eyes-sheet.json'), `${JSON.stringify(sheet, null, 2)}\n`);
   writeFileSync(path.join(outDir, 'eyes-key.json'), `${JSON.stringify(key, null, 2)}\n`);
+}
+
+async function main(): Promise<number> {
+  const argv = Bun.argv.slice(2);
+  const outDir = path.resolve(argValue(argv, '--out'));
+  const datasetDir = path.resolve(optionalArg(argv, '--dataset') ?? 'docs/evals/dataset');
+  const { model, seed } = judgeSettings(argv, DEFAULT_SEED);
+  mkdirSync(outDir, { recursive: true });
+  const batches = buildEyesBatches(eyesItems(argValue(argv, '--rounds')), seed);
+  writeSheets(outDir, batches);
   if (argv.includes('--sheet-only')) return 0;
   const samples = new Map(loadDatasetWithHash(datasetDir).samples.map((s) => [s.id, s]));
   const byId = new Map(batches.map((b) => [b.spotId, b]));
-  const results = await judgeEachSpot(
+  const verdictsFile = path.join(outDir, 'eyes-verdicts.json');
+  const results = await judgeEachSpot<SpotResult>(
     batches.map((b) => b.spotId),
     async (spotId) => {
       const sample = samples.get(spotId);
       const batch = byId.get(spotId);
       if (!sample || !batch) throw new Error(`unknown spot ${spotId}`);
-      const { text, usage } = await runJudgeCall(buildEyesJudgePrompt(sample, batch), datasetDir);
+      const prompt = buildEyesJudgePrompt(sample, batch);
+      const { text, usage } = await runJudgeCall(prompt, datasetDir, model);
       return { verdicts: verdictSchema.parse(extractJson(text)).items, usage };
     },
     (spotId, res) => `${res.verdicts.length}/${byId.get(spotId)?.items.length ?? 0} verdicts`,
+    loadDone(verdictsFile, argv.includes('--resume')),
   );
-  writeFileSync(
-    path.join(outDir, 'eyes-verdicts.json'),
-    `${JSON.stringify(Object.fromEntries(results), null, 2)}\n`,
-  );
+  writeFileSync(verdictsFile, `${JSON.stringify(Object.fromEntries(results), null, 2)}\n`);
   const verdicts = new Map([...results].map(([id, res]) => [id, res.verdicts]));
   const summary = {
-    judgeModel: JUDGE_MODEL,
-    seed: SEED,
+    judgeModel: model,
+    seed,
     spots: batches.length,
     spotsJudged: results.size,
     ...summarizeEyesJudgement(batches, verdicts),
@@ -142,7 +165,7 @@ async function main(): Promise<number> {
     `${JSON.stringify(summary, null, 2)}\n`,
   );
   console.log(JSON.stringify(summary, null, 2));
-  return 0;
+  return results.size === batches.length ? 0 : 1;
 }
 
 if (import.meta.main) process.exit(await main());
