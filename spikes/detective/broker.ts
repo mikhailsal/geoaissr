@@ -17,13 +17,19 @@ export type QuestionStatus = 'answered' | 'abstained' | 'timeout' | 'eyes_down';
 export type Question =
   | { kind: 'feature'; feature: string }
   | { kind: 'choice'; question: string; options: string[] }
-  | { kind: 'text'; target: string };
+  | { kind: 'text'; target: string }
+  /** Report protocol (spike 3): a topic the eyes describe in their own words. */
+  | { kind: 'describe'; topic: string };
+
+/** Report protocol: how sure the eyes are of what they wrote. */
+export type EyesConfidence = 'sure' | 'unsure';
 
 export interface AnswerItem {
   /** 1-based number of the question in the request. */
   n: number;
   value: string;
   frame: number | null;
+  confidence?: EyesConfidence;
 }
 
 export interface SettledItem {
@@ -32,6 +38,8 @@ export interface SettledItem {
   status: QuestionStatus;
   value: string | null;
   frame: number | null;
+  /** Report protocol only, and only on an answered item. */
+  confidence?: EyesConfidence;
 }
 
 export type SettledBy = 'answer' | 'timeout' | 'eyes_down' | 'closed';
@@ -101,6 +109,7 @@ function settleItems(
       status: statusOf(item),
       value: item?.value ?? null,
       frame: item?.frame ?? null,
+      ...(item?.confidence ? { confidence: item.confidence } : {}),
     };
   });
 }

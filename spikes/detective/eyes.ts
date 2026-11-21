@@ -6,6 +6,8 @@ import { allowedValues, findFeature, isAbstain } from './catalog.ts';
 import { normalizeChoiceValue } from './choice.ts';
 import { formatRequestForEyes } from './format.ts';
 import { answerSchema, eyesLookSchema, type AnswerInput } from './protocol.ts';
+import { REPORT_FIRST_TEXT } from './report-eyes.ts';
+import { PRE_REPORT_LOOKS, reportAnswerSchema, type ReportAnswerInput } from './report-protocol.ts';
 import {
   NEXT_REQUEST_WAIT_MS,
   ZOOM_MIN_LEFT_MS,
@@ -55,6 +57,13 @@ export async function handleLook(s: SessionState, args: unknown): Promise<ToolRe
       `Платные ходы кончились (${s.opts.moveLimit} из ${s.opts.moveLimit}). Ход не списан: отвечай по имеющимся кадрам или not_visible.`,
     );
   }
+  // The brain cannot start without the report, so the text hunt before it is short.
+  if (s.opts.protocol === 'report' && s.report === null && s.turnsUsed >= PRE_REPORT_LOOKS) {
+    s.earlyLookRefusals += 1;
+    return errorReply(
+      `До отчёта можно сделать не больше ${PRE_REPORT_LOOKS} приближений. Ход не списан: сдай отчёт (report), остальные приближения — по просьбам напарника.`,
+    );
+  }
   s.turnsUsed += 1;
   const { heading, pitch } = parsed.data;
   const fov = parsed.data.fov ?? 90;
@@ -86,6 +95,7 @@ export async function handleLook(s: SessionState, args: unknown): Promise<ToolRe
 
 export async function handleNextRequest(s: SessionState): Promise<ToolReply> {
   if (roundOver(s)) return { text: ROUND_OVER_TEXT };
+  if (s.opts.protocol === 'report' && s.report === null) return errorReply(REPORT_FIRST_TEXT);
   const request = await s.broker.nextRequest(s.opts.nextRequestWaitMs ?? NEXT_REQUEST_WAIT_MS);
   if (roundOver(s)) return { text: ROUND_OVER_TEXT };
   if (!request) return { text: 'Запросов пока нет. Вызови next_request снова.' };
@@ -94,6 +104,7 @@ export async function handleNextRequest(s: SessionState): Promise<ToolReply> {
     text: formatRequestForEyes(s.opts.catalog, request, s.frames, {
       turnsLeft: Math.max(0, s.opts.moveLimit - s.turnsUsed),
       requireZoom: s.opts.requireZoom,
+      confidence: s.opts.protocol === 'report',
     }),
   };
 }
@@ -125,16 +136,23 @@ function itemProblems(s: SessionState, request: BrokerRequest, item: AnswerItem)
     else if (!s.frames.some((f) => f.n === item.frame)) {
       problems.push(`вопрос ${item.n}: кадра ${item.frame} не было`);
     }
+    if (s.opts.protocol === 'report' && item.confidence === undefined) {
+      problems.push(`вопрос ${item.n}: укажи confidence — sure или unsure`);
+    }
   }
   return problems;
 }
 
 /** Choice values become option numbers, so the record and the brain see one canonical form. */
-function toItems(input: AnswerInput, request: BrokerRequest | null): AnswerItem[] {
+function toItems(
+  input: AnswerInput | ReportAnswerInput,
+  request: BrokerRequest | null,
+): AnswerItem[] {
   return input.answers.map((a) => {
     const q = request?.questions[a.n - 1];
     const value = q?.kind === 'choice' ? (normalizeChoiceValue(q, a.value) ?? a.value) : a.value;
-    return { n: a.n, value, frame: a.frame ?? null };
+    const confidence = 'confidence' in a && !isAbstain(value) ? a.confidence : undefined;
+    return { n: a.n, value, frame: a.frame ?? null, ...(confidence ? { confidence } : {}) };
   });
 }
 
@@ -156,7 +174,8 @@ export function handleAnswer(
   current: BrokerRequest | null,
 ): ToolReply {
   if (roundOver(s)) return { text: ROUND_OVER_TEXT };
-  const parsed = answerSchema.safeParse(args);
+  const schema = s.opts.protocol === 'report' ? reportAnswerSchema : answerSchema;
+  const parsed = schema.safeParse(args);
   if (!parsed.success) return errorReply(formatToolZodError(parsed.error));
   const matching = current?.id === parsed.data.request_id ? current : null;
   const items = toItems(parsed.data, matching);

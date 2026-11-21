@@ -1,11 +1,14 @@
 import { handleAsk, handleFinalGuess } from './brain.ts';
 import { handleAnswer, handleLook, handleNextRequest, handleObserve } from './eyes.ts';
 import type { Role } from './protocol.ts';
+import { handleBriefing, handleReportAsk } from './report-brain.ts';
+import { handleReport } from './report-eyes.ts';
 import {
   createSessionState,
   elapsedMs,
   errorReply,
   roundOver,
+  wakeReportWaiters,
   type SessionOptions,
   type SessionState,
   type ToolReply,
@@ -28,9 +31,11 @@ export interface DetectiveSession {
 }
 
 async function dispatchBrain(s: SessionState, tool: string, args: unknown): Promise<ToolReply> {
+  const report = s.opts.protocol === 'report';
+  if (tool === 'briefing' && report) return handleBriefing(s);
   switch (tool) {
     case 'ask':
-      return handleAsk(s, args);
+      return report ? handleReportAsk(s, args) : handleAsk(s, args);
     case 'final_guess':
       return Promise.resolve(handleFinalGuess(s, args));
     default:
@@ -39,6 +44,9 @@ async function dispatchBrain(s: SessionState, tool: string, args: unknown): Prom
 }
 
 async function dispatchEyes(s: SessionState, tool: string, args: unknown): Promise<ToolReply> {
+  if (tool === 'report' && s.opts.protocol === 'report') {
+    return Promise.resolve(handleReport(s, args));
+  }
   switch (tool) {
     case 'observe':
       return handleObserve(s);
@@ -76,10 +84,12 @@ export function createDetectiveSession(opts: SessionOptions): DetectiveSession {
       // An exit after the round ended is the normal shutdown, not an eyes failure.
       if (s.eyesDownAtMs === null && !roundOver(s)) s.eyesDownAtMs = elapsedMs(s);
       s.broker.eyesDown();
+      wakeReportWaiters(s);
     },
     end() {
       s.ended = true;
       s.broker.close();
+      wakeReportWaiters(s);
     },
     onFinal(listener) {
       if (s.final) listener();

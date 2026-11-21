@@ -4,8 +4,10 @@ import type { BotImageSize } from '../../shared/bot-tools.ts';
 import type { EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
 import { createBroker, type AskOutcome, type Broker, type Question } from './broker.ts';
 import type { CatalogFeature } from './catalog.ts';
+import type { Confidence } from './ceiling-prompts.ts';
 import { createPlaceGuard, type PlaceGuard } from './guard.ts';
 import type { Protocol } from './protocol.ts';
+import type { SceneReport } from './report.ts';
 
 /** Shared state of one Detective round: both roles' handlers read and write it. */
 
@@ -41,12 +43,29 @@ export interface AskRecord {
   findingState: 'not_due' | 'recorded' | 'missing';
   currentGuess: LatLngPoint | null;
   outcome: AskOutcome | null;
+  /** Report protocol: the brain marked this ask as its control check. */
+  control?: boolean;
 }
 
 export interface FinalRecord extends LatLngPoint {
   tMs: number;
   summary: string | null;
   finding: string | null;
+  /** Report protocol only. */
+  confidence?: Confidence | null;
+  clue?: string | null;
+}
+
+/** The scene report of the report protocol (spike 3). */
+export interface ReportRecord {
+  tMs: number;
+  /** As the eyes wrote it. */
+  raw: SceneReport;
+  /** As the brain reads it: place words outside «…» are masked. */
+  masked: SceneReport;
+  maskedWords: string[];
+  /** Lines that name a frame the eyes were never given. */
+  unknownFrames: number;
 }
 
 export interface EyesAnswerLog {
@@ -69,6 +88,8 @@ export interface SessionOptions {
   /** The eyes must make a look during a request before they may abstain (spike 2). */
   requireZoom: boolean;
   askTimeoutMs?: number;
+  /** Report protocol: how long one `briefing` call waits for the report. */
+  briefingWaitMs?: number;
   minRemainingMs?: number;
   nextRequestWaitMs?: number;
   now?: () => number;
@@ -97,6 +118,17 @@ export interface SessionState {
   askDeadlineAt: number | null;
   /** Answers refused because they abstained without a look (requireZoom). */
   zoomRefusals: number;
+  /** Report protocol: the eyes' scene report, once filed. */
+  report: ReportRecord | null;
+  reportWaiters: Array<() => void>;
+  /** Report protocol: when the brain first received the report. */
+  briefingAtMs: number | null;
+  /** Report protocol: requests refused for their question form («?» or «ли»). */
+  formRejections: number;
+  /** Zooms refused because the scene report was not filed yet (report protocol). */
+  earlyLookRefusals: number;
+  /** Report protocol: place words masked in the eyes' answers before the brain read them. */
+  maskedInAnswers: string[];
   toolCalls: { brain: number; eyes: number; brainErrors: number; eyesErrors: number };
   eyesDownAtMs: number | null;
   /** Set when the round runner ends the round (final, brain exit, budget or abort). */
@@ -130,6 +162,12 @@ export function createSessionState(opts: SessionOptions): SessionState {
     looksAtDelivery: new Map(),
     askDeadlineAt: null,
     zoomRefusals: 0,
+    report: null,
+    reportWaiters: [],
+    briefingAtMs: null,
+    formRejections: 0,
+    earlyLookRefusals: 0,
+    maskedInAnswers: [],
     toolCalls: { brain: 0, eyes: 0, brainErrors: 0, eyesErrors: 0 },
     eyesDownAtMs: null,
     ended: false,
@@ -152,4 +190,9 @@ export function roundOver(s: SessionState): boolean {
 
 export function errorReply(text: string): ToolReply {
   return { text, isError: true };
+}
+
+/** Wakes a brain that waits for the report: it was filed, the eyes left or the round ended. */
+export function wakeReportWaiters(s: SessionState): void {
+  for (const wake of s.reportWaiters.splice(0)) wake();
 }

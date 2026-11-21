@@ -1,5 +1,6 @@
 import type { CatalogFeature } from './catalog.ts';
 import { MAX_OPTIONS, MAX_QUESTIONS, type Protocol } from './protocol.ts';
+import { buildReportBrainPrompt, buildReportEyesPrompt } from './report-prompts.ts';
 
 /** Start texts of the two roles. The brain learns only the region, the scale and the budget. */
 
@@ -18,6 +19,7 @@ export interface BrainPromptOptions {
 }
 
 export function buildBrainPrompt(opts: BrainPromptOptions): string {
+  if (opts.protocol === 'report') return buildReportBrainPrompt(opts);
   return opts.protocol === 'choice' ? buildChoiceBrainPrompt(opts) : buildCatalogBrainPrompt(opts);
 }
 
@@ -28,6 +30,7 @@ export interface EyesPromptOptions {
 }
 
 export function buildEyesPrompt(opts: EyesPromptOptions): string {
+  if (opts.protocol === 'report') return buildReportEyesPrompt(opts);
   return opts.protocol === 'choice' ? buildChoiceEyesPrompt(opts) : buildCatalogEyesPrompt(opts);
 }
 

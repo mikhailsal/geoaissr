@@ -11,12 +11,28 @@ import type { SessionState } from './state.ts';
 function fakeValue(s: SessionState, q: Question): string {
   if (q.kind === 'feature') return s.opts.sample.labels?.[q.feature] ?? 'not_visible';
   if (q.kind === 'choice') return '1';
+  if (q.kind === 'describe') return 'серый асфальт, разметки нет';
   return s.opts.sample.signText?.[0]?.text ?? 'not_visible';
+}
+
+/** Report protocol: one zoom, then the scene report, before the first request. */
+async function fileFakeReport(session: DetectiveSession): Promise<void> {
+  const sign = session.state.opts.sample.signText?.[0]?.text;
+  await session.call('eyes', 'look', { heading: 90, fov: 30 });
+  await session.call('eyes', 'report', {
+    sections: {
+      texts: sign ? [{ text: `«${sign}» — вывеска на здании`, frame: 5 }] : [],
+      road: [{ text: 'серый асфальт, разметки нет', frame: 1 }],
+      buildings: [{ text: 'двухэтажные дома со скатными крышами', frame: 2 }],
+    },
+  });
 }
 
 export async function runFakeEyes(session: DetectiveSession): Promise<void> {
   const s = session.state;
+  const report = s.opts.protocol === 'report';
   await session.call('eyes', 'observe', {});
+  if (report) await fileFakeReport(session);
   for (let i = 0; i < 20 && s.final === null; i += 1) {
     await session.call('eyes', 'next_request', {});
     const request = s.broker.current();
@@ -25,6 +41,7 @@ export async function runFakeEyes(session: DetectiveSession): Promise<void> {
       n: idx + 1,
       value: fakeValue(s, q),
       frame: 1,
+      ...(report ? { confidence: 'sure' } : {}),
     }));
     const mustZoom =
       s.opts.requireZoom &&
@@ -66,8 +83,44 @@ const CHOICE_ASKS = [
   ],
 ];
 
+const REPORT_ASKS = [
+  [
+    { kind: 'describe', topic: 'дорога: покрытие, разметка, бордюры' },
+    { kind: 'text', target: 'самая крупная вывеска' },
+  ],
+  [{ kind: 'describe', topic: 'машины: по какой стороне дороги стоят и едут' }],
+];
+
+async function runFakeReportBrain(session: DetectiveSession): Promise<void> {
+  const s = session.state;
+  const point = { lat: s.opts.sample.lat + 0.5, lng: s.opts.sample.lng + 0.5 };
+  await session.call('brain', 'briefing', {});
+  await session.call('brain', 'ask', {
+    hypothesis: 'Вывеска и дорога разделят основные версии.',
+    requests: REPORT_ASKS[0],
+    finding: 'В отчёте асфальт без разметки и двухэтажные дома: версии пока широкие.',
+    current_guess: point,
+  });
+  await session.call('brain', 'ask', {
+    hypothesis: 'Сторона движения подтвердит или опровергнет версию.',
+    requests: REPORT_ASKS[1],
+    finding: 'Вывеска прочитана: версия сузилась до одной страны.',
+    current_guess: point,
+    control: true,
+  });
+  await session.call('brain', 'final_guess', {
+    lat: point.lat,
+    lng: point.lng,
+    confidence: 'country',
+    clue: 'Вывеска на здании.',
+    summary: 'Я прочитал отчёт, попросил переписать вывеску и перепроверил сторону движения.',
+    finding: 'Сторона движения подтвердила версию.',
+  });
+}
+
 export async function runFakeBrain(session: DetectiveSession): Promise<void> {
   const s = session.state;
+  if (s.opts.protocol === 'report') return runFakeReportBrain(session);
   const point = { lat: s.opts.sample.lat + 0.5, lng: s.opts.sample.lng + 0.5 };
   const [first, second] = s.opts.protocol === 'choice' ? CHOICE_ASKS : CATALOG_ASKS;
   await session.call('brain', 'ask', {

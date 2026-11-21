@@ -24,8 +24,19 @@ test('spike 2 flags: protocol, per-role models and the zoom rule', () => {
   expect(defaults.requireZoom).toBe(false);
 });
 
+test('spike 3 flags: the report protocol and the brain effort', () => {
+  const args = parseSpikeArgs(['--protocol', 'report', '--brain-effort', 'medium']);
+  expect(args.protocol).toBe('report');
+  expect(args.brainEffort).toBe('medium');
+  expect(parseSpikeArgs([]).brainEffort).toBe('low');
+  expect(() => parseSpikeArgs(['--brain-effort', 'max'])).toThrow('low or medium');
+  expect(() => parseSpikeArgs(['--arm', 'labels', '--protocol', 'report'])).toThrow(
+    'a report has no labels',
+  );
+});
+
 test('bad spike 2 flags are refused', () => {
-  expect(() => parseSpikeArgs(['--protocol', 'free'])).toThrow('catalog or choice');
+  expect(() => parseSpikeArgs(['--protocol', 'free'])).toThrow('catalog, choice or report');
   expect(() => parseSpikeArgs(['--brain-model', 'gpt-5'])).toThrow('--brain-model must match');
   expect(() => parseSpikeArgs(['--arm', 'labels', '--protocol', 'choice'])).toThrow(
     'choices have no labels',

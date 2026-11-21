@@ -4,7 +4,8 @@ import { builtinOption, duplicateOption, type ChoiceQuestion } from './choice.ts
 import { mentionsScript } from './guard.ts';
 import { formatAskOutcome } from './format.ts';
 import { labelOutcome } from './labels.ts';
-import { buildBrainSchemas, type AskInput } from './protocol.ts';
+import { buildBrainSchemas, classicProtocol, type AskInput } from './protocol.ts';
+import { parseFinalExtras } from './report-protocol.ts';
 import {
   ASK_TIMEOUT_MS,
   MIN_REMAINING_MS,
@@ -32,7 +33,7 @@ function questionTexts(q: Question): Array<{ text: string; scriptContext: boolea
   ];
 }
 
-function placeWordReply(s: SessionState, text: string, word: string): ToolReply {
+export function placeWordReply(s: SessionState, text: string, word: string): ToolReply {
   s.guardRejections.push(word);
   return errorReply(
     `[GEO_DETECTIVE_PLACE_WORD] Вопрос не отправлен: в тексте «${text}» есть название места или народа («${word}»). Правило: глазам нельзя подсказывать место. Перефразируй без названий мест и народов (названия письменностей можно: «грузинское письмо»), например «самая крупная вывеска». Отклонённый запрос не засчитывается в лимит 5 вопросов.`,
@@ -81,8 +82,20 @@ function journalCorrection(s: SessionState, input: AskInput): ToolReply | null {
   );
 }
 
-function recordAsk(s: SessionState, input: AskInput): AskRecord {
-  const due = s.asks.length > 0;
+/** The journal fields the ask schemas of all protocols share. */
+export interface AskJournal {
+  hypothesis: string;
+  questions: Question[];
+  finding?: string | undefined;
+  current_guess?: { lat: number; lng: number } | undefined;
+}
+
+/** `due`: whether this ask owes a finding; the report protocol owes one from the first ask. */
+export function recordAsk(
+  s: SessionState,
+  input: AskJournal,
+  due: boolean = s.asks.length > 0,
+): AskRecord {
   const record: AskRecord = {
     index: s.asks.length + 1,
     tMs: elapsedMs(s),
@@ -100,7 +113,10 @@ function recordAsk(s: SessionState, input: AskInput): AskRecord {
   return record;
 }
 
-async function settleAsk(s: SessionState, questions: Question[]): Promise<AskOutcome | ToolReply> {
+export async function settleAsk(
+  s: SessionState,
+  questions: Question[],
+): Promise<AskOutcome | ToolReply> {
   const waitMs = Math.min(
     s.opts.askTimeoutMs ?? ASK_TIMEOUT_MS,
     remainingMs(s) - (s.opts.minRemainingMs ?? MIN_REMAINING_MS),
@@ -126,7 +142,8 @@ async function settleAsk(s: SessionState, questions: Question[]): Promise<AskOut
 
 export async function handleAsk(s: SessionState, args: unknown): Promise<ToolReply> {
   if (roundOver(s)) return errorReply(ROUND_OVER_TEXT);
-  const parsed = buildBrainSchemas(s.opts.catalog, s.opts.protocol).ask.safeParse(args);
+  const schemas = buildBrainSchemas(s.opts.catalog, classicProtocol(s.opts.protocol));
+  const parsed = schemas.ask.safeParse(args);
   if (!parsed.success) return errorReply(formatToolZodError(parsed.error));
   const blocked = guardQuestions(s, parsed.data.questions) ?? journalCorrection(s, parsed.data);
   if (blocked) return blocked;
@@ -147,7 +164,14 @@ export function handleFinalGuess(s: SessionState, args: unknown): ToolReply {
   if (!guess) {
     return errorReply('final_guess: нужны числовые lat и lng. Догадка не записана.');
   }
-  const missing = [...(guess.summary ? [] : ['summary']), ...(guess.finding ? [] : ['finding'])];
+  // The report protocol also owes a confidence level and the deciding clue.
+  const extras = s.opts.protocol === 'report' ? parseFinalExtras(args) : null;
+  const missing = [
+    ...(guess.summary ? [] : ['summary']),
+    ...(guess.finding ? [] : ['finding']),
+    ...(extras && extras.confidence === null ? ['confidence (country | region | guess)'] : []),
+    ...(extras && extras.clue === null ? ['clue'] : []),
+  ];
   if (missing.length > 0 && !s.correctionsUsed.has('final')) {
     s.correctionsUsed.add('final');
     s.corrections.push({ role: 'brain', tool: 'final_guess', reason: missing.join(',') });
@@ -162,6 +186,7 @@ export function handleFinalGuess(s: SessionState, args: unknown): ToolReply {
     tMs: elapsedMs(s),
     summary: guess.summary ?? null,
     finding: guess.finding ?? null,
+    ...(extras ?? {}),
   };
   s.broker.close();
   for (const listener of s.finalListeners.splice(0)) listener();

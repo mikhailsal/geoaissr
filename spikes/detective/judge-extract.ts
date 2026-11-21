@@ -85,6 +85,8 @@ const MASKS: RegExp[] = [
   /(?<!\p{L})напарник\p{L}*/giu,
   /(?<!\p{L})ответ\p{L}*/giu,
   /(?<!\p{L})запрос\p{L}*/giu,
+  // Spike 3: the brain of the report protocol reads its partner's report.
+  /(?<!\p{L})отч[её]т\p{L}*/giu,
   /(?<!\p{L})кадр\p{L}*\s*\d+/giu,
 ];
 

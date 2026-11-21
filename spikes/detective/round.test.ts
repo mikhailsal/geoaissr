@@ -21,6 +21,7 @@ const SETTINGS: DetectiveSettings = {
   brainModel: 'claude-haiku-5-5',
   eyesModel: 'claude-haiku-5-5',
   effort: 'low',
+  brainEffort: 'low',
   protocol: 'catalog',
   requireZoom: false,
   dry: true,
@@ -35,6 +36,7 @@ function config(planned: number): DetectiveRunConfig {
     protocol: 'catalog',
     requireZoom: false,
     effort: 'low',
+    brainEffort: 'low',
     budgetSec: 90,
     moveLimit: 4,
     imageSize: 640,
@@ -116,4 +118,40 @@ test('a dry choice round with the zoom rule runs end to end and reports accuracy
   expect(summary.choices.answered).toBe(2);
   expect(summary.accuracy.within750Km.hits).toBe(1);
   expect(summary.accuracy.scoreMedian).toBeGreaterThan(4500);
+});
+
+test('a dry report round files the scene report, briefs the brain and keeps the confidence', async () => {
+  const sample = loadDataset(null)[0];
+  if (!sample) throw new Error('no built-in sample');
+  const record = await runDetectiveRound({
+    root,
+    runName: 'test',
+    settings: { ...SETTINGS, protocol: 'report', requireZoom: true, moveLimit: 8 },
+    sample,
+    repeat: 4,
+    catalog: loadCatalog(),
+    signal: new AbortController().signal,
+  });
+  expect(record?.hasFinalGuess).toBe(true);
+  expect(record?.protocol).toBe('report');
+  expect(record?.exchanges).toBe(2);
+  expect(record?.reportRound?.report?.lines.length).toBeGreaterThanOrEqual(2);
+  expect(record?.reportRound?.briefingAtSec).not.toBeNull();
+  expect(record?.asks.map((a) => a.findingState)).toEqual(['recorded', 'recorded']);
+  expect(record?.asks[1]?.control).toBe(true);
+  expect(record?.final?.confidence).toBe('country');
+  expect(record?.final?.clue).toContain('Вывеска');
+  const summary = summarizeDetective(
+    { ...config(1), protocol: 'report', requireZoom: true, moveLimit: 8 },
+    record ? [record] : [],
+  );
+  expect(summary.questionMix.describe).toBe(2);
+  expect(summary.accuracy.beyond2000Km.hits).toBe(0);
+  const stats = summary.reportProtocol;
+  expect(stats?.report.filed.rate).toBe(1);
+  expect(stats?.control.asked.hits).toBe(1);
+  expect(stats?.byConfidence.country?.rounds).toBe(1);
+  expect(stats?.bars.bar1Finish.passed).toBe(true);
+  expect(stats?.bars.bar2Dialogue.passed).toBe(true);
+  expect(stats?.bars.bar6Accuracy.passed).toBe(true);
 });

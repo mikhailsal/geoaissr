@@ -15,12 +15,14 @@ import {
 import {
   buildEyesBatches,
   eyesItems,
+  isCopiedText,
   type EyesBatch,
   type EyesItem,
 } from './judge-eyes-extract.ts';
 
 /**
- * Model judge for the eyes' answers (docs/evals/detective-spike-2.md, bar 3):
+ * Model judge for the eyes' answers (docs/evals/detective-spike-2.md, bar 3) and, in spike 3,
+ * for the eyes' scene report and free descriptions (docs/evals/detective-spike-3.md, bars 3, 4):
  *   bun run spikes/detective/judge-eyes.ts --rounds <rounds.jsonl> --out <dir>
  *     [--judge-model <id>] [--seed <n>] [--resume] [--sheet-only]
  * One `claude -p` call per spot with read-only access to the dataset frames. Writes the sheet
@@ -41,15 +43,25 @@ const verdictSchema = z.object({
   ),
 });
 
+/** Rules for the statements of spike 3; added only when a batch holds such items. */
+const STATEMENT_RULES = [
+  '- [scene note] items: one line of a description of the scene, written by an assistant who saw these photos and could zoom into parts of them; a frame number above 4 means such a zoomed view. "correct" if the photos agree with all of it. "wrong" if any part of it is contradicted by the photos or describes something that appears in none of them. Where a note quotes writing from the scene in «…» (a sign, a plate, a label), the quote must reproduce text that appears in the photos, allowing one or two wrong characters per word. A note that says some text cannot be read is "wrong" only if that text is clearly readable.',
+  '- [description] items: a request to describe something and the answer in the assistant\'s own words. Judge the answer like a scene note. For "not visible" or "unreadable": "correct" if the thing asked about really cannot be seen or read, "wrong" if it is clearly visible or readable.',
+];
+
 export function buildEyesJudgePrompt(sample: EvalSampleItem, batch: EyesBatch): string {
   const frames = (sample.imagePaths ?? []).map((p, i) => `- photo ${i + 1}: ${p}`).join('\n');
   const items = batch.items.map((it) => `${it.n}. ${it.text}`).join('\n');
+  const statements = [...batch.key.values()].some(
+    (item) => item.kind === 'report' || item.kind === 'describe',
+  );
   return [
     'You are checking answers that an assistant gave about one street scene. The questions are in Russian.',
     `First open all four photos of this scene with the Read tool:\n${frames}`,
     'Then judge every numbered item below against the photos only. Small details count as visible if they can be made out in the full-resolution photos.',
     '- [choice] items: a question, its numbered options and the answer. "correct" if the chosen option is the one that fits the photos best; for "none of the options fits", if no option fits; for "not visible" or "unreadable", if the thing asked about really cannot be seen or read. "wrong" if another option fits better, if an option fits though the answer says none does, or if the thing is clearly visible or readable though the answer says it is not.',
     '- [transcription] items: a request to copy visible text and the answer. "correct" if the answer reproduces text that appears in the photos, allowing one or two wrong characters per word; for "not visible" or "unreadable", if no such text can be read. "wrong" if the text is not in the photos, is substantially different, or is clearly readable though the answer says it is not.',
+    ...(statements ? STATEMENT_RULES : []),
     '- "cannot_tell" only when the photos do not let you decide, for example a question too vague to check.',
     `Items:\n${items}`,
     'Answer with ONLY a JSON object, no prose: {"items":[{"n":1,"verdict":"correct","reason":"short"}]} with one entry per item number.',
@@ -66,7 +78,45 @@ interface Tally {
 function group(item: EyesItem): string {
   if (item.status === 'abstained') return `${item.kind}Abstained`;
   if (item.kind === 'choice' && item.value === NONE_OF_THESE) return 'choiceNoneOfThese';
+  if (item.kind === 'report') return isCopiedText(item) ? 'reportCopiedText' : 'reportLine';
   return `${item.kind}Answered`;
+}
+
+const EMPTY: Tally = { correct: 0, wrong: 0, cannotTell: 0, missing: 0 };
+
+function addTallies(tallies: readonly Tally[]): Tally {
+  return tallies.reduce(
+    (a, b) => ({
+      correct: a.correct + b.correct,
+      wrong: a.wrong + b.wrong,
+      cannotTell: a.cannotTell + b.cannotTell,
+      missing: a.missing + b.missing,
+    }),
+    EMPTY,
+  );
+}
+
+/** The correct share of the judged items; `cannot_tell` is left out and counted. */
+function shareOf(tally: Tally) {
+  const judged = tally.correct + tally.wrong;
+  return {
+    ...tally,
+    judged,
+    correctRate: judged === 0 ? null : Math.round((tally.correct / judged) * 1000) / 1000,
+    ci: wilsonInterval(tally.correct, judged),
+  };
+}
+
+function barOf(tally: Tally, threshold: number) {
+  const share = shareOf(tally);
+  return { ...share, barPassed: share.judged > 0 && tally.correct / share.judged >= threshold };
+}
+
+function count(t: Tally, verdict: EyesVerdict | undefined): void {
+  if (verdict === 'correct') t.correct += 1;
+  else if (verdict === 'wrong') t.wrong += 1;
+  else if (verdict === 'cannot_tell') t.cannotTell += 1;
+  else t.missing += 1;
 }
 
 export function summarizeEyesJudgement(
@@ -74,36 +124,33 @@ export function summarizeEyesJudgement(
   verdicts: ReadonlyMap<string, ReadonlyArray<{ n: number; verdict: EyesVerdict }>>,
 ) {
   const tallies: Record<string, Tally> = {};
+  const byConfidence = { sure: { ...EMPTY }, unsure: { ...EMPTY } };
   for (const batch of batches) {
     const byN = new Map((verdicts.get(batch.spotId) ?? []).map((v) => [v.n, v.verdict]));
     for (const [n, item] of batch.key) {
-      const t = (tallies[group(item)] ??= { correct: 0, wrong: 0, cannotTell: 0, missing: 0 });
-      const v = byN.get(n);
-      if (v === 'correct') t.correct += 1;
-      else if (v === 'wrong') t.wrong += 1;
-      else if (v === 'cannot_tell') t.cannotTell += 1;
-      else t.missing += 1;
+      count((tallies[group(item)] ??= { ...EMPTY }), byN.get(n));
+      if (item.status === 'answered' && item.confidence) {
+        count(byConfidence[item.confidence], byN.get(n));
+      }
     }
   }
-  const pick = (k: string): Tally =>
-    tallies[k] ?? { correct: 0, wrong: 0, cannotTell: 0, missing: 0 };
-  // Bar 3: answered choices, an option or "none of these", over the judged ones.
-  const bar = [pick('choiceAnswered'), pick('choiceNoneOfThese')].reduce((a, b) => ({
-    correct: a.correct + b.correct,
-    wrong: a.wrong + b.wrong,
-    cannotTell: a.cannotTell + b.cannotTell,
-    missing: a.missing + b.missing,
-  }));
-  const judged = bar.correct + bar.wrong;
+  const pick = (...keys: string[]): Tally => addTallies(keys.map((k) => tallies[k] ?? EMPTY));
   return {
     groups: tallies,
-    choiceAnswered: {
-      ...bar,
-      judged,
-      correctRate: judged === 0 ? null : Math.round((bar.correct / judged) * 1000) / 1000,
-      ci: wilsonInterval(bar.correct, judged),
-      barPassed: judged > 0 && bar.correct / judged >= 0.8,
+    // Spike 3: answered requests by the confidence the eyes gave.
+    answersByConfidence: {
+      sure: shareOf(byConfidence.sure),
+      unsure: shareOf(byConfidence.unsure),
     },
+    // Spike 2, bar 3: answered choices, an option or "none of these", over the judged ones.
+    choiceAnswered: barOf(pick('choiceAnswered', 'choiceNoneOfThese'), 0.8),
+    // Spike 3, bar 3: report lines and answered requests; abstentions are reported apart.
+    statements: barOf(
+      pick('reportLine', 'reportCopiedText', 'describeAnswered', 'textAnswered'),
+      0.8,
+    ),
+    // Spike 3, bar 4: the texts the eyes copied, in the report or in an answer.
+    copiedTexts: barOf(pick('reportCopiedText', 'textAnswered'), 0.9),
   };
 }
 

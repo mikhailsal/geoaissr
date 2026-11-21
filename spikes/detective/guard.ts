@@ -189,7 +189,29 @@ export function mentionsScript(text: string): boolean {
 const ADJECTIVE_END = /(ая|ое|ий|ие|ый|ые|ой)$/u;
 
 /** Common words that a country stem catches ("того" is Togo, "грузовик" starts like Georgia). */
-const COMMON_WORDS = new Set(['того', 'груз', 'кана', 'марок', 'лесом', 'лесок']);
+const COMMON_WORDS = new Set([
+  'того',
+  'груз',
+  'кана',
+  'марок',
+  'лесом',
+  'лесок',
+  // Spike 3, Part C: «косой» is not Kosovo, «кость» is not Costa Rica.
+  'косой',
+  'косого',
+  'косому',
+  'косом',
+  'косое',
+  'кость',
+  'кости',
+  'костей',
+  'костра',
+  // «суда» are ships, not Sudan.
+  'суда',
+  'судам',
+  'судами',
+  'судах',
+]);
 const COMMON_PREFIXES = [
   'грузов',
   'грузч',
@@ -220,6 +242,16 @@ const COMMON_PREFIXES = [
   'лесос',
   'россып',
   'туник',
+  // Added before the first paid call of Part C, from the reports of Part B: «катакана» names a
+  // script and was masked as Qatar; the others are scene words with a country's stem.
+  'катакан',
+  'катам',
+  'катан',
+  'костел',
+  'костёл',
+  'костыл',
+  'белизн',
+  'белил',
 ];
 
 /** «камера» in any case is the camera; «Камерун» is still caught. */

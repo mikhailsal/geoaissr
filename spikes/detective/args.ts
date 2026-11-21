@@ -1,3 +1,4 @@
+import type { EffortLevel } from '../../shared/bot-tools.ts';
 import type { Protocol } from './protocol.ts';
 import type { Arm } from './records.ts';
 
@@ -9,6 +10,8 @@ export interface SpikeArgs {
   /** Model ids per role; null means the claude harness default. */
   brainModel: string | null;
   eyesModel: string | null;
+  /** The brain's effort; the eyes always run at low. */
+  brainEffort: EffortLevel;
   requireZoom: boolean;
   budgetSec: number;
   moveLimit: number;
@@ -32,10 +35,13 @@ export class SpikeArgsError extends Error {
 
 export const SPIKE_HELP = `Usage: bun run spike:detective -- [flags]
   --arm detective|labels  detective: brain + eyes; labels: brain fed the human labels (default detective)
-  --protocol catalog|choice  catalog: closed feature catalog (spike 1); choice: brain-written
-                          questions and options (spike 2). labels needs catalog (default catalog)
+  --protocol catalog|choice|report  catalog: closed feature catalog (spike 1); choice:
+                          brain-written questions and options (spike 2); report: the eyes file a
+                          scene report first, then describe topics in their own words (spike 3).
+                          labels needs catalog (default catalog)
   --brain-model <id>      the brain's claude model (default: the harness default)
   --eyes-model <id>       the eyes' claude model (default: the harness default)
+  --brain-effort low|medium  the brain's effort; the eyes run at low (default low)
   --require-zoom          the eyes must make a look in a request before they may abstain
   --budget <sec>          round budget, 30-600 (default 90)
   --move-limit <n>        eyes' paid looks, 0-10 (default 4)
@@ -65,6 +71,7 @@ const STRING_FLAGS = new Set([
   '--protocol',
   '--brain-model',
   '--eyes-model',
+  '--brain-effort',
   '--spot',
   '--dataset',
   '--out',
@@ -87,9 +94,13 @@ function parseInt10(flag: string, raw: string, min: number, max: number): number
 
 function applyString(out: SpikeArgs, flag: string, value: string): void {
   if (flag === '--protocol') {
-    if (value !== 'catalog' && value !== 'choice')
-      throw new SpikeArgsError(`--protocol must be catalog or choice (got "${value}")`);
+    if (value !== 'catalog' && value !== 'choice' && value !== 'report')
+      throw new SpikeArgsError(`--protocol must be catalog, choice or report (got "${value}")`);
     out.protocol = value;
+  } else if (flag === '--brain-effort') {
+    if (value !== 'low' && value !== 'medium')
+      throw new SpikeArgsError(`--brain-effort must be low or medium (got "${value}")`);
+    out.brainEffort = value;
   } else if (flag === '--brain-model') out.brainModel = modelId(flag, value);
   else if (flag === '--eyes-model') out.eyesModel = modelId(flag, value);
   else if (flag === '--spot') out.spotIds.push(value);
@@ -109,6 +120,7 @@ export function parseSpikeArgs(argv: readonly string[]): SpikeArgs {
     protocol: 'catalog',
     brainModel: null,
     eyesModel: null,
+    brainEffort: 'low',
     requireZoom: false,
     budgetSec: 90,
     moveLimit: 4,
@@ -141,8 +153,10 @@ export function parseSpikeArgs(argv: readonly string[]): SpikeArgs {
     if (intSpec) out[intSpec.key] = parseInt10(flag, value, intSpec.min, intSpec.max);
     else applyString(out, flag, value);
   }
-  if (out.arm === 'labels' && out.protocol !== 'catalog')
-    throw new SpikeArgsError('--arm labels needs --protocol catalog: choices have no labels');
+  if (out.arm === 'labels' && out.protocol !== 'catalog') {
+    const why = out.protocol === 'choice' ? 'choices have no labels' : 'a report has no labels';
+    throw new SpikeArgsError(`--arm labels needs --protocol catalog: ${why}`);
+  }
   if (out.dry) out.datasetDir = null;
   return out;
 }

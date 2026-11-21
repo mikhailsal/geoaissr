@@ -11,7 +11,7 @@ import { isAbstain } from './catalog.ts';
 function labelValue(sample: EvalSampleItem, q: Question): string {
   if (q.kind === 'feature') return sample.labels?.[q.feature] ?? 'not_visible';
   // Brain-written choices have no labels; the labels arm runs only with the catalog protocol.
-  if (q.kind === 'choice') return 'not_visible';
+  if (q.kind === 'choice' || q.kind === 'describe') return 'not_visible';
   const texts = (sample.signText ?? []).map((s) => s.text).filter((t) => t.trim().length > 0);
   return texts.length > 0 ? texts.join(' | ') : 'not_visible';
 }

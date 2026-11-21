@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { seenClaimBar } from './judge-bar5.ts';
 import { argValue, optionalArg } from './judge-call.ts';
 import type { JudgeArm } from './judge-extract.ts';
 import {
@@ -262,6 +263,8 @@ function findingsReport(runDirs: readonly string[], refDir: string | null) {
   );
   return {
     pooled: poolFindings(runs.map((run) => run.items)),
+    // Spike 3, bar 5; null for runs without the claim kinds of rubric v3.
+    seenClaimBar: seenClaimBar(runs.map((run) => run.items)),
     perRun: runs.map((run) => ({ ...findingsMeta(run.dir), ...poolFindings([run.items]) })),
     betweenRuns,
     reference: ref === null ? null : { ...findingsMeta(ref.dir), ...poolFindings([ref.items]) },

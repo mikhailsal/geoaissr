@@ -138,6 +138,34 @@ Baselines are the existing runs: `candidate-90` (single agent), `detective2-90` 
 
 **Spending cap:** at most 9 pilot rounds and 84 measured rounds; 56 findings-judge calls and 28 eyes-judge calls on `claude-opus-5-5`, plus 1 smoke call per judge on a pilot round.
 
+**Amendment of 2026-11-21, made before the first paid call of this part.** Parts A and B are finished; their reports are below. Where this amendment and the text above differ, the amendment holds. The spending cap is unchanged.
+
+1. **Settings fixed by the Part B rules.** The eyes run on `claude-sonnet-5-5` and the brain at effort `low`. The run line of v3-90 is `--protocol report --brain-model claude-sonnet-5-5 --eyes-model claude-sonnet-5-5 --brain-effort low --require-zoom --move-limit 8 --budget 90 --repeats 3 --concurrency 2`.
+2. **The report is short and comes early.** The brain cannot start before the report, so:
+   - the eyes may spend at most 3 of their 8 zooms before the report, and the server refuses a fourth;
+   - the eyes are told to write at most 4 lines per section (8 in `texts`), each of at most 120 characters. The describers of Part B were told 8, 12 and 200;
+   - a line with a frame number that was never issued does not reject the report. It is counted.
+3. **Journal fields from the first ask.** The brain has read the report by its first `ask`, so `finding` and `current_guess` are due in every `ask`, with one correction per ask as before.
+4. **Control check.** The brain marks the `ask` that re-checks its deciding fact with `control: true`. The check changed the answer when the final pin is more than 100 km from the `current_guess` of that ask.
+5. **Guard word list.** The sonnet reports of Part B had two words masked, both by mistake: «косой» (taken for Kosovo) and «катакана» (taken for Qatar). Before the first paid call of this part the guard's list of ordinary words gained these two with their case forms, and scene words with the same kind of clash: «катамаран», «катание», «костёл», «костыль», «кость», «костра», «белизна», «белила», «суда». With the new list no word is masked in the 56 reports of Part B. The list is not changed after the first paid call.
+6. **Bar 2.** The server refuses an `ask` before the briefing, so every ask comes after it. The bar reads the median number of asks that the eyes answered.
+7. **Bar 3.** The judged statements are every line of every filed report and every answered request, `describe` or `text`. Abstentions (`not_visible`, `unreadable`) are judged and reported apart, as in spike 2.
+8. **Bar 4.** The copied texts are the lines of the `texts` section of a report that hold a «…» quote, and the answered `text` requests.
+9. **Eyes judge.** `claude-opus-5-5`, one run, seed 20261128, one call per spot. It reads two new kinds of item:
+   - a report line is `wrong` if any part of it is contradicted by the photos or describes something that appears in none of them. A quote of writing in «…» must reproduce text that appears in the photos, allowing one or two wrong characters per word. A line that says a text cannot be read is `wrong` only if that text is clearly readable;
+   - an answer to a `describe` request is judged like a report line, and an abstention as in spike 2.
+
+   The judge is not shown the frame number of a line. Answered requests are also tallied by the confidence the eyes gave.
+
+10. **Bar 5 is re-anchored.** Part A showed that the limit of 15% cannot be read as written. Under the opus judge the single agent itself has 31.5%, and half of its unsupported verdicts hold no wrong claim about what is in the scene. The bar is now relative to the single agent, and it counts claims that something is there:
+    - **Rubric v3** is rubric v2 with two changes. The judge gives each visual claim a kind: `seen` (something is visible, or what it looks like) or `not_seen` (something is absent, not visible or cannot be read). The judge is told that the players could zoom into parts of the photos, and that a mention of a zoomed view or of a frame number above 4 is not a visual claim.
+    - **Judged findings**, as in spikes 1 and 2: the `finding` of every ask of v3-90 and the step findings of `candidate-90`, blinded and shuffled together per spot. The word «отчёт» is masked with the other role words. Two runs on `claude-opus-5-5`, seeds 20261126 and 20261127.
+    - **Bar:** pooled over both runs, the error of the `seen` claims of v3-90 is at most 5 points above the error of the `seen` claims of the single agent in the same calls. The error is `contradicted` plus `absent`, over those plus `ok`. The bar passes on its point estimate. A 95% interval of the difference is reported: a percentile bootstrap that resamples spots (2,000 resamples, seed 20261129).
+    - **Reported without a bar:** per arm, the share of findings with a wrong `seen` claim, the share of findings with a wrong claim of either kind (the reading of rubric v2, comparable with the 44.8% and 31.5% of Part A), and the error of `not_seen` claims; the agreement of the two runs.
+    - For orientation only: by the keyword split of Part A, the error of `seen` claims was 17.3% for `detective2-90` and 3.8% for the single agent, 13.5 points apart.
+11. **Bar 6.** A round without a pin counts as 20,000 km in the median and as more than 2,000 km from the spot.
+12. **More reported numbers (no bars).** Zooms refused before the report. Place words masked in the eyes' report and answers. A leak check made after the run with a hand-written list of name and demonym stems for the countries of the data set: the rounds in which the eyes' own words, outside «…», name the spot's country, and how many of them the guard masked.
+
 ## Report
 
 ### Part A: the opus re-judge of spike 2
@@ -265,3 +293,57 @@ The opus judge also fails a finding on a small point: a real object named with a
 - A single verdict of either judge is weak evidence. Shares over a whole run are usable, but the two opus runs are 5.5 points apart on Detective, so a gap of that size between two runs is noise.
 
 **Consequence for Part C.** Bar 5 of Part C asks for a pooled unsupported share of at most 15% under this judge and rubric. It was written when the single agent's share was known only from the sonnet judge (7.9%). Under the opus judge the single agent itself has 31.5%, about twice the limit, so the single agent would fail the bar as written. Bar 5 must be re-anchored by a dated amendment to Part C before Part C's first paid call. That amendment is not part of this report.
+
+### Part B: the ceiling test
+
+**Reading under the rules fixed in Part B: the stop rule did not fire, the eyes of Part C run on `claude-sonnet-5-5`, and the brain runs at effort `low`.** A brain that sees no picture and reads a full description written by `claude-sonnet-5-5` puts 76.2% of rounds within 750 km of the spot. The live protocol of spike 2 had 51.2%, and the single agent has 95.2%.
+
+**Run.** One run on 2026-11-21, from 15:26 to 15:35 (+03), from commit `7365409` with the format fix described in the note to Part B.
+
+- 56 describer calls, one per spot and describer, and 1 retry: the first `claude-haiku-5-5` reply for spot-10 named a section that the schema does not have. 252 brain calls, none retried; every one returned a point.
+- About 1.1 M tokens for the describers and 1.2 M for the brain.
+- A sonnet report has 34 lines at the median (17 to 42), 4 of them in `texts`. A haiku report has 30.5 lines (17 to 54). Each describer copied at least one text in 22 of the 28 spots.
+- The aggregate is `docs/evals/results/detective/ceiling3.json`, made by `spikes/detective/ceiling.ts`. The reports and the brain's replies are not committed.
+
+**Accuracy.** The two last rows are the existing runs, for comparison. Intervals are Wilson 95%.
+
+| Arm                                      | Median error | Within 25 km  | Within 750 km              | Beyond 2,000 km |
+| ---------------------------------------- | ------------ | ------------- | -------------------------- | --------------- |
+| haiku reports, brain at `medium`         | 203 km       | 30/84 = 35.7% | 55/84 = 65.5% (54.8–74.8%) | 23/84 = 27.4%   |
+| **sonnet reports, brain at `medium`**    | **122 km**   | 37/84 = 44.0% | 64/84 = 76.2% (66.1–84.0%) | 10/84 = 11.9%   |
+| sonnet reports, brain at `low`           | 121 km       | 34/84 = 40.5% | 64/84 = 76.2% (66.1–84.0%) | 13/84 = 15.5%   |
+| `detective2-90` (spike 2, live protocol) | 479 km       | 24/84 = 28.6% | 43/84 = 51.2%              | 39/84 = 46.4%   |
+| `candidate-90` (single agent)            | 5.8 km       | 57/84 = 67.9% | 80/84 = 95.2%              | 2/84 = 2.4%     |
+
+**The rules, applied.**
+
+- **Better describer:** `claude-sonnet-5-5`, with 76.2% of its medium-effort rounds within 750 km against 65.5%.
+- **Stop rule:** not fired. 76.2% is above the limit of 60%.
+- **Eyes model for Part C:** `claude-sonnet-5-5`. The sonnet share is 10.7 points higher, and the rule asks for at least 10. The margin is one round: the gap is 9 rounds of 84, and with 8 the rule would have named `claude-haiku-5-5`. The two intervals overlap.
+- **Brain effort for Part C:** `low`. The share within 750 km is 76.2% at both efforts.
+
+**By the brain's own confidence** (sonnet reports).
+
+| Confidence | Effort `medium`: rounds | Median error | Within 750 km | Effort `low`: rounds | Median error | Within 750 km |
+| ---------- | ----------------------- | ------------ | ------------- | -------------------- | ------------ | ------------- |
+| `country`  | 46                      | 8.6 km       | 42 = 91.3%    | 54                   | 13.2 km      | 49 = 90.7%    |
+| `region`   | 10                      | 228 km       | 7             | 2                    | 1,984 km     | 1             |
+| `guess`    | 28                      | 673 km       | 15 = 53.6%    | 28                   | 736 km       | 14 = 50.0%    |
+
+- When the brain says `country`, it is within 750 km about 9 times in 10. When it says `guess`, about every second time. The level tells a player how far to trust the pin.
+- On the haiku reports the picture is the same and sharper: `country` 49 rounds with 45 within 750 km, `guess` 30 rounds with 8 within 750 km and a median error of 5,799 km.
+
+**By spot** (median of the three passes; sonnet reports, brain at `medium`).
+
+- Against `detective2-90`: closer on 21 of 28 spots, further on 6, 1 tie. The median of the spot medians is 91.5 km against 397 km.
+- Against the single agent: closer on 10 spots, further on 15, 3 ties. The median of the spot medians is 91.5 km against 4.9 km.
+- Seven spots have a median error above 750 km: spot-01 (Australia, 1,058 km), spot-06 (Georgia, 1,250 km), spot-08 (India, 1,734 km), spot-14 (New Zealand, 9,470 km), spot-15 (Puerto Rico, 5,772 km), spot-17 (USA, 3,735 km) and spot-27 (Japan, 827 km). `detective2-90` has 13 such spots. The single agent has one, the same spot-14 (8,764 km).
+
+**Masked words.** The server masked two words in the sonnet reports, «косой» and «катакана», once each, and none in the haiku reports. Both are mistakes of the guard: neither names a place. The amendment to Part C adds them to the guard's list of ordinary words.
+
+**What this test does and does not show.**
+
+- A text-only brain can place a spot from a description. This was the question of Part B, and the answer is yes: the median error falls from 479 km to about 120 km, and the rounds beyond 2,000 km from 46% to 12–16%.
+- The description does not carry what the single agent sees. With the same pictures the single agent is within 25 km in 68% of rounds, and the report brain in 40–44%.
+- It is an upper bound for the report, not a forecast of Part C. The describers read full-size frames at effort `medium` with no time limit. The live eyes get 640-pixel frames and zooms, work at effort `low`, share 90 s with the brain, and are told to write at most 4 lines per section. A live round has one thing the test lacks: the brain can ask for more after the report.
+- The three passes of a spot read the same report, so the 84 rounds of an arm are 28 reports read three times. The intervals treat the rounds as independent and are too narrow for that reason.

@@ -17,9 +17,9 @@ import { parseSpikeArgs, SPIKE_HELP, SpikeArgsError, type SpikeArgs } from './ar
 import { loadCatalog, type CatalogFeature } from './catalog.ts';
 import { summarizeDetective, type DetectiveSummary } from './metrics.ts';
 import { buildBrainPrompt, buildEyesPrompt } from './prompts.ts';
-import { roleToolDefinitions } from './protocol.ts';
 import type { DetectiveRoundRecord } from './records.ts';
 import { runDetectiveRound, type DetectiveSettings } from './round.ts';
+import { toolDefinitions } from './tools.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 const RESULTS_DIR = path.join(REPO_ROOT, 'docs', 'evals', 'results', 'detective');
@@ -46,8 +46,8 @@ function hashes(args: SpikeArgs, catalog: readonly CatalogFeature[]) {
         })
       : '';
   const tools = JSON.stringify([
-    roleToolDefinitions('brain', catalog, args.protocol),
-    roleToolDefinitions('eyes', catalog, args.protocol),
+    toolDefinitions('brain', catalog, args.protocol),
+    toolDefinitions('eyes', catalog, args.protocol),
   ]);
   return { promptHash: shortHash(`${brain}\n---\n${eyes}`), toolSchemaHash: shortHash(tools) };
 }
@@ -74,6 +74,7 @@ async function runAll(
     brainModel: args.brainModel ?? defaultModel,
     eyesModel: args.eyesModel ?? defaultModel,
     effort: 'low',
+    brainEffort: args.brainEffort,
     protocol: args.protocol,
     requireZoom: args.requireZoom,
     dry: args.dry,
@@ -166,6 +167,7 @@ async function execute(args: SpikeArgs): Promise<number> {
       protocol: args.protocol,
       requireZoom: args.requireZoom,
       effort: settings.effort,
+      brainEffort: settings.brainEffort,
       budgetSec: args.budgetSec,
       moveLimit: args.moveLimit,
       imageSize: settings.imageSize,

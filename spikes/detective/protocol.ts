@@ -14,7 +14,19 @@ export type Role = 'brain' | 'eyes';
  * - choice: the brain writes the question and its 2–6 options, the eyes pick one (spike 2).
  * Both protocols keep the literal transcription request.
  */
-export type Protocol = 'catalog' | 'choice';
+export type ClassicProtocol = 'catalog' | 'choice';
+
+/**
+ * - report (spike 3): the eyes file a scene report first, then answer requests in their own
+ *   words. Its schemas and tools are in report-protocol.ts; tools.ts picks the tool list.
+ */
+export type Protocol = ClassicProtocol | 'report';
+
+/** The handlers of spikes 1 and 2 never run under the report protocol. */
+export function classicProtocol(protocol: Protocol): ClassicProtocol {
+  if (protocol === 'report') throw new Error('The report protocol has its own handlers');
+  return protocol;
+}
 
 export const MAX_QUESTIONS = 5;
 export const TEXT_TARGET_MAX_LEN = 80;
@@ -30,14 +42,14 @@ export interface ToolDefinition {
   inputSchema: Record<string, unknown>;
 }
 
-function jsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+export function jsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   const compatible = schema as unknown as Parameters<typeof zodToJsonSchema>[0];
   const raw = zodToJsonSchema(compatible, { target: 'jsonSchema7' }) as Record<string, unknown>;
   const { $schema: _removed, ...rest } = raw;
   return rest;
 }
 
-const textQuestion = z
+export const textQuestion = z
   .object({
     kind: z.literal('text'),
     target: z
@@ -66,7 +78,7 @@ const choiceQuestion = z
   })
   .strict();
 
-function questionSchema(catalog: readonly CatalogFeature[], protocol: Protocol) {
+function questionSchema(catalog: readonly CatalogFeature[], protocol: ClassicProtocol) {
   if (protocol === 'choice') return z.discriminatedUnion('kind', [choiceQuestion, textQuestion]);
   const ids = catalog.map((f) => f.id);
   const [first, ...rest] = ids;
@@ -80,7 +92,7 @@ function questionSchema(catalog: readonly CatalogFeature[], protocol: Protocol) 
   return z.discriminatedUnion('kind', [feature, textQuestion]);
 }
 
-export function buildBrainSchemas(catalog: readonly CatalogFeature[], protocol: Protocol) {
+export function buildBrainSchemas(catalog: readonly CatalogFeature[], protocol: ClassicProtocol) {
   const question = questionSchema(catalog, protocol);
   const ask = z
     .object({
@@ -122,7 +134,7 @@ export const eyesLookSchema = z
 
 export const nextRequestSchema = z.object({}).strict();
 
-const ANSWER_VALUE_DESCRIPTION: Record<Protocol, string> = {
+const ANSWER_VALUE_DESCRIPTION: Record<ClassicProtocol, string> = {
   catalog: 'id значения из списка, not_visible, unreadable или дословный текст',
   choice: 'номер варианта, none_of_these, not_visible, unreadable или дословный текст',
 };
@@ -157,17 +169,18 @@ function buildAnswerSchema(valueDescription: string) {
 export const answerSchema = buildAnswerSchema(ANSWER_VALUE_DESCRIPTION.catalog);
 export type AnswerInput = z.infer<typeof answerSchema>;
 
-const ASK_DESCRIPTION: Record<Protocol, string> = {
+const ASK_DESCRIPTION: Record<ClassicProtocol, string> = {
   catalog:
     'Задать глазам до 5 вопросов о признаках сцены. Блокирует до ответа (не дольше 30 с). Бесплатно. Со второго вызова обязательно finding и current_guess.',
   choice:
     'Задать глазам до 5 вопросов: свой вопрос с 2–6 вариантами ответа или просьбу прочитать текст. Блокирует до ответа (не дольше 30 с). Бесплатно. Со второго вызова обязательно finding и current_guess.',
 };
 
+/** Tools of the catalog and choice protocols. `toolDefinitions` in tools.ts covers all three. */
 export function roleToolDefinitions(
   role: Role,
   catalog: readonly CatalogFeature[],
-  protocol: Protocol,
+  protocol: ClassicProtocol,
 ): ToolDefinition[] {
   if (role === 'brain') {
     return [

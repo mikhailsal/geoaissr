@@ -17,6 +17,9 @@ test('role words and frame numbers are masked for the blind judge', () => {
   expect(maskRoleWords('На кадре 2 жёлтая линия; запрос к напарнику')).toBe(
     'На […] жёлтая линия; […] к […]',
   );
+  expect(maskRoleWords('В отчёте вывеска латиницей, по отчету асфальт')).toBe(
+    'В […] вывеска латиницей, по […] асфальт',
+  );
 });
 
 test('batches group by spot, number the items and shuffle reproducibly by seed', () => {
@@ -127,4 +130,38 @@ test('judge settings default to the earlier spikes and take a model and a seed',
     seed: 20261123,
   });
   expect(() => judgeSettings(['--seed', 'x'], 1)).toThrow('bad --seed');
+});
+
+test('rubric v3 tags each claim seen or not_seen; only a wrong seen claim makes a finding unsupported', () => {
+  const reply =
+    '{"findings":[{"n":1,"claims":[{"text":"a","kind":"seen","mark":"ok"},{"text":"номер не читается","kind":"not_seen","mark":"contradicted"}],"rule_ok":null},' +
+    '{"n":2,"claims":[{"text":"пальмы","kind":"seen","mark":"absent"}],"rule_ok":null}]}';
+  const parsed = parseJudgeReply(reply, 'v3');
+  expect(parsed.map((f) => f.verdict)).toEqual(['supported', 'unsupported']);
+  expect(() => parseJudgeReply(reply.replaceAll('"kind":"seen",', ''), 'v3')).toThrow();
+
+  const batches = buildBatches(ITEMS.slice(0, 2), 7);
+  const batch = batches[0];
+  if (!batch) throw new Error('no batch');
+  const verdicts = parsed.map((f, i) => ({ ...f, n: [...batch.key.keys()][i] ?? 0 }));
+  const s = summarizeJudgement(batches, new Map([[batch.spotId, verdicts]]));
+  const all = [s.detective, s.single];
+  expect(all.reduce((n, a) => n + a.seenClaims.ok + a.seenClaims.absent, 0)).toBe(2);
+  expect(all.reduce((n, a) => n + a.notSeenClaims.contradicted, 0)).toBe(1);
+  expect(all.map((a) => a.seenClaimErrorRate).sort()).toEqual([0, 1]);
+  // Rubric v2 would fail both findings: the first one on its wrong not_seen claim.
+  expect(all.reduce((n, a) => n + a.v2Unsupported, 0)).toBe(2);
+  expect(all.reduce((n, a) => n + a.unsupported, 0)).toBe(1);
+
+  const sample = {
+    id: 's1',
+    countryNameRu: 'Тест',
+    lat: 0,
+    lng: 0,
+    imagePaths: ['./a.jpg', './b.jpg', './c.jpg', './d.jpg'] as [string, string, string, string],
+  };
+  const v3 = buildJudgePrompt(sample, batch, 'v3');
+  expect(v3).toContain('"not_seen" if it states that something is absent');
+  expect(v3).toContain('a frame number above 4: that is not a visual claim');
+  expect(buildJudgePrompt(sample, batch, 'v2')).not.toContain('not_seen');
 });

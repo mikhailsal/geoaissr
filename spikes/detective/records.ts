@@ -2,7 +2,9 @@ import type { EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
 import type { BotTokenUsage } from '../../shared/bot-results.ts';
 import { haversineDistanceKm } from '../../shared/score.ts';
 import type { SettledBy } from './broker.ts';
+import type { Confidence } from './ceiling-prompts.ts';
 import type { Protocol } from './protocol.ts';
+import { reportLines, type ReportLine, type SectionId } from './report.ts';
 import { scoreItem, type ScoredItem } from './scoring.ts';
 import type { SessionState } from './state.ts';
 
@@ -20,6 +22,27 @@ export interface AskRow {
   settledBy: SettledBy | null;
   cycleSec: number | null;
   items: ScoredItem[];
+  /** Report protocol: the brain marked this ask as its control check. */
+  control?: boolean;
+}
+
+/** What the report protocol adds to a round record (spike 3, Part C). */
+export interface ReportRoundFields {
+  /** The eyes' scene report as they wrote it; null when none was filed. */
+  report: {
+    tSec: number;
+    lines: Array<ReportLine & { section: SectionId }>;
+    maskedWords: string[];
+    unknownFrames: number;
+  } | null;
+  /** When the brain first received the report. */
+  briefingAtSec: number | null;
+  /** Requests refused for their question form («?» or «ли»). */
+  formRejections: number;
+  /** Zooms the server refused because the report was not filed yet. */
+  earlyLookRefusals: number;
+  /** Place words masked in the eyes' answers before the brain read them. */
+  maskedInAnswers: string[];
 }
 
 export interface RoleExit {
@@ -50,7 +73,15 @@ export interface DetectiveRoundRecord {
   /** Asks that reached the broker, whatever their outcome. */
   asksSent: number;
   asks: AskRow[];
-  final: { summary: string | null; finding: string | null } | null;
+  final: {
+    summary: string | null;
+    finding: string | null;
+    /** Report protocol only. */
+    confidence?: Confidence | null;
+    clue?: string | null;
+  } | null;
+  /** Present only under the report protocol. */
+  reportRound?: ReportRoundFields;
   framesIssued: number;
   eyesLooks: number;
   corrections: SessionState['corrections'];
@@ -87,7 +118,32 @@ function askRows(sample: EvalSampleItem, s: SessionState): AskRow[] {
     settledBy: a.outcome?.settledBy ?? null,
     cycleSec: a.outcome ? sec(a.outcome.cycleMs) : null,
     items: (a.outcome?.items ?? []).map((item) => scoreItem(sample, item)),
+    ...(a.control ? { control: true } : {}),
   }));
+}
+
+function reportRoundFields(s: SessionState): ReportRoundFields {
+  return {
+    report: s.report
+      ? {
+          tSec: sec(s.report.tMs),
+          lines: reportLines(s.report.raw),
+          maskedWords: s.report.maskedWords,
+          unknownFrames: s.report.unknownFrames,
+        }
+      : null,
+    briefingAtSec: s.briefingAtMs === null ? null : sec(s.briefingAtMs),
+    formRejections: s.formRejections,
+    earlyLookRefusals: s.earlyLookRefusals,
+    maskedInAnswers: s.maskedInAnswers,
+  };
+}
+
+function finalRow(s: SessionState): DetectiveRoundRecord['final'] {
+  if (!s.final) return null;
+  const base = { summary: s.final.summary, finding: s.final.finding };
+  if (s.opts.protocol !== 'report') return base;
+  return { ...base, confidence: s.final.confidence ?? null, clue: s.final.clue ?? null };
 }
 
 /** An infra error is a round the model never played: a CLI that failed before any tool call. */
@@ -138,7 +194,8 @@ export function buildDetectiveRecord(ctx: {
     exchanges: asks.filter((a) => a.settledBy === 'answer').length,
     asksSent: asks.filter((a) => a.settledBy !== null).length,
     asks,
-    final: s.final ? { summary: s.final.summary, finding: s.final.finding } : null,
+    final: finalRow(s),
+    ...(s.opts.protocol === 'report' ? { reportRound: reportRoundFields(s) } : {}),
     framesIssued: s.frames.length,
     eyesLooks: s.turnsUsed,
     corrections: s.corrections,

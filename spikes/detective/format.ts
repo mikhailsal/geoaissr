@@ -1,4 +1,4 @@
-import type { AskOutcome, BrokerRequest, Question, SettledItem } from './broker.ts';
+import type { AskOutcome, BrokerRequest, EyesConfidence, Question, SettledItem } from './broker.ts';
 import {
   ABSTAIN_RU,
   allowedValues,
@@ -19,8 +19,20 @@ export interface FrameRef {
 export function questionTitle(catalog: readonly CatalogFeature[], q: Question): string {
   if (q.kind === 'text') return `Текст «${q.target}»`;
   if (q.kind === 'choice') return `«${q.question}»`;
+  if (q.kind === 'describe') return `«${q.topic}»`;
   const feature = findFeature(catalog, q.feature);
   return feature ? `${feature.ru} (${feature.id})` : q.feature;
+}
+
+const CONFIDENCE_RU: Record<EyesConfidence, string> = { sure: 'уверенно', unsure: 'неуверенно' };
+
+/** « (неуверенно, кадр 5)»: the confidence mark of the report protocol and the frame. */
+function answerTail(item: SettledItem): string {
+  const parts = [
+    ...(item.confidence ? [CONFIDENCE_RU[item.confidence]] : []),
+    ...(item.frame === null ? [] : [`кадр ${item.frame}`]),
+  ];
+  return parts.length === 0 ? '' : ` (${parts.join(', ')})`;
 }
 
 function itemLine(catalog: readonly CatalogFeature[], item: SettledItem): string {
@@ -35,7 +47,11 @@ function itemLine(catalog: readonly CatalogFeature[], item: SettledItem): string
       return `${item.n}. ${title}: ${ABSTAIN_RU[item.value === 'unreadable' ? 'unreadable' : 'not_visible']}${frame}`;
     case 'answered': {
       const value = item.value ?? '';
-      if (item.question.kind === 'text') return `${item.n}. ${title}: "${value}"${frame}`;
+      if (item.question.kind === 'text') {
+        return `${item.n}. ${title}: "${value}"${answerTail(item)}`;
+      }
+      if (item.question.kind === 'describe')
+        return `${item.n}. ${title}: ${value}${answerTail(item)}`;
       if (item.question.kind === 'choice') {
         return `${item.n}. ${title}: ${choiceLabelRu(item.question, value)}${frame}`;
       }
@@ -64,6 +80,9 @@ function questionForEyes(catalog: readonly CatalogFeature[], q: Question, n: num
   if (q.kind === 'text') {
     return `${n}. Прочитай дословно текст: «${q.target}». value — текст как написано (любой алфавит); или not_visible / unreadable.`;
   }
+  if (q.kind === 'describe') {
+    return `${n}. Опиши своими словами, что видно: «${q.topic}». value — короткое описание (до 200 знаков); или not_visible, если этого на кадрах нет, / unreadable.`;
+  }
   if (q.kind === 'choice') {
     const options = q.options.map((o, i) => `${i + 1} — ${o}`).join('; ');
     return `${n}. Вопрос: «${q.question}». Варианты: ${options}. value — номер варианта; или ${NONE_OF_THESE} (видно, но ни один не подходит) / not_visible / unreadable.`;
@@ -86,8 +105,9 @@ export function formatRequestForEyes(
   catalog: readonly CatalogFeature[],
   request: BrokerRequest,
   frames: readonly FrameRef[],
-  opts: { turnsLeft: number; requireZoom: boolean },
+  opts: { turnsLeft: number; requireZoom: boolean; confidence?: boolean },
 ): string {
+  const fields = opts.confidence ? '{n, value, confidence, frame}' : '{n, value, frame}';
   const zoom =
     opts.requireZoom && opts.turnsLeft > 0
       ? [
@@ -95,7 +115,7 @@ export function formatRequestForEyes(
         ]
       : [];
   return [
-    `Запрос ${request.id}. Ответь через answer(request_id="${request.id}", answers=[{n, value, frame}]).`,
+    `Запрос ${request.id}. Ответь через answer(request_id="${request.id}", answers=[${fields}]).`,
     ...request.questions.map((q, idx) => questionForEyes(catalog, q, idx + 1)),
     framesLine(frames),
     `Осталось платных ходов look: ${opts.turnsLeft}. Отвечай быстро: у мозга мало времени.`,

@@ -20,16 +20,16 @@ import { summarizeJudgement, verdictFromClaims, type JudgedFinding } from './jud
 
 /**
  * Blinded model judge for unsupported findings (docs/evals/detective-spike.md, rubric section;
- * rubric v2 in docs/evals/detective-spike-3.md, Part A).
+ * rubric v2 in docs/evals/detective-spike-3.md, Part A; rubric v3 in its Part C amendment).
  *   bun run spikes/detective/judge.ts --detective <rounds.jsonl> --single <rounds.jsonl> --out <dir>
- *     [--rubric v1|v2] [--judge-model <id>] [--seed <n>] [--resume] [--sheet-only]
+ *     [--rubric v1|v2|v3] [--judge-model <id>] [--seed <n>] [--resume] [--sheet-only]
  * One `claude -p` call per spot with read-only access to the dataset frames. Writes the blind
  * sheet (for the owner's human review), the key, the raw verdicts and judge-summary.json.
  */
 
 const DEFAULT_SEED = 20261121;
 
-export type Rubric = 'v1' | 'v2';
+export type Rubric = 'v1' | 'v2' | 'v3';
 
 type StoredFinding = JudgedFinding & { reason?: string };
 
@@ -61,12 +61,32 @@ const v2Schema = z.object({
   ),
 });
 
+const v3Schema = z.object({
+  findings: z.array(
+    z.object({
+      n: z.number().int().min(1),
+      claims: z.array(
+        z.object({
+          text: z.string(),
+          kind: z.enum(['seen', 'not_seen']),
+          mark: z.enum(['ok', 'contradicted', 'absent', 'unclear']),
+        }),
+      ),
+      rule_ok: z.boolean().nullable(),
+      reason: z.string().optional(),
+    }),
+  ),
+});
+
+const V2_MARKS =
+  '"ok" if the photos agree with it; "contradicted" if the photos show otherwise, including a claimed absence of something that is plainly there; "absent" if it describes something that appears in none of the photos; "unclear" if the photos are too small, dark or blurred to settle it either way. Small zoomed details count as visible if they can be seen in the full-resolution photo. Do not mark a plainly right or plainly wrong claim "unclear".';
+
 const CLAIMS_RULE =
   "1. List its visual claims: statements about what is or is not visible in the scene (road markings, driving side, script on signs, sign text, poles, plates, vegetation, soil, roofs, buildings, vehicles...). Claims about countries, places or the writer's reasoning are not visual claims.";
 const RULE_OK =
   '3. rule_ok = true if the geographic rule it states (for example "left-hand traffic narrows it to ...") is correct, false if it is wrong, null if it states none.';
 
-const RUBRIC_TEXT: Record<Rubric, { marks: string; answer: string }> = {
+const RUBRIC_TEXT: Record<Rubric, { marks: string; answer: string; note?: string }> = {
   v1: {
     marks:
       '2. verdict = "no_visual_claim" if it has none; "unsupported" if at least one visual claim is contradicted by the photos or describes something that appears in none of them; otherwise "supported". Small zoomed details count as visible if they can be seen in the full-resolution photo.',
@@ -74,10 +94,15 @@ const RUBRIC_TEXT: Record<Rubric, { marks: string; answer: string }> = {
       'Answer with ONLY a JSON object, no prose: {"findings":[{"n":1,"visual_claims":["..."],"verdict":"supported","rule_ok":true,"reason":"short"}]} with one entry per finding number.',
   },
   v2: {
-    marks:
-      '2. Mark each claim: "ok" if the photos agree with it; "contradicted" if the photos show otherwise, including a claimed absence of something that is plainly there; "absent" if it describes something that appears in none of the photos; "unclear" if the photos are too small, dark or blurred to settle it either way. Small zoomed details count as visible if they can be seen in the full-resolution photo. Do not mark a plainly right or plainly wrong claim "unclear".',
+    marks: `2. Mark each claim: ${V2_MARKS}`,
     answer:
       'Answer with ONLY a JSON object, no prose: {"findings":[{"n":1,"claims":[{"text":"...","mark":"ok"}],"rule_ok":true,"reason":"short"}]} with one entry per finding number. A finding with no visual claim gets "claims":[].',
+  },
+  v3: {
+    marks: `2. Give each claim a kind: "seen" if it states that something is visible or what it looks like; "not_seen" if it states that something is absent, not visible or cannot be read. Then mark it: ${V2_MARKS}`,
+    note: 'The players could also zoom into parts of these photos. A note may mention a zoomed view or a frame number above 4: that is not a visual claim. Judge what the note says is visible against the four photos.',
+    answer:
+      'Answer with ONLY a JSON object, no prose: {"findings":[{"n":1,"claims":[{"text":"...","kind":"seen","mark":"ok"}],"rule_ok":true,"reason":"short"}]} with one entry per finding number. A finding with no visual claim gets "claims":[].',
   },
 };
 
@@ -95,6 +120,7 @@ export function buildJudgePrompt(
     CLAIMS_RULE,
     RUBRIC_TEXT[rubric].marks,
     RULE_OK,
+    ...(RUBRIC_TEXT[rubric].note === undefined ? [] : [RUBRIC_TEXT[rubric].note]),
     'Text in […] was masked on purpose; ignore it.',
     `Findings:\n${findings}`,
     RUBRIC_TEXT[rubric].answer,
@@ -105,7 +131,8 @@ export function buildJudgePrompt(
 export function parseJudgeReply(text: string, rubric: Rubric): StoredFinding[] {
   const json = extractJson(text);
   if (rubric === 'v1') return v1Schema.parse(json).findings;
-  return v2Schema.parse(json).findings.map((f) => ({
+  const parsed = rubric === 'v3' ? v3Schema.parse(json) : v2Schema.parse(json);
+  return parsed.findings.map((f) => ({
     n: f.n,
     verdict: verdictFromClaims(f.claims),
     rule_ok: f.rule_ok,
@@ -178,7 +205,7 @@ async function judgeAll(
 
 function rubricArg(argv: readonly string[]): Rubric {
   const value = optionalArg(argv, '--rubric') ?? 'v1';
-  if (value !== 'v1' && value !== 'v2') throw new Error(`bad --rubric ${value}`);
+  if (value !== 'v1' && value !== 'v2' && value !== 'v3') throw new Error(`bad --rubric ${value}`);
   return value;
 }
 

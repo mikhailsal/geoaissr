@@ -40,7 +40,9 @@ export interface DetectiveSettings {
   imageSize: BotImageSize;
   brainModel: string;
   eyesModel: string;
+  /** The eyes' effort; the brain's is `brainEffort` (spike 3, Part B rule). */
   effort: EffortLevel;
+  brainEffort: EffortLevel;
   protocol: Protocol;
   requireZoom: boolean;
   dry: boolean;
@@ -114,11 +116,7 @@ function launchRoles(
       fakeDone: Promise.all([eyes, runFakeBrain(session)]).then(() => undefined),
     };
   }
-  const common = {
-    childrenFile: dirs.childrenFile,
-    effort: settings.effort,
-    apiUrl: server.baseUrl,
-  };
+  const common = { childrenFile: dirs.childrenFile, apiUrl: server.baseUrl };
   const brainPrompt = buildBrainPrompt({
     regionLabelRu: 'весь мир',
     regionDiagonalKm: getRegionDiagonalKm('world'),
@@ -129,6 +127,7 @@ function launchRoles(
   const brain = launchRole({
     ...common,
     model: settings.brainModel,
+    effort: settings.brainEffort,
     role: 'brain',
     workDir: dirs.brain,
     prompt: brainPrompt,
@@ -139,6 +138,7 @@ function launchRoles(
       ? launchRole({
           ...common,
           model: settings.eyesModel,
+          effort: settings.effort,
           role: 'eyes',
           workDir: dirs.eyes,
           prompt: buildEyesPrompt({

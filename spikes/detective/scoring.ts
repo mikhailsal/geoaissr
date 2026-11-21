@@ -1,13 +1,13 @@
 import type { EvalSampleItem } from '../../scripts/eval-bots/manifest.ts';
-import type { SettledItem } from './broker.ts';
+import type { EyesConfidence, SettledItem } from './broker.ts';
 import { placeNamesIn } from './guard.ts';
 
 /** Scores of one answered question against the human labels of the spot. */
 
 export interface ScoredItem {
-  kind: 'feature' | 'text' | 'choice';
+  kind: 'feature' | 'text' | 'choice' | 'describe';
   feature: string | null;
-  /** Choice: the brain's question; text: the transcription target. */
+  /** Choice: the brain's question; text: the transcription target; describe: the topic. */
   question?: string;
   /** Choice only: the brain's options, numbered from 1. */
   options?: string[];
@@ -20,6 +20,8 @@ export interface ScoredItem {
   agrees: boolean | null;
   /** Place names in a transcription that the labelled sign text does not contain. */
   inventedPlaces: string[];
+  /** Report protocol: the eyes' own confidence in an answered item. */
+  confidence?: EyesConfidence;
 }
 
 function normalizeText(text: string): string {
@@ -74,6 +76,22 @@ export function scoreItem(sample: EvalSampleItem, item: SettledItem): ScoredItem
       inventedPlaces: [],
     };
   }
+  const confidence = item.confidence ? { confidence: item.confidence } : {};
+  if (item.question.kind === 'describe') {
+    // Free descriptions have no labels; the eyes-statement judge scores them (spike 3).
+    return {
+      kind: 'describe',
+      feature: null,
+      question: item.question.topic,
+      status: item.status,
+      value: item.value,
+      frame: item.frame,
+      label: null,
+      agrees: null,
+      inventedPlaces: [],
+      ...confidence,
+    };
+  }
   const texts = (sample.signText ?? []).map((s) => s.text);
   const labelPlaces = new Set(placeNamesIn(texts.join(' ')));
   const value = item.value ?? '';
@@ -87,5 +105,6 @@ export function scoreItem(sample: EvalSampleItem, item: SettledItem): ScoredItem
     label: texts.length > 0 ? texts.join(' | ') : null,
     agrees: answered ? transcriptionMatches(value, texts) : null,
     inventedPlaces: answered ? placeNamesIn(value).filter((p) => !labelPlaces.has(p)) : [],
+    ...confidence,
   };
 }

@@ -4,6 +4,7 @@ import { calculateRoundScore } from '../../shared/score.ts';
 import { NONE_OF_THESE } from './choice.ts';
 import type { Protocol } from './protocol.ts';
 import type { DetectiveRoundRecord } from './records.ts';
+import { reportProtocolStats } from './report-metrics.ts';
 import type { ScoredItem } from './scoring.ts';
 
 /** Aggregate numbers of one Detective arm. Committed as JSON; per-round files stay local. */
@@ -16,7 +17,9 @@ export interface DetectiveRunConfig {
   eyesModel: string;
   protocol: Protocol;
   requireZoom: boolean;
+  /** The eyes' effort. */
   effort: string;
+  brainEffort: string;
   budgetSec: number;
   moveLimit: number;
   imageSize: number;
@@ -102,6 +105,11 @@ function accuracy(records: readonly DetectiveRoundRecord[]) {
   return {
     within25Km: within(25),
     within750Km: within(750),
+    // A round without a pin counts as beyond 2,000 km.
+    beyond2000Km: rate(
+      records.filter((r) => r.errorKm === null || r.errorKm > 2000).length,
+      records.length,
+    ),
     scoreMedian: quantile(scores, 0.5),
   };
 }
@@ -155,6 +163,7 @@ export function summarizeDetective(
   const features = itemsOf(records, 'feature');
   const texts = itemsOf(records, 'text');
   const choices = itemsOf(records, 'choice');
+  const describes = itemsOf(records, 'describe');
   const inventedPlaces = texts.flatMap((t) => t.inventedPlaces);
   return {
     ...config,
@@ -171,7 +180,12 @@ export function summarizeDetective(
     errorKm: computeMedianAndIqr(nums(records.map((r) => r.errorKm))),
     accuracy: accuracy(records),
     ...askStats(records),
-    questionMix: { feature: features.length, choice: choices.length, text: texts.length },
+    questionMix: {
+      feature: features.length,
+      choice: choices.length,
+      text: texts.length,
+      describe: describes.length,
+    },
     features: { ...itemCounts(features), perFeature: perFeature(features) },
     choices: choiceCounts(choices),
     transcriptions: {
@@ -190,6 +204,7 @@ export function summarizeDetective(
       records.map((r) => r.eyesLooks),
       0.5,
     ),
+    ...(config.protocol === 'report' ? { reportProtocol: reportProtocolStats(records) } : {}),
   };
 }
 

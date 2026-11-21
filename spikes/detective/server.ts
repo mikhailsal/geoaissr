@@ -1,8 +1,9 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { CatalogFeature } from './catalog.ts';
-import { roleToolDefinitions, type Role } from './protocol.ts';
+import type { Role } from './protocol.ts';
 import type { DetectiveSession } from './session.ts';
 import type { ToolReply } from './state.ts';
+import { toolDefinitions } from './tools.ts';
 
 /**
  * Loopback tool API for one Detective round. Each token is bound to one role on the server, so
@@ -59,7 +60,7 @@ export function startDetectiveToolServer(
       }
       if (url.pathname === '/tools') {
         return Response.json({
-          tools: roleToolDefinitions(role, catalog, session.state.opts.protocol),
+          tools: toolDefinitions(role, catalog, session.state.opts.protocol),
         });
       }
       if (!url.pathname.startsWith('/tool/')) return new Response('Not found', { status: 404 });

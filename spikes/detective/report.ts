@@ -49,10 +49,20 @@ export const REPORT_SECTIONS = [
 
 export type SectionId = (typeof REPORT_SECTIONS)[number]['id'];
 
-/** The limits the eyes are told. The schema allows more, so a long line is not a failed call. */
-export const REPORT_LINE_TOLD_LEN = 200;
-export const REPORT_LINES_TOLD = 8;
-export const REPORT_TEXT_LINES_TOLD = 12;
+/** The limits a writer is told. The schema allows more, so a long line is not a failed call. */
+export interface ReportLimits {
+  /** Lines per section. */
+  lines: number;
+  /** Lines of the `texts` section. */
+  textLines: number;
+  lineLen: number;
+}
+
+/** Part B: a describer with no time limit. */
+export const CEILING_LIMITS: ReportLimits = { lines: 8, textLines: 12, lineLen: 200 };
+/** Part C: the brain waits for the report inside the round, so it is shorter. */
+export const LIVE_LIMITS: ReportLimits = { lines: 4, textLines: 8, lineLen: 120 };
+
 const LINE_MAX_LEN = 400;
 const SECTION_MAX_LINES = 20;
 
@@ -126,13 +136,18 @@ export function formatReport(report: SceneReport): string {
 }
 
 /** The rules of a report, shared by the describers of Part B and the eyes of Part C. */
-export const REPORT_RULES_RU: readonly string[] = [
-  'Не называй и не угадывай место: никаких стран, городов, регионов, народов и языков. Пиши только то, что видно. Письменность называй с существительным: «латиница», «кириллица», «арабская вязь», «иероглифы», «тайское письмо».',
-  'Любой текст со снимков переписывай дословно в кавычках-ёлочках «…»: буква в букву, тем же алфавитом, без перевода и исправлений. Если текст не разобрать, не выдумывай: напиши, что надпись есть и какими знаками она написана.',
-  'Одна строка — один факт, который видно на снимке, и номер кадра. Без выводов и догадок о месте.',
-  'Не пиши о том, чего не видно. Раздел без наблюдений оставь пустым списком.',
-  `В разделе не больше ${REPORT_LINES_TOLD} строк (в texts — не больше ${REPORT_TEXT_LINES_TOLD}); строка не длиннее ${REPORT_LINE_TOLD_LEN} знаков.`,
-];
+export function reportRules(limits: ReportLimits): string[] {
+  return [
+    'Не называй и не угадывай место: никаких стран, городов, регионов, народов и языков. Пиши только то, что видно. Письменность называй с существительным: «латиница», «кириллица», «арабская вязь», «иероглифы», «тайское письмо».',
+    'Любой текст со снимков переписывай дословно в кавычках-ёлочках «…»: буква в букву, тем же алфавитом, без перевода и исправлений. Если текст не разобрать, не выдумывай: напиши, что надпись есть и какими знаками она написана.',
+    'Одна строка — один факт, который видно на снимке, и номер кадра. Без выводов и догадок о месте.',
+    'Не пиши о том, чего не видно. Раздел без наблюдений оставь пустым списком.',
+    `В разделе не больше ${limits.lines} строк (в texts — не больше ${limits.textLines}); строка не длиннее ${limits.lineLen} знаков.`,
+  ];
+}
+
+/** The rules as the describers of Part B read them. */
+export const REPORT_RULES_RU: readonly string[] = reportRules(CEILING_LIMITS);
 
 export function reportSectionLines(): string[] {
   return REPORT_SECTIONS.map((s) => `- ${s.id} — ${s.hint}.`);

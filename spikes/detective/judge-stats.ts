@@ -7,9 +7,17 @@ export type Verdict = 'supported' | 'unsupported' | 'no_visual_claim' | 'unclear
 /** Rubric v2 (docs/evals/detective-spike-3.md, Part A): the judge marks each visual claim. */
 export type ClaimMark = 'ok' | 'contradicted' | 'absent' | 'unclear';
 
+/**
+ * Rubric v3 (docs/evals/detective-spike-3.md, Part C amendment): `seen` states that something is
+ * visible or what it looks like; `not_seen` states that something is absent or cannot be read.
+ */
+export type SeenKind = 'seen' | 'not_seen';
+
 export interface JudgedClaim {
   text: string;
   mark: ClaimMark;
+  /** Present only under rubric v3. */
+  kind?: SeenKind;
 }
 
 export interface JudgedFinding {
@@ -20,10 +28,17 @@ export interface JudgedFinding {
   claims?: JudgedClaim[];
 }
 
-/** Rubric v2: the script, not the judge, turns the claim marks into the verdict of a finding. */
+export const isWrongMark = (mark: ClaimMark): boolean =>
+  mark === 'contradicted' || mark === 'absent';
+
+/**
+ * Rubrics v2 and v3: the script, not the judge, turns the claim marks into the verdict of a
+ * finding. Under v3 only a wrong `seen` claim makes a finding unsupported: a wrong `not_seen`
+ * claim is a miss of the eyes, counted apart.
+ */
 export function verdictFromClaims(claims: readonly JudgedClaim[]): Verdict {
   if (claims.length === 0) return 'no_visual_claim';
-  if (claims.some((c) => c.mark === 'contradicted' || c.mark === 'absent')) return 'unsupported';
+  if (claims.some((c) => isWrongMark(c.mark) && c.kind !== 'not_seen')) return 'unsupported';
   return claims.some((c) => c.mark === 'ok') ? 'supported' : 'unclear';
 }
 
@@ -69,7 +84,23 @@ export interface ArmCounts {
   missingVerdicts: number;
   /** Rubric v2 only: marks over all visual claims of the arm. */
   claims: Record<ClaimMark, number>;
+  /** Rubric v3 only: the same marks, split by the judge's claim kind. */
+  seenClaims: Record<ClaimMark, number>;
+  notSeenClaims: Record<ClaimMark, number>;
+  /**
+   * Rubric v3 only: the verdicts as rubric v2 derives them, where a wrong claim of either kind
+   * fails a finding. They keep the shares comparable with Part A.
+   */
+  v2Supported: number;
+  v2Unsupported: number;
 }
+
+const noMarks = (): Record<ClaimMark, number> => ({
+  ok: 0,
+  contradicted: 0,
+  absent: 0,
+  unclear: 0,
+});
 
 export function emptyCounts(): ArmCounts {
   return {
@@ -80,8 +111,19 @@ export function emptyCounts(): ArmCounts {
     ruleOk: 0,
     ruleWrong: 0,
     missingVerdicts: 0,
-    claims: { ok: 0, contradicted: 0, absent: 0, unclear: 0 },
+    claims: noMarks(),
+    seenClaims: noMarks(),
+    notSeenClaims: noMarks(),
+    v2Supported: 0,
+    v2Unsupported: 0,
   };
+}
+
+function addV2Reading(c: ArmCounts, claims: readonly JudgedClaim[]): void {
+  if (!claims.some((claim) => claim.kind !== undefined)) return;
+  const verdict = verdictFromClaims(claims.map(({ text, mark }) => ({ text, mark })));
+  if (verdict === 'supported') c.v2Supported += 1;
+  if (verdict === 'unsupported') c.v2Unsupported += 1;
 }
 
 export function addVerdict(c: ArmCounts, v: JudgedFinding | undefined): void {
@@ -95,19 +137,33 @@ export function addVerdict(c: ArmCounts, v: JudgedFinding | undefined): void {
   else c.noVisualClaim += 1;
   if (v.rule_ok === true) c.ruleOk += 1;
   if (v.rule_ok === false) c.ruleWrong += 1;
-  for (const claim of v.claims ?? []) c.claims[claim.mark] += 1;
+  for (const claim of v.claims ?? []) {
+    c.claims[claim.mark] += 1;
+    if (claim.kind === 'seen') c.seenClaims[claim.mark] += 1;
+    if (claim.kind === 'not_seen') c.notSeenClaims[claim.mark] += 1;
+  }
+  addV2Reading(c, v.claims ?? []);
+}
+
+/** Wrong marks over the settled ones (`unclear` left out); null when nothing was settled. */
+export function markErrorRate(marks: Record<ClaimMark, number>): number | null {
+  const wrong = marks.contradicted + marks.absent;
+  const settled = wrong + marks.ok;
+  return settled === 0 ? null : r3(wrong / settled);
 }
 
 /** Shares of an arm: unsupported findings over judged ones, wrong claims over settled ones. */
 export function withRates(c: ArmCounts) {
   const judged = c.supported + c.unsupported;
-  const wrongClaims = c.claims.contradicted + c.claims.absent;
-  const settledClaims = wrongClaims + c.claims.ok;
+  const v2Judged = c.v2Supported + c.v2Unsupported;
   return {
     ...c,
     judged,
     unsupportedRate: judged === 0 ? null : r3(c.unsupported / judged),
-    claimErrorRate: settledClaims === 0 ? null : r3(wrongClaims / settledClaims),
+    v2UnsupportedRate: v2Judged === 0 ? null : r3(c.v2Unsupported / v2Judged),
+    claimErrorRate: markErrorRate(c.claims),
+    seenClaimErrorRate: markErrorRate(c.seenClaims),
+    notSeenClaimErrorRate: markErrorRate(c.notSeenClaims),
   };
 }
 

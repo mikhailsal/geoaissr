@@ -80,3 +80,86 @@ test('eyes verdicts are tallied by group and bar 3 counts options and none-of-th
   expect(summary.choiceAnswered.barPassed).toBe(false);
   expect(summary.groups.textAbstained?.wrong).toBe(1);
 });
+
+const REPORT_ROUND = {
+  spotId: 'spot-a',
+  executionId: 'e2',
+  infraError: null,
+  reportRound: {
+    report: {
+      tSec: 21,
+      lines: [
+        { section: 'texts', text: '«LAWSON» — вывеска на здании', frame: 1 },
+        { section: 'texts', text: 'надпись на табличке, не разобрать', frame: 2 },
+        { section: 'road', text: 'серый асфальт без разметки', frame: 1 },
+      ],
+      maskedWords: [],
+      unknownFrames: 0,
+    },
+  },
+  asks: [
+    {
+      index: 1,
+      items: [
+        {
+          kind: 'describe',
+          question: 'номера машин',
+          status: 'answered',
+          value: 'жёлтые',
+          confidence: 'unsure',
+        },
+        { kind: 'describe', question: 'люди', status: 'abstained', value: 'not_visible' },
+        { kind: 'text', question: 'табличка', status: 'answered', value: 'ローソン' },
+      ],
+    },
+  ],
+};
+
+test('spike 3: report lines and free descriptions are judged, and bars 3 and 4 are tallied', () => {
+  const items = withRounds([REPORT_ROUND], eyesItems);
+  expect(items.map((i) => `${i.kind}:${i.askIndex}`)).toEqual([
+    'report:0',
+    'report:0',
+    'report:0',
+    'describe:1',
+    'describe:1',
+    'text:1',
+  ]);
+  expect(renderEyesItem(items[0] ?? ({} as never))).toBe(
+    '[scene note] «LAWSON» — вывеска на здании',
+  );
+  expect(renderEyesItem(items[3] ?? ({} as never))).toBe(
+    '[description] Request: «номера машин». Answer: жёлтые',
+  );
+  expect(renderEyesItem(items[4] ?? ({} as never))).toContain('Answer: not visible');
+  const batches = buildEyesBatches(items, 1);
+  const batch = batches[0];
+  if (!batch) throw new Error('no batch');
+  const paths: [string, string, string, string] = ['/f/a.jpg', '/f/b.jpg', '/f/c.jpg', '/f/d.jpg'];
+  const prompt = buildEyesJudgePrompt({ ...SAMPLE, imagePaths: paths }, batch);
+  expect(prompt).toContain('[scene note] items');
+  expect(prompt).toContain('[description] items');
+  // Every item is judged correct except the copied text of the report.
+  const verdicts = [...batch.key].map(([n, item]) => ({
+    n,
+    verdict: item.value.includes('LAWSON') ? ('wrong' as const) : ('correct' as const),
+  }));
+  const summary = summarizeEyesJudgement(batches, new Map([['spot-a', verdicts]]));
+  expect(summary.groups.reportCopiedText?.wrong).toBe(1);
+  expect(summary.groups.reportLine?.correct).toBe(2);
+  expect(summary.statements.judged).toBe(5);
+  expect(summary.statements.correctRate).toBe(0.8);
+  expect(summary.statements.barPassed).toBe(true);
+  expect(summary.copiedTexts.judged).toBe(2);
+  expect(summary.copiedTexts.barPassed).toBe(false);
+  expect(summary.groups.describeAbstained?.correct).toBe(1);
+  expect(summary.answersByConfidence.unsure.judged).toBe(1);
+  expect(summary.answersByConfidence.sure.judged).toBe(0);
+});
+
+test('the spike 2 prompt has no statement rules when a batch holds only choices and texts', () => {
+  const batch = buildEyesBatches(withRounds([ROUND], eyesItems), 1)[0];
+  if (!batch) throw new Error('no batch');
+  const paths: [string, string, string, string] = ['/f/a.jpg', '/f/b.jpg', '/f/c.jpg', '/f/d.jpg'];
+  expect(buildEyesJudgePrompt({ ...SAMPLE, imagePaths: paths }, batch)).not.toContain('scene note');
+});

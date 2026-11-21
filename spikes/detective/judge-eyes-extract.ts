@@ -1,23 +1,31 @@
 import { readFileSync } from 'node:fs';
 import { NONE_OF_THESE } from './choice.ts';
 import { seededRandom } from './judge-extract.ts';
+import type { ReportRoundFields } from './records.ts';
+import { isCopiedTextLine } from './report-metrics.ts';
 import type { ScoredItem } from './scoring.ts';
 
 /**
  * Items for the eyes-answer judge (spike 2, bar 3): every choice and transcription question the
  * eyes answered or abstained on, grouped by spot, shuffled with a fixed seed and numbered.
  * Brain-written choices have no human labels, so this judge is their labelling pass.
+ * Spike 3 adds what the eyes wrote in their own words: the lines of the scene report (kind
+ * `report`, ask index 0) and the answers to `describe` requests.
  */
 
 export interface EyesItem {
   spotId: string;
   executionId: string;
+  /** 0 for a line of the scene report. */
   askIndex: number;
-  kind: 'choice' | 'text';
+  kind: 'choice' | 'text' | 'describe' | 'report';
+  /** The question, the transcription target or the topic; the section id for a report line. */
   question: string;
   options: string[];
   value: string;
   status: 'answered' | 'abstained';
+  /** Spike 3: how sure the eyes said they were of an answer. */
+  confidence?: 'sure' | 'unsure';
 }
 
 export interface EyesBatch {
@@ -31,6 +39,20 @@ interface RoundRow {
   executionId: string;
   infraError: string | null;
   asks: Array<{ index: number; items: ScoredItem[] }>;
+  reportRound?: Pick<ReportRoundFields, 'report'>;
+}
+
+function reportItems(r: RoundRow): EyesItem[] {
+  return (r.reportRound?.report?.lines ?? []).map((line) => ({
+    spotId: r.spotId,
+    executionId: r.executionId,
+    askIndex: 0,
+    kind: 'report' as const,
+    question: line.section,
+    options: [],
+    value: line.text,
+    status: 'answered' as const,
+  }));
 }
 
 function toEyesItem(r: RoundRow, askIndex: number, it: ScoredItem): EyesItem | null {
@@ -45,6 +67,7 @@ function toEyesItem(r: RoundRow, askIndex: number, it: ScoredItem): EyesItem | n
     options: it.options ?? [],
     value: it.value,
     status: it.status,
+    ...(it.confidence ? { confidence: it.confidence } : {}),
   };
 }
 
@@ -54,11 +77,18 @@ export function eyesItems(file: string): EyesItem[] {
     .filter((line) => line.trim().length > 0)
     .map((line) => JSON.parse(line) as RoundRow)
     .filter((r) => r.infraError === null)
-    .flatMap((r) =>
-      r.asks.flatMap((a) =>
+    .flatMap((r) => [
+      ...reportItems(r),
+      ...r.asks.flatMap((a) =>
         a.items.map((it) => toEyesItem(r, a.index, it)).filter((x): x is EyesItem => x !== null),
       ),
-    );
+    ]);
+}
+
+/** A statement in the eyes' own words that copies text from the scene (spike 3, bar 4). */
+export function isCopiedText(item: EyesItem): boolean {
+  if (item.kind === 'text') return item.status === 'answered';
+  return item.kind === 'report' && isCopiedTextLine({ section: item.question, text: item.value });
 }
 
 function answerText(item: EyesItem): string {
@@ -71,6 +101,11 @@ function answerText(item: EyesItem): string {
 
 /** One line the judge reads; it carries no role, round or timing field. */
 export function renderEyesItem(item: EyesItem): string {
+  if (item.kind === 'report') return `[scene note] ${item.value}`;
+  if (item.kind === 'describe') {
+    const answer = item.status === 'abstained' ? answerText(item) : item.value;
+    return `[description] Request: «${item.question}». Answer: ${answer}`;
+  }
   if (item.kind === 'text') {
     return `[transcription] Request: «${item.question}». Answer: ${answerText(item)}`;
   }
