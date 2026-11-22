@@ -189,3 +189,22 @@ test('a panorama that is not from the road network is skipped', async () => {
   });
   expect(result.hops).toBe(0);
 });
+
+// Value: protects=a panorama a few metres away under another id is not counted as a hop; fails_when=the minimum-advance guard is dropped and a duplicate counts as movement; why_new=no other road in this file has a panorama inside the 3 m minimum; seam=metadata lookup; no_claim=how often real roads repeat a place.
+test('a panorama closer than the minimum advance is not a hop', async () => {
+  const near = destinationPoint(ORIGIN.lat, ORIGIN.lng, 90, 0.002);
+  const { result } = await walk([{ panoId: 'twin', ...near }], 90, null);
+  expect(result.hops).toBe(0);
+  expect(result.end).toEqual(START);
+});
+
+// Value: protects=the first hop snaps the asked heading to a road within a quarter turn and refuses a road beyond it; fails_when=the first-hop turn limit is removed or tightened to the follow limit; why_new=the other roads start dead ahead or dead behind, so no test had a first hop between the two limits; seam=metadata lookup; no_claim=real junction angles.
+test('the first hop snaps to a road within a quarter turn and refuses one beyond it', async () => {
+  // 75 degrees is inside the first-hop limit (90) and outside the follow limit (60).
+  const snapped = await walk(leg('s', ORIGIN, 75, 200, 10), 0, null);
+  expect(snapped.result.hops).toBe(1);
+  expect(turnDeg(snapped.result.headingDeg, 75)).toBeLessThan(5);
+  const refused = await walk(leg('r', ORIGIN, 120, 200, 10), 0, null);
+  expect(refused.result.hops).toBe(0);
+  expect(refused.result.stop).toBe('road_end');
+});
