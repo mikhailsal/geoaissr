@@ -1,4 +1,6 @@
+import { z } from 'zod';
 import {
+  clampMoveDistanceM,
   formatToolZodError,
   lookInputSchema,
   moveInputSchema,
@@ -58,7 +60,11 @@ const LOOK_ARGS = lookInputSchema
   .extend({ hypothesis: lookInputSchema.shape.hypothesis.optional() });
 const MOVE_ARGS = moveInputSchema
   .omit({ finding: true, shifts: true, current_guess: true })
-  .extend({ hypothesis: moveInputSchema.shape.hypothesis.optional() });
+  .extend({
+    hypothesis: moveInputSchema.shape.hypothesis.optional(),
+    // Lenient: a distance outside the advertised range is clamped, not bounced.
+    distance_m: z.number().finite().positive().transform(clampMoveDistanceM).optional(),
+  });
 
 function optionalHypothesis(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return raw;

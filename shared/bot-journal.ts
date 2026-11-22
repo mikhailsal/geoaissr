@@ -74,6 +74,7 @@ export const journalFrameSchema = z.object({
       pitch: z.number().optional(),
       fov: z.number().optional(),
       step: z.number().optional(),
+      distanceM: z.number().optional(),
     })
     .optional(),
 });

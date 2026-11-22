@@ -4,16 +4,29 @@ Bots inspect the panorama through the local bridge. Reasoning and usage appear i
 
 ## Exploration and the step journal
 
-| Tool          | Effect                                          | Paid turns   |
-| ------------- | ----------------------------------------------- | ------------ |
-| `observe`     | Return the four starting views (journal step 0) | 0            |
-| `look`        | Change heading, pitch or field of view          | 1 on success |
-| `move`        | Move along the road when movement is enabled    | 1 on success |
-| `final_guess` | Freeze the final answer                         | 0            |
+| Tool          | Effect                                           | Paid turns   |
+| ------------- | ------------------------------------------------ | ------------ |
+| `observe`     | Return the four starting views (journal step 0)  | 0            |
+| `look`        | Change heading, pitch or field of view           | 1 on success |
+| `move`        | Step or drive along the road when movement is on | 1 on success |
+| `final_guess` | Freeze the final answer                          | 0            |
 
 There is no `draft_guess` or `submit_guess`: both are unknown tools. Checkpoints come only from `current_guess` on `look` and `move`.
 
 Failed calls do not spend a turn. A final submission remains available after the paid-turn limit. Final answers cannot be overwritten. If the process exits or time expires without a final answer, the latest checkpoint is scored; with no checkpoint and no final answer the bot has no guess (no pin, zero points, "нет догадки"). Process completion drains terminal usage without holding round completion for a price request.
+
+### Moving
+
+`move` takes a `heading` and an optional `distance_m`.
+
+- Without `distance_m` it is one short step: the server looks for the panorama nearest to a point 18 m ahead (then 40 m ahead) and returns one frame that looks along the requested heading.
+- With `distance_m` (20 to 2000; a value outside the range is clamped, not rejected) it is a long move for the same single paid turn. The server walks the road from panorama to panorama: each hop asks for the panorama nearest to a point 150, 60 or 18 m ahead on the current bearing, and the next hop continues on the bearing of the hop just made, so the walk follows the bends of the road. The first hop may leave the requested heading by up to 90 degrees (it snaps to the road); later hops may turn by up to 60 degrees, so the walk stops at a T-junction or a dead end instead of picking a side. It never returns to a panorama it left. When the short probes miss (a gap in the coverage, a hairpin), a long move tries the longer ones before it gives up, so it may overshoot the requested distance by up to about 150 m.
+- A long move ends when the distance is covered, the road ends, or the search budget runs out (40 metadata lookups or 8 seconds). It returns one frame that looks along the road at the new position, and its reply says how far it went and whether it stopped short. Only Street View metadata lookups are made on the way; they are free of charge and use no quota. The one image at the end is the only billed request, as for a short step. A 1,000 to 2,000 m move took 1.4 to 6.8 seconds on six real roads over two trials (8 to 33 lookups), against about 0.7 seconds for a short step.
+- A move that finds no panorama in the requested direction fails, charges no turn and leaves the bot where it was.
+
+The scored target is the start panorama: a bot that reads an address two kilometres away answers two kilometres off.
+
+The eval tool has no `move`: its dataset holds four frames of one panorama per spot.
 
 ### Fields
 
