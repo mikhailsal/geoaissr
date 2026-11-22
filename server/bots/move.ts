@@ -1,7 +1,10 @@
-import { normalizeLongitude } from '../../shared/bot-tools.ts';
 import type { LocationService } from '../location.ts';
+import { destinationPoint, walkRoad, type WalkStop } from './road-walk.ts';
 
-const EARTH_RADIUS_KM = 6371;
+export { destinationPoint } from './road-walk.ts';
+
+/** Length of the single short step in fake mode, where there is no road to follow. */
+const FAKE_STEP_M = 25;
 
 export interface BotPosition {
   panoId: string;
@@ -15,43 +18,40 @@ export interface MoveResult {
   ok: boolean;
   position: BotPosition;
   message?: string;
+  /** Distance covered along the road by this call, in metres; set on success. */
+  travelledM?: number;
+  /** Bearing of the last hop: the direction the road leads at the new position. */
+  headingDeg?: number;
+  /** Why the walk ended; anything but `reached` means it stopped short of the request. */
+  stop?: WalkStop;
 }
 
-export function destinationPoint(
-  lat: number,
-  lng: number,
-  headingDeg: number,
-  distanceKm: number,
-): { lat: number; lng: number } {
-  const toRad = (d: number): number => (d * Math.PI) / 180;
-  const toDeg = (r: number): number => (r * 180) / Math.PI;
-  const lat1 = toRad(lat);
-  const lng1 = toRad(lng);
-  const brng = toRad(headingDeg);
-  const ang = distanceKm / EARTH_RADIUS_KM;
-
-  const sinLat2 = Math.sin(lat1) * Math.cos(ang) + Math.cos(lat1) * Math.sin(ang) * Math.cos(brng);
-  const lat2 = Math.asin(Math.max(-1, Math.min(1, sinLat2)));
-  const lng2 =
-    lng1 +
-    Math.atan2(
-      Math.sin(brng) * Math.sin(ang) * Math.cos(lat1),
-      Math.cos(ang) - Math.sin(lat1) * Math.sin(lat2),
-    );
-  return { lat: toDeg(lat2), lng: normalizeLongitude(toDeg(lng2)) };
+export interface MoveRequest {
+  /** Long move: metres to cover along the road. Absent means one short step. */
+  distanceM?: number;
+  signal?: AbortSignal;
 }
 
 export interface MoveTracker {
   getPosition: () => BotPosition;
   restorePosition: (prev: BotPosition) => void;
-  stepToward: (headingDeg: number) => Promise<MoveResult>;
+  stepToward: (headingDeg: number, request?: MoveRequest) => Promise<MoveResult>;
 }
+
+const NO_ROAD_MESSAGE =
+  'В этом направлении не найдена соседняя панорама дороги. Ход не списан, выберите другой азимут или осмотритесь через look.';
+/** The search stopped before the first hop: nothing says the road is missing. */
+const NO_TIME_MESSAGE =
+  'Сервер не успел найти панораму дороги в этом направлении. Ход не списан, повторите move или выберите другой азимут.';
+const ROUND_OVER_MESSAGE = 'Раунд уже завершён.';
 
 export function createMoveTracker(opts: {
   initial: { panoId: string; lat: number; lng: number; fakeSceneIndex: number };
   moveEnabled: boolean;
   fakeMode: boolean;
   locationService: LocationService;
+  /** Clock for the walk's time limit; tests replace it. */
+  now?: () => number;
 }): MoveTracker {
   let pos: BotPosition = {
     panoId: opts.initial.panoId,
@@ -61,7 +61,21 @@ export function createMoveTracker(opts: {
     fakeSceneIndex: opts.initial.fakeSceneIndex,
   };
 
-  async function stepToward(headingDeg: number): Promise<MoveResult> {
+  function fakeStep(headingDeg: number, request: MoveRequest): MoveResult {
+    const travelledM = request.distanceM ?? FAKE_STEP_M;
+    const next = destinationPoint(pos.lat, pos.lng, headingDeg, travelledM / 1000);
+    const nextStep = pos.steps + 1;
+    pos = {
+      ...pos,
+      lat: next.lat,
+      lng: next.lng,
+      panoId: `${opts.initial.panoId}:step${nextStep}`,
+      steps: nextStep,
+    };
+    return { ok: true, position: pos, travelledM, headingDeg, stop: 'reached' };
+  }
+
+  async function stepToward(headingDeg: number, request: MoveRequest = {}): Promise<MoveResult> {
     if (!opts.moveEnabled) {
       return {
         ok: false,
@@ -69,47 +83,29 @@ export function createMoveTracker(opts: {
         message: 'Движение запрещено правилами этой партии (no-move).',
       };
     }
+    if (opts.fakeMode) return fakeStep(headingDeg, request);
 
-    if (opts.fakeMode) {
-      const next = destinationPoint(pos.lat, pos.lng, headingDeg, 0.025);
-      const nextStep = pos.steps + 1;
-      pos = {
-        ...pos,
-        lat: next.lat,
-        lng: next.lng,
-        panoId: `${opts.initial.panoId}:step${nextStep}`,
-        steps: nextStep,
-      };
-      return { ok: true, position: pos };
+    const walk = await walkRoad({
+      start: { panoId: pos.panoId, lat: pos.lat, lng: pos.lng },
+      headingDeg,
+      distanceM: request.distanceM ?? null,
+      queryMetadata: (lat, lng, radius) => opts.locationService.queryMetadata(lat, lng, radius),
+      ...(request.signal ? { signal: request.signal } : {}),
+      ...(opts.now ? { now: opts.now } : {}),
+    });
+    // A round that ended during the walk moves nobody: the frame would be a billed request.
+    if (walk.stop === 'aborted') return { ok: false, position: pos, message: ROUND_OVER_MESSAGE };
+    if (walk.hops === 0) {
+      const message = walk.stop === 'road_end' ? NO_ROAD_MESSAGE : NO_TIME_MESSAGE;
+      return { ok: false, position: pos, message };
     }
-
-    for (const stepKm of [0.018, 0.04]) {
-      const candidate = destinationPoint(pos.lat, pos.lng, headingDeg, stepKm);
-      const meta = await opts.locationService.queryMetadata(candidate.lat, candidate.lng, 35);
-      if (
-        meta?.status === 'OK' &&
-        meta.pano_id &&
-        meta.pano_id !== pos.panoId &&
-        meta.location &&
-        typeof meta.copyright === 'string' &&
-        /google/i.test(meta.copyright)
-      ) {
-        pos = {
-          ...pos,
-          panoId: meta.pano_id,
-          lat: meta.location.lat,
-          lng: meta.location.lng,
-          steps: pos.steps + 1,
-        };
-        return { ok: true, position: pos };
-      }
-    }
-
+    pos = { ...pos, ...walk.end, steps: pos.steps + 1 };
     return {
-      ok: false,
+      ok: true,
       position: pos,
-      message:
-        'В этом направлении не найдена соседняя панорама дороги. Ход не списан, выберите другой азимут или осмотритесь через look.',
+      travelledM: Math.round(walk.travelledM),
+      headingDeg: walk.headingDeg,
+      stop: walk.stop,
     };
   }
 

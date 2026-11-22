@@ -107,6 +107,9 @@
                   >зум {formatZoom(thumb.params.fov)}× (fov {thumb.params.fov}°)</span
                 >{/if}
               {#if thumb.params.step !== undefined}<span>шаг {thumb.params.step}</span>{/if}
+              {#if thumb.params.distanceM !== undefined}<span
+                  >проезд {thumb.params.distanceM} м</span
+                >{/if}
             </div>
           {/if}
           {#if thumb.hypothesis}<p>{thumb.hypothesis}</p>{/if}

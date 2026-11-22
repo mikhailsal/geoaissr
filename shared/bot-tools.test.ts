@@ -1,5 +1,12 @@
 import { expect, test } from 'bun:test';
-import { finalGuessInputSchema, getBotToolDefinitions, parseGuessInput } from './bot-tools.ts';
+import {
+  clampMoveDistanceM,
+  finalGuessInputSchema,
+  getBotToolDefinitions,
+  MOVE_DISTANCE_MAX_M,
+  MOVE_DISTANCE_MIN_M,
+  parseGuessInput,
+} from './bot-tools.ts';
 
 test('advertises exactly observe, look, move and final_guess', () => {
   expect(getBotToolDefinitions().map((tool) => tool.name)).toEqual([
@@ -18,6 +25,25 @@ test('look and move advertise finding and current_guess as required', () => {
     expect(required).toContain('finding');
     expect(required).toContain('current_guess');
   }
+});
+
+// Value: protects=the long move is advertised to the bot as an optional distance with its range; fails_when=distance_m becomes required, loses its range, or disappears from the move tool; seam=none; no_claim=whether a model uses it.
+test('move advertises an optional distance_m with its range', () => {
+  const move = getBotToolDefinitions().find((t) => t.name === 'move');
+  const props = move?.inputSchema.properties as Record<string, Record<string, unknown>>;
+  expect(props.distance_m).toMatchObject({
+    type: 'number',
+    minimum: MOVE_DISTANCE_MIN_M,
+    maximum: MOVE_DISTANCE_MAX_M,
+  });
+  expect(move?.inputSchema.required as string[]).not.toContain('distance_m');
+  expect(move?.description).toContain('distance_m');
+  // With movement off the tool says so and does not describe a long move.
+  const off = getBotToolDefinitions(false).find((t) => t.name === 'move');
+  expect(off?.description).not.toContain('distance_m');
+  expect(clampMoveDistanceM(5)).toBe(MOVE_DISTANCE_MIN_M);
+  expect(clampMoveDistanceM(1e9)).toBe(MOVE_DISTANCE_MAX_M);
+  expect(clampMoveDistanceM(432.6)).toBe(433);
 });
 
 test('final_guess carries summary and finding, not the old reasoning fields', () => {

@@ -37,7 +37,9 @@ export function stepTitle(step: JournalStep): string {
     return `${head}${heading}`;
   }
   const head = params?.step !== undefined ? `Шаг ${params.step}` : 'Перемещение';
-  return `${head}${heading}`;
+  // A long move shows how much road it covered.
+  const far = params?.distanceM !== undefined ? ` · ${Math.round(params.distanceM)} м` : '';
+  return `${head}${heading}${far}`;
 }
 
 /** Accessible name of a frame button: «Кадр шага N: <действие>». */

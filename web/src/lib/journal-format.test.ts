@@ -32,6 +32,10 @@ test('step titles come from action and camera params', () => {
     'Шаг 2 · азимут 0°',
   );
   expect(stepTitle(step({ kind: 'move' }))).toBe('Перемещение');
+  // A long move shows the road distance it covered.
+  expect(
+    stepTitle(step({ kind: 'move', frames: [frame({ heading: 40, step: 2, distanceM: 432 })] })),
+  ).toBe('Шаг 2 · азимут 40° · 432 м');
   expect(stepTitle(step({}))).toBe('Осмотр');
 });
 

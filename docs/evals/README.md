@@ -75,7 +75,7 @@ The committed dataset lives in `docs/evals/dataset/` (28 spots, frames in `frame
 
 ### Headings and the unknown-compass limitation
 
-`headingDeg` is the compass heading of frame 0. When it is known, the headings the bot sees (start frames and `look` labels) are compass headings. When it is `null`, headings are measured from frame 0 (frame 0 is labelled 0 degrees, "С"). Such spots still show N/E/S/W-style labels, but they are relative to frame 0, not real compass directions. This is a known limitation: a bot that reasons about the sun or the compass will be misled on these spots.
+`headingDeg` is the compass heading of frame 0. When it is known, the headings the bot sees (start frames and `look` labels) are compass headings. When it is `null`, headings are measured from frame 0 (frame 0 is labelled 0 degrees, "С"). Such spots still show N/E/S/W-style labels, but they are relative to frame 0, not real compass directions. This is a known limitation: a bot that reasons about the sun or the compass will be misled on these spots. The bot prompt now tells bots to use the sun and the shadows, so a result on a spot with a `null` heading mixes that error in; new spots should carry a real `headingDeg`.
 
 ### How `look` works on frames
 

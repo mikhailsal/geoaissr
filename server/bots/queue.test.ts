@@ -228,3 +228,33 @@ test('audit covers invalid, unknown, aborted, image and thrown calls without cha
   expect(audits[3]?.error).toBe('broken handler');
   expect(audits[4]?.result?.isError).toBe(true);
 });
+
+// Value: protects=a long move reaches the handler with its distance, and a distance outside the advertised range is clamped instead of costing the bot a failed call; fails_when=distance_m is dropped by the queue or an over-long distance is rejected; seam=none; no_claim=what the handler does with it.
+test('move passes distance_m through, clamped to the advertised range', async () => {
+  const seen: Array<number | undefined> = [];
+  let turns = 0;
+  const q = createBotToolQueue({
+    moveLimit: 5,
+    moveEnabled: true,
+    handlers: makeHandlers({
+      executeMove: (args) => {
+        seen.push(args.distance_m);
+        return Promise.resolve({ text: 'move-ok' });
+      },
+      onTurnsChanged: (t) => {
+        turns = t;
+      },
+    }),
+  });
+  expect((await q.dispatch('move', { heading: 90 })).isError).toBeUndefined();
+  expect((await q.dispatch('move', { heading: 90, distance_m: 750 })).isError).toBeUndefined();
+  expect((await q.dispatch('move', { heading: 90, distance_m: 99_999 })).isError).toBeUndefined();
+  expect((await q.dispatch('move', { heading: 90, distance_m: 3 })).isError).toBeUndefined();
+  expect(seen).toEqual([undefined, 750, 2000, 20]);
+  expect(turns).toBe(4);
+
+  const bad = await q.dispatch('move', { heading: 90, distance_m: -50 });
+  expect(bad.isError).toBe(true);
+  expect(bad.text).toContain('Ход не списан');
+  expect(turns).toBe(4);
+});
