@@ -2,6 +2,18 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.3.2] - 2026-11-22
+
+### Added
+
+- Bots can drive far along the road in one turn. `move` takes an optional `distance_m` from 20 to 2000 metres. The server walks the road from panorama to panorama and stops where the distance is covered, the road ends or the search runs out of lookups or time. A long move costs one paid turn, the same as a short step. Its reply names the distance really covered and why the walk stopped, and the step journal and the results timeline show that distance.
+
+### Changed
+
+- Bots are told that their score is the distance between their point and the start panorama. The round prompt names the driving side and the position of the sun as clues to check first, says the list of clues is open and invites the bot to invent its own checks, and explains when a long move is worth a turn. The answer still describes the start, so the prompt tells the bot to account for the distance it drove.
+- A short `move` no longer steps backward at a dead end. A move with no road panorama ahead is refused and costs nothing.
+- A round that ends while a bot is still driving leaves the bot where it was and requests no frame, so the billed image request is not made.
+
 ## [0.3.1] - 2026-11-21
 
 ### Added
