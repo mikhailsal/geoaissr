@@ -43,11 +43,14 @@ test('spawnManaged stops entire detached process group including forked children
       childrenFile,
     });
 
+    // The shell creates the file before it writes the pid, so wait for the pid, not for the file.
+    const readGrandchildPid = (): number =>
+      existsSync(childPidFile) ? Number(readFileSync(childPidFile, 'utf8').trim()) : 0;
     const deadline = Date.now() + 3000;
-    while (!existsSync(childPidFile) && Date.now() < deadline) {
+    while (!(readGrandchildPid() > 0) && Date.now() < deadline) {
       await Bun.sleep(25);
     }
-    const grandchildPid = Number(readFileSync(childPidFile, 'utf8').trim());
+    const grandchildPid = readGrandchildPid();
     expect(grandchildPid).toBeGreaterThan(0);
     expect(isProcessAlive(handle.pid)).toBe(true);
     expect(isProcessAlive(grandchildPid)).toBe(true);

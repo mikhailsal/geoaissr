@@ -1,0 +1,159 @@
+{
+  "label": "leak-90",
+  "arms": {
+    "detective": "detective-90, median of 3 passes per spot",
+    "labels": "labels-90, 1 pass"
+  },
+  "note": "A round without a pin would score 20000 km; none occurred.",
+  "spots": 28,
+  "detectiveCloser": 5,
+  "labelsCloser": 20,
+  "ties": 3,
+  "medianOfSpotMediansKm": {
+    "detective": 3493.5,
+    "labels": 899
+  },
+  "medianPairedDifferenceKm": 245,
+  "pairs": [
+    {
+      "spotId": "spot-01",
+      "detectiveKm": 16681.8,
+      "labelsKm": 17474.9
+    },
+    {
+      "spotId": "spot-02",
+      "detectiveKm": 12091,
+      "labelsKm": 11841.2
+    },
+    {
+      "spotId": "spot-03",
+      "detectiveKm": 8559.7,
+      "labelsKm": 229.8
+    },
+    {
+      "spotId": "spot-04",
+      "detectiveKm": 446.2,
+      "labelsKm": 188.5
+    },
+    {
+      "spotId": "spot-05",
+      "detectiveKm": 9951.6,
+      "labelsKm": 1704.8
+    },
+    {
+      "spotId": "spot-06",
+      "detectiveKm": 10240.6,
+      "labelsKm": 10007.2
+    },
+    {
+      "spotId": "spot-07",
+      "detectiveKm": 2934.6,
+      "labelsKm": 2984.1
+    },
+    {
+      "spotId": "spot-08",
+      "detectiveKm": 16599.8,
+      "labelsKm": 5158.4
+    },
+    {
+      "spotId": "spot-09",
+      "detectiveKm": 358.8,
+      "labelsKm": 347
+    },
+    {
+      "spotId": "spot-10",
+      "detectiveKm": 359.5,
+      "labelsKm": 525.2
+    },
+    {
+      "spotId": "spot-11",
+      "detectiveKm": 377.6,
+      "labelsKm": 137.3
+    },
+    {
+      "spotId": "spot-12",
+      "detectiveKm": 4.7,
+      "labelsKm": 2.8
+    },
+    {
+      "spotId": "spot-13",
+      "detectiveKm": 1014.8,
+      "labelsKm": 4.8
+    },
+    {
+      "spotId": "spot-14",
+      "detectiveKm": 9465.8,
+      "labelsKm": 18707.6
+    },
+    {
+      "spotId": "spot-15",
+      "detectiveKm": 4052.3,
+      "labelsKm": 1773.5
+    },
+    {
+      "spotId": "spot-16",
+      "detectiveKm": 14.8,
+      "labelsKm": 1783.8
+    },
+    {
+      "spotId": "spot-17",
+      "detectiveKm": 1729.3,
+      "labelsKm": 1.2
+    },
+    {
+      "spotId": "spot-18",
+      "detectiveKm": 0.2,
+      "labelsKm": 0.2
+    },
+    {
+      "spotId": "spot-19",
+      "detectiveKm": 0.5,
+      "labelsKm": 0.5
+    },
+    {
+      "spotId": "spot-20",
+      "detectiveKm": 861.7,
+      "labelsKm": 689
+    },
+    {
+      "spotId": "spot-21",
+      "detectiveKm": 1546,
+      "labelsKm": 79.4
+    },
+    {
+      "spotId": "spot-22",
+      "detectiveKm": 6417.1,
+      "labelsKm": 1109
+    },
+    {
+      "spotId": "spot-23",
+      "detectiveKm": 16857.1,
+      "labelsKm": 16274.8
+    },
+    {
+      "spotId": "spot-24",
+      "detectiveKm": 17278.4,
+      "labelsKm": 2622
+    },
+    {
+      "spotId": "spot-25",
+      "detectiveKm": 8549.6,
+      "labelsKm": 0.9
+    },
+    {
+      "spotId": "spot-26",
+      "detectiveKm": 7.1,
+      "labelsKm": 0.3
+    },
+    {
+      "spotId": "spot-27",
+      "detectiveKm": 9156,
+      "labelsKm": 8094.4
+    },
+    {
+      "spotId": "spot-28",
+      "detectiveKm": 8994.6,
+      "labelsKm": 8994.6
+    }
+  ]
+}

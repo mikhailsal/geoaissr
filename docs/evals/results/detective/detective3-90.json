@@ -1,0 +1,384 @@
+{
+  "label": "detective3-90",
+  "arm": "detective",
+  "model": "claude-sonnet-5-5",
+  "eyesModel": "claude-sonnet-5-5",
+  "protocol": "report",
+  "requireZoom": true,
+  "effort": "low",
+  "brainEffort": "low",
+  "budgetSec": 90,
+  "moveLimit": 8,
+  "imageSize": 640,
+  "concurrency": 2,
+  "repeats": 3,
+  "spots": 28,
+  "spotIds": [
+    "spot-01",
+    "spot-02",
+    "spot-03",
+    "spot-04",
+    "spot-05",
+    "spot-06",
+    "spot-07",
+    "spot-08",
+    "spot-09",
+    "spot-10",
+    "spot-11",
+    "spot-12",
+    "spot-13",
+    "spot-14",
+    "spot-15",
+    "spot-16",
+    "spot-17",
+    "spot-18",
+    "spot-19",
+    "spot-20",
+    "spot-21",
+    "spot-22",
+    "spot-23",
+    "spot-24",
+    "spot-25",
+    "spot-26",
+    "spot-27",
+    "spot-28"
+  ],
+  "plannedRounds": 84,
+  "dry": false,
+  "gitCommit": "9d55152",
+  "date": "2026-11-21T14:06:30.051Z",
+  "promptHash": "e59b2fac7ca1",
+  "toolSchemaHash": "d7dc442807ab",
+  "datasetHash": "8599d87ad828",
+  "interrupted": false,
+  "completedRounds": 84,
+  "infraErrorRounds": 0,
+  "complete": true,
+  "measuredRounds": 84,
+  "finishRate": {
+    "hits": 84,
+    "total": 84,
+    "rate": 1,
+    "ci": {
+      "low": 0.956,
+      "high": 1
+    }
+  },
+  "noPinRate": {
+    "hits": 0,
+    "total": 84,
+    "rate": 0,
+    "ci": {
+      "low": 0,
+      "high": 0.044
+    }
+  },
+  "timeToFinalSec": {
+    "p50": 36.1,
+    "p95": 45.5
+  },
+  "errorKm": {
+    "median": 140.5,
+    "iqr": 1296.2
+  },
+  "accuracy": {
+    "within25Km": {
+      "hits": 30,
+      "total": 84,
+      "rate": 0.357,
+      "ci": {
+        "low": 0.263,
+        "high": 0.464
+      }
+    },
+    "within750Km": {
+      "hits": 56,
+      "total": 84,
+      "rate": 0.667,
+      "ci": {
+        "low": 0.561,
+        "high": 0.758
+      }
+    },
+    "beyond2000Km": {
+      "hits": 18,
+      "total": 84,
+      "rate": 0.214,
+      "ci": {
+        "low": 0.14,
+        "high": 0.313
+      }
+    },
+    "scoreMedian": 4552.5
+  },
+  "exchangesMedian": 2,
+  "exchangesAtLeast3": {
+    "hits": 6,
+    "total": 84,
+    "rate": 0.071,
+    "ci": {
+      "low": 0.033,
+      "high": 0.147
+    }
+  },
+  "askCycleSec": {
+    "p50": 5.3,
+    "p95": 8.8,
+    "n": 140
+  },
+  "settledBy": {
+    "answer": 140,
+    "timeout": 0,
+    "eyesDown": 0,
+    "closed": 0
+  },
+  "findingsRecorded": {
+    "hits": 140,
+    "total": 140,
+    "rate": 1,
+    "ci": {
+      "low": 0.973,
+      "high": 1
+    }
+  },
+  "questionMix": {
+    "feature": 0,
+    "choice": 0,
+    "text": 114,
+    "describe": 269
+  },
+  "features": {
+    "asked": 0,
+    "answered": 0,
+    "abstained": 0,
+    "timeout": 0,
+    "eyesDown": 0,
+    "agreement": {
+      "hits": 0,
+      "total": 0,
+      "rate": null,
+      "ci": null
+    },
+    "perFeature": {}
+  },
+  "choices": {
+    "asked": 0,
+    "answered": 0,
+    "noneOfThese": 0,
+    "abstained": 0,
+    "timeout": 0,
+    "eyesDown": 0
+  },
+  "transcriptions": {
+    "asked": 114,
+    "answered": 45,
+    "abstained": 69,
+    "timeout": 0,
+    "eyesDown": 0,
+    "agreement": {
+      "hits": 16,
+      "total": 45,
+      "rate": 0.356,
+      "ci": {
+        "low": 0.232,
+        "high": 0.502
+      }
+    },
+    "inventedPlaceNames": 1,
+    "inventedPlaces": ["nepal"]
+  },
+  "tokens": {
+    "brainMedian": 43029,
+    "eyesMedian": 119612.5,
+    "perRoundMedian": 163377.5,
+    "roundsWithUsage": 84
+  },
+  "corrections": 38,
+  "guardRejections": 1,
+  "optionRejections": 0,
+  "lateAnswers": 0,
+  "invalidAnswers": 0,
+  "zoomRefusals": 1,
+  "eyesLooksMedian": 5,
+  "reportProtocol": {
+    "report": {
+      "filed": {
+        "hits": 84,
+        "total": 84,
+        "rate": 1,
+        "ci": {
+          "low": 0.956,
+          "high": 1
+        }
+      },
+      "atSec": {
+        "p50": 15.8,
+        "p95": 21.4,
+        "n": 84
+      },
+      "briefingAtSec": {
+        "p50": 15.8,
+        "p95": 21.4,
+        "n": 84
+      },
+      "linesMedian": 20,
+      "copiedTextLinesMedian": 2,
+      "looksBeforeMedian": 3,
+      "unknownFrames": 0,
+      "maskedWords": {
+        "камерного": 1
+      }
+    },
+    "textRead": {
+      "hits": 64,
+      "total": 84,
+      "rate": 0.762,
+      "ci": {
+        "low": 0.661,
+        "high": 0.84
+      }
+    },
+    "byConfidence": {
+      "country": {
+        "rounds": 33,
+        "medianErrorKm": 3.7,
+        "within750Km": {
+          "hits": 30,
+          "total": 33,
+          "rate": 0.909,
+          "ci": {
+            "low": 0.764,
+            "high": 0.969
+          }
+        },
+        "beyond2000Km": {
+          "hits": 3,
+          "total": 33,
+          "rate": 0.091,
+          "ci": {
+            "low": 0.031,
+            "high": 0.236
+          }
+        }
+      },
+      "region": {
+        "rounds": 14,
+        "medianErrorKm": 45.9,
+        "within750Km": {
+          "hits": 12,
+          "total": 14,
+          "rate": 0.857,
+          "ci": {
+            "low": 0.601,
+            "high": 0.96
+          }
+        },
+        "beyond2000Km": {
+          "hits": 1,
+          "total": 14,
+          "rate": 0.071,
+          "ci": {
+            "low": 0.013,
+            "high": 0.315
+          }
+        }
+      },
+      "guess": {
+        "rounds": 37,
+        "medianErrorKm": 1057.7,
+        "within750Km": {
+          "hits": 14,
+          "total": 37,
+          "rate": 0.378,
+          "ci": {
+            "low": 0.241,
+            "high": 0.539
+          }
+        },
+        "beyond2000Km": {
+          "hits": 14,
+          "total": 37,
+          "rate": 0.378,
+          "ci": {
+            "low": 0.241,
+            "high": 0.539
+          }
+        }
+      },
+      "none": {
+        "rounds": 0,
+        "medianErrorKm": null,
+        "within750Km": {
+          "hits": 0,
+          "total": 0,
+          "rate": null,
+          "ci": null
+        },
+        "beyond2000Km": {
+          "hits": 0,
+          "total": 0,
+          "rate": null,
+          "ci": null
+        }
+      }
+    },
+    "control": {
+      "asked": {
+        "hits": 84,
+        "total": 84,
+        "rate": 1,
+        "ci": {
+          "low": 0.956,
+          "high": 1
+        }
+      },
+      "answered": 84,
+      "pinMovedAfter": 8
+    },
+    "requests": {
+      "asked": 383,
+      "answered": 284,
+      "unsure": 136,
+      "abstained": 99,
+      "timeout": 0
+    },
+    "formRejections": 1,
+    "earlyLookRefusals": 0,
+    "maskedInAnswers": {
+      "арабской": 1,
+      "косо": 1,
+      "тайский": 1,
+      "европейский": 1,
+      "английские": 1
+    },
+    "bars": {
+      "bar1Finish": {
+        "hits": 84,
+        "total": 84,
+        "rate": 1,
+        "ci": {
+          "low": 0.956,
+          "high": 1
+        },
+        "passed": true
+      },
+      "bar2Dialogue": {
+        "exchangesMedian": 2,
+        "passed": true
+      },
+      "bar6Accuracy": {
+        "medianErrorKm": 140.5,
+        "beyond2000Km": {
+          "hits": 18,
+          "total": 84,
+          "rate": 0.214,
+          "ci": {
+            "low": 0.14,
+            "high": 0.313
+          }
+        },
+        "passed": true
+      }
+    }
+  }
+}

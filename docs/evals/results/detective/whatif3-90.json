@@ -1,0 +1,101 @@
+{
+  "label": "whatif3-90",
+  "arms": {
+    "detective": "detective3-90",
+    "single": "Stage 1 candidate-90"
+  },
+  "note": "Part C of docs/evals/detective-spike-3.md, intuition what-ifs. Each detective3-90 round is paired with the candidate-90 round of the same spot and pass; under a rule the pin is replaced by the single agent's pin. Nothing is played again.",
+  "pairs": 84,
+  "asPlayed": {
+    "rounds": 84,
+    "medianErrorKm": 140.5,
+    "within750Km": {
+      "hits": 56,
+      "total": 84,
+      "rate": 0.667,
+      "ci": {
+        "low": 0.561,
+        "high": 0.758
+      }
+    },
+    "beyond2000Km": {
+      "hits": 18,
+      "total": 84,
+      "rate": 0.214,
+      "ci": {
+        "low": 0.14,
+        "high": 0.313
+      }
+    }
+  },
+  "single": {
+    "rounds": 84,
+    "medianErrorKm": 5.8,
+    "within750Km": {
+      "hits": 80,
+      "total": 84,
+      "rate": 0.952,
+      "ci": {
+        "low": 0.884,
+        "high": 0.981
+      }
+    },
+    "beyond2000Km": {
+      "hits": 2,
+      "total": 84,
+      "rate": 0.024,
+      "ci": {
+        "low": 0.007,
+        "high": 0.083
+      }
+    }
+  },
+  "rules": {
+    "noTextRead": {
+      "replaced": 20,
+      "rounds": 84,
+      "medianErrorKm": 73.7,
+      "within750Km": {
+        "hits": 66,
+        "total": 84,
+        "rate": 0.786,
+        "ci": {
+          "low": 0.687,
+          "high": 0.86
+        }
+      },
+      "beyond2000Km": {
+        "hits": 13,
+        "total": 84,
+        "rate": 0.155,
+        "ci": {
+          "low": 0.093,
+          "high": 0.247
+        }
+      }
+    },
+    "confidenceGuess": {
+      "replaced": 37,
+      "rounds": 84,
+      "medianErrorKm": 13.1,
+      "within750Km": {
+        "hits": 75,
+        "total": 84,
+        "rate": 0.893,
+        "ci": {
+          "low": 0.809,
+          "high": 0.943
+        }
+      },
+      "beyond2000Km": {
+        "hits": 6,
+        "total": 84,
+        "rate": 0.071,
+        "ci": {
+          "low": 0.033,
+          "high": 0.147
+        }
+      }
+    }
+  }
+}

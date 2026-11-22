@@ -1,0 +1,192 @@
+{
+  "label": "detective2-haiku-90",
+  "arm": "detective",
+  "model": "claude-haiku-5-5",
+  "eyesModel": "claude-haiku-5-5",
+  "protocol": "choice",
+  "requireZoom": true,
+  "effort": "low",
+  "budgetSec": 90,
+  "moveLimit": 4,
+  "imageSize": 640,
+  "concurrency": 2,
+  "repeats": 1,
+  "spots": 28,
+  "spotIds": [
+    "spot-01",
+    "spot-02",
+    "spot-03",
+    "spot-04",
+    "spot-05",
+    "spot-06",
+    "spot-07",
+    "spot-08",
+    "spot-09",
+    "spot-10",
+    "spot-11",
+    "spot-12",
+    "spot-13",
+    "spot-14",
+    "spot-15",
+    "spot-16",
+    "spot-17",
+    "spot-18",
+    "spot-19",
+    "spot-20",
+    "spot-21",
+    "spot-22",
+    "spot-23",
+    "spot-24",
+    "spot-25",
+    "spot-26",
+    "spot-27",
+    "spot-28"
+  ],
+  "plannedRounds": 28,
+  "dry": false,
+  "gitCommit": "5bba473",
+  "date": "2026-11-21T07:51:37.993Z",
+  "promptHash": "78e1131b1ba2",
+  "toolSchemaHash": "88d5b0f36d0f",
+  "datasetHash": "8599d87ad828",
+  "interrupted": false,
+  "completedRounds": 28,
+  "infraErrorRounds": 0,
+  "complete": true,
+  "measuredRounds": 28,
+  "finishRate": {
+    "hits": 28,
+    "total": 28,
+    "rate": 1,
+    "ci": {
+      "low": 0.879,
+      "high": 1
+    }
+  },
+  "noPinRate": {
+    "hits": 0,
+    "total": 28,
+    "rate": 0,
+    "ci": {
+      "low": 0,
+      "high": 0.121
+    }
+  },
+  "timeToFinalSec": {
+    "p50": 46.5,
+    "p95": 53.3
+  },
+  "errorKm": {
+    "median": 1620.6,
+    "iqr": 8370.7
+  },
+  "accuracy": {
+    "within25Km": {
+      "hits": 5,
+      "total": 28,
+      "rate": 0.179,
+      "ci": {
+        "low": 0.079,
+        "high": 0.356
+      }
+    },
+    "within750Km": {
+      "hits": 12,
+      "total": 28,
+      "rate": 0.429,
+      "ci": {
+        "low": 0.265,
+        "high": 0.609
+      }
+    },
+    "scoreMedian": 1691
+  },
+  "exchangesMedian": 3,
+  "exchangesAtLeast3": {
+    "hits": 20,
+    "total": 28,
+    "rate": 0.714,
+    "ci": {
+      "low": 0.529,
+      "high": 0.847
+    }
+  },
+  "askCycleSec": {
+    "p50": 5.8,
+    "p95": 12.6,
+    "n": 79
+  },
+  "settledBy": {
+    "answer": 79,
+    "timeout": 0,
+    "eyesDown": 0,
+    "closed": 0
+  },
+  "findingsRecorded": {
+    "hits": 51,
+    "total": 51,
+    "rate": 1,
+    "ci": {
+      "low": 0.93,
+      "high": 1
+    }
+  },
+  "questionMix": {
+    "feature": 0,
+    "choice": 210,
+    "text": 78
+  },
+  "features": {
+    "asked": 0,
+    "answered": 0,
+    "abstained": 0,
+    "timeout": 0,
+    "eyesDown": 0,
+    "agreement": {
+      "hits": 0,
+      "total": 0,
+      "rate": null,
+      "ci": null
+    },
+    "perFeature": {}
+  },
+  "choices": {
+    "asked": 210,
+    "answered": 158,
+    "noneOfThese": 15,
+    "abstained": 52,
+    "timeout": 0,
+    "eyesDown": 0
+  },
+  "transcriptions": {
+    "asked": 78,
+    "answered": 25,
+    "abstained": 53,
+    "timeout": 0,
+    "eyesDown": 0,
+    "agreement": {
+      "hits": 16,
+      "total": 25,
+      "rate": 0.64,
+      "ci": {
+        "low": 0.445,
+        "high": 0.798
+      }
+    },
+    "inventedPlaceNames": 0,
+    "inventedPlaces": []
+  },
+  "tokens": {
+    "brainMedian": 79043,
+    "eyesMedian": 120011,
+    "perRoundMedian": 206430.5,
+    "roundsWithUsage": 28
+  },
+  "corrections": 9,
+  "guardRejections": 1,
+  "optionRejections": 17,
+  "lateAnswers": 0,
+  "invalidAnswers": 0,
+  "zoomRefusals": 2,
+  "eyesLooksMedian": 3
+}

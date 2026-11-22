@@ -1,0 +1,110 @@
+{
+  "label": "judge-eyes3-90",
+  "arm": "detective3-90 (84 rounds; every report line and every answered or abstained request)",
+  "note": "Model judge, not human. Part C of docs/evals/detective-spike-3.md, bars 3 and 4: one run of claude-opus-5-5 (seed 20261128), one call per spot. The judge reads the four start frames of a spot at full size; it does not see the zoomed frames. statements is bar 3 and copiedTexts is bar 4.",
+  "mode": "eyes",
+  "judgeModel": "claude-opus-5-5",
+  "seed": 20261128,
+  "spots": 28,
+  "spotsJudged": 28,
+  "groups": {
+    "describeAnswered": {
+      "correct": 201,
+      "wrong": 35,
+      "cannotTell": 3,
+      "missing": 0
+    },
+    "reportLine": {
+      "correct": 1403,
+      "wrong": 73,
+      "cannotTell": 17,
+      "missing": 0
+    },
+    "textAnswered": {
+      "correct": 39,
+      "wrong": 3,
+      "cannotTell": 3,
+      "missing": 0
+    },
+    "textAbstained": {
+      "correct": 56,
+      "wrong": 13,
+      "cannotTell": 0,
+      "missing": 0
+    },
+    "describeAbstained": {
+      "correct": 26,
+      "wrong": 3,
+      "cannotTell": 1,
+      "missing": 0
+    },
+    "reportCopiedText": {
+      "correct": 136,
+      "wrong": 15,
+      "cannotTell": 4,
+      "missing": 0
+    }
+  },
+  "answersByConfidence": {
+    "sure": {
+      "correct": 127,
+      "wrong": 19,
+      "cannotTell": 2,
+      "missing": 0,
+      "judged": 146,
+      "correctRate": 0.87,
+      "ci": {
+        "low": 0.806,
+        "high": 0.915
+      }
+    },
+    "unsure": {
+      "correct": 113,
+      "wrong": 19,
+      "cannotTell": 4,
+      "missing": 0,
+      "judged": 132,
+      "correctRate": 0.856,
+      "ci": {
+        "low": 0.786,
+        "high": 0.906
+      }
+    }
+  },
+  "choiceAnswered": {
+    "correct": 0,
+    "wrong": 0,
+    "cannotTell": 0,
+    "missing": 0,
+    "judged": 0,
+    "correctRate": null,
+    "ci": null,
+    "barPassed": false
+  },
+  "statements": {
+    "correct": 1779,
+    "wrong": 126,
+    "cannotTell": 27,
+    "missing": 0,
+    "judged": 1905,
+    "correctRate": 0.934,
+    "ci": {
+      "low": 0.922,
+      "high": 0.944
+    },
+    "barPassed": true
+  },
+  "copiedTexts": {
+    "correct": 175,
+    "wrong": 18,
+    "cannotTell": 7,
+    "missing": 0,
+    "judged": 193,
+    "correctRate": 0.907,
+    "ci": {
+      "low": 0.857,
+      "high": 0.94
+    },
+    "barPassed": true
+  }
+}

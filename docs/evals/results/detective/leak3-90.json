@@ -1,0 +1,21 @@
+{
+  "label": "leak3-90",
+  "arm": "detective3-90 (84 rounds)",
+  "note": "Part C of docs/evals/detective-spike-3.md, leak check made after the run. The eyes' own words are the report lines and the answers to describe requests with every «…» quote removed. A hit is a word that starts with a hand-written name or demonym stem of the spot's country. A script name is a hit followed by a noun such as «письмо», which the eyes are allowed to write.",
+  "rounds": 84,
+  "roundsNamingTheCountry": 5,
+  "ofThemOnlyAsAScriptName": 4,
+  "hitRounds": ["spot-18#1", "spot-18#2", "spot-18#3", "spot-19#1", "spot-19#3"],
+  "wordsMaskedByTheGuard": {
+    "inReports": {
+      "камерного": 1
+    },
+    "inAnswers": {
+      "арабской": 1,
+      "косо": 1,
+      "тайский": 1,
+      "европейский": 1,
+      "английские": 1
+    }
+  }
+}

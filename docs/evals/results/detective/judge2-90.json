@@ -1,0 +1,38 @@
+{
+  "label": "judge2-90",
+  "arms": {
+    "detective": "detective2-90 (84 rounds, step findings from the second ask on)",
+    "single": "Stage 1 candidate-90 (84 rounds, look-step findings)"
+  },
+  "note": "Model judge, not human. Same judge, rubric and seed as spike 1 (judge-90.json). Newcombe interval treats findings as independent although findings of one round are correlated.",
+  "judgeModel": "claude-sonnet-5-5",
+  "seed": 20261121,
+  "spots": 28,
+  "single": {
+    "supported": 82,
+    "unsupported": 7,
+    "noVisualClaim": 0,
+    "ruleOk": 10,
+    "ruleWrong": 3,
+    "missingVerdicts": 0,
+    "judged": 89,
+    "unsupportedRate": 0.079
+  },
+  "detective": {
+    "supported": 125,
+    "unsupported": 75,
+    "noVisualClaim": 0,
+    "ruleOk": 21,
+    "ruleWrong": 8,
+    "missingVerdicts": 0,
+    "judged": 200,
+    "unsupportedRate": 0.375
+  },
+  "difference": {
+    "diff": -0.296,
+    "low": -0.376,
+    "high": -0.198
+  },
+  "reading": "detective higher",
+  "barPassed": false
+}
