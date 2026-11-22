@@ -308,6 +308,34 @@ test('round prompt describes checkpoints, exploration and image delivery', () =>
   for (const prompt of [mcp, file]) expect(prompt).toContain('не выдумывай');
 });
 
+// protects=the bot is told what it is scored on, the two clues that split the world, that the clue list is open, and how to move far; fails_when=the goal line, the driving-side or sun guidance, the invitation to improvise or the long-move hint leaves the prompt, or the long move is offered with movement off; why_new=the checks above cover the journal and delivery only; seam=none; no_claim=presence does not prove model compliance.
+test('round prompt states the goal, the world-splitting clues and the long move', () => {
+  const options = {
+    botName: 'Bot',
+    regionLabelRu: 'Мир',
+    moveLimit: 3,
+    budgetSec: 60,
+    personalityPreset: 'neutral' as const,
+    personalityText: '',
+    deliveryMode: 'mcp' as const,
+  };
+  const withMove = buildBotRoundPrompt({ ...options, moveEnabled: true });
+  const noMove = buildBotRoundPrompt({ ...options, moveEnabled: false });
+  for (const prompt of [withMove, noMove]) {
+    expect(prompt).toContain('как можно ближе');
+    expect(prompt).toContain('только от расстояния');
+    expect(prompt).toContain('Сторона движения');
+    expect(prompt).toContain('Солнце');
+    expect(prompt).toContain('не полный список');
+  }
+  expect(withMove).toContain('distance_m');
+  expect(withMove).toContain('дальний ход');
+  // The target stays the start panorama however far the bot drives.
+  expect(withMove).toContain('Отвечать нужно про старт');
+  expect(noMove).not.toContain('distance_m');
+  expect(noMove).toContain('Движение (move) отключено');
+});
+
 test('agy audit caps the journal and records truncation without denying a permitted call', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-agy-audit-cap-'));
   try {
