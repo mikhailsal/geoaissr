@@ -1,7 +1,7 @@
 import { getRegionDiagonalKm } from '../../shared/regions.ts';
 import type { RenderedBotImage } from '../images/bot-image-service.ts';
 import { normalizeHeadingDeg } from '../images/label.ts';
-import type { MoveTracker } from './move.ts';
+import type { MoveResult, MoveTracker } from './move.ts';
 import type { BotSessionHandlers, ToolResponsePayload } from './queue.ts';
 import { REGION_LABELS_RU, type RoundBotParams, type RunnerCtx } from './runner-types.ts';
 import { dispatchObserveThumbs, makeThumb } from './thumbs.ts';
@@ -58,29 +58,56 @@ async function runLookTool(
   }
 }
 
+/** Reply of a successful move: a short step keeps its old text, a long move reports the road. */
+export function moveReplyText(label: string, res: MoveResult, far: boolean): string {
+  if (!far) return `Перемещение выполнено (${label}).`;
+  const base = `Дальний ход: пройдено около ${res.travelledM ?? 0} м по дороге, кадр смотрит по ходу движения (${label}).`;
+  if (res.stop === 'road_end') return `${base} Дальше в эту сторону панорам нет.`;
+  if (res.stop === 'search_limit') {
+    return `${base} Сервер остановился раньше заданного расстояния: дорога слишком извилистая.`;
+  }
+  if (res.stop === 'lookup_failed') {
+    return `${base} Сервер остановился раньше заданного расстояния: запрос следующей панорамы не удался.`;
+  }
+  return base;
+}
+
 async function runMoveTool(
   ctx: RunnerCtx,
   params: RoundBotParams,
   tracker: MoveTracker,
   turnNum: number,
-  args: { heading: number; hypothesis?: string },
+  args: { heading: number; distance_m?: number; hypothesis?: string },
   signal: AbortSignal,
 ): Promise<ToolResponsePayload> {
   const prevPos = tracker.getPosition();
+  const far = args.distance_m !== undefined;
+  // Read through a function: the round can end during any await below.
+  const roundOver = (): boolean => signal.aborted;
   try {
-    const res = await tracker.stepToward(args.heading);
+    const res = await tracker.stepToward(args.heading, {
+      signal,
+      ...(args.distance_m !== undefined ? { distanceM: args.distance_m } : {}),
+    });
     if (!res.ok) return { text: res.message ?? 'Тупик', isError: true };
+    if (roundOver()) {
+      // The round ended during the last lookup: the frame is the billed request, so none is made.
+      tracker.restorePosition(prevPos);
+      return { text: 'Раунд уже завершён.', isError: true };
+    }
+    // A short step keeps looking where the bot asked; a long move looks along the road it took.
+    const viewHeading = far ? (res.headingDeg ?? args.heading) : args.heading;
     try {
       const view = await ctx.imageService.getMoveView({
         panoId: res.position.panoId,
         lat: res.position.lat,
         lng: res.position.lng,
-        heading: args.heading,
+        heading: viewHeading,
         step: res.position.steps,
         size: params.slot.imageSize,
         fakeSceneIndex: res.position.fakeSceneIndex,
       });
-      if (signal.aborted) throw new Error('Раунд уже завершён.');
+      if (roundOver()) throw new Error('Раунд уже завершён.');
       ctx.dispatch({
         type: 'bot_thumb_added',
         matchId: params.matchId,
@@ -88,11 +115,15 @@ async function runMoveTool(
         roundNumber: params.roundNumber,
         botId: params.slot.id,
         thumb: makeThumb(turnNum, 'move', view, {
-          params: { heading: normalizeHeadingDeg(args.heading), step: res.position.steps },
+          params: {
+            heading: normalizeHeadingDeg(viewHeading),
+            step: res.position.steps,
+            ...(far && res.travelledM !== undefined ? { distanceM: res.travelledM } : {}),
+          },
           ...(args.hypothesis ? { hypothesis: args.hypothesis } : {}),
         }),
       });
-      return { text: `Перемещение выполнено (${view.label}).`, images: toImageBlocks([view]) };
+      return { text: moveReplyText(view.label, res, far), images: toImageBlocks([view]) };
     } catch (err) {
       tracker.restorePosition(prevPos);
       throw err;

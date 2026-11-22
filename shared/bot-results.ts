@@ -33,6 +33,7 @@ export interface BotTurnThumbView {
   label: string;
   thumbUrl: string;
   fullUrl?: string;
-  params?: { heading: number; pitch?: number; fov?: number; step?: number };
+  /** `distanceM` is set on a long move: the road distance it covered, in metres. */
+  params?: { heading: number; pitch?: number; fov?: number; step?: number; distanceM?: number };
   hypothesis?: string;
 }

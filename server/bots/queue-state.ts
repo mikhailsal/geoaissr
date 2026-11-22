@@ -36,7 +36,7 @@ export interface BotSessionHandlers {
     signal: AbortSignal,
   ) => Promise<ToolResponsePayload>;
   executeMove: (
-    args: { heading: number; hypothesis?: string },
+    args: { heading: number; distance_m?: number; hypothesis?: string },
     signal: AbortSignal,
   ) => Promise<ToolResponsePayload>;
   /** `finalized=false` stores a checkpoint (`current_guess`), `true` the final answer. */

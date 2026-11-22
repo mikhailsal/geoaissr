@@ -133,9 +133,27 @@ export const lookInputSchema = z
   })
   .strict();
 
+/** A long move covers this much road in one paid turn; a move without a distance is one step. */
+export const MOVE_DISTANCE_MIN_M = 20;
+export const MOVE_DISTANCE_MAX_M = 2000;
+
+/** A distance outside the advertised range is pulled into it instead of failing the call. */
+export function clampMoveDistanceM(distanceM: number): number {
+  return Math.round(Math.max(MOVE_DISTANCE_MIN_M, Math.min(MOVE_DISTANCE_MAX_M, distanceM)));
+}
+
 export const moveInputSchema = z
   .object({
     heading: z.number().finite().min(0).max(360).describe('Азимут движения по дороге (0–360)'),
+    distance_m: z
+      .number()
+      .finite()
+      .min(MOVE_DISTANCE_MIN_M)
+      .max(MOVE_DISTANCE_MAX_M)
+      .optional()
+      .describe(
+        `Дальний ход: сколько метров проехать по дороге (${MOVE_DISTANCE_MIN_M}–${MOVE_DISTANCE_MAX_M}). Без этого поля — один короткий шаг около 20 м`,
+      ),
     hypothesis: hypothesisSchema,
     ...stepJournalShape,
   })
@@ -237,7 +255,7 @@ export function getBotToolDefinitions(moveEnabled = true): BotToolDefinition[] {
     {
       name: 'move',
       description: moveEnabled
-        ? `Сделать шаг по дороге в сторону heading и получить новый снимок. Стоит 1 ход.${JOURNAL_NOTE}`
+        ? `Пройти по дороге в сторону heading и получить новый снимок. Без distance_m — короткий шаг около 20 м; с distance_m — дальний ход до ${MOVE_DISTANCE_MAX_M} м: сервер едет по дороге от панорамы к панораме и останавливается раньше, если дорога кончилась. Шаг и дальний ход стоят одинаково: 1 ход.${JOURNAL_NOTE}`
         : 'Движение по панораме выключено в этой партии (вызов вернёт ошибку без списания хода).',
       inputSchema: toToolJsonSchema(moveInputSchema),
     },
