@@ -91,4 +91,52 @@ test('the move reply tells a short step from a long move and names an early stop
   expect(moveReplyText('x', { ...base, stop: 'search_limit' }, true)).toContain(
     'остановился раньше',
   );
+  expect(moveReplyText('x', { ...base, stop: 'lookup_failed' }, true)).toContain(
+    'запрос следующей панорамы не удался',
+  );
+});
+
+// Value: protects=a round that ended during the walk moves nobody, and a search that ran out of time before the first hop is not reported as a missing road; fails_when=an aborted walk is committed as a successful move, or a stalled search tells the bot there is no road that way; why_new=the other tracker tests never end a round or stall a lookup; seam=metadata lookup and the clock; no_claim=how often real lookups stall.
+test('an ended round moves nobody and a stalled search is not called a missing road', async () => {
+  const road = roadService(leg('e', ORIGIN, 90, 3000, 10));
+  const round = new AbortController();
+  let lookups = 0;
+  const tracker = createMoveTracker({
+    initial,
+    moveEnabled: true,
+    fakeMode: false,
+    locationService: {
+      ...road.service,
+      queryMetadata: (lat, lng, radius) => {
+        lookups += 1;
+        if (lookups === 3) round.abort();
+        return road.service.queryMetadata(lat, lng, radius);
+      },
+    },
+  });
+  const before = tracker.getPosition();
+  const ended = await tracker.stepToward(90, { distanceM: 1500, signal: round.signal });
+  expect(ended).toEqual({ ok: false, position: before, message: 'Раунд уже завершён.' });
+  expect(tracker.getPosition()).toEqual(before);
+
+  let clock = 0;
+  const stalled = createMoveTracker({
+    initial,
+    moveEnabled: true,
+    fakeMode: false,
+    locationService: {
+      ...road.service,
+      // Every lookup misses and takes five seconds of the walk's clock.
+      queryMetadata: () => {
+        clock += 5_000;
+        return Promise.resolve({ status: 'ZERO_RESULTS' });
+      },
+    },
+    now: () => clock,
+  });
+  const res = await stalled.stepToward(90, { distanceM: 500 });
+  expect(res.ok).toBe(false);
+  expect(res.message).toContain('не успел');
+  expect(res.message).toContain('Ход не списан');
+  expect(res.message).not.toContain('не найдена');
 });

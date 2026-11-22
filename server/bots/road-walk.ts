@@ -17,8 +17,11 @@ export interface PanoPoint {
   lng: number;
 }
 
-/** Why a walk ended: the distance was covered, the road gave out, or the search budget did. */
-export type WalkStop = 'reached' | 'road_end' | 'search_limit' | 'aborted';
+/**
+ * Why a walk ended: the distance was covered, the road gave out, the search budget did, a lookup
+ * failed after the walk had moved, or the round ended.
+ */
+export type WalkStop = 'reached' | 'road_end' | 'search_limit' | 'lookup_failed' | 'aborted';
 
 export interface WalkResult {
   /** Where the walk ended; the start itself when no panorama was found. */
@@ -112,20 +115,84 @@ interface WalkState {
   hops: number;
   probes: number;
   visited: Set<string>;
+  /** Why the walk has to end now; null while it may go on. */
+  halt: WalkStop | null;
 }
 
 type MetadataQuery = LocationService['queryMetadata'];
+type Metadata = Awaited<ReturnType<MetadataQuery>>;
+
+/** What a walk takes from outside: the lookup, the round's abort signal and the clock. */
+interface WalkEnv {
+  queryMetadata: MetadataQuery;
+  signal: AbortSignal | undefined;
+  now: () => number;
+  deadlineAt: number;
+}
+
+/** True while the walk may make another lookup; otherwise records why it has to end. */
+function mayProbe(st: WalkState, env: WalkEnv): boolean {
+  if (st.halt !== null) return false;
+  if (env.signal?.aborted) st.halt = 'aborted';
+  else if (st.probes >= MAX_WALK_PROBES || env.now() > env.deadlineAt) st.halt = 'search_limit';
+  return st.halt === null;
+}
+
+const CUT = Symbol('cut');
+
+/** Settles like `pending`, or with CUT as soon as the walk's time is up or the round ends. */
+async function raceBudget<T>(pending: Promise<T>, env: WalkEnv): Promise<T | typeof CUT> {
+  let release = (): void => undefined;
+  const cut = new Promise<typeof CUT>((resolve) => {
+    const fire = (): void => {
+      resolve(CUT);
+    };
+    const timer = setTimeout(fire, Math.max(0, env.deadlineAt - env.now()));
+    env.signal?.addEventListener('abort', fire, { once: true });
+    release = () => {
+      clearTimeout(timer);
+      env.signal?.removeEventListener('abort', fire);
+    };
+  });
+  try {
+    return await Promise.race([pending, cut]);
+  } finally {
+    release();
+  }
+}
+
+/**
+ * One metadata lookup held to the walk's limits: it gives up (null) when the time runs out or
+ * the round ends while the request is in flight. A lookup that throws after the walk has moved
+ * ends the walk where it stands; with nothing gained the error goes to the caller.
+ */
+async function lookup(
+  st: WalkState,
+  env: WalkEnv,
+  at: { lat: number; lng: number },
+  radiusM: number,
+): Promise<Metadata> {
+  try {
+    const answer = await raceBudget(env.queryMetadata(at.lat, at.lng, radiusM), env);
+    if (answer !== CUT) return answer;
+    st.halt = env.signal?.aborted ? 'aborted' : 'search_limit';
+  } catch (err) {
+    if (st.hops === 0) throw err;
+    st.halt = 'lookup_failed';
+  }
+  return null;
+}
 
 /** One metadata lookup; null when it found no usable panorama ahead. */
 async function probeAhead(
   st: WalkState,
   probe: Probe,
   maxTurnDeg: number,
-  queryMetadata: MetadataQuery,
+  env: WalkEnv,
 ): Promise<{ point: PanoPoint; stepM: number; bearing: number } | null> {
   st.probes += 1;
   const ahead = destinationPoint(st.pos.lat, st.pos.lng, st.bearing, probe.aheadM / 1000);
-  const meta = await queryMetadata(ahead.lat, ahead.lng, probe.radiusM);
+  const meta = await lookup(st, env, ahead, probe.radiusM);
   if (meta?.status !== 'OK' || !meta.pano_id || !meta.location) return null;
   // Photos uploaded by users are single spheres off the road network.
   if (typeof meta.copyright !== 'string' || !/google/i.test(meta.copyright)) return null;
@@ -138,16 +205,15 @@ async function probeAhead(
   return { point, stepM, bearing };
 }
 
-/** Tries every probe of one reach; moves the walk and returns true on the first that hits. */
-async function tryReach(
-  st: WalkState,
-  reach: number,
-  queryMetadata: MetadataQuery,
-): Promise<boolean> {
+/**
+ * Tries every probe of one reach; moves the walk and returns true on the first that hits. The
+ * walk's limits (lookups, time, the round's end) are checked before each lookup.
+ */
+async function tryReach(st: WalkState, reach: number, env: WalkEnv): Promise<boolean> {
   const maxTurnDeg = st.hops === 0 ? FIRST_HOP_MAX_TURN_DEG : FOLLOW_MAX_TURN_DEG;
   for (const probe of REACHES[reach] ?? []) {
-    if (st.probes >= MAX_WALK_PROBES) return false;
-    const found = await probeAhead(st, probe, maxTurnDeg, queryMetadata);
+    if (!mayProbe(st, env)) return false;
+    const found = await probeAhead(st, probe, maxTurnDeg, env);
     if (!found) continue;
     st.pos = found.point;
     st.bearing = found.bearing;
@@ -168,14 +234,14 @@ async function hop(
   st: WalkState,
   firstReach: number,
   jumpGaps: boolean,
-  queryMetadata: MetadataQuery,
+  env: WalkEnv,
 ): Promise<number | null> {
   for (let reach = firstReach; reach <= NEAR; reach += 1) {
-    if (await tryReach(st, reach, queryMetadata)) return reach;
+    if (await tryReach(st, reach, env)) return reach;
   }
   if (!jumpGaps) return null;
   for (let reach = firstReach - 1; reach >= 0; reach -= 1) {
-    if (await tryReach(st, reach, queryMetadata)) return reach;
+    if (await tryReach(st, reach, env)) return reach;
   }
   return null;
 }
@@ -199,7 +265,8 @@ interface Pace {
 /**
  * Picks the reach of the next hop. A lookup that misses is wasted, so after a longer reach
  * missed the walk stays on the one that hit for a few hops, doubling that wait on each further
- * miss (a winding road), and steps one size up again once the wait is over.
+ * miss (a winding road), and steps one size up again once the wait is over. The wait goes back
+ * to one hop only when the longer reach hits: stepping up is not yet proof of a straight road.
  */
 function repace(pace: Pace, tried: number, hit: number, firstHop: boolean): void {
   if (firstHop) {
@@ -213,7 +280,7 @@ function repace(pace: Pace, tried: number, hit: number, firstHop: boolean): void
     pace.reach = hit;
   } else if (pace.wait > 0) {
     pace.wait -= 1;
-    pace.reach = hit;
+    pace.reach = pace.wait === 0 ? Math.max(0, hit - 1) : hit;
   } else {
     pace.hold = 1;
     pace.reach = Math.max(0, hit - 1);
@@ -224,6 +291,8 @@ function repace(pace: Pace, tried: number, hit: number, firstHop: boolean): void
  * Walks from `start` along the road. `distanceM: null` is the single short step (one hop);
  * a number is the long move: hops continue until that distance is covered, the road ends, or
  * the search budget (probes, time) runs out. The walk never returns to a panorama it left.
+ * A walk that has moved keeps what it covered whatever stops it; a lookup error before the
+ * first hop is thrown to the caller.
  */
 export async function walkRoad(opts: {
   start: PanoPoint;
@@ -234,7 +303,12 @@ export async function walkRoad(opts: {
   now?: () => number;
 }): Promise<WalkResult> {
   const now = opts.now ?? Date.now;
-  const startedAt = now();
+  const env: WalkEnv = {
+    queryMetadata: opts.queryMetadata,
+    signal: opts.signal,
+    now,
+    deadlineAt: now() + MAX_WALK_MS,
+  };
   const st: WalkState = {
     pos: opts.start,
     bearing: opts.headingDeg,
@@ -242,6 +316,7 @@ export async function walkRoad(opts: {
     hops: 0,
     probes: 0,
     visited: new Set([opts.start.panoId]),
+    halt: null,
   };
   const done = (stop: WalkStop): WalkResult => ({
     end: st.pos,
@@ -253,13 +328,11 @@ export async function walkRoad(opts: {
   const targetM = opts.distanceM;
   const pace: Pace = { reach: 0, hold: 1, wait: 0 };
   for (;;) {
-    if (opts.signal?.aborted) return done('aborted');
-    if (st.probes >= MAX_WALK_PROBES || now() - startedAt > MAX_WALK_MS) {
-      return done('search_limit');
-    }
     const tried = targetM === null ? NEAR : Math.max(pace.reach, reachFor(targetM - st.travelledM));
-    const hit = await hop(st, tried, targetM !== null, opts.queryMetadata);
-    if (hit === null) return done(st.probes >= MAX_WALK_PROBES ? 'search_limit' : 'road_end');
+    const hit = await hop(st, tried, targetM !== null, env);
+    if (hit === null) {
+      return done(st.halt ?? (st.probes >= MAX_WALK_PROBES ? 'search_limit' : 'road_end'));
+    }
     if (targetM === null || st.travelledM >= targetM - ARRIVAL_SLACK_M) return done('reached');
     repace(pace, tried, hit, st.hops === 1);
   }

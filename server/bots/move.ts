@@ -40,12 +40,18 @@ export interface MoveTracker {
 
 const NO_ROAD_MESSAGE =
   'В этом направлении не найдена соседняя панорама дороги. Ход не списан, выберите другой азимут или осмотритесь через look.';
+/** The search stopped before the first hop: nothing says the road is missing. */
+const NO_TIME_MESSAGE =
+  'Сервер не успел найти панораму дороги в этом направлении. Ход не списан, повторите move или выберите другой азимут.';
+const ROUND_OVER_MESSAGE = 'Раунд уже завершён.';
 
 export function createMoveTracker(opts: {
   initial: { panoId: string; lat: number; lng: number; fakeSceneIndex: number };
   moveEnabled: boolean;
   fakeMode: boolean;
   locationService: LocationService;
+  /** Clock for the walk's time limit; tests replace it. */
+  now?: () => number;
 }): MoveTracker {
   let pos: BotPosition = {
     panoId: opts.initial.panoId,
@@ -85,8 +91,14 @@ export function createMoveTracker(opts: {
       distanceM: request.distanceM ?? null,
       queryMetadata: (lat, lng, radius) => opts.locationService.queryMetadata(lat, lng, radius),
       ...(request.signal ? { signal: request.signal } : {}),
+      ...(opts.now ? { now: opts.now } : {}),
     });
-    if (walk.hops === 0) return { ok: false, position: pos, message: NO_ROAD_MESSAGE };
+    // A round that ended during the walk moves nobody: the frame would be a billed request.
+    if (walk.stop === 'aborted') return { ok: false, position: pos, message: ROUND_OVER_MESSAGE };
+    if (walk.hops === 0) {
+      const message = walk.stop === 'road_end' ? NO_ROAD_MESSAGE : NO_TIME_MESSAGE;
+      return { ok: false, position: pos, message };
+    }
     pos = { ...pos, ...walk.end, steps: pos.steps + 1 };
     return {
       ok: true,

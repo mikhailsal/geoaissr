@@ -66,6 +66,9 @@ export function moveReplyText(label: string, res: MoveResult, far: boolean): str
   if (res.stop === 'search_limit') {
     return `${base} Сервер остановился раньше заданного расстояния: дорога слишком извилистая.`;
   }
+  if (res.stop === 'lookup_failed') {
+    return `${base} Сервер остановился раньше заданного расстояния: запрос следующей панорамы не удался.`;
+  }
   return base;
 }
 
@@ -79,12 +82,19 @@ async function runMoveTool(
 ): Promise<ToolResponsePayload> {
   const prevPos = tracker.getPosition();
   const far = args.distance_m !== undefined;
+  // Read through a function: the round can end during any await below.
+  const roundOver = (): boolean => signal.aborted;
   try {
     const res = await tracker.stepToward(args.heading, {
       signal,
       ...(args.distance_m !== undefined ? { distanceM: args.distance_m } : {}),
     });
     if (!res.ok) return { text: res.message ?? 'Тупик', isError: true };
+    if (roundOver()) {
+      // The round ended during the last lookup: the frame is the billed request, so none is made.
+      tracker.restorePosition(prevPos);
+      return { text: 'Раунд уже завершён.', isError: true };
+    }
     // A short step keeps looking where the bot asked; a long move looks along the road it took.
     const viewHeading = far ? (res.headingDeg ?? args.heading) : args.heading;
     try {
@@ -97,7 +107,7 @@ async function runMoveTool(
         size: params.slot.imageSize,
         fakeSceneIndex: res.position.fakeSceneIndex,
       });
-      if (signal.aborted) throw new Error('Раунд уже завершён.');
+      if (roundOver()) throw new Error('Раунд уже завершён.');
       ctx.dispatch({
         type: 'bot_thumb_added',
         matchId: params.matchId,

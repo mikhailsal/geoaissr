@@ -4,6 +4,7 @@ import { leg, ORIGIN, roadService, START } from '../../test/fixtures/road.ts';
 import {
   bearingDeg,
   destinationPoint,
+  MAX_WALK_MS,
   MAX_WALK_PROBES,
   turnDeg,
   walkRoad,
@@ -207,4 +208,117 @@ test('the first hop snaps to a road within a quarter turn and refuses one beyond
   const refused = await walk(leg('r', ORIGIN, 120, 200, 10), 0, null);
   expect(refused.result.hops).toBe(0);
   expect(refused.result.stop).toBe('road_end');
+});
+
+// Value: protects=on a road where the long reach never lands, the walk stays off it for longer after every miss and covers the distance inside the lookup cap; fails_when=the wait starts over as soon as the walk steps up, so the long reach is retried every fourth hop and the cap is hit short of the distance; why_new=the cap test's road answers only the shortest probe, so it hits the cap with or without the back-off; seam=metadata lookup; no_claim=how winding real roads are.
+test('the walk stays off a reach for longer after every miss', async () => {
+  let longMisses = 0;
+  let found = 0;
+  const result = await walkRoad({
+    start: START,
+    headingDeg: 90,
+    distanceM: 2000,
+    // The 150 m probe never lands; a shorter one finds a panorama exactly where it asked.
+    queryMetadata: (lat, lng, radius = 5000) => {
+      if (radius > 40) {
+        longMisses += 1;
+        return Promise.resolve({ status: 'ZERO_RESULTS' });
+      }
+      found += 1;
+      return Promise.resolve({
+        status: 'OK',
+        pano_id: `w${found}`,
+        location: { lat, lng },
+        copyright: '© Google',
+      });
+    },
+  });
+  expect(result.stop).toBe('reached');
+  expect(result.travelledM).toBeGreaterThanOrEqual(1990);
+  expect(longMisses).toBeLessThanOrEqual(6);
+});
+
+// Value: protects=the time limit stops the walk between two lookups of one hop; fails_when=the clock is read once per hop, so a hop of slow misses makes all four of its lookups and reports that the road ended; why_new=the older time test has hops of one lookup each; seam=metadata lookup and the clock; no_claim=real lookup latency.
+test('the time limit stops the walk between the lookups of one hop', async () => {
+  let clock = 0;
+  let calls = 0;
+  const result = await walkRoad({
+    start: START,
+    headingDeg: 90,
+    distanceM: 2000,
+    // Every lookup misses and takes five seconds of the walk's clock.
+    queryMetadata: () => {
+      calls += 1;
+      clock += 5_000;
+      return Promise.resolve({ status: 'ZERO_RESULTS' });
+    },
+    now: () => clock,
+  });
+  expect(result.stop).toBe('search_limit');
+  expect(result.hops).toBe(0);
+  expect(calls).toBe(2);
+});
+
+// Value: protects=a lookup that never answers cannot hold a move past the walk's time limit or past the end of the round, and the walk keeps the hops it made; fails_when=the walk waits for the lookup itself; why_new=every other lookup in this file answers at once; seam=metadata lookup, the clock and the round signal; no_claim=the lookup's own HTTP timeout.
+test('a lookup that hangs is cut off at the time limit and at the end of the round', async () => {
+  const road = roadService(leg('e', ORIGIN, 90, 3000, 10));
+  const hangAtThird = (onHang: () => void) => {
+    let calls = 0;
+    return (lat: number, lng: number, radius?: number) => {
+      calls += 1;
+      if (calls <= 2) return road.service.queryMetadata(lat, lng, radius);
+      onHang();
+      return new Promise<null>(() => undefined);
+    };
+  };
+  let clock = 0;
+  const late = await walkRoad({
+    start: START,
+    headingDeg: 90,
+    distanceM: 2000,
+    // The third lookup starts 20 ms before the limit and never answers.
+    queryMetadata: hangAtThird(() => (clock = MAX_WALK_MS - 20)),
+    now: () => clock,
+  });
+  expect(late.stop).toBe('search_limit');
+  expect(late.hops).toBe(2);
+
+  const round = new AbortController();
+  const ended = await walkRoad({
+    start: START,
+    headingDeg: 90,
+    distanceM: 2000,
+    queryMetadata: hangAtThird(() =>
+      setTimeout(() => {
+        round.abort();
+      }, 5),
+    ),
+    signal: round.signal,
+  });
+  expect(ended.stop).toBe('aborted');
+  expect(ended.hops).toBe(2);
+});
+
+// Value: protects=a lookup error after the walk has moved ends it there with what it covered, and an error before the first hop still reaches the caller; fails_when=the error throws away the hops already made, or a failing first lookup is reported as a missing road; why_new=no other lookup in this file fails; seam=metadata lookup; no_claim=which errors the metadata service returns.
+test('a lookup error ends a walk that has moved and is thrown before the first hop', async () => {
+  const road = roadService(leg('e', ORIGIN, 90, 3000, 10));
+  let calls = 0;
+  const failAfter = (good: number) => (lat: number, lng: number, radius?: number) => {
+    calls += 1;
+    if (calls <= good) return road.service.queryMetadata(lat, lng, radius);
+    return Promise.reject(new Error('lookup failed'));
+  };
+  const walked = { start: START, headingDeg: 90, distanceM: 2000 };
+  const partial = await walkRoad({ ...walked, queryMetadata: failAfter(2) });
+  expect(partial.stop).toBe('lookup_failed');
+  expect(partial.hops).toBe(2);
+  expect(partial.travelledM).toBeGreaterThan(200);
+  expect(calls).toBe(3);
+
+  calls = 0;
+  const first = await walkRoad({ ...walked, queryMetadata: failAfter(0) }).catch(
+    (err: unknown) => err,
+  );
+  expect(first).toBeInstanceOf(Error);
+  expect((first as Error).message).toBe('lookup failed');
 });
