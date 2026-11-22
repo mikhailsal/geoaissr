@@ -2,8 +2,7 @@
   import { X } from '@lucide/svelte';
   import type { RoundResultEntryView } from '$shared/protocol';
   import Avatar from './Avatar.svelte';
-  import BotReasoning from './BotReasoning.svelte';
-  import BotTimeline from './BotTimeline.svelte';
+  import BotJournal from './BotJournal.svelte';
   import BotAccounting from './BotAccounting.svelte';
   import {
     formatDistanceRu,
@@ -71,9 +70,17 @@
   </header>
 
   {#key selection}
+    <BotJournal {entry} />
+    {#if entry.lat !== null && entry.lng !== null}
+      <p class="coordinates">{entry.lat.toFixed(5)}, {entry.lng.toFixed(5)}</p>
+    {:else}
+      <p class="muted">{RU.results.noBotGuess}</p>
+    {/if}
+    {#if entry.quip}<blockquote>«{entry.quip}»</blockquote>{/if}
+    {#if entry.turnsUsed === 0 && entry.lat !== null && entry.lng !== null}
+      <p class="muted">{RU.results.noMovesMade}</p>
+    {/if}
     <BotAccounting {entry} />
-    <BotReasoning {entry} />
-    <BotTimeline thumbs={entry.thumbs} />
   {/key}
 
   {#if entry.diagnosticsTail && entry.terminationReason !== 'normal'}
@@ -92,6 +99,16 @@
     flex-direction: column;
     gap: var(--sp-3);
     min-width: 0;
+  }
+
+  /* The results table can be wider than a narrow pane: keep the card inside the visible pane. */
+  @media (max-width: 899px) {
+    .bot-card {
+      position: sticky;
+      left: 0;
+      width: 100cqw;
+      box-sizing: border-box;
+    }
   }
 
   .card-head {
@@ -116,6 +133,23 @@
     margin: 0;
     font-size: 0.85rem;
     color: var(--paper-dim);
+  }
+
+  .coordinates,
+  .muted {
+    margin: 0;
+    color: var(--paper-dim);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  blockquote {
+    margin: 0;
+    padding-left: var(--sp-3);
+    border-left: 3px solid var(--paint);
+    color: var(--paint);
+    font-style: italic;
+    overflow-wrap: anywhere;
   }
 
   .close-btn {

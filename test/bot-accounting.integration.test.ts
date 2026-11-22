@@ -117,7 +117,7 @@ test('CLI exposes usage and delayed pricing to host and guest result views', asy
     resolveEstimate = resolve;
   });
   const requests: Array<{ model: string; usage: BotTokenUsage }> = [];
-  const script = `const [url,token]=process.argv.slice(1); await fetch(url+'/tool/final_guess',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({lat:55.75,lng:37.61,conclusion:'Test'})}); process.stdout.write(JSON.stringify({type:'result',usage:{input_tokens:120,output_tokens:30,cache_read_input_tokens:20,cache_creation_input_tokens:5}}));`;
+  const script = `const [url,token]=process.argv.slice(1); await fetch(url+'/tool/final_guess',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({lat:55.75,lng:37.61,summary:'Test'})}); process.stdout.write(JSON.stringify({type:'result',usage:{input_tokens:120,output_tokens:30,cache_read_input_tokens:20,cache_creation_input_tokens:5}}));`;
   const server = await startGeoServer(
     { ...parseStartArgs(['--fake', '--no-tunnel', '--no-open']), port: 0 },
     {

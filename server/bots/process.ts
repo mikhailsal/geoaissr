@@ -34,6 +34,8 @@ export interface ActiveBotHandle {
   stopped: boolean;
   releaseObserve: () => void;
   setStartedAt: (ms: number) => void;
+  /** Engine round end (epoch ms) when it is earlier than the slot budget, e.g. after early confirmation. */
+  setRoundDeadline?: (atMs: number) => void;
   flushDiagnostics?: () => void;
 }
 
@@ -261,6 +263,21 @@ function reportBotExit(
   opts: Parameters<typeof attachBotProcessMonitor>[0],
   exitInfo: { code: number | null; signal: NodeJS.Signals | null },
 ): void {
+  if (opts.proc.pid <= 0) {
+    // The OS never started the process (for example the CLI is not installed): spawn reports that
+    // asynchronously as an exit with code 1, which must not look like a bot that ran and failed.
+    dispatchBotLaunchFailure({
+      dispatch: opts.dispatch,
+      matchId: opts.handle.matchId,
+      gen: opts.handle.gen,
+      roundNumber: opts.handle.roundNumber,
+      botId: opts.handle.slotId,
+      token: opts.handle.token,
+      err: new Error(`не удалось запустить процесс: ${opts.proc.command}`),
+      logger: opts.logger,
+    });
+    return;
+  }
   const submitted = opts.didSubmitGuess();
   const tail = formatStderrTail(opts.proc.getStderr(), 50);
   const codeNum = exitInfo.code ?? -1;

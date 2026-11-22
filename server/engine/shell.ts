@@ -37,6 +37,8 @@ export interface ShellDeps {
     moveEnabled: boolean;
   }) => void;
   releaseBotObserve: (matchId: string, gen: number, roundNumber: number) => void;
+  /** Optional: tells running bots that the round now ends at `atMs` (epoch ms). */
+  setBotRoundDeadline?: (matchId: string, gen: number, roundNumber: number, atMs: number) => void;
   stopBotProcess: (matchId: string, gen: number, botId: string, reason: string) => void;
   stopAllBots: (reason: string) => void;
   clearRoundImages: () => void;
@@ -262,6 +264,9 @@ function runSyncEffect(ctx: EffectContext, effect: EngineEffect, currentState: R
     }
     case 'release_bot_observe':
       ctx.deps.releaseBotObserve(effect.matchId, effect.gen, effect.roundNumber);
+      return;
+    case 'set_bot_round_deadline':
+      ctx.deps.setBotRoundDeadline?.(effect.matchId, effect.gen, effect.roundNumber, effect.atMs);
       return;
     case 'stop_bot_process': {
       const t = ctx.timers.botBudgets.get(effect.botId);

@@ -1,3 +1,4 @@
+/** Legacy post-hoc reasoning. Old results carry it; new rounds use `BotJournal` instead. */
 export interface BotReasoning {
   facts?: string;
   rejectedGuesses?: Array<{ guess: string; reason: string }>;

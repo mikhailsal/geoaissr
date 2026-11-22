@@ -19,6 +19,7 @@ import {
   handleRoundPrepared,
   maybeStartCountdown,
 } from './round.ts';
+import { addFindingToJournal, addThumbToJournal } from './journal.ts';
 import type { EngineEvent, ReduceOutput, RoomState } from './types.ts';
 import { computeStartBlockedReasons } from './view.ts';
 
@@ -64,6 +65,7 @@ function handleBotEvent(state: RoomState, event: EngineEvent, now: number): Redu
     event.type !== 'bot_turns_updated' &&
     event.type !== 'bot_thumb_added' &&
     event.type !== 'bot_guess_recorded' &&
+    event.type !== 'bot_finding' &&
     event.type !== 'bot_finished'
   ) {
     return { state, effects: [] };
@@ -82,7 +84,11 @@ function handleBotEvent(state: RoomState, event: EngineEvent, now: number): Redu
   if (event.type === 'bot_turns_updated') {
     updatedBot = { ...bot, turnsUsed: event.turnsUsed };
   } else if (event.type === 'bot_thumb_added') {
-    updatedBot = { ...bot, thumbs: [...bot.thumbs, event.thumb] };
+    const atMs = Math.max(0, now - (active.roundStartedAt ?? now));
+    const journal = addThumbToJournal(bot.journal ?? [], event.thumb, atMs);
+    updatedBot = { ...bot, thumbs: [...bot.thumbs, event.thumb], journal };
+  } else if (event.type === 'bot_finding') {
+    updatedBot = { ...bot, journal: addFindingToJournal(bot.journal ?? [], event) };
   } else if (event.type === 'bot_guess_recorded') {
     if (bot.guessFinalized) return { state, effects: [] };
     updatedBot = {
@@ -341,6 +347,7 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
     case 'bot_turns_updated':
     case 'bot_thumb_added':
     case 'bot_guess_recorded':
+    case 'bot_finding':
     case 'bot_finished':
       return handleBotEvent(state, event, now);
     case 'bot_accounting':

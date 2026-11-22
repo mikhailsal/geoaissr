@@ -154,9 +154,7 @@ test('draft checkpoints remain active and the latest draft is scored on timeout'
     lat: TARGET.lat,
     lng: TARGET.lng,
     explanation: '',
-    facts: 'Французская вывеска',
-    rejectedGuesses: [{ guess: 'Бельгия', reason: 'Не совпадает дорожный знак' }],
-    conclusion: 'Париж',
+    summary: 'Париж',
   };
   state = guess(state, latest);
   state = reduce(state, {
@@ -172,9 +170,7 @@ test('draft checkpoints remain active and the latest draft is scored on timeout'
   const entry = botResult(finish(state));
   expect(entry.roundScore).toBe(5000);
   expect(entry.usedDraft).toBe(true);
-  expect(entry.facts).toBe(latest.facts);
-  expect(entry.rejectedGuesses).toEqual(latest.rejectedGuesses);
-  expect(entry.conclusion).toBe('Париж');
+  expect(entry.journal?.summary).toBe('Париж');
 });
 
 // protects=final overrides a draft and cannot be overwritten while terminal process accounting drains; fails_when=later draft/final changes the submitted coordinates; no_claim=does not prove process exit timing
@@ -182,7 +178,7 @@ test('final guesses take precedence and freeze subsequent submissions', () => {
   let state = guess(activeRoom(), { lat: 0, lng: 0, explanation: 'draft' });
   state = guess(
     state,
-    { lat: TARGET.lat, lng: TARGET.lng, explanation: '', conclusion: 'Final' },
+    { lat: TARGET.lat, lng: TARGET.lng, explanation: '', summary: 'Final' },
     true,
   );
   const late = guess(state, { lat: -30, lng: -70, explanation: 'late' });
@@ -193,7 +189,7 @@ test('final guesses take precedence and freeze subsequent submissions', () => {
     lat: TARGET.lat,
     roundScore: 5000,
     usedDraft: false,
-    conclusion: 'Final',
+    journal: { summary: 'Final' },
   });
 });
 
@@ -240,8 +236,7 @@ test('structured reasoning and usage are visible only after the round', () => {
     lat: TARGET.lat,
     lng: TARGET.lng,
     explanation: '',
-    facts: 'unreleased-reasoning',
-    conclusion: 'France',
+    summary: 'unreleased-reasoning',
   });
   state = accounting(state, { tokenUsage: USAGE, costUsd: null });
   for (const id of ['host', 'guest']) {
@@ -253,8 +248,7 @@ test('structured reasoning and usage are visible only after the round', () => {
   for (const id of ['host', 'guest']) {
     const entry = present(present(projectView(results, id).results).entries.find((e) => e.isAi));
     expect(entry).toMatchObject({
-      facts: 'unreleased-reasoning',
-      conclusion: 'France',
+      journal: { summary: 'unreleased-reasoning' },
       tokenUsage: USAGE,
       costUsd: null,
       usedDraft: true,

@@ -38,6 +38,7 @@ function buildInitialBotsForRound(state: RoomState): {
       lastGuessAt: null,
       guess: null,
       thumbs: [],
+      journal: [],
       startedAt: null,
       finishedAt: null,
     };
@@ -370,6 +371,13 @@ export function checkAllHumansConfirmedAndBotsState(state: RoomState, now: numbe
         matchId: state.matchId,
         gen: state.gen,
         kind: 'wait',
+        atMs: waitEnd,
+      },
+      {
+        type: 'set_bot_round_deadline',
+        matchId: state.matchId,
+        gen: state.gen,
+        roundNumber: state.roundNumber,
         atMs: waitEnd,
       },
     ],

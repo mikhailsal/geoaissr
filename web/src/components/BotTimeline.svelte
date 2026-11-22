@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-  import { Eye, Move, ScanEye, X } from '@lucide/svelte';
+  import { Eye, Move, ScanEye } from '@lucide/svelte';
   import type { BotTurnThumbView } from '$shared/protocol';
   import { formatZoom } from '../i18n/format';
+  import ImagePreview from './ImagePreview.svelte';
   let { thumbs }: { thumbs: BotTurnThumbView[] } = $props();
   let ordered = $derived([
     ...thumbs.filter((t) => t.action === 'observe'),
@@ -115,42 +116,7 @@
   </div>
 {/if}
 {#if zoomedUrl && !broken[zoomedUrl]}
-  <dialog
-    class="zoomed-preview"
-    aria-label="Снимок бота"
-    bind:this={previewDialog}
-    onclose={() => (zoomedThumb = null)}
-    onkeydown={(event) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      previewDialog?.close();
-    }}
-    onclick={(event) => {
-      if (event.target !== event.currentTarget) return;
-      const bounds = event.currentTarget.getBoundingClientRect();
-      if (
-        event.clientX < bounds.left ||
-        event.clientX > bounds.right ||
-        event.clientY < bounds.top ||
-        event.clientY > bounds.bottom
-      )
-        previewDialog?.close();
-    }}
-  >
-    <header>
-      <span>Снимок бота</span>
-      <button
-        type="button"
-        class="btn"
-        aria-label="Закрыть снимок"
-        onclick={() => previewDialog?.close()}
-      >
-        <X size={20} aria-hidden="true" />
-      </button>
-    </header>
-    <img src={zoomedUrl} alt="Увеличенный снимок бота" onerror={previewError} />
-  </dialog>
+  <ImagePreview src={zoomedUrl} onClose={() => (zoomedThumb = null)} onError={previewError} />
 {/if}
 
 <style>
@@ -221,43 +187,5 @@
     font-size: 1rem;
     margin: var(--sp-1) 0 0;
     white-space: pre-line;
-  }
-  .zoomed-preview {
-    position: fixed;
-    width: max-content;
-    max-width: calc(100vw - 32px);
-    max-height: calc(100dvh - 32px);
-    padding: var(--sp-3);
-    background: var(--asphalt-900);
-    color: var(--paper);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-panel);
-  }
-  .zoomed-preview::backdrop {
-    background: var(--asphalt-900);
-    opacity: 0.8;
-  }
-  .zoomed-preview header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-4);
-    margin-bottom: var(--sp-2);
-  }
-  .zoomed-preview .btn {
-    min-width: var(--control-h);
-    padding: 0;
-  }
-  .zoomed-preview img {
-    width: auto;
-    max-width: 100%;
-    max-height: calc(100dvh - 132px);
-    height: auto;
-    display: block;
-    margin: 0 auto;
-    object-fit: contain;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--line);
   }
 </style>

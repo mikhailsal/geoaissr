@@ -43,7 +43,7 @@ A single root `package.json` (no workspaces):
 - `bun run doctor` / `bun run doctor --json` — check keys, `cloudflared`, harnesses.
 - `bun run start` — build the client, start the server and tunnel (`--no-tunnel`, `--public-url`, `--port`, `--no-open`).
 - `bun run test:harness` / `bun run test:tunnel` — on-demand live checks (with network/CLI).
-- `bun run eval:bots` — evaluate bot prompts and schemas on local snapshots.
+- `bun run eval:bots` — measure one bot configuration (finish rate, time, error, pin movement) on the licensed panorama dataset; flags and metrics in [docs/evals/README.md](./docs/evals/README.md).
 
 ## Data storage and errors
 
@@ -55,6 +55,10 @@ A single root `package.json` (no workspaces):
 
 - This is a locally run application. There is no hosted deployment step; a release does not restart the local app.
 - Use `package.json` as the version source, pinned by `.gstack/version-path`.
+- Choosing the version (the game is still `0.x`):
+  - **Patch** (`0.3.0` → `0.3.1`) is the default for every release: fixes, new features, UI work, and changes to bot tools, prompts or the eval tool. The bot tools in `shared/bot-tools.ts` are served only to the game's own bots, so changing or removing one breaks no outside consumer and is not a reason for a bigger bump.
+  - **Minor** (`0.3.x` → `0.4.0`) and **major** (`1.0.0`) only when the owner asks for that version in their own words for this release. A plan, a review recommendation or a delegated "take the recommended option" approval does not choose one. When in doubt, ship a patch and raise the question in the pull request.
+  - Example: the bot step journal and the `eval:bots` tool shipped as `0.3.1` after `0.4.0` had been picked by mistake (PR #22).
 - Update `CHANGELOG.md` for the release, run the required checks, and commit the version and changelog together.
 - After CI passes for the release commit on `main`, create and push an annotated Git tag named `v<version>` at that commit.
 - Preserve published tags. Never replace or force-push an existing release tag.

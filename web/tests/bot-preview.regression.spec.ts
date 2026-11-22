@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { ServerMessage } from '../../shared/protocol';
 import { startIsolatedFakeServer } from './helpers';
 
-async function openBotCard(page: Page, url: string): Promise<void> {
+async function openBotCard(page: Page, url: string, journal = false): Promise<void> {
   await page.routeWebSocket('**/*', (socket) => {
     const server = socket.connectToServer();
     server.onMessage((message) => {
@@ -13,7 +13,12 @@ async function openBotCard(page: Page, url: string): Promise<void> {
       const state = JSON.parse(message) as ServerMessage;
       if (state.type === 'state' && state.view.results) {
         for (const entry of state.view.results.entries) {
-          if (entry.isAi && entry.thumbs[0]) entry.thumbs[0].fullUrl = '/slow-full';
+          if (!entry.isAi || !entry.thumbs[0]) continue;
+          const paidFrame = entry.journal?.steps.find((s) => s.kind !== 'observe')?.frames[0];
+          if (journal && paidFrame) paidFrame.fullUrl = '/slow-full';
+          if (journal) continue;
+          delete entry.journal;
+          entry.thumbs[0].fullUrl = '/slow-full';
         }
       }
       socket.send(JSON.stringify(state));
@@ -95,3 +100,41 @@ for (const fail of [false, true]) {
     }
   });
 }
+
+// Value: protects=the journal preview shows the step's loaded thumbnail at once and switches to the full frame when it is ready; fails_when=the dialog stays blank while the full frame loads or the thumbnail is replaced by nothing; why_new=the slow-full test only covered the legacy timeline; seam=none; no_claim=provider latency.
+test('journal preview shows the thumbnail while the full frame loads', async ({ page }) => {
+  const server = await startIsolatedFakeServer({ seedBot: true, rounds: 1 });
+  let release: () => void = () => {};
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    await page.route('**/slow-full', async (route) => {
+      await pending;
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"/>',
+      });
+    });
+    await openBotCard(page, server.hostUrl, true);
+    const card = page.locator('.bot-card');
+    await card.getByRole('button', { name: /^Ход за ходом/ }).click();
+    const frame = card.getByRole('button', { name: /^Кадр шага 1:/ });
+    const thumb = await frame.locator('img').getAttribute('src');
+    await expect
+      .poll(() => frame.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBeGreaterThan(0);
+    await frame.click();
+    const image = page.locator('.zoomed-preview img');
+    await expect(image).toHaveAttribute('src', thumb ?? '');
+    await expect(image).toBeVisible();
+    release();
+    await expect(image).toHaveAttribute('src', '/slow-full');
+    await page.keyboard.press('Escape');
+    await expect(image).toHaveCount(0);
+  } finally {
+    release();
+    await server.stop();
+  }
+});

@@ -6,22 +6,8 @@ import sharp from 'sharp';
 import { createBotRunner } from '../server/bots/runner.ts';
 import type { EngineEvent } from '../server/engine/types.ts';
 import { createFakeLocationService } from '../server/location.ts';
-import { type EvalArmMetrics, loadDataset, parseEvalArgs, pickFinalGuess } from './eval-bots.ts';
-
-test('parseEvalArgs validates flags and supports --out cleanly', () => {
-  expect(
-    parseEvalArgs(['--dry', '--harness', 'codex', '--repeats', '2', '--out', '/tmp/a.json']),
-  ).toEqual({
-    dry: true,
-    harness: 'codex',
-    datasetDir: null,
-    repeats: 2,
-    outPath: '/tmp/a.json',
-  });
-  expect(() => parseEvalArgs(['--harness', '--dry'])).toThrow();
-  expect(() => parseEvalArgs(['--harness', 'invalid-cli'])).toThrow();
-  expect(() => parseEvalArgs(['--repeats', '0'])).toThrow();
-});
+import { loadDataset, loadDatasetWithHash } from './eval-bots/manifest.ts';
+import { pickFinalGuess } from './eval-bots/records.ts';
 
 test('loadDataset rejects missing manifest when --dataset is passed and resolves imagePaths', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-eval-ds-'));
@@ -44,21 +30,31 @@ test('loadDataset rejects missing manifest when --dataset is passed and resolves
           lat: 52.23,
           lng: 21.01,
           imagePaths: ['0.jpg', '90.jpg', '180.jpg', '270.jpg'],
+          source: {
+            pageUrl: 'https://example.org/p',
+            author: 'A',
+            license: 'CC0',
+            licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+          },
         },
       ]),
     );
     const items = loadDataset(dir);
     expect(items.length).toBe(1);
     expect(items[0]?.imagePaths?.[0]).toBe(path.join(dir, '0.jpg'));
+    // Value: protects=the dataset fingerprint changes when a frame is replaced without a manifest edit; fails_when=only manifest bytes are hashed; why_new=two runs over different photos looked identical; seam=none; no_claim=which frame changed.
+    const before = loadDatasetWithHash(dir).datasetHash;
+    writeFileSync(path.join(dir, '90.jpg'), Buffer.concat([imgBuf, Buffer.from([0])]));
+    expect(loadDatasetWithHash(dir).datasetHash).not.toBe(before);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('eval-bots CLI fails live runs without imagePaths and writes clean --dry JSON to --out', async () => {
+test('eval-bots CLI fails live runs without imagePaths and writes a dry summary and rounds file to --out', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-eval-cli-'));
   try {
-    const outFile = path.join(dir, 'report.json');
+    const outFile = path.join(dir, 'out-report');
     const badProc = Bun.spawn([process.execPath, 'run', 'scripts/eval-bots.ts', '--repeats', '1'], {
       stdout: 'pipe',
       stderr: 'pipe',
@@ -79,10 +75,15 @@ test('eval-bots CLI fails live runs without imagePaths and writes clean --dry JS
       { stdout: 'pipe', stderr: 'pipe' },
     );
     expect(await dryProc.exited).toBe(0);
-    expect(existsSync(outFile)).toBe(true);
-    const report = JSON.parse(readFileSync(outFile, 'utf8')) as { dry: boolean; repeats: number };
+    expect(existsSync(path.join(outFile, 'rounds.jsonl'))).toBe(true);
+    const report = JSON.parse(readFileSync(path.join(outFile, 'summary.json'), 'utf8')) as {
+      dry: boolean;
+      repeats: number;
+      rounds: number;
+    };
     expect(report.dry).toBe(true);
     expect(report.repeats).toBe(1);
+    expect(report.rounds).toBe(3);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -108,10 +109,16 @@ test('eval-bots --dataset --dry handles valid dataset dir without hanging on get
           lat: 41.9,
           lng: 12.5,
           imagePaths: ['0.jpg', '90.jpg', '180.jpg', '270.jpg'],
+          source: {
+            pageUrl: 'https://example.org/p',
+            author: 'A',
+            license: 'CC0',
+            licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+          },
         },
       ]),
     );
-    const outFile = path.join(dir, 'ds-out.json');
+    const outFile = path.join(dir, 'ds-out');
     const proc = Bun.spawn(
       [
         process.execPath,
@@ -128,18 +135,20 @@ test('eval-bots --dataset --dry handles valid dataset dir without hanging on get
       { stdout: 'pipe', stderr: 'pipe' },
     );
     expect(await proc.exited).toBe(0);
-    // The report is a paired comparison: a `baseline` and a `candidate` arm.
-    const report = JSON.parse(readFileSync(outFile, 'utf8')) as {
-      baseline: EvalArmMetrics;
-      candidate: EvalArmMetrics;
+    const report = JSON.parse(readFileSync(path.join(outFile, 'summary.json'), 'utf8')) as {
+      rounds: number;
+      medianErrorKm: number | null;
+      finishRate: number | null;
     };
-    expect(report.baseline.armName).toBe('baseline');
-    expect(report.candidate.armName).toBe('candidate');
-    // One sample at one repeat gives exactly one measured run per arm.
-    for (const arm of [report.baseline, report.candidate]) {
-      expect(arm.runs).toBe(1);
-      expect(typeof arm.medianKm).toBe('number');
-    }
+    // One spot at one repeat gives exactly one measured round.
+    expect(report.rounds).toBe(1);
+    expect(typeof report.medianErrorKm).toBe('number');
+    expect(report.finishRate).toBe(1);
+    const lines = readFileSync(path.join(outFile, 'rounds.jsonl'), 'utf8').trim().split('\n');
+    expect(lines.length).toBe(1);
+    const row = JSON.parse(lines[0] ?? '{}') as { spotId: string; pinSource: string };
+    expect(row.spotId).toBe('it-1');
+    expect(row.pinSource).toBe('final');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
