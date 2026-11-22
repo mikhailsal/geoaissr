@@ -484,3 +484,13 @@ Bar 2 passes through the control reminder that the pilot added. In 37 rounds the
 - The brain's confidence is a usable signal: a round it calls `country` is within 750 km in 30 of 33 cases, a round it calls `guess` in 14 of 37.
 - The rounds that go far are mostly rounds without text, and the brain leaves more than half of the budget unused. Both point at the same next step: more of the round spent on finding text.
 - Limits of the evidence. One run. The 84 rounds are 28 spots played three times, so the intervals are too narrow. Both judges are a model, with no human check. The judges read the four start frames at full size and never see a zoomed frame. Bar 5 was re-anchored in the amendment, before the first paid call of this part. The pilot fixes include a server reply, and bar 2 passes through it.
+
+### After the report: prompt changes that are not measured
+
+The numbers above were measured with the prompts of hash `e59b2fac7ca1`. The prompts in `spikes/detective/report-prompts.ts` were changed after that run and have not been run on any spot. A result for them needs a new run on new spots, because prompts are not tuned on the eval set.
+
+- **Goal.** The brain is told that only the distance between its point and the real place is scored.
+- **Open list.** The list of clues is said to be incomplete, and the brain is told to invent its own topics and checks.
+- **Driving side and sun.** Every report must carry two lines: «Сторона движения: …» first in `road` and «Солнце: …» first in `nature`, each with «не определить» when the frames do not show it. The brain is told how to read them. These are prompt rules: the server does not check that the lines are there.
+- **Plates.** The measured brain prompt named number plates seven times, and both request examples were about plates; real Street View frames blur them. The examples are now about road markings and soil, and the prompt says that plates are often blurred.
+- **Unknown compass.** 24 of the 28 spots of the set have no real heading, so their frame labels are not compass directions. For such a round (`compassKnown: false`) the eyes report the sun by frame number, and the brain is told not to judge the hemisphere by it. The prompt hash of a run is computed from the prompts of a round with a real compass.

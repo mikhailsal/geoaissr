@@ -107,6 +107,7 @@ function launchRoles(
   server: ReturnType<typeof startDetectiveToolServer>,
   dirs: { brain: string; eyes: string; childrenFile: string },
   catalog: readonly CatalogFeature[],
+  compassKnown: boolean,
 ): Launched {
   if (settings.dry) {
     const eyes = settings.arm === 'detective' ? runFakeEyes(session) : Promise.resolve();
@@ -123,6 +124,7 @@ function launchRoles(
     budgetSec: settings.budgetSec,
     catalog,
     protocol: settings.protocol,
+    compassKnown,
   });
   const brain = launchRole({
     ...common,
@@ -145,6 +147,7 @@ function launchRoles(
             moveLimit: settings.moveLimit,
             protocol: settings.protocol,
             requireZoom: settings.requireZoom,
+            compassKnown,
           }),
           token: server.tokens.eyes,
         })
@@ -220,7 +223,9 @@ export async function runDetectiveRound(opts: {
   const server = startDetectiveToolServer(session, opts.catalog);
   try {
     session.start();
-    const launched = launchRoles(settings, session, server, dirs, opts.catalog);
+    // A dataset spot without a heading labels its frames from frame 0, not from north.
+    const compassKnown = !sample.imagePaths || (sample.headingDeg ?? null) !== null;
+    const launched = launchRoles(settings, session, server, dirs, opts.catalog, compassKnown);
     const brainDone = launched.brain?.done ?? launched.fakeDone ?? Promise.resolve();
     await waitForRoundEnd(session, brainDone, settings.budgetSec, opts.signal);
     session.end();

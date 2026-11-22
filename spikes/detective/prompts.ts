@@ -16,6 +16,8 @@ export interface BrainPromptOptions {
   budgetSec: number;
   catalog: readonly CatalogFeature[];
   protocol: Protocol;
+  /** Report protocol only: false when the frame labels are not real compass directions. */
+  compassKnown?: boolean;
 }
 
 export function buildBrainPrompt(opts: BrainPromptOptions): string {
@@ -27,6 +29,8 @@ export interface EyesPromptOptions {
   moveLimit: number;
   protocol: Protocol;
   requireZoom: boolean;
+  /** Report protocol only: false when the frame labels are not real compass directions. */
+  compassKnown?: boolean;
 }
 
 export function buildEyesPrompt(opts: EyesPromptOptions): string {

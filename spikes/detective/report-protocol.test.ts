@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { loadCatalog } from './catalog.ts';
 import { buildBrainPrompt, buildEyesPrompt } from './prompts.ts';
+import { DRIVING_SIDE_LINE, NOT_DETERMINED, SUN_LINE } from './report-prompts.ts';
 import { hasQuestionForm, parseFinalExtras } from './report-protocol.ts';
 import { toolDefinitions } from './tools.ts';
 
@@ -60,4 +61,53 @@ test('the report prompts tell the brain to ask for topics and the eyes never to 
   expect(eyes).toContain('не подтверждай из вежливости');
   expect(eyes).toContain('Охота за текстом — обязательный шаг до отчёта');
   expect(brain).toContain('Не заканчивай рано');
+});
+
+// Value: protects=the brain is told what it is scored on, that the clue list is open, and that the driving side and the sun come as fixed report lines the eyes must write; fails_when=the goal line, the invitation to improvise or either required line leaves a prompt, or the two roles stop agreeing on the words the lines start with; seam=none; no_claim=presence does not prove that a model complies.
+test('the report prompts state the goal and make the driving side and the sun required lines', () => {
+  const brain = buildBrainPrompt({
+    regionLabelRu: 'весь мир',
+    regionDiagonalKm: 20000,
+    budgetSec: 90,
+    catalog: loadCatalog(),
+    protocol: 'report',
+  });
+  const eyes = buildEyesPrompt({ moveLimit: 8, protocol: 'report', requireZoom: true });
+  expect(brain).toContain('как можно ближе');
+  expect(brain).toContain('оценивается только расстояние');
+  expect(brain).toContain('Этот список не полный');
+  expect(brain).toContain('Придумывай свои темы и проверки');
+  for (const prompt of [brain, eyes]) {
+    expect(prompt).toContain(DRIVING_SIDE_LINE);
+    expect(prompt).toContain(SUN_LINE);
+    expect(prompt).toContain(NOT_DETERMINED);
+  }
+  expect(brain).toContain('северное полушарие');
+  expect(eyes).toContain('Две строки обязательны в каждом отчёте');
+  expect(eyes).toContain(`«${SUN_LINE} на юге, высоко»`);
+  // Plates are blurred on real imagery: they are no longer the model request.
+  expect(brain).not.toContain('"topic": "номера машин');
+});
+
+// Value: protects=a spot whose frame labels are not real compass directions cannot produce a hemisphere claim from the sun; fails_when=the hemisphere rule or a compass side reaches the prompts of such a round; seam=none; no_claim=presence does not prove that a model complies.
+test('without a real compass the prompts take the hemisphere rule away', () => {
+  const brain = buildBrainPrompt({
+    regionLabelRu: 'весь мир',
+    regionDiagonalKm: 20000,
+    budgetSec: 90,
+    catalog: loadCatalog(),
+    protocol: 'report',
+    compassKnown: false,
+  });
+  const eyes = buildEyesPrompt({
+    moveLimit: 8,
+    protocol: 'report',
+    requireZoom: true,
+    compassKnown: false,
+  });
+  expect(brain).not.toContain('северное полушарие');
+  expect(brain).toContain('о полушарии по ней не суди');
+  expect(eyes).not.toContain('на юге, высоко');
+  expect(eyes).toContain('стороны света не называй');
+  expect(eyes).toContain(DRIVING_SIDE_LINE);
 });
