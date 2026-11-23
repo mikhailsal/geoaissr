@@ -202,3 +202,46 @@ function assertToolAudit(logger: ServerLogger): void {
     args: { finding: '[REDACTED]' },
   });
 }
+
+test('a slot set to Detective that plays Intuit leaves one log record with the reason', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-runner-'));
+  const logger = createServerLogger(path.join(dir, 'logs'));
+  const events: EngineEvent[] = [];
+  const runner = createBotRunner({
+    runDir: path.join(dir, 'run'),
+    childrenFile: path.join(dir, 'children.json'),
+    fakeMode: true,
+    fakeStepDelayMs: 5,
+    logger,
+    imageService: createBotImageService({
+      serverKey: null,
+      fakeMode: true,
+      quotaManager: createQuotaManager(path.join(dir, 'quota.json')),
+      thumbStore: createThumbStore(),
+    }),
+    locationService: createFakeLocationService(),
+    dispatch: (event) => events.push(event),
+  });
+  try {
+    runner.startRoundBots({
+      ...(await roundParams()),
+      bots: [makeSlot('b1'), makeSlot('b2')],
+      styleFallbacks: { b1: 'budget' },
+    });
+    const logText = readFileSync(
+      path.join(logger.getLogsDir(), `${new Date().toISOString().slice(0, 10)}.jsonl`),
+      'utf8',
+    );
+    const records = logText
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { event: string; data: Record<string, unknown> })
+      .filter((record) => record.event === 'bot_style_fallback');
+    expect(records.map((record) => record.data)).toMatchObject([
+      { matchId: 'm1', roundNumber: 1, slotId: 'b1', played: 'intuit', reason: 'budget' },
+    ]);
+  } finally {
+    await runner.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

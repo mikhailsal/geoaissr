@@ -4,6 +4,7 @@ import type { BotImageService } from '../images/bot-image-service.ts';
 import type { LocationService } from '../location.ts';
 import type { ServerLogger } from '../log.ts';
 import { createBotToolApiServer } from './api.ts';
+import { logBotDiagnostic } from './diagnostics.ts';
 import type { ActiveBotHandle, CustomBotLaunchBuilder } from './process.ts';
 import { dispatchLaunchFailure, launchBotProcess, stopBotHandle } from './runner-launch.ts';
 import type { BotRunner, RunnerCtx } from './runner-types.ts';
@@ -66,10 +67,23 @@ export function createBotRunner(opts: {
 
   let closed = false;
   return {
-    startRoundBots({ matchId, gen, roundNumber, target, bots, moveEnabled }) {
+    startRoundBots({ matchId, gen, roundNumber, target, bots, moveEnabled, styleFallbacks }) {
       if (closed) return;
       for (const slot of bots) {
         const params = { matchId, gen, roundNumber, target, slot, moveEnabled };
+        const reason = styleFallbacks?.[slot.id];
+        if (reason) {
+          logBotDiagnostic(ctx.logger, 'bot_style_fallback', {
+            matchId,
+            gen,
+            roundNumber,
+            slotId: slot.id,
+            harness: slot.harness,
+            requested: 'detective',
+            played: 'intuit',
+            reason,
+          });
+        }
         try {
           launchBotProcess(ctx, params);
         } catch (err) {

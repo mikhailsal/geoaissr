@@ -6,6 +6,7 @@ type AccountingEvent = Extract<EngineEvent, { type: 'bot_accounting' }>;
 export function accountingFields(value: BotAccounting): BotAccounting {
   return {
     ...(value.tokenUsage !== undefined ? { tokenUsage: value.tokenUsage } : {}),
+    ...(value.roleUsage !== undefined ? { roleUsage: value.roleUsage } : {}),
     ...(value.costUsd !== undefined ? { costUsd: value.costUsd } : {}),
     ...(value.matchedModelId !== undefined ? { matchedModelId: value.matchedModelId } : {}),
     ...(value.isApproximateMatch !== undefined

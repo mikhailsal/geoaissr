@@ -10,6 +10,7 @@ import {
   personalityTextSchema,
 } from './bot-tools.ts';
 import { PARTICIPANT_COLOR_IDS } from './colors.ts';
+import { PLAY_STYLES } from './play-style.ts';
 
 export const HARNESS_IDS = ['codex', 'claude', 'agy'] as const;
 export type HarnessId = (typeof HARNESS_IDS)[number];
@@ -52,6 +53,8 @@ export const botSlotConfigSchema = z.object({
   moveLimit: z.number().int().min(0).max(20),
   imageSize: z.union([z.literal(256), z.literal(400), z.literal(640)]),
   budgetSec: z.number().int().min(60).max(600),
+  /** Absent in settings saved before the Detective style existed: those bots play Intuit. */
+  playStyle: z.enum(PLAY_STYLES).optional(),
   difficultyPreset: z.enum(DIFFICULTY_PRESETS),
   personalityPreset: z.enum(PERSONALITY_PRESETS),
   personalityText: personalityTextSchema,

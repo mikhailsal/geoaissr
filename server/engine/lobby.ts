@@ -10,6 +10,7 @@ import {
 } from '../../shared/bot-tools.ts';
 import { avatarAppearanceSchema, type AvatarAppearance } from '../../shared/avatar.ts';
 import { pickFirstFreeColor } from '../../shared/colors.ts';
+import { DETECTIVE_MIN_BUDGET_SEC } from '../../shared/play-style.ts';
 import { MAX_BOTS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { BotSlotConfig, HarnessId, SettingsFile } from '../../shared/storage-schemas.ts';
 import type { PlayerState, ReduceOutput, RoomState } from './types.ts';
@@ -155,6 +156,16 @@ export function handleRemoveBot(state: RoomState, playerId: string, botId: strin
   };
 }
 
+/** A Detective needs time for the scene report and two requests: its budget never goes below. */
+function applyPlayStylePatch(next: BotSlotConfig, patch: Record<string, unknown>): void {
+  if (patch.playStyle === 'intuit' || patch.playStyle === 'detective') {
+    next.playStyle = patch.playStyle;
+  }
+  if (next.playStyle === 'detective' && next.budgetSec < DETECTIVE_MIN_BUDGET_SEC) {
+    next.budgetSec = DETECTIVE_MIN_BUDGET_SEC;
+  }
+}
+
 function mergeBotSlotPatch(
   slot: BotSlotConfig,
   patch: Record<string, unknown>,
@@ -191,6 +202,7 @@ function mergeBotSlotPatch(
   }
   if (typeof patch.model === 'string') next.model = patch.model;
   if (typeof patch.budgetSec === 'number') next.budgetSec = patch.budgetSec;
+  applyPlayStylePatch(next, patch);
   if (typeof patch.personalityPreset === 'string') {
     next.personalityPreset = patch.personalityPreset as PersonalityPreset;
   }

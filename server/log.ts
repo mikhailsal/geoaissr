@@ -28,6 +28,7 @@ export type LogEventType =
   | 'harness_tool_call'
   | 'bot_tool_call'
   | 'bot_journal_correction'
+  | 'bot_style_fallback'
   | 'google_call'
   | 'quota_update'
   | 'tunnel_event'

@@ -1,0 +1,206 @@
+import { expect, test } from 'bun:test';
+import { buildQuotaMetric } from '../storage/quota.ts';
+import type { SettingsFile } from '../../shared/storage-schemas.ts';
+import { patchJournalStep } from './journal.ts';
+import { reduce } from './reduce.ts';
+import { projectView } from './view.ts';
+import {
+  createInitialRoomState,
+  type EngineEffect,
+  type EngineEvent,
+  type RoomState,
+  type RoundTarget,
+} from './types.ts';
+
+const TARGET: RoundTarget = {
+  panoId: 'pano-1',
+  lat: 55.75,
+  lng: 37.61,
+  countryId: '643-eu',
+  countryNameRu: 'Россия',
+  region: 'world',
+  fakeSceneIndex: 0,
+};
+
+function makeRoom(roundDurationSec: number): RoomState {
+  const settings: SettingsFile = {
+    version: 1,
+    region: 'world',
+    rounds: 1,
+    roundDurationSec,
+    moveEnabled: true,
+    aiWaitWindowSec: 30,
+    bots: [],
+  };
+  const quota = { used: 0, ceiling: 8000, worst: 2 };
+  const base = createInitialRoomState({
+    matchId: 'm1',
+    fakeMode: true,
+    settings,
+    quotaSummary: {
+      metrics: {
+        static: buildQuotaMetric(0, 8000),
+        pano: buildQuotaMetric(0, 4000),
+        map: buildQuotaMetric(0, 8000),
+      },
+      staticUsed: quota.used,
+      staticCeiling: quota.ceiling,
+      staticWorstCase: 10,
+      panoUsed: quota.used,
+      panoCeiling: 4000,
+      panoWorstCase: quota.worst,
+      mapUsed: quota.used,
+      mapCeiling: quota.ceiling,
+      mapWorstCase: quota.worst,
+      needsResetConfirm: false,
+      sufficient: true,
+    },
+    tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },
+    availableHarnesses: [
+      { id: 'claude', available: true, readsOwnerFiles: false, models: ['haiku'] },
+    ],
+  });
+  return reduce(
+    base,
+    { type: 'player_join', playerId: 'h', secret: 's', name: 'Хост', color: 'p-1', isHost: true },
+    100,
+  ).state;
+}
+
+/** A lobby with one bot; returns the room and the bot's id. */
+function withBot(roundDurationSec: number): { room: RoomState; botId: string } {
+  const room = reduce(makeRoom(roundDurationSec), { type: 'add_bot', playerId: 'h' }, 110).state;
+  return { room, botId: room.settings.bots[0]?.id ?? '' };
+}
+
+function patchBot(room: RoomState, botId: string, patch: Record<string, unknown>): RoomState {
+  const out = reduce(room, { type: 'update_bot', playerId: 'h', botId, patch }, 120);
+  expect(out.ack).toBe('ok');
+  return out.state;
+}
+
+/** Plays the round up to ROUND_ACTIVE and returns every effect on the way. */
+function startRound(room: RoomState): { room: RoomState; effects: EngineEffect[] } {
+  const effects: EngineEffect[] = [];
+  let s = room;
+  const step = (event: EngineEvent, now: number): void => {
+    const out = reduce(s, event, now);
+    s = out.state;
+    effects.push(...out.effects);
+  };
+  step({ type: 'start_match', playerId: 'h' }, 1000);
+  step({ type: 'round_prepared', matchId: 'm1', gen: s.gen, roundNumber: 1, target: TARGET }, 1100);
+  step({ type: 'pano_loaded', playerId: 'h', roundNumber: 1 }, 1200);
+  step({ type: 'countdown_done', matchId: 'm1', gen: s.gen }, 10_000);
+  return { room: s, effects };
+}
+
+test('a Detective slot keeps at least 90 s of budget; Intuit keeps the old floor', () => {
+  const { room, botId } = withBot(60);
+  expect(room.settings.bots[0]?.budgetSec).toBe(60);
+  const detective = patchBot(room, botId, { playStyle: 'detective' });
+  expect(detective.settings.bots[0]).toMatchObject({ playStyle: 'detective', budgetSec: 90 });
+  // Lowering the budget of a Detective is not accepted.
+  const lowered = patchBot(detective, botId, { budgetSec: 60 });
+  expect(lowered.settings.bots[0]?.budgetSec).toBe(90);
+  const intuit = patchBot(lowered, botId, { playStyle: 'intuit', budgetSec: 60 });
+  expect(intuit.settings.bots[0]).toMatchObject({ playStyle: 'intuit', budgetSec: 60 });
+  // An unknown style is ignored.
+  expect(patchBot(intuit, botId, { playStyle: 'psychic' }).settings.bots[0]?.playStyle).toBe(
+    'intuit',
+  );
+});
+
+test('a round long enough runs the Detective; a shorter one runs the same bot as Intuit', () => {
+  const long = withBot(120);
+  const played = startRound(patchBot(long.room, long.botId, { playStyle: 'detective' }));
+  expect(played.room.phase).toBe('ROUND_ACTIVE');
+  expect(played.room.loadingOrActive?.bots[long.botId]?.playStyle).toBe('detective');
+  expect(played.effects.some((e) => e.type === 'start_bot_processes')).toBe(true);
+  const view = projectView(played.room, 'h');
+  expect(view.active?.botProgress[0]?.playStyle).toBe('detective');
+  // The round duration caps the budget at 60 s: the slot keeps its setting, the round does not.
+  const short = withBot(60);
+  const fallback = startRound(patchBot(short.room, short.botId, { playStyle: 'detective' }));
+  expect(fallback.room.settings.bots[0]?.playStyle).toBe('detective');
+  expect(fallback.room.loadingOrActive?.bots[short.botId]?.playStyle).toBeUndefined();
+  const shortView = projectView(fallback.room, 'h');
+  expect(shortView.active?.botProgress[0]?.playStyle).toBeUndefined();
+});
+
+test('a patch opens an exchange step, fills it in and never drops what the step has', () => {
+  const request = { n: 1, kind: 'describe' as const, text: 'разметка' };
+  const pending = [{ ...request, status: 'pending' as const }];
+  let journal = patchJournalStep([], 1, { reason: 'версии', requests: pending }, 500);
+  expect(journal).toEqual([
+    {
+      index: 1,
+      kind: 'ask',
+      frames: [],
+      findingState: 'pending',
+      atMs: 500,
+      reason: 'версии',
+      requests: pending,
+    },
+  ]);
+  const settled = [{ ...request, status: 'answered' as const, value: 'белая', frame: 2 }];
+  journal = patchJournalStep(journal, 1, { requests: settled }, 900);
+  expect(journal[0]).toMatchObject({ reason: 'версии', atMs: 500, requests: settled });
+  // Step 0 opened by a patch is the observe step, and steps stay in index order.
+  journal = patchJournalStep(journal, 0, { report: [] }, 950);
+  expect(journal.map((s) => [s.index, s.kind])).toEqual([
+    [0, 'observe'],
+    [1, 'ask'],
+  ]);
+});
+
+test('the result card of a Detective carries the style, the exchanges, the confidence and the clue', () => {
+  const { room, botId } = withBot(120);
+  let s = startRound(patchBot(room, botId, { playStyle: 'detective' })).room;
+  const ids = { matchId: 'm1', gen: s.gen, roundNumber: 1, botId };
+  const feed = (event: EngineEvent, now: number): void => {
+    s = reduce(s, event, now).state;
+  };
+  const thumb = { turn: 0, action: 'observe' as const, n: 1, label: 'С', thumbUrl: '/t1.jpg' };
+  feed({ type: 'bot_thumb_added', ...ids, thumb }, 11_000);
+  const report = [{ section: 'road' as const, text: 'Сторона движения: правая', frame: 1 }];
+  feed({ type: 'bot_step_patched', ...ids, turn: 0, patch: { report } }, 12_000);
+  const requests = [
+    {
+      n: 1,
+      kind: 'text' as const,
+      text: 'вывеска',
+      status: 'abstained' as const,
+      value: 'unreadable',
+    },
+  ];
+  feed(
+    { type: 'bot_step_patched', ...ids, turn: 1, patch: { reason: 'версии', requests } },
+    13_000,
+  );
+  feed(
+    { type: 'bot_finding', ...ids, turn: 0, findingState: 'recorded', finding: 'отчёт' },
+    13_000,
+  );
+  const guess = {
+    lat: 55.8,
+    lng: 37.5,
+    explanation: 'итог',
+    summary: 'итог',
+    confidence: 'region' as const,
+    clue: 'Разметка.',
+  };
+  feed({ type: 'bot_guess_recorded', ...ids, guess, finalized: true }, 14_000);
+  feed({ type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 55.7, lng: 37.6 }, 15_000);
+  feed({ type: 'bot_finished', ...ids, aborted: false, reason: 'завершил ход' }, 16_000);
+  expect(s.phase).toBe('ROUND_RESULTS');
+  const journal = s.results?.entries.find((e) => e.id === botId)?.journal;
+  expect(journal).toMatchObject({ style: 'detective', confidence: 'region', clue: 'Разметка.' });
+  expect(journal?.steps.map((step) => [step.index, step.kind, step.atMs])).toEqual([
+    [0, 'observe', 1000],
+    [1, 'ask', 3000],
+  ]);
+  expect(journal?.steps[0]).toMatchObject({ report, finding: 'отчёт' });
+  expect(journal?.steps[0]?.frames[0]).toMatchObject({ n: 1, action: 'observe' });
+  expect(journal?.steps[1]).toMatchObject({ reason: 'версии', requests });
+});

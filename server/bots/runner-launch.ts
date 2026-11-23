@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { joinUnder } from '../paths.ts';
 import { getHarnessAdapter } from './adapters/index.ts';
+import { launchDetectiveBot } from './detective/launch.ts';
 import { logBotDiagnostic } from './diagnostics.ts';
 import { startMonitoredFakeBot } from './fake-bot.ts';
 import { createMoveTracker } from './move.ts';
@@ -99,6 +100,15 @@ function queueDiagnostics(
 
 export function launchBotProcess(ctx: RunnerCtx, params: RoundBotParams): void {
   const { matchId, gen, roundNumber, target, slot, moveEnabled } = params;
+  // The engine resolved the style for this round: a Detective runs two processes of its own.
+  if (slot.playStyle === 'detective') {
+    try {
+      launchDetectiveBot(ctx, params, (prev) => void stopBotHandle(ctx, prev, 'superseded'));
+    } catch (err) {
+      dispatchLaunchFailure(ctx, params, err);
+    }
+    return;
+  }
   const workDir = joinUnder(ctx.runDir, matchId, `r${roundNumber}-g${gen}`, slot.id);
   mkdirSync(workDir, { recursive: true });
   const tracker = createMoveTracker({
@@ -191,6 +201,7 @@ export async function stopBotHandle(
   h.stopped = true;
   h.abortQueue(reason);
   // Swallow stop failures: callers fire-and-forget this, and cleanup must still run.
-  await h.proc?.stop(500).catch(() => undefined);
+  const procs = [...(h.proc ? [h.proc] : []), ...(h.extraProcs ?? [])];
+  await Promise.all(procs.map((proc) => proc.stop(500).catch(() => undefined)));
   cleanupBotHandle(ctx.api, ctx.activeHandles, h);
 }

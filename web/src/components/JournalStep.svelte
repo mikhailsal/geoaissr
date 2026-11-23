@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { JournalFrame, JournalStep } from '$shared/bot-journal';
   import { findingLine, pinLine, shiftLabel, stepTitle } from '../lib/journal-format';
+  import StepExchange from './StepExchange.svelte';
   import StepFrames from './StepFrames.svelte';
+  import StepReport from './StepReport.svelte';
 
   interface Props {
     step: JournalStep;
@@ -13,13 +15,20 @@
   let pin = $derived(pinLine(step));
 </script>
 
-<li class="step" class:observe={step.kind === 'observe'} class:has-media={step.frames.length > 0}>
+<li
+  class="step"
+  class:observe={step.kind === 'observe'}
+  class:ask={step.kind === 'ask'}
+  class:has-media={step.frames.length > 0}
+>
   <h4 class="title">{stepTitle(step)}</h4>
   {#if step.frames.length}
     <div class="media"><StepFrames {step} {onPreview} /></div>
   {/if}
   <div class="text">
+    {#if step.report}<StepReport lines={step.report} />{/if}
     {#if step.reason}<p><span class="label">Зачем:</span> {step.reason}</p>{/if}
+    {#if step.requests?.length}<StepExchange requests={step.requests} />{/if}
     {#if finding}
       <p class:placeholder={finding.placeholder}>
         {#if finding.placeholder}{finding.text}{:else}<span class="label">Вывод:</span>
@@ -106,9 +115,10 @@
   .effect.stronger {
     color: var(--ok);
   }
-  /* Wide cards: a single frame sits in a 128 px column beside the title and text. */
+  /* Wide cards: a single frame sits in a 128 px column beside the title and text. A Detective
+     exchange may bring several frames, so it keeps the one-column order. */
   @container (min-width: 480px) {
-    .step.has-media:not(.observe) {
+    .step.has-media:not(.observe):not(.ask) {
       grid-template-columns: 128px minmax(0, 1fr);
       grid-template-rows: auto 1fr;
       grid-template-areas: 'media title' 'media text';

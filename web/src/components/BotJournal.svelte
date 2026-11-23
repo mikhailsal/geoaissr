@@ -3,6 +3,7 @@
   import { ChevronDown, ChevronRight } from '@lucide/svelte';
   import type { JournalFrame } from '$shared/bot-journal';
   import type { RoundResultEntryView } from '$shared/protocol';
+  import { confidenceLine } from '../lib/detective-format';
   import { disclosureLabel, NO_SUMMARY_TEXT } from '../lib/journal-format';
   import BotTimeline from './BotTimeline.svelte';
   import ImagePreview from './ImagePreview.svelte';
@@ -28,6 +29,7 @@
   let summary = $derived(
     journal ? journal.summary : (entry.conclusion ?? entry.explanation ?? undefined),
   );
+  let confidence = $derived(confidenceLine(journal?.confidence));
   let previewSrc = $derived.by(() => {
     if (!preview) return null;
     const { frame, fullReady, fullFailed, thumbFailed } = preview;
@@ -76,6 +78,8 @@
         {summary || NO_SUMMARY_TEXT}
         {#if entry.usedDraft}<span class="draft">Черновик</span>{/if}
       </p>
+      {#if confidence}<p class="verdict">{confidence}</p>{/if}
+      {#if journal?.clue}<p class="verdict">Решающий признак: {journal.clue}</p>{/if}
     </div>
   {/if}
 
@@ -135,8 +139,12 @@
     font-size: var(--text-base);
     white-space: pre-line;
   }
-  .placeholder {
+  .placeholder,
+  .verdict {
     color: var(--paper-dim);
+  }
+  .verdict {
+    font-size: var(--text-xs);
   }
   .draft {
     color: var(--paper);

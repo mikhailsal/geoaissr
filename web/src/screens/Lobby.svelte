@@ -218,6 +218,7 @@
       isCheckingVision={checkingVisionBotId === bot.id}
       visionToast={visionToastByBot[bot.id]}
       isHost={view.viewerIsHost}
+      roundDurationSec={view.roundDurationSec}
       onResetWins={() => {
         onResetBotWins(bot.id);
       }}

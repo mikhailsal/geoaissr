@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { ParticipantColorId } from '$shared/colors';
+  import BotPlayStyle from './BotPlayStyle.svelte';
+  import BotSlotAdvanced from './BotSlotAdvanced.svelte';
   import ParticipantColorPicker from './ParticipantColorPicker.svelte';
   import type { DifficultyPreset } from '$shared/bot-tools';
   import type { HarnessCatalogEntry } from '$shared/protocol';
   import type { BotSlotConfig } from '$shared/storage-schemas';
   import type { VisionToast } from '../lib/game-store.svelte';
   import { formatSecondsOnly } from '../i18n/format';
-  import { EFFORT_LABELS, PERSONALITY_LABELS, PRESET_LABELS, RU } from '../i18n/ru';
+  import { EFFORT_LABELS, PRESET_LABELS, RU } from '../i18n/ru';
 
   interface Props {
     config: BotSlotConfig;
@@ -15,6 +17,8 @@
     isCheckingVision: boolean;
     visionToast?: VisionToast;
     isHost: boolean;
+    /** The match's round duration: it caps the bot's budget and decides the play style. */
+    roundDurationSec: number;
     onUpdate: (patch: Record<string, unknown>) => void;
     onApplyPreset: (preset: Exclude<DifficultyPreset, 'custom'>) => void;
     onCheckVision: () => void;
@@ -29,6 +33,7 @@
     isCheckingVision,
     visionToast,
     isHost,
+    roundDurationSec,
     onUpdate,
     onApplyPreset,
     onCheckVision,
@@ -38,7 +43,6 @@
 
   let draftName = $state('');
   let draftModel = $state('');
-  let draftPersonality = $state('');
   let customModelMode = $state(false);
 
   const selectedHarness = $derived(availableHarnesses.find((h) => h.id === slot.harness));
@@ -58,7 +62,6 @@
   $effect(() => {
     draftName = slot.name;
     draftModel = slot.model;
-    draftPersonality = slot.personalityText;
     customModelMode = !modelChoices.includes(slot.model);
   });
 
@@ -73,13 +76,6 @@
     const clean = draftModel.trim().slice(0, 120);
     if (clean && clean !== slot.model) {
       onUpdate({ model: clean });
-    }
-  }
-
-  function commitPersonalityText(): void {
-    const clean = draftPersonality.replace(/[\r\n]+/g, ' ').slice(0, 200);
-    if (clean !== slot.personalityText) {
-      onUpdate({ personalityText: clean });
     }
   }
 </script>
@@ -208,6 +204,8 @@
     <p class="warn-line" role="note">{RU.lobby.agyPrivacyWarning}</p>
   {/if}
 
+  <BotPlayStyle config={slot} {roundDurationSec} {isHost} {onUpdate} />
+
   <div class="preset-bar" role="group" aria-label="Уровень сложности бота">
     <span class="lbl">Сложность ({PRESET_LABELS[slot.difficultyPreset]})</span>
     <div class="preset-btns">
@@ -264,74 +262,7 @@
     </label>
   </div>
 
-  <details class="advanced">
-    <summary>{RU.lobby.advanced}</summary>
-    <div class="row-2 adv-grid">
-      <label class="field">
-        <span class="lbl">Размер снимка</span>
-        <select
-          class="field-select"
-          disabled={!isHost}
-          value={String(slot.imageSize)}
-          onchange={(e) => {
-            onUpdate({ imageSize: Number(e.currentTarget.value) });
-          }}
-        >
-          <option value="256">256 px</option>
-          <option value="400">400 px</option>
-          <option value="640">640 px</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="lbl">Бюджет раунда (с)</span>
-        <input
-          type="number"
-          class="field-input"
-          min={60}
-          max={600}
-          disabled={!isHost}
-          value={slot.budgetSec}
-          onchange={(e) => {
-            const val = Number.parseInt(e.currentTarget.value, 10);
-            if (Number.isFinite(val)) onUpdate({ budgetSec: Math.max(60, Math.min(600, val)) });
-          }}
-        />
-      </label>
-
-      <label class="field">
-        <span class="lbl">Характер</span>
-        <select
-          class="field-select"
-          disabled={!isHost}
-          value={slot.personalityPreset}
-          onchange={(e) => {
-            onUpdate({ personalityPreset: e.currentTarget.value });
-          }}
-        >
-          {#each ['neutral', 'braggart', 'humble', 'scientist'] as const as p (p)}
-            <option value={p}>{PERSONALITY_LABELS[p]}</option>
-          {/each}
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="lbl">Свой тон (до 200 символов)</span>
-        <input
-          type="text"
-          class="field-input"
-          maxlength={200}
-          disabled={!isHost}
-          placeholder="Например: любит дорожные знаки"
-          bind:value={draftPersonality}
-          onblur={commitPersonalityText}
-          onkeydown={(e) => {
-            if (e.key === 'Enter') commitPersonalityText();
-          }}
-        />
-      </label>
-    </div>
-  </details>
+  <BotSlotAdvanced config={slot} {isHost} {onUpdate} />
 
   <div class="vision-row">
     <button
@@ -424,18 +355,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
-  }
-
-  .advanced summary {
-    cursor: pointer;
-    color: var(--paper-dim);
-    min-height: var(--control-h);
-    display: flex;
-    align-items: center;
-  }
-
-  .adv-grid {
-    margin-top: var(--sp-2);
   }
 
   .vision-row {

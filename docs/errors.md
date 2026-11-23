@@ -80,6 +80,33 @@ Not a command-line error: it is the code at the end of the tool result that the 
 - **Why:** the bridge runs inside the bot's CLI process and reaches the server over `127.0.0.1`; the server may have stopped the round or be restarting.
 - **What the host should do:** nothing for a single occurrence. If every bot hits it every round, restart `bun run start` and check `bun run doctor`.
 
+## GEO_DETECTIVE_QUESTION_FORM
+
+Not a command-line error: it is the code at the start of a refusal that the tool `ask` returns to the brain of a Detective bot.
+
+- **What:** a request to the eyes contains `?` or the particle «ли», so it is a question with an expected answer.
+- **Why:** the eyes tend to confirm what they are asked about. A request names a topic to look at («дорожная разметка: цвет осевой линии») and the eyes describe what is there.
+- **What the bot should do:** send the request again as a topic. The refused `ask` is not counted, no request reaches the eyes and no paid turn is charged.
+- **What the host sees:** nothing; the refused request is not on the result card.
+
+## GEO_DETECTIVE_PLACE_WORD
+
+Not a command-line error: it is the code at the start of a refusal that the tool `ask` returns to the brain of a Detective bot.
+
+- **What:** a request to the eyes names a country, a city or a people. Names of scripts next to their noun («арабская вязь», «тайское письмо») are allowed.
+- **Why:** the eyes must not learn the brain's guess, or they start to see what fits it.
+- **What the bot should do:** rephrase the request without the place name. The refused `ask` is not counted.
+- **What the host sees:** nothing. The check is a word list (country names from `shared/regions`, large cities, demonyms), so an unusual place name can pass; in the other direction, a place word the eyes write outside quoted text reaches the brain as «[…]».
+
+## GEO_DETECTIVE_CONTROL_MISSING
+
+Not a command-line error: it is the code at the start of the one-time reminder that the tool `final_guess` returns to the brain of a Detective bot.
+
+- **What:** the final answer came before any `ask` with `control: true`, while the eyes are alive and more than 30 s of the round are left.
+- **Why:** one more look at the deciding clue catches an answer the eyes gave to please the question.
+- **What the bot should do:** send an `ask` with `control: true`, or repeat `final_guess`: the second one is accepted as it is. The point of the refused call is kept as a checkpoint, so the bot loses nothing if the round ends.
+- **What the host sees:** the result card marks the control exchange «контрольная проверка»; a bot that skipped it has no such step.
+
 ## GEO_CRASH
 
 Unexpected exception on the server. The full stack trace (without keys and tokens) is written to `<GEOAISSR_DATA_DIR>/logs/crash-<timestamp>.log`. Restart `bun run start`.

@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { getBotToolDefinitions } from '../shared/bot-tools.ts';
+import { DETECTIVE_ROLES, getDetectiveToolDefinitions } from '../shared/detective-tools.ts';
 import { transportErrorResult } from './transport-error.ts';
 
 interface BackendToolResponse {
@@ -21,6 +22,8 @@ const BOT_TOKEN =
 const DELIVERY_MODE = process.env.GEO_DELIVERY_MODE === 'file' ? 'file' : 'mcp';
 const WORK_DIR = process.env.GEO_WORK_DIR ?? process.cwd();
 const MOVE_ENABLED = process.env.GEO_MOVE_ENABLED !== 'false';
+/** Set for the two processes of a Detective bot; a camera bot has no role. */
+const ROLE = DETECTIVE_ROLES.find((role) => role === process.env.GEO_BOT_ROLE);
 
 async function postToolCall(tool: string, args: unknown): Promise<BackendToolResponse> {
   const res = await fetch(`${API_URL}/tool/${encodeURIComponent(tool)}`, {
@@ -74,7 +77,9 @@ async function main(): Promise<void> {
 
   const mcp = new McpServer({ name: 'geo', version: '0.1.0' }, { capabilities: { tools: {} } });
 
-  const tools = getBotToolDefinitions(MOVE_ENABLED);
+  const tools = ROLE
+    ? getDetectiveToolDefinitions(ROLE, MOVE_ENABLED)
+    : getBotToolDefinitions(MOVE_ENABLED);
 
   mcp.server.setRequestHandler(ListToolsRequestSchema, () => Promise.resolve({ tools }));
 

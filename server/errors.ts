@@ -28,6 +28,9 @@ export const ERROR_CODES = [
   'GEO_QUOTA_CEILING',
   'GEO_BOT_JOURNAL_FIELD_MISSING',
   'GEO_BOT_BRIDGE_UNREACHABLE',
+  'GEO_DETECTIVE_QUESTION_FORM',
+  'GEO_DETECTIVE_PLACE_WORD',
+  'GEO_DETECTIVE_CONTROL_MISSING',
   'GEO_CRASH',
   'GEO_EVAL_HARNESS_FAILED',
 ] as const;
@@ -178,6 +181,31 @@ export const ERROR_REGISTRY: Record<ErrorCode, ErrorRegistryEntry> = {
     fixTemplate:
       'бот повторяет вызов один раз и затем отправляет final_guess; если так в каждом раунде — перезапустите `bun run start`',
     docAnchor: 'docs/errors.md#GEO_BOT_BRIDGE_UNREACHABLE',
+  },
+  GEO_DETECTIVE_QUESTION_FORM: {
+    code: 'GEO_DETECTIVE_QUESTION_FORM',
+    errorClass: 'usage',
+    exitCode: 1,
+    whatTemplate: 'мозг Детектива отправил глазам вопрос вместо темы для описания',
+    fixTemplate: 'бот перефразирует просьбу без «?» и «ли»; хосту ничего делать не нужно',
+    docAnchor: 'docs/errors.md#GEO_DETECTIVE_QUESTION_FORM',
+  },
+  GEO_DETECTIVE_PLACE_WORD: {
+    code: 'GEO_DETECTIVE_PLACE_WORD',
+    errorClass: 'usage',
+    exitCode: 1,
+    whatTemplate: 'мозг Детектива назвал в просьбе глазам место или народ',
+    fixTemplate: 'бот перефразирует просьбу без названий мест; хосту ничего делать не нужно',
+    docAnchor: 'docs/errors.md#GEO_DETECTIVE_PLACE_WORD',
+  },
+  GEO_DETECTIVE_CONTROL_MISSING: {
+    code: 'GEO_DETECTIVE_CONTROL_MISSING',
+    errorClass: 'usage',
+    exitCode: 1,
+    whatTemplate: 'мозг Детектива отправил итоговый ответ без контрольной проверки',
+    fixTemplate:
+      'бот отправляет контрольный запрос или повторяет final_guess; хосту ничего делать не нужно',
+    docAnchor: 'docs/errors.md#GEO_DETECTIVE_CONTROL_MISSING',
   },
   GEO_CRASH: {
     code: 'GEO_CRASH',

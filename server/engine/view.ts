@@ -103,6 +103,7 @@ function projectActive(state: RoomState, viewerId: string): ClientViewState['act
       moveLimit: b.moveLimit,
       status: b.status,
       abortReason: b.abortReason,
+      ...(b.playStyle ? { playStyle: b.playStyle } : {}),
     })),
   };
 }

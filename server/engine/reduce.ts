@@ -19,7 +19,7 @@ import {
   handleRoundPrepared,
   maybeStartCountdown,
 } from './round.ts';
-import { addFindingToJournal, addThumbToJournal } from './journal.ts';
+import { addFindingToJournal, addThumbToJournal, patchJournalStep } from './journal.ts';
 import type { EngineEvent, ReduceOutput, RoomState } from './types.ts';
 import { computeStartBlockedReasons } from './view.ts';
 
@@ -66,6 +66,7 @@ function handleBotEvent(state: RoomState, event: EngineEvent, now: number): Redu
     event.type !== 'bot_thumb_added' &&
     event.type !== 'bot_guess_recorded' &&
     event.type !== 'bot_finding' &&
+    event.type !== 'bot_step_patched' &&
     event.type !== 'bot_finished'
   ) {
     return { state, effects: [] };
@@ -81,12 +82,15 @@ function handleBotEvent(state: RoomState, event: EngineEvent, now: number): Redu
   if (!bot || bot.status !== 'thinking') return { state, effects: [] };
 
   let updatedBot = bot;
+  const atMs = Math.max(0, now - (active.roundStartedAt ?? now));
   if (event.type === 'bot_turns_updated') {
     updatedBot = { ...bot, turnsUsed: event.turnsUsed };
   } else if (event.type === 'bot_thumb_added') {
-    const atMs = Math.max(0, now - (active.roundStartedAt ?? now));
     const journal = addThumbToJournal(bot.journal ?? [], event.thumb, atMs);
     updatedBot = { ...bot, thumbs: [...bot.thumbs, event.thumb], journal };
+  } else if (event.type === 'bot_step_patched') {
+    const journal = patchJournalStep(bot.journal ?? [], event.turn, event.patch, atMs);
+    updatedBot = { ...bot, journal };
   } else if (event.type === 'bot_finding') {
     updatedBot = { ...bot, journal: addFindingToJournal(bot.journal ?? [], event) };
   } else if (event.type === 'bot_guess_recorded') {
@@ -348,6 +352,7 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
     case 'bot_thumb_added':
     case 'bot_guess_recorded':
     case 'bot_finding':
+    case 'bot_step_patched':
     case 'bot_finished':
       return handleBotEvent(state, event, now);
     case 'bot_accounting':

@@ -137,6 +137,21 @@ export const RU = {
     abortedTag: 'оборван',
     loadingTag: 'загружает панораму',
   },
+  playStyle: {
+    label: 'Стиль игры',
+    intuit: 'Интуит',
+    detective: 'Детектив',
+    brain: 'Мозг',
+    eyes: 'Глаза',
+    intuitHint: 'Один процесс: сам смотрит кадры и ставит точку',
+    detectiveHint:
+      'Два процесса: «глаза» видят кадры и описывают их, «мозг» кадров не видит, рассуждает по описаниям и ставит точку. Токены считаются за оба. «Проверить зрение» проверяет глаза',
+    minBudgetHint: (minSec: number) => `Детективу нужно не меньше ${minSec} с`,
+    fallbackBudget: (roundSec: number, minSec: number) =>
+      `Раунд длится ${roundSec} с, а Детективу нужно не меньше ${minSec} с: в этой партии бот сыграет как Интуит`,
+    fallbackHarness: (supported: string, harness: string) =>
+      `Детектив пока работает только с ${supported}: с харнессом ${harness} бот сыграет как Интуит`,
+  },
   results: {
     correctCountry: (country: string) => `Правильный ответ: ${country}`,
     noAnswersAtAll: 'Никто не ответил',

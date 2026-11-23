@@ -29,6 +29,10 @@ export function shiftLabel(effect: ShiftEffect): string {
 /** Title of a step row, from its action and the camera parameters of its first frame. */
 export function stepTitle(step: JournalStep): string {
   if (step.kind === 'observe') return FIRST_LOOK_TITLE;
+  // A Detective exchange: the brain's request number k is step k.
+  if (step.kind === 'ask') {
+    return step.control ? `Запрос ${step.index} · контрольная проверка` : `Запрос ${step.index}`;
+  }
   const params = step.frames[0]?.params;
   const heading = params ? ` · азимут ${Math.round(params.heading)}°` : '';
   if (step.kind === 'look') {
@@ -42,8 +46,29 @@ export function stepTitle(step: JournalStep): string {
   return `${head}${heading}${far}`;
 }
 
-/** Accessible name of a frame button: «Кадр шага N: <действие>». */
-export function frameName(step: JournalStep, frameLabel: string): string {
+/** «400 м от старта» for a frame the eyes took after driving away; null at the start. */
+export function awayFromStart(fromStartM: number | undefined): string | null {
+  return fromStartM !== undefined && fromStartM > 0
+    ? `${Math.round(fromStartM)} м от старта`
+    : null;
+}
+
+/**
+ * Accessible name of a frame button: «Кадр шага N: <действие>». A Detective frame has its own
+ * number, the one the report and the answers cite: «Кадр 5: <подпись>».
+ */
+export function frameName(
+  step: JournalStep,
+  frameLabel: string,
+  frameNumber?: number,
+  fromStartM?: number,
+): string {
+  if (frameNumber !== undefined) {
+    const label = frameLabel.trim();
+    const away = awayFromStart(fromStartM);
+    const parts = [label, ...(away ? [away] : [])].filter((part) => part.length > 0);
+    return parts.length > 0 ? `Кадр ${frameNumber}: ${parts.join(' · ')}` : `Кадр ${frameNumber}`;
+  }
   const base = `Кадр шага ${step.index}: ${stepTitle(step)}`;
   return step.kind === 'observe' && frameLabel.trim() ? `${base} — ${frameLabel.trim()}` : base;
 }

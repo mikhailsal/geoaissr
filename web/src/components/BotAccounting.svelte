@@ -2,6 +2,7 @@
   import { Coins } from '@lucide/svelte';
   import type { RoundResultEntryView } from '$shared/protocol';
   import { formatNumberRu } from '../i18n/format';
+  import { RU } from '../i18n/ru';
   let { entry }: { entry: RoundResultEntryView } = $props();
   let root: HTMLDivElement;
   let hovering = $state(false);
@@ -83,6 +84,15 @@
           ? formatNumberRu(entry.tokenUsage.cachedInputTokens)
           : 'н/д'}</span
       >
+      {#if entry.roleUsage}
+        <span>
+          {RU.playStyle.brain}: {entry.roleUsage.brain
+            ? formatNumberRu(entry.roleUsage.brain.totalTokens)
+            : 'н/д'} · {RU.playStyle.eyes}: {entry.roleUsage.eyes
+            ? formatNumberRu(entry.roleUsage.eyes.totalTokens)
+            : 'н/д'}
+        </span>
+      {/if}
       <span
         >Модель: {entry.matchedModelId ?? 'н/д'}{entry.isApproximateMatch
           ? ' (приблизительное совпадение)'

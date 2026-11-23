@@ -21,6 +21,9 @@ export async function connectBridgeMcp(opts: {
   workDir: string;
   deliveryMode?: 'mcp' | 'file';
   bridgeScriptPath?: string;
+  /** One of the two roles of a Detective bot; the bridge then lists that role's tools. */
+  role?: 'brain' | 'eyes';
+  moveEnabled?: boolean;
 }): Promise<{
   client: Client;
   callTool: (name: string, args: Record<string, unknown>) => Promise<McpToolCallResult>;
@@ -40,6 +43,8 @@ export async function connectBridgeMcp(opts: {
       GEO_BOT_TOKEN: opts.botToken,
       GEO_WORK_DIR: opts.workDir,
       GEO_DELIVERY_MODE: opts.deliveryMode ?? 'mcp',
+      ...(opts.role ? { GEO_BOT_ROLE: opts.role } : {}),
+      ...(opts.moveEnabled === false ? { GEO_MOVE_ENABLED: 'false' } : {}),
     },
   });
   const client = new Client({ name: 'fake-harness', version: '1.0.0' }, { capabilities: {} });

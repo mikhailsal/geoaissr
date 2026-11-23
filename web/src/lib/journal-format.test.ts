@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { JournalStep } from '$shared/bot-journal';
 import {
+  awayFromStart,
   disclosureLabel,
   findingLine,
   formatKm,
@@ -81,4 +82,20 @@ test('finding lines handle every state', () => {
     'раунд закончился раньше вывода',
   );
   expect(findingLine(step({ findingState: 'recorded' }))).toBeNull();
+});
+
+test('a Detective exchange is titled by its number, and its frames by their own number', () => {
+  expect(stepTitle(step({ kind: 'ask', index: 2 }))).toBe('Запрос 2');
+  expect(stepTitle(step({ kind: 'ask', index: 3, control: true }))).toBe(
+    'Запрос 3 · контрольная проверка',
+  );
+  expect(frameName(step({ kind: 'ask', index: 2 }), 'шаг 1', 6)).toBe('Кадр 6: шаг 1');
+  expect(frameName(step({ kind: 'observe', index: 0 }), ' ', 3)).toBe('Кадр 3');
+  // A frame taken after a drive says how far from the start it is.
+  expect(frameName(step({ kind: 'ask', index: 2 }), 'шаг 1', 6, 412.4)).toBe(
+    'Кадр 6: шаг 1 · 412 м от старта',
+  );
+  expect(frameName(step({ kind: 'ask', index: 2 }), '', 6, 412.4)).toBe('Кадр 6: 412 м от старта');
+  expect(awayFromStart(0)).toBeNull();
+  expect(awayFromStart(undefined)).toBeNull();
 });

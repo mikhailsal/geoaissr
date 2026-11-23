@@ -13,6 +13,7 @@ import { logAgyToolAttempts, logBotDiagnostic } from './diagnostics.ts';
 import type { BotToolApiServer } from './api.ts';
 import type { EngineEvent, RoundTarget } from '../engine/types.ts';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
+import type { DetectiveRole } from '../../shared/detective-tools.ts';
 
 export type CustomBotLaunchBuilder = (params: {
   slot: BotSlotConfig;
@@ -20,6 +21,8 @@ export type CustomBotLaunchBuilder = (params: {
   apiUrl: string;
   botToken: string;
   prompt: string;
+  /** Set for the two processes of a Detective bot. */
+  role?: DetectiveRole;
 }) => { cmd: string[]; cwd: string; stdinText?: string };
 
 export interface ActiveBotHandle {
@@ -29,6 +32,9 @@ export interface ActiveBotHandle {
   slotId: string;
   workDir: string;
   token: string;
+  /** A Detective bot runs two processes: the second one's token and both processes live here. */
+  extraTokens?: string[];
+  extraProcs?: ManagedProcess[];
   abortQueue: (reason: string) => void;
   proc?: ManagedProcess;
   stopped: boolean;
@@ -56,6 +62,7 @@ export function cleanupBotHandle(
   handle.releaseObserve();
   handle.abortQueue('stopped');
   api.unregisterBot(handle.token);
+  for (const token of handle.extraTokens ?? []) api.unregisterBot(token);
   const flush = handle.flushDiagnostics;
   handle.flushDiagnostics = undefined;
   try {

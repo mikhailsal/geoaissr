@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { HarnessCatalogEntry } from '../../../shared/protocol.ts';
 import { botNameFromModel, isAutoBotName } from '../../../shared/bot-tools.ts';
+import type { DetectiveRole } from '../../../shared/detective-tools.ts';
 import type { BotSlotConfig, HarnessId } from '../../../shared/storage-schemas.ts';
 import harnessesMeta from './harnesses.json' with { type: 'json' };
 import type { CommandProbe, HarnessAdapter } from './types.ts';
@@ -96,6 +97,7 @@ export function buildSharedMcpEnv(opts: {
   deliveryMode: 'mcp' | 'file';
   moveEnabled: boolean;
   workDir: string;
+  role?: DetectiveRole | undefined;
 }): Record<string, string> {
   return {
     GEO_API_URL: opts.apiUrl,
@@ -103,6 +105,7 @@ export function buildSharedMcpEnv(opts: {
     GEO_DELIVERY_MODE: opts.deliveryMode,
     GEO_MOVE_ENABLED: opts.moveEnabled ? 'true' : 'false',
     ...(opts.deliveryMode === 'file' ? { GEO_WORK_DIR: opts.workDir } : {}),
+    ...(opts.role ? { GEO_BOT_ROLE: opts.role } : {}),
   };
 }
 

@@ -1,4 +1,5 @@
 import { normalizeLongitude } from '../../shared/bot-tools.ts';
+import { resolvePlayStyle } from '../../shared/play-style.ts';
 import { COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS, ROUND_INTRO_MS } from '../../shared/protocol.ts';
 import { finishActiveRoundToResults } from './results.ts';
 import type {
@@ -24,7 +25,9 @@ function buildInitialBotsForRound(state: RoomState): {
 
   const bots: Record<string, BotRoundState> = {};
   for (const bot of enabledBots) {
+    const { style } = resolvePlayStyle(bot, state.settings.roundDurationSec);
     bots[bot.id] = {
+      ...(style === 'detective' ? { playStyle: style } : {}),
       slotId: bot.id,
       name: bot.name,
       color: bot.color,
