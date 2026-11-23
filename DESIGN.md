@@ -76,6 +76,10 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 - **Icons:** only `@lucide/svelte`, and only meaningful ones.
 - **Shared state components:** `StatusBanner.svelte` (connection and warnings for the host) and `InlineState.svelte` (loading, empty, error with an action button).
 
+## AI play style in the lobby
+
+The slot settings show «Стиль игры» as two buttons, «Интуит» and «Детектив»; the selected one uses the primary button style and `aria-pressed`. A hint under them, in the same small caption style as the other slot hints, says what the selected style does, and for a Detective ends with «Детективу нужно не меньше 90 с». When a slot set to Detective will play Intuit in this match (round shorter than 90 seconds, or a harness other than `claude`), a bordered note (`1px solid var(--paint)`, `role="note"`) under the hint says why, and the same sentence appears under the bot in the participants list. A slot that will play Detective shows « · Детектив» in its line of the participants list. During a round the bot's status in the player rail reads «детектив · ход N/M».
+
 ## AI result cards
 
 The card reads top to bottom: header, bot's story, step-by-step disclosure, coordinates, accounting (always last).
@@ -88,9 +92,11 @@ Each step row is separated by a 1 px `--line` divider (no nested shadows, no per
 
 State copy: a missing finding reads «вывод не записан»; a finding cut off by the round end (or still pending on the last step) reads «раунд закончился раньше вывода». Shifts are text labels with their reason, never colour alone: «Отпало» (`--signal`), «Менее вероятно» (`--paper-dim`), «Более вероятно» (`--ok`). The pin line reads «первая точка», «точка сдвинулась на N км» (tabular numerals), «точка не сдвинулась» or «новая точка не записана». All model text is plain text with `overflow-wrap: anywhere`.
 
+A Detective card keeps the same order and adds what the two processes said. The header shows the tag «Детектив» beside the name (1 px `--line` border, 14 px, `--paper-dim`). Under the story come «Уверенность: …» and «Решающий признак: …» in 14 px `--paper-dim`. «Первый взгляд» shows every frame taken before the report and then «Отчёт глаз»: a panel on `--asphalt-800` with the report's sections as small headings and each line followed by «(кадр N)». Every request of the brain is a step titled «Запрос N», the control one «Запрос N · контрольная проверка». Its frames sit in a wrapping row above the text; «Зачем:» is followed by the exchange, each item two lines tagged «МОЗГ» and «ГЛАЗА» behind a 1 px `--line` left rule. An answer ends with «(уверенно · кадр N)» or «(неуверенно · кадр N)». A request without an answer shows its status in words in `--paper-dim`, never by colour alone: «не видно», «неразборчиво», «проехать не удалось», «глаза не ответили», «глаза отключились», «раунд закончился раньше ответа». Every Detective frame carries its number on a dark tag in the top left corner, with « · N м от старта» when it was taken after a drive, and its button is named «Кадр N: …».
+
 One shared native modal dialog previews a frame. Escape closes it first and restores focus to the frame button; the card's own Escape order is unchanged. The «почему?» button is at least 44 px tall.
 
-Token and estimated-cost details use one compact metric button. Its tooltip works with hover, keyboard focus and tap; Escape closes the tooltip before the surrounding card, and clicking outside dismisses it. Reference API prices show three decimal places and the label “API-цена для справки”; approximate model matches are explicit.
+Token and estimated-cost details use one compact metric button. For a Detective its tooltip adds one line with the split by process: «Мозг: N · Глаза: N». Its tooltip works with hover, keyboard focus and tap; Escape closes the tooltip before the surrounding card, and clicking outside dismisses it. Reference API prices show three decimal places and the label “API-цена для справки”; approximate model matches are explicit.
 
 Live accounting updates preserve the selected card's focus, open tooltip and image preview. Selecting a different bot or round resets those inspection controls.
 

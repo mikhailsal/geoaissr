@@ -77,7 +77,7 @@ One round, as the bot sends it (`observe` → one `look` with a bounced first at
 
 ### Journal data
 
-`shared/bot-journal.ts` defines one shape (zod and types): steps `{index, kind: observe | look | move, reason?, frames, finding?, findingState: pending | recorded | missing | round-ended, shifts?, currentGuess?, pointMissing?, movedKm?, atMs}` plus `{summary?, finalFinding?}`. The engine event `bot_finding` attaches a finding, shifts and point to a step; the journal reaches clients as `journal` on the AI entry of the round results. Old results with `facts`, `conclusion` or `rejectedGuesses` and no journal still parse, and a record without a journal shows no steps.
+`shared/bot-journal.ts` defines one shape (zod and types): steps `{index, kind: observe | look | move | ask, reason?, frames, finding?, findingState: pending | recorded | missing | round-ended, shifts?, currentGuess?, pointMissing?, movedKm?, atMs}` plus `{summary?, finalFinding?}`. A Detective journal adds `style: detective`, `confidence` and `clue`; its step 0 carries the `report` (lines `{section, text, frame}`), and request number k of the brain is step k with `kind: ask`, the brain's `reason`, the `requests` (`{n, kind, text, status: pending | answered | abstained | timeout | eyes_down, value?, confidence?, frame?}`) and `control` for the control check. Frames the eyes take while answering belong to that step and carry their number `n` and `action`. The engine event `bot_finding` attaches a finding, shifts and point to a step; the journal reaches clients as `journal` on the AI entry of the round results. Old results with `facts`, `conclusion` or `rejectedGuesses` and no journal still parse, and a record without a journal shows no steps.
 
 The prompt asks the bot to keep several region versions, record the reason before each action and the finding after it, add shifts that exclude or weaken a version, send the current point with every paid action and finish with a first-person summary. A clue counts only if it is tied to a frame and shifts the weight between versions. File-based harnesses may use `read_file` only for game-provided images. These instructions do not guarantee a model's compliance or geographic accuracy.
 
@@ -85,9 +85,80 @@ The advertised time budget is capped by the round duration. Every tool response 
 
 `look` accepts heading, optional pitch, optional `fov` and optional `zoom` in `1..9`. Explicit finite `fov` takes precedence and is clamped to `10..120`; otherwise `fov = clamp(round(90 / zoom), 10, 120)`, defaulting to 90. A field of view of 20–45 zooms in, while 120 is wide. Fake images use the same field-of-view projection. Successful step records preserve the effective parameters and the valid hypothesis (the step's reason).
 
+## Detective play style
+
+A bot slot has a play style. **Intuit** (the default) is everything above: one process sees the frames and guesses. **Detective** splits the bot into two processes of the same model that talk only through the server:
+
+- the **eyes** see the frames and describe them. They never name a place;
+- the **brain** reads the descriptions, asks for more and places the pin. It never receives an image.
+
+The split is there to stop a model from seeing what its own guess expects. The eyes do not know the guess; the brain cannot ask a leading question.
+
+### When a slot plays Detective
+
+`shared/play-style.ts` decides per round (`resolvePlayStyle`). A slot set to Detective plays Intuit, and the lobby says why, when:
+
+- its harness is not `claude`. Only that harness has run the two-process launch (`DETECTIVE_HARNESSES`);
+- the round is shorter than 90 seconds (`DETECTIVE_MIN_BUDGET_SEC`). The round duration caps the bot's budget, and a report plus two requests do not fit into less. The lobby also keeps the budget of a Detective slot at 90 seconds or more.
+
+### Tools by role
+
+Each process gets its own bearer token, and the bridge (`bot-tools/main.ts`, `GEO_BOT_ROLE`) lists only the tools of its role. A call to a tool of the other role is refused.
+
+| Role  | Tool           | Effect                                                              | Paid turns   |
+| ----- | -------------- | ------------------------------------------------------------------- | ------------ |
+| eyes  | `observe`      | The four starting views, numbered 1–4                               | 0            |
+| eyes  | `look`         | Turn or zoom the camera; the new frame gets the next number         | 1 on success |
+| eyes  | `move`         | Step or drive along the road (listed only when movement is on)      | 1 on success |
+| eyes  | `report`       | File the scene report, once, before the first request               | 0            |
+| eyes  | `next_request` | Wait up to 20 s for the brain's next request                        | 0            |
+| eyes  | `answer`       | Answer every item of the current request                            | 0            |
+| brain | `briefing`     | Wait for the report and read it                                     | 0            |
+| brain | `ask`          | Send up to 5 requests and wait for the answers                      | 0            |
+| brain | `final_guess`  | Freeze the final answer with `confidence`, `clue` and the `summary` | 0            |
+
+`look` and `move` share the slot's move limit. Every frame has a number; report lines, answers and the result card cite frames by it.
+
+### Report, requests and answers
+
+The eyes first hunt for text with at most three paid actions (`PRE_REPORT_ACTIONS`), then file the report: seven fixed sections (`texts`, `road`, `vehicles`, `poles_signs`, `buildings`, `nature`, `unusual`), each line `{text, frame}`. The prompts agree on three lines the report always has: «Сторона движения:», «Дорога идёт:» and «Солнце:».
+
+A request names a topic to look at, never an expected answer:
+
+- `{kind: "describe", topic}`: describe the topic in the eyes' own words;
+- `{kind: "text", target}`: copy a text letter for letter;
+- `{kind: "drive", heading, distance_m, topic}`: drive along the road, then describe the new place. One per `ask`, only when movement is on and a paid turn is left. The other requests of that `ask` are answered from the new place.
+
+Each answer carries `value`, `confidence` (`sure` or `unsure`) and the `frame` it rests on. Instead of a description the eyes may abstain with `not_visible`, `unreadable` or, for a drive, `no_road`. A drive answer is accepted only after a successful `move`.
+
+The server enforces the separation whatever the prompts say:
+
+- a request with `?` or the particle «ли» is refused with `GEO_DETECTIVE_QUESTION_FORM`, one that names a country, a city or a people with `GEO_DETECTIVE_PLACE_WORD`. A refused `ask` is not counted;
+- place words the eyes write in their own words reach the brain as `[…]`; text copied from a frame inside «…» is kept;
+- frames taken 15 metres or more from the start are annotated for the brain («кадр 7, 640 м к СВ от старта»), because the answer is about the start;
+- an `ask` waits 30 seconds for its answers, 45 with a drive; unanswered items come back as timed out. With less than 10 seconds left an `ask` is not sent;
+- a `final_guess` before any `ask` with `control: true` gets one reminder (`GEO_DETECTIVE_CONTROL_MISSING`) while more than 30 seconds are left; the second one is accepted. Its point is kept as a checkpoint either way;
+- an `ask` without `finding` or `current_guess`, and a `final_guess` without `summary`, `finding`, `confidence` or `clue`, gets the one-time correction `GEO_BOT_JOURNAL_FIELD_MISSING`, as for an Intuit bot. `hypothesis` is required by the `ask` schema.
+
+The codes are described in [errors](./errors.md#GEO_DETECTIVE_QUESTION_FORM).
+
+### Processes and the round end
+
+The server owns the deadline, both tokens and both processes. The brain runs at the slot's effort, the eyes at `low`. If the eyes exit early, pending and later requests come back as `eyes_down` and the brain is told to send its final guess. The round counts the bot as finished when the brain has exited and the eyes have exited too or 8 seconds have passed; the eyes are then stopped. This keeps the token usage of both processes on the badge. A process that cannot start fails the launch for the round («сбой запуска»). If the brain exits without a final guess, the latest `current_guess` is scored, as for an Intuit bot.
+
+### Prompts
+
+The start prompts are plain text files in `server/bots/prompts/`: `intuit.txt`, `detective-brain.txt` and `detective-eyes.txt`. A file is read at every bot launch, so an edit applies from the next round without a restart. The tag syntax, the variables of each file and what happens when a file is broken are in [the prompts README](../server/bots/prompts/README.md).
+
+### Fake mode
+
+With `--fake` a scripted brain and scripted eyes play through the real session: a report, three exchanges (one with a drive when movement is on, one unreadable text, one unsure answer, one control check) and a final guess. The token numbers on the badge are made up, so the split by process can be seen without a CLI.
+
 ## Usage and price estimates
 
 Normalized `inputTokens` includes cached reads; `cachedInputTokens` is a subset. `totalTokens` is normalized input plus output. Claude input includes its separately reported cache creation and cache reads. Codex already includes cached reads in its input count. AGY's reported total determines whether its raw input already includes cache reads or reports them separately, so cached input is counted once. Ambiguous or contradictory AGY usage is unavailable. See its [official headless documentation](https://antigravity.google/docs/cli/headless/#read-the-results) for the raw counters. Terminal totals are used without also summing intermediate snapshots. Missing or invalid usage is unavailable. Codex skips unrelated oversized lines and discards accumulated counters when a malformed, truncated or oversized terminal event is identifiable in its bounded prefix.
+
+A Detective bot reports the sum of its two processes as `tokenUsage` and the parts as `roleUsage: {brain?, eyes?}`; the price estimate uses the sum, and the badge tooltip shows the split («Мозг», «Глаза»).
 
 A paid game turn counts a successful `look` or `move`, not a model request. Observation, checkpoint and final submissions and image-file reads can require further model exchanges and repeated input processing even when only one paid turn is used.
 
@@ -107,9 +178,10 @@ The cache lives at `{dataDir}/openrouter-models-cache.json`, is fresh for 24 hou
 
 The server writes daily JSON Lines files at `{dataDir}/logs/YYYY-MM-DD.jsonl` and prunes log files older than 14 days. Diagnostic records identify a bot run with `matchId`, `gen`, `roundNumber` and `slotId`; timestamps are UTC. Bot diagnostics are bounded and secret-redacted before they reach the log.
 
-- `bot_tool_call` records each requested game tool, including rejected calls and final-answer submissions. It includes bounded original arguments, result text and image metadata/counts (not image bytes), whether a checkpoint was saved, duration and `ok` status.
+- `bot_tool_call` records each requested game tool, including rejected calls and final-answer submissions. It includes bounded original arguments, result text and image metadata/counts (not image bytes), whether a checkpoint was saved, duration and `ok` status. For a Detective bot the record names the `role` (`brain` or `eyes`) and holds the tool, bounded arguments, duration and `ok` status.
 - `bot_journal_correction` records each one-time correction with `harness`, `tool`, `missing` (field names) and the code, so the correction rate per harness can be counted. It never contains prompt text, environment values or file paths.
-- `harness_start` and `harness_end` record the selected model, context and process lifecycle. `harness_usage` records raw counters, usage status (`reported`, `missing`, `invalid` or `truncated`), normalized `tokenUsage` or `null`, the number of terminal usage records, and safe CLI metadata when available (`conversation_id`, `status`, `num_turns`, `duration_seconds`). `num_turns` is the CLI's counter; it is not a count of model generations. `rawCounterScope` is `terminal` for Claude and AGY and `last-turn` for Codex.
+- `bot_style_fallback` records, at round start, each slot set to Detective that plays Intuit in that round, with the `reason` (`budget` or `harness`).
+- `harness_start` and `harness_end` record the selected model, context and process lifecycle; a Detective bot writes one pair per process, each with its `role`. `harness_usage` records raw counters, usage status (`reported`, `missing`, `invalid` or `truncated`), normalized `tokenUsage` or `null`, the number of terminal usage records, and safe CLI metadata when available (`conversation_id`, `status`, `num_turns`, `duration_seconds`). `num_turns` is the CLI's counter; it is not a count of model generations. `rawCounterScope` is `terminal` for Claude and AGY and `last-turn` for Codex.
 - `harness_cost` records an asynchronous reference price estimate. It is not the provider's actual bill.
 - `harness_tool_call` copies AGY guard attempts with `phase: "attempt"`, observed time, tool and allow/deny decision; a record shows an attempted operation, not proof that it completed successfully. The hook journal is copied before the round's `workDir` is removed. Concurrent writes are serialized and capped at 256 KiB; collection accepts at most 512 records. Malformed, overflowing or dropped journal records produce `harness_monitor_error`, while permission decisions remain unchanged.
 - `harness_monitor_error` reports issues collecting usage or diagnostics. Diagnostic capture is best-effort and does not alter gameplay.

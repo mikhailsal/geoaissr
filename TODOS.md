@@ -122,6 +122,110 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 **Priority:** P3
 **Depends on:** bot step journal card
 
+## Deferred on 2026-11-23
+
+The owner put these aside to build the Detective play style first. Nothing here is started.
+
+### Flaky tests in CI
+
+**What:** Fix four tests that fail from time to time on unchanged code.
+
+- `server/proc/spawn.test.ts`, "stops entire detached process group": it reads the pid file as soon as the file exists, before the shell has written the pid. A fix (wait for a positive pid) is on the branch of PR #24, commit `e6079b0`.
+- `web/tests/lobby-characters.spec.ts:228`, avatar drag: it expects exactly 4 `avatar_turn` messages and sometimes gets 5. The cause is not established.
+- `web/tests/lobby-character-inspection.spec.ts:128`, AI tabs.
+- `web/tests/audio.spec.ts`, lobby music hand-off: GitHub issue #21.
+
+**Why:** Each failure costs a CI rerun of about 10 minutes and hides real failures.
+
+**Effort:** S
+**Priority:** P2
+
+### Long move: replies and error statuses
+
+**What:** Three follow-ups of the long move (v0.3.2).
+
+- A walk that stops at a sharp, tight bend replies that the road ends, although it goes on. A walk that runs out of search time replies that the road is too winding. Both replies should say what really happened.
+- A Street View metadata reply with an error status (for example `OVER_QUERY_LIMIT`) is read as "no panorama here". It should surface as an error.
+- `DESIGN.md` shows step titles without the " · N м" suffix of a long move.
+
+**Context:** `server/bots/road-walk.ts`, `moveReplyText` in `server/bots/runner-handlers.ts`, the limits listed in `docs/bot-tools.md`.
+
+**Effort:** S
+**Priority:** P2
+
+### Detective: first rounds with a real model
+
+**What:** Play a few Detective rounds with a real model and read the logs: does the brain wait for the report, how many requests fit into a round, do the eyes obey the report format, does a drive finish inside 45 seconds.
+
+**Why:** The Detective mode is checked with unit tests, scripted CLI processes over the real MCP bridge and the fake pair. No real model has played a round of it in the game. The timings in the prompts («отчёт приходит на 20–30-й секунде», «один запрос занимает около 10 с») come from the spike on still photos, not from the game.
+
+**Context:** Prompts are in `server/bots/prompts/`. `bot_tool_call` records in the daily log carry the `role`. A paid run needs the owner's approval.
+
+**Effort:** S
+**Priority:** P1
+
+### Detective in `eval:bots`
+
+**What:** Let `bun run eval:bots` measure a Detective configuration (a `--style detective` flag, two processes per round, usage summed by role).
+
+**Why:** The eval tool launches one Intuit process per round, so the two styles cannot be compared on the photo set yet. The numbers from the spike (PR #24) were measured by throwaway code.
+
+**Context:** `scripts/eval-bots.ts`, `scripts/eval-bots/`, `server/bots/detective/launch.ts`. The current set has no movement, so a drive cannot be measured on it (see the roads set below).
+
+**Effort:** M
+**Priority:** P2
+
+### Detective for `codex` and `agy`
+
+**What:** Run the two-process launch with the `codex` and `agy` harnesses and add them to `DETECTIVE_HARNESSES`.
+
+**Why:** A slot with one of these harnesses set to Detective plays Intuit. `agy` delivers frames as files, which the eyes prompt does not describe yet.
+
+**Context:** `shared/play-style.ts`, `server/bots/detective/procs.ts`, `server/bots/adapters/`.
+
+**Effort:** M
+**Priority:** P3
+
+### Roads and rural places in the eval set
+
+**What:** A second eval set of about 30 open road and village panoramas from Panoramax (no key, CC BY-SA), with neighbouring panoramas so that bots can move.
+
+**Why:** The current 28 spots are mostly streets with readable text, movement is off on them, and 24 of them have no real compass heading, so the driving-side and sun hints and the long move cannot be measured there.
+
+**Context:** Proposed on 2026-11-22: at least 10 left-hand-traffic spots and 10 in the southern hemisphere, spots drawn by lot inside a region, rejection rules written before the draw, compass computed from the sun position (the Panoramax compass field was off by 36 to 93 degrees on 3 of 7 samples). Two neighbours each way make about 110 MB; a long move needs many more panoramas per spot, and that size is not worked out. Africa and Central Asia need a Mapillary key from the owner. Wikimedia Commons refused downloads without a contact in the request header and is not needed.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** the owner's go-ahead; a paid run on the set needs a separate approval
+
+### Paid eval runs that wait for approval
+
+**What:** None of these runs without the owner's approval.
+
+- Both play styles on the new road set: 30 spots, 3 repeats, 2 bots, 180 rounds plus judges.
+- Stage 1 again at concurrency 2 (about 170 rounds): the plan asked for at most two rounds at once and the runs used three. The slowest final guess took 22.5 s of 60, so the result is not in doubt.
+- The spike 3 follow-up that spends the brain's unused time on finding text (84 rounds). The run on the new set replaces it.
+
+**Priority:** P3
+
+### Spike reports of PR #24
+
+**What:** Decide whether to merge PR #24 (Detective spikes 1 to 3: `spikes/detective/` and three reports in `docs/evals/`). If it is merged, add two limits to the spike 3 report: movement was off for both bots, and the set has few roads and rural scenes.
+
+**Context:** The Detective play style in `server/bots/detective/` was built from main and does not depend on that branch.
+
+**Priority:** P3
+
+### Release tooling
+
+**What:** Two optional settings.
+
+- `.gstack/ship-policy.json` with `"bump": "patch"`, so that `/ship` stops offering minor and major versions. The rule itself is in `CLAUDE.md`.
+- The gstack credential scan before a push: gstack installs its hook into the git directory, and this repository uses `.githooks` through `core.hooksPath`, so nothing was installed. It needs a line in `.githooks/pre-push`.
+
+**Effort:** S
+**Priority:** P3
+
 ## Completed
 
 ### Sounds
