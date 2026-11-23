@@ -3,7 +3,7 @@
   import { ChevronDown, ChevronRight } from '@lucide/svelte';
   import type { JournalFrame } from '$shared/bot-journal';
   import type { RoundResultEntryView } from '$shared/protocol';
-  import { confidenceLine } from '../lib/detective-format';
+  import { BRAIN_BLIND_NOTE, confidenceLine } from '../lib/detective-format';
   import { disclosureLabel, NO_SUMMARY_TEXT } from '../lib/journal-format';
   import BotTimeline from './BotTimeline.svelte';
   import ImagePreview from './ImagePreview.svelte';
@@ -80,6 +80,7 @@
       </p>
       {#if confidence}<p class="verdict">{confidence}</p>{/if}
       {#if journal?.clue}<p class="verdict">Решающий признак: {journal.clue}</p>{/if}
+      {#if journal?.style === 'detective'}<p class="verdict">{BRAIN_BLIND_NOTE}</p>{/if}
     </div>
   {/if}
 

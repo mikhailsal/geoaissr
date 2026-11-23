@@ -110,6 +110,7 @@ test('the result card of a Detective shows the report, the exchanges and both pr
     await expect(card.getByText(/^Я не видел кадров/)).toBeVisible();
     await expect(card.getByText('Уверенность: уверен в стране')).toBeVisible();
     await expect(card.getByText(/^Решающий признак: Разметка и столбы/)).toBeVisible();
+    await expect(card.getByText('Мозг не видел кадров — только ответы глаз')).toBeVisible();
 
     await card.getByRole('button', { name: 'Ход за ходом (4 шага)' }).click();
     const report = card.getByRole('region', { name: 'Отчёт глаз' });

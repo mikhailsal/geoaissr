@@ -7,6 +7,8 @@ export const BRAIN_TAG = 'МОЗГ';
 export const EYES_TAG = 'ГЛАЗА';
 export const REPORT_TITLE = 'Отчёт глаз';
 export const CONTROL_TAG = 'контрольная проверка';
+/** Said once on the card: the frames in the steps were seen by the eyes, not by the narrator. */
+export const BRAIN_BLIND_NOTE = 'Мозг не видел кадров — только ответы глаз';
 
 const CONFIDENCE_LABELS: Record<NonNullable<BotJournal['confidence']>, string> = {
   country: 'уверен в стране',
