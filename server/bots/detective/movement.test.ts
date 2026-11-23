@@ -54,7 +54,8 @@ test('paid actions stop at the slot limit, and a look needs the start frames', a
 });
 
 test('the eyes drive on request; the answer cites a frame marked with the distance from the start', async () => {
-  const { session, log } = await briefed();
+  // No test override of the ask timeout: a drive gets the product's longer limit.
+  const { session, log } = await briefed({ askTimeoutMs: undefined });
   const asked = session.call('brain', 'ask', DRIVE_ASK);
   const request = await session.call('eyes', 'next_request', {});
   expect(request.text).toContain('Проедь по дороге: move(heading=0, distance_m=600)');
@@ -66,9 +67,23 @@ test('the eyes drive on request; the answer cites a frame marked with the distan
   ]);
   expect(lazy.isError).toBe(true);
   expect(lazy.text).toContain('сначала вызови move');
+  // «Не видно» about a place nobody drove to is refused too: only no_road answers without a move.
+  const blind = await answerCurrent(session, [
+    { n: 1, value: 'not_visible' },
+    { n: 2, value: 'not_visible' },
+  ]);
+  expect(blind.isError).toBe(true);
+  expect(blind.text).toContain('сначала вызови move');
   const moved = await session.call('eyes', 'move', { heading: 0, distance_m: 600 });
   expect(moved.isError).toBeUndefined();
   expect(moved.text).toContain('Кадр 5.');
+  // After the drive the answer must come from the new place, not from a frame taken before it.
+  const stale = await answerCurrent(session, [
+    { n: 1, value: 'синий указатель', confidence: 'sure', frame: 2 },
+    { n: 2, value: 'not_visible' },
+  ]);
+  expect(stale.isError).toBe(true);
+  expect(stale.text).toContain('кадр 2 снят до проезда; ответь по кадру 5');
   const ack = await answerCurrent(session, [
     { n: 1, value: 'синий указатель на перекрёстке', confidence: 'sure', frame: 5 },
     { n: 2, value: 'CENTRUM 3', confidence: 'sure', frame: 5 },

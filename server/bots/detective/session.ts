@@ -1,5 +1,5 @@
 import type { DetectiveRole } from '../../../shared/detective-tools.ts';
-import { handleAsk, handleBriefing, handleFinalGuess } from './brain.ts';
+import { handleAsk, handleBriefing, handleFinalGuess, onDeadlineMoved } from './brain.ts';
 import {
   handleAnswer,
   handleLook,
@@ -33,6 +33,8 @@ export interface DetectiveSession {
   eyesExited: () => void;
   /** Ends the round for both roles: waits wake up and later calls are refused. */
   end: () => void;
+  /** The round deadline moved earlier: waits sized for the old one are cut. */
+  deadlineMoved: () => void;
   submittedGuess: () => boolean;
   turnsUsed: () => number;
 }
@@ -44,7 +46,7 @@ function dispatchBrain(s: SessionState, tool: string, args: unknown): Promise<To
     case 'ask':
       return handleAsk(s, args);
     case 'final_guess':
-      return Promise.resolve(handleFinalGuess(s, args));
+      return handleFinalGuess(s, args);
     default:
       return Promise.resolve(errorReply(`Инструмент ${tool} недоступен мозгу.`));
   }
@@ -96,6 +98,9 @@ export function createDetectiveSession(opts: SessionOptions): DetectiveSession {
       s.abort.abort();
       s.broker.close();
       wakeReportWaiters(s);
+    },
+    deadlineMoved() {
+      if (!roundOver(s)) onDeadlineMoved(s);
     },
     submittedGuess: () => s.submittedGuess,
     turnsUsed: () => s.turnsUsed,

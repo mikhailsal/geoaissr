@@ -98,8 +98,15 @@ test('an ask needs the briefing first, then finding and current_guess', async ()
   expect(refused.text).toContain('GEO_BOT_JOURNAL_FIELD_MISSING');
   expect(refused.text).toContain('из отчёта');
   expect(session.state.asks).toBe(0);
+  // Logged with the same fields as the camera bot's journal correction.
   expect(log.corrections).toEqual([
-    { role: 'brain', tool: 'ask', reason: 'finding,current_guess' },
+    {
+      role: 'brain',
+      tool: 'ask',
+      reason: 'finding,current_guess',
+      missing: ['finding', 'current_guess'],
+      code: 'GEO_BOT_JOURNAL_FIELD_MISSING',
+    },
   ]);
   // One correction per step: the same call again is accepted and the step is marked as missing.
   const asked = session.call('brain', 'ask', bare);

@@ -55,6 +55,8 @@ function addFrame(
   action: FrameRecord['action'],
   view: RenderedBotImage,
   params: NonNullable<BotTurnThumbView['params']>,
+  /** The exchange the frame belongs to: the one that was open when the action began. */
+  turn: number,
 ): number {
   const n = s.frames.length + 1;
   const pos = s.opts.tracker.getPosition();
@@ -68,8 +70,7 @@ function addFrame(
     fromStartDir: away ? headingToCardinalRu(bearingDeg(s.opts.target, pos)) : null,
   });
   s.opts.sink.frame({
-    // Frames taken while the eyes answer belong to the exchange they answer.
-    turn: s.asks,
+    turn,
     action,
     n,
     label: view.label,
@@ -90,6 +91,7 @@ function afterObserveText(s: SessionState): string {
 export async function handleObserve(s: SessionState): Promise<ToolReply> {
   await s.opts.waitStart(s.abort.signal);
   if (roundOver(s)) return { text: ROUND_OVER_TEXT };
+  const turn = s.asks;
   try {
     const views = await s.opts.imageService.getObserveViews({
       target: s.opts.target,
@@ -97,7 +99,7 @@ export async function handleObserve(s: SessionState): Promise<ToolReply> {
     });
     if (roundOver(s)) return { text: ROUND_OVER_TEXT };
     if (s.frames.length === 0) {
-      views.forEach((view, idx) => addFrame(s, 'observe', view, { heading: idx * 90 }));
+      views.forEach((view, idx) => addFrame(s, 'observe', view, { heading: idx * 90 }, turn));
     }
     const list = views.map((v, i) => `${i + 1} — ${v.label}`).join('; ');
     return { text: `Кадры 1–4: ${list}. ${afterObserveText(s)}`, images: imageBlocks(views, 1) };
@@ -137,6 +139,8 @@ export async function handleLook(s: SessionState, args: unknown): Promise<ToolRe
   const { heading, pitch } = parsed.data;
   const fov = parsed.data.fov ?? 90;
   const pos = s.opts.tracker.getPosition();
+  // Read before the camera work: the brain may open the next exchange while the frame renders.
+  const turn = s.asks;
   try {
     const view = await s.opts.imageService.getLookView({
       panoId: pos.panoId,
@@ -150,11 +154,12 @@ export async function handleLook(s: SessionState, args: unknown): Promise<ToolRe
     });
     if (roundOver(s)) return { text: ROUND_OVER_TEXT };
     chargeTurn(s);
-    const n = addFrame(s, 'look', view, {
+    const params = {
       heading: normalizeHeadingDeg(heading),
       pitch: Math.round(pitch),
       fov: Math.round(fov),
-    });
+    };
+    const n = addFrame(s, 'look', view, params, turn);
     return { text: `Кадр ${n}: ${view.label}`, images: imageBlocks([view], n) };
   } catch (err) {
     return errorReply(err instanceof Error ? err.message : String(err));
@@ -174,6 +179,7 @@ export async function handleMove(s: SessionState, args: unknown): Promise<ToolRe
   const prev = tracker.getPosition();
   const distanceM = parsed.data.distance_m;
   const far = distanceM !== undefined;
+  const turn = s.asks;
   try {
     const res = await tracker.stepToward(parsed.data.heading, {
       signal: s.abort.signal,
@@ -199,11 +205,12 @@ export async function handleMove(s: SessionState, args: unknown): Promise<ToolRe
     }
     chargeTurn(s);
     s.movesDone += 1;
-    const n = addFrame(s, 'move', view, {
+    const params = {
       heading: normalizeHeadingDeg(heading),
       step: res.position.steps,
       ...(far && res.travelledM !== undefined ? { distanceM: res.travelledM } : {}),
-    });
+    };
+    const n = addFrame(s, 'move', view, params, turn);
     const text = `Кадр ${n}. ${moveReplyText(view.label, res, far)} Следующие look снимаются отсюда.`;
     return { text, images: imageBlocks([view], n) };
   } catch (err) {
@@ -240,6 +247,13 @@ export async function handleNextRequest(s: SessionState): Promise<ToolReply> {
   return { text: formatRequestForEyes(s, request) };
 }
 
+/** The first frame of the drive made for this request; null while the eyes have not moved. */
+function firstDriveFrame(s: SessionState, requestId: string): number | null {
+  const movesBefore = s.movesAtDelivery.get(requestId);
+  if (movesBefore === undefined) return null;
+  return s.frames.filter((f) => f.action === 'move')[movesBefore]?.n ?? null;
+}
+
 /** Problems of one answer item against the request and the issued frames; empty when valid. */
 function itemProblems(s: SessionState, request: BrokerRequest, item: AnswerItem): string[] {
   const q = request.questions[item.n - 1];
@@ -247,22 +261,40 @@ function itemProblems(s: SessionState, request: BrokerRequest, item: AnswerItem)
   if (item.value === 'no_road') {
     return q.kind === 'drive' ? [] : [`просьба ${item.n}: no_road годится только для проезда`];
   }
+  // Checked before the abstain values: without a move nobody saw the new place, so «не видно»
+  // would mislead the brain. Only no_road answers a drive that did not happen.
+  const driveFrame = q.kind === 'drive' ? firstDriveFrame(s, request.id) : null;
+  if (q.kind === 'drive' && driveFrame === null) {
+    return [
+      `просьба ${item.n} — проезд: сначала вызови move, потом отвечай по новому кадру; если проехать не удалось — value "no_road"`,
+    ];
+  }
   if (isAbstain(item.value)) return [];
   const problems: string[] = [];
   if (item.frame === null) problems.push(`просьба ${item.n}: укажи frame — номер кадра`);
   else if (!s.frames.some((f) => f.n === item.frame)) {
     problems.push(`просьба ${item.n}: кадра ${item.frame} не было`);
+  } else if (driveFrame !== null && item.frame < driveFrame) {
+    problems.push(
+      `просьба ${item.n} — проезд: кадр ${item.frame} снят до проезда; ответь по кадру ${driveFrame} или более позднему`,
+    );
   }
   if (item.confidence === undefined) {
     problems.push(`просьба ${item.n}: укажи confidence — sure или unsure`);
   }
-  const moved = s.movesDone > (s.movesAtDelivery.get(request.id) ?? s.movesDone);
-  if (q.kind === 'drive' && !moved) {
-    problems.push(
-      `просьба ${item.n} — проезд: сначала вызови move, потом отвечай по новому кадру; если проехать не удалось — value "no_road"`,
-    );
-  }
   return problems;
+}
+
+/** Every request needs exactly one item: the broker would show a missing one as a timeout. */
+function coverageProblems(request: BrokerRequest, items: readonly AnswerItem[]): string[] {
+  return request.questions.flatMap((_question, idx) => {
+    const n = idx + 1;
+    const count = items.filter((item) => item.n === n).length;
+    if (count === 1) return [];
+    return count === 0
+      ? [`просьба ${n}: ответа нет — на каждую просьбу нужен один ответ (или not_visible)`]
+      : [`просьба ${n}: на неё в answers несколько ответов — оставь один`];
+  });
 }
 
 export function handleAnswer(s: SessionState, args: unknown): ToolReply {
@@ -277,7 +309,10 @@ export function handleAnswer(s: SessionState, args: unknown): ToolReply {
   }));
   const current = s.broker.current();
   if (current?.id === parsed.data.request_id) {
-    const problems = items.flatMap((item) => itemProblems(s, current, item));
+    const problems = [
+      ...items.flatMap((item) => itemProblems(s, current, item)),
+      ...coverageProblems(current, items),
+    ];
     if (problems.length > 0) {
       s.opts.sink.correction?.({ role: 'eyes', tool: 'answer', reason: problems.join('; ') });
       return errorReply(

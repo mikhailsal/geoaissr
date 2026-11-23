@@ -92,6 +92,11 @@ export function addFindingToJournal(
   return journal.map((s) => (s.index === event.turn ? applyFinding(s, event, prev) : s));
 }
 
+/** The bot's final guess is recorded (a checkpoint is not one). */
+export function hasFinalGuess(bot: BotRoundState): boolean {
+  return bot.guess !== null && bot.guessFinalized !== false;
+}
+
 /**
  * The journal as the result card gets it. Steps still waiting for a finding when the
  * round is scored are marked `round-ended`.
@@ -100,7 +105,7 @@ export function finalizeJournal(bot: BotRoundState): BotJournal | undefined {
   const steps = (bot.journal ?? []).map((s) =>
     s.findingState === 'pending' ? { ...s, findingState: 'round-ended' as const } : s,
   );
-  const finalized = bot.guess !== null && bot.guessFinalized !== false;
+  const finalized = hasFinalGuess(bot);
   const summary = bot.guess?.summary;
   const lastFinding = finalized ? steps.at(-1)?.finding : undefined;
   if (steps.length === 0 && !summary) return undefined;

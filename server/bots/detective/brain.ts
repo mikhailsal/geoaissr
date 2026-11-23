@@ -60,6 +60,15 @@ function waitForReport(s: SessionState): Promise<void> {
   });
 }
 
+/**
+ * The round deadline moved earlier (every human confirmed). A wait that was sized for the old
+ * deadline is cut, so the brain still gets its reply with time left for `final_guess`.
+ */
+export function onDeadlineMoved(s: SessionState): void {
+  s.broker.capWait(remainingMs(s) - minRemaining(s));
+  wakeReportWaiters(s);
+}
+
 export async function handleBriefing(s: SessionState): Promise<ToolReply> {
   await s.opts.waitStart(s.abort.signal);
   if (roundOver(s)) return errorReply(ROUND_OVER_TEXT);
@@ -141,7 +150,13 @@ function journalCorrection(s: SessionState, input: DetectiveAskInput): ToolReply
   const key = `ask:${s.asks + 1}`;
   if (missing.length === 0 || s.correctionsUsed.has(key)) return null;
   s.correctionsUsed.add(key);
-  s.opts.sink.correction?.({ role: 'brain', tool: 'ask', reason: missing.join(',') });
+  s.opts.sink.correction?.({
+    role: 'brain',
+    tool: 'ask',
+    reason: missing.join(','),
+    missing,
+    code: JOURNAL_FIELD_MISSING_CODE,
+  });
   const source = s.asks === 0 ? 'отчёта' : 'ответов на предыдущий запрос';
   return errorReply(
     `[${JOURNAL_FIELD_MISSING_CODE}] ask: не хватает полей: ${missing.join(', ')}. В finding напиши, что нового ты узнал из ${source} и что это меняет; в current_guess — твою лучшую точку. Запрос не отправлен. Исправление одно на шаг: повтори вызов с этими полями.`,
@@ -233,34 +248,62 @@ function controlReminder(s: SessionState, guess: { lat: number; lng: number }): 
   if (s.controlAsked || !s.briefed || s.eyesDown) return null;
   if (remainingMs(s) <= CONTROL_MIN_LEFT_MS || s.correctionsUsed.has('final:control')) return null;
   s.correctionsUsed.add('final:control');
-  s.opts.sink.correction?.({ role: 'brain', tool: 'final_guess', reason: 'control' });
+  s.opts.sink.correction?.({
+    role: 'brain',
+    tool: 'final_guess',
+    reason: 'control',
+    code: CONTROL_MISSING_CODE,
+  });
   checkpoint(s, guess);
   return errorReply(
     `[${CONTROL_MISSING_CODE}] Точка сохранена как промежуточная, раунд не окончен: контрольной проверки ещё не было, а до конца раунда ${secondsLeft(s)} с. Отправь ask с control: true: попроси напарника ещё раз посмотреть туда, где был решающий признак, и добавь просьбы о том, чего ты ещё не знаешь. Если повторишь final_guess без проверки, он будет принят.`,
   );
 }
 
-export function handleFinalGuess(s: SessionState, args: unknown): ToolReply {
+/** The fields a final guess owes, as the correction text shows them. */
+const FINAL_FIELD_HINTS: Readonly<Record<string, string>> = {
+  confidence: 'confidence (country | region | guess)',
+};
+
+/** A final guess without its journal fields is refused once; its point is kept as a checkpoint. */
+function finalFieldsCorrection(
+  s: SessionState,
+  guess: NonNullable<ReturnType<typeof parseGuessInput>>,
+  extras: ReturnType<typeof parseFinalExtras>,
+): ToolReply | null {
+  const missing = [
+    ...(guess.summary ? [] : ['summary']),
+    ...(guess.finding ? [] : ['finding']),
+    ...(extras.confidence === null ? ['confidence'] : []),
+    ...(extras.clue === null ? ['clue'] : []),
+  ];
+  if (missing.length === 0 || s.correctionsUsed.has('final')) return null;
+  s.correctionsUsed.add('final');
+  const shown = missing.map((name) => FINAL_FIELD_HINTS[name] ?? name);
+  s.opts.sink.correction?.({
+    role: 'brain',
+    tool: 'final_guess',
+    reason: shown.join(','),
+    missing,
+    code: JOURNAL_FIELD_MISSING_CODE,
+  });
+  checkpoint(s, guess);
+  return errorReply(
+    `[${JOURNAL_FIELD_MISSING_CODE}] final_guess: не хватает полей: ${shown.join(', ')}. Точка сохранена как промежуточная. Повтори final_guess с этими полями.`,
+  );
+}
+
+export async function handleFinalGuess(s: SessionState, args: unknown): Promise<ToolReply> {
+  // Like the camera bot's final_guess: no guess is recorded before the round has started.
+  await s.opts.waitStart(s.abort.signal);
   if (roundOver(s)) return errorReply(ROUND_OVER_TEXT);
   const guess = parseGuessInput(args);
   if (!guess) return errorReply('final_guess: нужны числовые lat и lng. Догадка не записана.');
   const reminder = controlReminder(s, guess);
   if (reminder) return reminder;
   const extras = parseFinalExtras(args);
-  const missing = [
-    ...(guess.summary ? [] : ['summary']),
-    ...(guess.finding ? [] : ['finding']),
-    ...(extras.confidence === null ? ['confidence (country | region | guess)'] : []),
-    ...(extras.clue === null ? ['clue'] : []),
-  ];
-  if (missing.length > 0 && !s.correctionsUsed.has('final')) {
-    s.correctionsUsed.add('final');
-    s.opts.sink.correction?.({ role: 'brain', tool: 'final_guess', reason: missing.join(',') });
-    checkpoint(s, guess);
-    return errorReply(
-      `[${JOURNAL_FIELD_MISSING_CODE}] final_guess: не хватает полей: ${missing.join(', ')}. Точка сохранена как промежуточная. Повтори final_guess с этими полями.`,
-    );
-  }
+  const fieldsCorrection = finalFieldsCorrection(s, guess, extras);
+  if (fieldsCorrection) return fieldsCorrection;
   const { finding, shifts, ...point } = guess;
   s.final = true;
   s.submittedGuess = true;

@@ -78,3 +78,33 @@ test('script names and ordinary scene words are not masked', () => {
   expect(maskPlaceWords(guard, 'табличка как в Камеруне').masked).toEqual(['камеруне']);
   expect(maskPlaceWords(guard, 'Северная Корея').text).toBe('Северная […]');
 });
+
+// Value: protects=a long report cannot carry place names past the mask; fails_when=the mask stops after a fixed number of words and returns the rest in clear; why_new=the loop gave up after twenty passes; seam=none; no_claim=names the stem list does not know.
+test('every place word of a long text is masked, however many there are', () => {
+  const names = [
+    'Японии, России, Индии, Франции, Германии, Италии, Испании, Польши, Швеции, Норвегии',
+    'Финляндии, Греции, Турции, Египта, Кении, Бразилии, Аргентины, Чили, Перу, Мексики',
+    'Канады, Австралии, Таиланда, Вьетнама, Монголии, Китая',
+  ]
+    .join(', ')
+    .split(', ');
+  expect(names.length).toBeGreaterThan(20);
+  const res = maskPlaceWords(guard, `дома как в: ${names.join(', ')}.`);
+  expect(res.text).toBe(`дома как в: ${names.map(() => '[…]').join(', ')}.`);
+  expect(res.masked).toHaveLength(names.length);
+});
+
+// Value: protects=a place name written with invisible or fullwidth characters is still caught; fails_when=a zero-width space, a soft hyphen or fullwidth letters carry a name to the brain; why_new=the guard matched plain letters only; seam=none; no_claim=lookalike letters of another alphabet and scripts other than Latin and Cyrillic (TODOS.md).
+test('invisible characters and fullwidth letters do not hide a place name', () => {
+  expect(guard.findPlaceWord('флаг Япо\u200bнии')).toBe('японии');
+  expect(guard.findPlaceWord('надпись Ｊａｐａｎ')).toBe('japan');
+  expect(maskPlaceWords(guard, 'флаг Япо\u200bнии на доме').text).toBe('флаг […] на доме');
+  expect(maskPlaceWords(guard, 'флаг Япо\u00adнии, вывеска Ｒｕｓｓｉａ').text).toBe(
+    'флаг […], вывеска […]',
+  );
+  // Copied text keeps its place: only the eyes' own words are masked.
+  expect(maskPlaceWords(guard, 'дома как в Япо\u200bнии, вывеска «Токио банк»').text).toBe(
+    'дома как в […], вывеска «Токио банк»',
+  );
+  expect(guard.findPlaceWord('как в Китае')).toBe('китае');
+});

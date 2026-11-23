@@ -204,3 +204,72 @@ test('the result card of a Detective carries the style, the exchanges, the confi
   expect(journal?.steps[0]?.frames[0]).toMatchObject({ n: 1, action: 'observe' });
   expect(journal?.steps[1]).toMatchObject({ reason: 'версии', requests });
 });
+
+/** A Detective round in play with the bot's guess recorded as final or as a checkpoint. */
+function roundWithGuess(finalized: boolean): {
+  room: RoomState;
+  botId: string;
+  ids: { matchId: string; gen: number; roundNumber: number; botId: string };
+} {
+  const { room, botId } = withBot(120);
+  const started = startRound(patchBot(room, botId, { playStyle: 'detective' })).room;
+  const ids = { matchId: 'm1', gen: started.gen, roundNumber: 1, botId };
+  const guess = { lat: 55.8, lng: 37.5, explanation: 'итог', summary: 'итог' };
+  const withGuess = reduce(
+    started,
+    { type: 'bot_guess_recorded', ...ids, guess, finalized },
+    14_000,
+  ).state;
+  return { room: withGuess, botId, ids };
+}
+
+// Value: protects=a bot whose final guess is in is shown as finished when the round ends while its processes still exit (a Detective waits for its eyes' tokens); fails_when=the card says the bot ran out of time although it answered; why_new=the round end marked every thinking bot as timed out; seam=none; no_claim=how long the processes take to exit.
+test('the round end counts a bot with its final guess as done and one with a checkpoint as timed out', () => {
+  const answered = roundWithGuess(true);
+  const tick = { type: 'deadline_tick' as const, matchId: 'm1', kind: 'round' as const };
+  const done = reduce(answered.room, { ...tick, gen: answered.ids.gen }, 130_000);
+  expect(done.state.phase).toBe('ROUND_RESULTS');
+  const card = done.state.results?.entries.find((e) => e.id === answered.botId);
+  expect(card?.terminationReason).toBe('завершил ход');
+  const aborted = done.effects.flatMap((e) => ('abortedBots' in e ? e.abortedBots : []));
+  expect(aborted).toEqual([]);
+
+  const draft = roundWithGuess(false);
+  const late = reduce(draft.room, { ...tick, gen: draft.ids.gen }, 130_000);
+  const lateCard = late.state.results?.entries.find((e) => e.id === draft.botId);
+  expect(lateCard?.terminationReason).toBe('истекло время раунда');
+  expect(late.effects.flatMap((e) => ('abortedBots' in e ? e.abortedBots : []))).toHaveLength(1);
+});
+
+test('the bot budget ending stops the processes of an answered bot without calling it a timeout', () => {
+  const { room, botId, ids } = roundWithGuess(true);
+  const out = reduce(
+    room,
+    { type: 'deadline_tick', matchId: 'm1', gen: ids.gen, kind: 'bot_budget', botId },
+    100_000,
+  );
+  expect(out.state.loadingOrActive?.bots[botId]).toMatchObject({
+    status: 'done',
+    terminationReason: 'завершил ход',
+    finishedAt: 100_000,
+  });
+  expect(out.state.loadingOrActive?.bots[botId]?.abortReason).toBeUndefined();
+  expect(out.effects.find((e) => e.type === 'stop_bot_process')).toMatchObject({ botId });
+
+  const draft = roundWithGuess(false);
+  const cut = reduce(
+    draft.room,
+    {
+      type: 'deadline_tick',
+      matchId: 'm1',
+      gen: draft.ids.gen,
+      kind: 'bot_budget',
+      botId: draft.botId,
+    },
+    100_000,
+  );
+  expect(cut.state.loadingOrActive?.bots[draft.botId]).toMatchObject({
+    status: 'aborted',
+    terminationReason: 'истек бюджет времени',
+  });
+});

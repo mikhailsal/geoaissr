@@ -11,7 +11,8 @@ import path from 'node:path';
  *   {{#if flag}}…{{else}}…{{/if}}    a block shown when the flag is true; `{{else}}` is optional
  *   {{! any text }}                  a comment, left out of the prompt
  * Blocks may nest. An unknown variable or a broken tag fails the launch with a message that names
- * the file, so a typo never reaches a model silently.
+ * the file, so a typo never reaches a model silently. Every name in the file is checked, also the
+ * ones inside a block this round does not show.
  */
 
 export const PROMPTS_DIR = path.resolve(import.meta.dir, 'prompts');
@@ -32,13 +33,23 @@ const STANDALONE_TAG = /^[ \t]*(\{\{(?:#if \w+|else|\/if)\}\})[ \t]*\n/gm;
 const BLOCK = /\{\{#if (\w+)\}\}((?:(?!\{\{#if )[\s\S])*?)\{\{\/if\}\}/g;
 const MAX_NESTING = 8;
 const VARIABLE = /\{\{(\w+)\}\}/g;
+/** Every name a tag refers to: `{{name}}` and `{{#if name}}`. */
+const REFERENCE = /\{\{(?:#if )?(\w+)\}\}/g;
 /** Any `{{` still there after the blocks and variables are gone. A lone `}}` is plain text. */
 const LEFTOVER = /\{\{[^}]*(?:\}\})?/;
 
 function lookup(file: string, values: PromptValues, name: string): string | number | boolean {
-  const value = values[name];
+  // Own names only: `{{toString}}` is a typo, not the function every object inherits.
+  const value = Object.hasOwn(values, name) ? values[name] : undefined;
   if (value === undefined) throw new PromptTemplateError(file, `unknown variable {{${name}}}`);
   return value;
+}
+
+/** A name in a block that is dropped would otherwise never be looked up. */
+function checkReferences(file: string, values: PromptValues, source: string): void {
+  for (const [, name = ''] of source.matchAll(REFERENCE)) {
+    if (name !== 'else') lookup(file, values, name);
+  }
 }
 
 export function renderPromptTemplate(
@@ -47,6 +58,7 @@ export function renderPromptTemplate(
   file = 'template',
 ): string {
   const source = template.replace(/\r\n/g, '\n').replace(COMMENT, '').replace(STANDALONE_TAG, '$1');
+  checkReferences(file, values, source);
   let withBlocks = source;
   for (let depth = 0; depth < MAX_NESTING && withBlocks.includes('{{#if '); depth += 1) {
     withBlocks = withBlocks.replace(BLOCK, (_match, flag: string, body: string) => {

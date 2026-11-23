@@ -96,3 +96,38 @@ test('a closed broker answers a new ask at once with timeouts', async () => {
   expect(outcome.settledBy).toBe('closed');
   expect(broker.hasPending()).toBe(false);
 });
+
+// Value: protects=a wait sized for the old round deadline is cut when the round gets shorter; fails_when=the brain stays blocked in ask past the new deadline; why_new=the timer was set once per request; seam=none; no_claim=who decides the new deadline (the engine).
+test('a shorter round cuts the outstanding wait, and a longer one never extends it', async () => {
+  const broker = createBroker({ newId: idSeq() });
+  const started = Date.now();
+  const asked = broker.ask(Q, 60_000);
+  broker.capWait(20);
+  const outcome = await asked;
+  expect(outcome.settledBy).toBe('timeout');
+  expect(Date.now() - started).toBeLessThan(5000);
+  // No time left at all: the request settles at once.
+  const second = broker.ask(Q, 60_000);
+  broker.capWait(0);
+  expect((await second).settledBy).toBe('timeout');
+  expect(broker.hasPending()).toBe(false);
+  // A cap longer than the request's own limit changes nothing, and so does one with no request.
+  const short = broker.ask(Q, 20);
+  broker.capWait(60_000);
+  expect((await short).settledBy).toBe('timeout');
+  expect(Date.now() - started).toBeLessThan(5000);
+  broker.capWait(10);
+});
+
+test('a handed-out request says how long the brain still waits for it', async () => {
+  const clock = { now: 1000 };
+  const broker = createBroker({ newId: idSeq(), now: () => clock.now });
+  const asked = broker.ask(Q, 30_000);
+  expect((await broker.nextRequest(10))?.leftMs).toBe(30_000);
+  clock.now = 9000;
+  expect(broker.current()?.leftMs).toBe(22_000);
+  broker.capWait(4000);
+  expect(broker.current()?.leftMs).toBe(4000);
+  broker.close();
+  await asked;
+});

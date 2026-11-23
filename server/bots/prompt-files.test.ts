@@ -43,6 +43,13 @@ test('a typo in a template fails with a message that names the file', () => {
     ['{{#if move}}x', 'broken tag'],
     ['Ходов: {{ limit }}', 'broken tag'],
     ['{{#if move}}a{{else}}b{{else}}c{{/if}}', 'two {{else}}'],
+    // A name in the branch this round does not show is checked too: the typo would otherwise
+    // wait for the first round with other settings.
+    ['{{#if move}}Ходов: {{limit}}{{else}}Стой: {{limt}}{{/if}}', 'unknown variable {{limt}}'],
+    ['{{#if move}}a{{else}}{{#if nope}}b{{/if}}{{/if}}', 'unknown variable {{nope}}'],
+    // Only the supplied names count, not what every object inherits.
+    ['Имя: {{toString}}', 'unknown variable {{toString}}'],
+    ['{{#if constructor}}x{{/if}}', 'unknown variable {{constructor}}'],
   ];
   for (const [template, problem] of broken) {
     let message = '';

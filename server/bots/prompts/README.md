@@ -34,7 +34,8 @@ names exist: a new variable needs a line of code in `server/bots/prompt.ts` (Int
 
 ## When a file is broken
 
-An unknown variable, a tag that is not closed or a missing file stops the bot from launching. The
+An unknown variable, a tag that is not closed or a missing file stops the bot from launching. Every
+name in the file is checked, also inside a block that the current settings do not show. The
 bot shows up as failed in the round, and the host's diagnostics name the file and the problem, for
 example `Prompt template detective-brain.txt: unknown variable {{budgetSecs}}`. Nothing is sent to
 a model in that case. Fix the file and the next round picks it up.

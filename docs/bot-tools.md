@@ -129,14 +129,15 @@ A request names a topic to look at, never an expected answer:
 - `{kind: "text", target}`: copy a text letter for letter;
 - `{kind: "drive", heading, distance_m, topic}`: drive along the road, then describe the new place. One per `ask`, only when movement is on and a paid turn is left. The other requests of that `ask` are answered from the new place.
 
-Each answer carries `value`, `confidence` (`sure` or `unsure`) and the `frame` it rests on. Instead of a description the eyes may abstain with `not_visible`, `unreadable` or, for a drive, `no_road`. A drive answer is accepted only after a successful `move`.
+Each answer carries `value`, `confidence` (`sure` or `unsure`) and the `frame` it rests on. Instead of a description the eyes may abstain with `not_visible`, `unreadable` or, for a drive, `no_road`. A drive answer is accepted only after a successful `move` and must cite a frame taken by that move or later; without a move only `no_road` answers a drive. An answer carries exactly one item for every request: one with a repeated or a missing number comes back to the eyes for correction.
 
 The server enforces the separation whatever the prompts say:
 
 - a request with `?` or the particle «ли» is refused with `GEO_DETECTIVE_QUESTION_FORM`, one that names a country, a city or a people with `GEO_DETECTIVE_PLACE_WORD`. A refused `ask` is not counted;
 - place words the eyes write in their own words reach the brain as `[…]`; text copied from a frame inside «…» is kept;
 - frames taken 15 metres or more from the start are annotated for the brain («кадр 7, 640 м к СВ от старта»), because the answer is about the start;
-- an `ask` waits 30 seconds for its answers, 45 with a drive; unanswered items come back as timed out. With less than 10 seconds left an `ask` is not sent;
+- an `ask` waits 30 seconds for its answers, 45 with a drive; unanswered items come back as timed out. With less than 10 seconds left an `ask` is not sent. When every human has confirmed and the round gets shorter, a waiting `ask` or `briefing` is cut so that 10 seconds stay for the final guess. The request text tells the eyes how long the brain really waits;
+- `final_guess` waits for the round start, like an Intuit bot's, so no guess is final before the eyes have a frame;
 - a `final_guess` before any `ask` with `control: true` gets one reminder (`GEO_DETECTIVE_CONTROL_MISSING`) while more than 30 seconds are left; the second one is accepted. Its point is kept as a checkpoint either way;
 - an `ask` without `finding` or `current_guess`, and a `final_guess` without `summary`, `finding`, `confidence` or `clue`, gets the one-time correction `GEO_BOT_JOURNAL_FIELD_MISSING`, as for an Intuit bot. `hypothesis` is required by the `ask` schema.
 
@@ -144,7 +145,7 @@ The codes are described in [errors](./errors.md#GEO_DETECTIVE_QUESTION_FORM).
 
 ### Processes and the round end
 
-The server owns the deadline, both tokens and both processes. The brain runs at the slot's effort, the eyes at `low`. If the eyes exit early, pending and later requests come back as `eyes_down` and the brain is told to send its final guess. The round counts the bot as finished when the brain has exited and the eyes have exited too or 8 seconds have passed; the eyes are then stopped. This keeps the token usage of both processes on the badge. A process that cannot start fails the launch for the round («сбой запуска»). If the brain exits without a final guess, the latest `current_guess` is scored, as for an Intuit bot.
+The server owns the deadline, both tokens and both processes. The brain runs at the slot's effort, the eyes at `low`. If the eyes exit early, pending and later requests come back as `eyes_down` and the brain is told to send its final guess. The round counts the bot as finished when the brain has exited and the eyes have exited too or 8 seconds have passed; the eyes are then stopped. This keeps the token usage of both processes on the badge. A process that cannot start fails the launch for the round («сбой запуска»). If the brain exits without a final guess, the latest `current_guess` is scored, as for an Intuit bot. A bot whose final guess is recorded counts as finished («завершил ход») even if the round or its budget ends while its processes are still exiting; this holds for Intuit bots too.
 
 ### Prompts
 
@@ -179,7 +180,7 @@ The cache lives at `{dataDir}/openrouter-models-cache.json`, is fresh for 24 hou
 The server writes daily JSON Lines files at `{dataDir}/logs/YYYY-MM-DD.jsonl` and prunes log files older than 14 days. Diagnostic records identify a bot run with `matchId`, `gen`, `roundNumber` and `slotId`; timestamps are UTC. Bot diagnostics are bounded and secret-redacted before they reach the log.
 
 - `bot_tool_call` records each requested game tool, including rejected calls and final-answer submissions. It includes bounded original arguments, result text and image metadata/counts (not image bytes), whether a checkpoint was saved, duration and `ok` status. For a Detective bot the record names the `role` (`brain` or `eyes`) and holds the tool, bounded arguments, duration and `ok` status.
-- `bot_journal_correction` records each one-time correction with `harness`, `tool`, `missing` (field names) and the code, so the correction rate per harness can be counted. It never contains prompt text, environment values or file paths.
+- `bot_journal_correction` records each one-time correction with `harness`, `tool`, `missing` (field names) and the code, so the correction rate per harness can be counted. It never contains prompt text, environment values or file paths. A Detective's line also names the `role` and a short `reason`; the control reminder has a code and no `missing`, and an `answer` the eyes had to correct is logged with `reason` only.
 - `bot_style_fallback` records, at round start, each slot set to Detective that plays Intuit in that round, with the `reason` (`budget` or `harness`).
 - `harness_start` and `harness_end` record the selected model, context and process lifecycle; a Detective bot writes one pair per process, each with its `role`. `harness_usage` records raw counters, usage status (`reported`, `missing`, `invalid` or `truncated`), normalized `tokenUsage` or `null`, the number of terminal usage records, and safe CLI metadata when available (`conversation_id`, `status`, `num_turns`, `duration_seconds`). `num_turns` is the CLI's counter; it is not a count of model generations. `rawCounterScope` is `terminal` for Claude and AGY and `last-turn` for Codex.
 - `harness_cost` records an asynchronous reference price estimate. It is not the provider's actual bill.

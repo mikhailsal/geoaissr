@@ -144,13 +144,18 @@ function fakeAsks(run: DetectiveRun): Array<Record<string, unknown>> {
   ];
 }
 
-/** Resolves to true when the final guess was accepted. */
-async function runFakeBrain(run: DetectiveRun, stepDelayMs: number): Promise<boolean> {
+/** Resolves to true when the final guess was accepted. Exported for its test. */
+export async function runFakeBrain(run: DetectiveRun, stepDelayMs: number): Promise<boolean> {
   const s = run.session.state;
   const { target, slot } = run.params;
   const call: Call = (tool, args = {}) => run.session.call('brain', tool, args);
-  while (!s.briefed && !roundOver(s)) await call('briefing');
-  for (const ask of fakeAsks(run)) {
+  // An error reply means there will be no report (the eyes are gone or time is short). It comes
+  // back without a wait, so asking again in a loop would never let the server do anything else.
+  let reportLost = false;
+  while (!s.briefed && !roundOver(s) && !reportLost) {
+    reportLost = (await call('briefing')).isError === true;
+  }
+  for (const ask of reportLost ? [] : fakeAsks(run)) {
     await pause(stepDelayMs);
     if (roundOver(s)) return false;
     await call('ask', ask);

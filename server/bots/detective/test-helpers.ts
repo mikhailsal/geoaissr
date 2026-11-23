@@ -48,7 +48,13 @@ export interface SinkLog {
   steps: Array<{ turn: number; patch: JournalStepPatch }>;
   findings: FindingRecord[];
   guesses: Array<{ guess: DetectiveGuess; finalized: boolean }>;
-  corrections: Array<{ role: string; tool: string; reason: string }>;
+  corrections: Array<{
+    role: string;
+    tool: string;
+    reason: string;
+    missing?: readonly string[];
+    code?: string;
+  }>;
 }
 
 export interface TestSession {
@@ -139,6 +145,20 @@ export async function briefed(overrides: Partial<SessionOptions> = {}): Promise<
   await t.session.call('eyes', 'report', REPORT);
   await t.session.call('brain', 'briefing', {});
   return t;
+}
+
+/** Waits for a state the code under test reaches on its own, without a fixed pause. */
+export async function until(reached: () => boolean): Promise<void> {
+  while (!reached()) await new Promise((resolve) => setTimeout(resolve, 1));
+}
+
+/** A gate a test opens by hand: the round start, or a camera frame that takes its time. */
+export function manualGate(): { wait: () => Promise<void>; open: () => void } {
+  let open: () => void = () => undefined;
+  const opened = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { wait: () => opened, open };
 }
 
 /** The eyes take the outstanding request and answer it. */

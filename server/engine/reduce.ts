@@ -9,7 +9,7 @@ import {
   handleUpdateBot,
   handleUpdateLobby,
 } from './lobby.ts';
-import { advanceFromResults, finishActiveRoundToResults } from './results.ts';
+import { advanceFromResults, closeThinkingBot, finishActiveRoundToResults } from './results.ts';
 import {
   checkAllHumansConfirmedAndBotsState,
   createLoadingStateForRound,
@@ -154,13 +154,10 @@ function handleDeadlineTick(
       ...state.loadingOrActive,
       bots: {
         ...state.loadingOrActive.bots,
-        [botId]: {
-          ...bot,
-          status: 'aborted',
-          abortReason: 'истек бюджет времени бота',
-          terminationReason: 'истек бюджет времени',
-          finishedAt: now,
-        },
+        [botId]: closeThinkingBot(bot, now, {
+          abort: 'истек бюджет времени бота',
+          termination: 'истек бюджет времени',
+        }),
       },
     },
   };

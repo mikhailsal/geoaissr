@@ -27,6 +27,11 @@ test('final_guess owes a control check once, then a confidence level and the dec
     'control',
     'confidence (country | region | guess),clue',
   ]);
+  expect(log.corrections.map((c) => c.code)).toEqual([
+    'GEO_DETECTIVE_CONTROL_MISSING',
+    'GEO_BOT_JOURNAL_FIELD_MISSING',
+  ]);
+  expect(log.corrections[1]?.missing).toEqual(['confidence', 'clue']);
   // Both refused guesses left their point as a checkpoint; the third is the final answer.
   expect(log.guesses.map((g) => g.finalized)).toEqual([false, false, true]);
   expect(log.guesses[2]?.guess).toEqual({

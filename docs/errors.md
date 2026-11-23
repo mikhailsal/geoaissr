@@ -76,7 +76,7 @@ Not a command-line error: it is the code at the end of the one-time correction t
 
 Not a command-line error: it is the code at the end of the tool result that the MCP bridge (`bot-tools/main.ts`) returns to a bot when its HTTP call to the game server fails (server stopped, connection reset, a reply that is not JSON).
 
-- **What the bot sees:** «Нет связи с сервером игры. Повторите вызов один раз; если ошибка повторится — вызовите final_guess.» with `isError: true`. For `look` and `move` the server may already have charged the turn before the reply was lost, so the line instead says «Ход мог быть уже списан, не повторяйте его: отправьте лучшую точку через final_guess.» The raw exception text is not passed to the model.
+- **What the bot sees:** «Нет связи с сервером игры. Повторите вызов один раз; если ошибка повторится — вызовите final_guess.» with `isError: true`. For `look` and `move` the server may already have charged the turn before the reply was lost, so the line instead says «Ход мог быть уже списан, не повторяйте его: отправьте лучшую точку через final_guess.» The eyes of a Detective have no `final_guess`: their line says to answer from the frames already received (after `look` or `move`) or to stop after one repeat. The raw exception text is not passed to the model.
 - **Why:** the bridge runs inside the bot's CLI process and reaches the server over `127.0.0.1`; the server may have stopped the round or be restarting.
 - **What the host should do:** nothing for a single occurrence. If every bot hits it every round, restart `bun run start` and check `bun run doctor`.
 

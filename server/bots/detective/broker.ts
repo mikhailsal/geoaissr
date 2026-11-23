@@ -52,6 +52,8 @@ export interface AskOutcome {
 export interface BrokerRequest {
   id: string;
   questions: Question[];
+  /** How long the brain still waits for this request, at the moment it was handed out. */
+  leftMs: number;
 }
 
 export class BrokerBusyError extends Error {
@@ -67,6 +69,8 @@ interface Pending {
   createdAt: number;
   delivered: boolean;
   resolve: (outcome: AskOutcome) => void;
+  /** When the request times out; moves earlier if the round gets shorter. */
+  deadlineAt: number;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -81,6 +85,11 @@ export interface Broker {
   eyesDown: () => void;
   /** The round ended: settle the outstanding request and wake waiting eyes. */
   close: () => void;
+  /**
+   * The round got shorter: the outstanding request may wait at most `maxMs` more. It never
+   * extends a wait; at zero or less the request times out now.
+   */
+  capWait: (maxMs: number) => void;
   hasPending: () => boolean;
   /** The outstanding request without delivering it; null when none. */
   current: () => BrokerRequest | null;
@@ -143,28 +152,52 @@ function settle(
   });
 }
 
+function timeoutTimer(core: Core, id: string, ms: number): ReturnType<typeof setTimeout> {
+  return setTimeout(() => {
+    if (core.pending?.id === id) settle(core, core.pending, null, 'timeout', 'timeout');
+  }, ms);
+}
+
 function openRequest(core: Core, questions: Question[], timeoutMs: number): Promise<AskOutcome> {
   return new Promise<AskOutcome>((resolve) => {
-    const p: Pending = {
-      id: core.newId(),
+    const id = core.newId();
+    const createdAt = core.now();
+    core.pending = {
+      id,
       questions,
-      createdAt: core.now(),
+      createdAt,
       delivered: false,
       resolve,
-      timer: setTimeout(() => {
-        if (core.pending === p) settle(core, p, null, 'timeout', 'timeout');
-      }, timeoutMs),
+      deadlineAt: createdAt + timeoutMs,
+      timer: timeoutTimer(core, id, timeoutMs),
     };
-    core.pending = p;
     wake(core);
   });
+}
+
+function capPendingWait(core: Core, maxMs: number): void {
+  const p = core.pending;
+  if (!p) return;
+  const until = core.now() + Math.max(0, maxMs);
+  if (until >= p.deadlineAt) return;
+  clearTimeout(p.timer);
+  if (maxMs <= 0) {
+    settle(core, p, null, 'timeout', 'timeout');
+    return;
+  }
+  p.deadlineAt = until;
+  p.timer = timeoutTimer(core, p.id, maxMs);
+}
+
+function handOut(core: Core, p: Pending): BrokerRequest {
+  return { id: p.id, questions: p.questions, leftMs: Math.max(0, p.deadlineAt - core.now()) };
 }
 
 /** An eyes process that asks again before answering gets the same request again. */
 function take(core: Core): BrokerRequest | null {
   if (!core.pending || core.closed) return null;
   core.pending.delivered = true;
-  return { id: core.pending.id, questions: core.pending.questions };
+  return handOut(core, core.pending);
 }
 
 async function waitForRequest(core: Core, waitMs: number): Promise<BrokerRequest | null> {
@@ -222,8 +255,10 @@ export function createBroker(opts: { now?: () => number; newId?: () => string } 
       if (core.pending) settle(core, core.pending, null, 'closed', 'timeout');
       wake(core);
     },
+    capWait: (maxMs) => {
+      capPendingWait(core, maxMs);
+    },
     hasPending: () => core.pending !== null,
-    current: () =>
-      core.pending ? { id: core.pending.id, questions: core.pending.questions } : null,
+    current: () => (core.pending ? handOut(core, core.pending) : null),
   };
 }

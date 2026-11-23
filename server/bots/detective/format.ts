@@ -7,14 +7,7 @@ import {
   type EyesConfidence,
 } from '../../../shared/detective-tools.ts';
 import type { AskOutcome, BrokerRequest, Question, SettledItem } from './broker.ts';
-import {
-  ASK_TIMEOUT_MS,
-  DRIVE_ASK_TIMEOUT_MS,
-  frameNote,
-  secondsLeft,
-  turnsLeft,
-  type SessionState,
-} from './state.ts';
+import { frameNote, secondsLeft, turnsLeft, type SessionState } from './state.ts';
 
 /** Russian texts the two roles read. Kept apart from the session logic so both stay small. */
 
@@ -108,8 +101,8 @@ function framesLine(s: SessionState): string {
 
 export function formatRequestForEyes(s: SessionState, request: BrokerRequest): string {
   const actions = s.opts.moveEnabled ? 'look и move' : 'look';
-  const drive = request.questions.some((q) => q.kind === 'drive');
-  const seconds = Math.round((drive ? DRIVE_ASK_TIMEOUT_MS : ASK_TIMEOUT_MS) / 1000);
+  // The real time left: near the end of a round the brain waits less than the usual limit.
+  const seconds = Math.max(1, Math.round(request.leftMs / 1000));
   return [
     `Запрос ${request.id}. Ответь через answer(request_id="${request.id}", answers=[{n, value, confidence, frame}]).`,
     ...request.questions.map((q, idx) => requestForEyes(q, idx + 1)),

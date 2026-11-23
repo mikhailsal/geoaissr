@@ -59,19 +59,25 @@ test('with 15 s or less left the brain is told to give the final guess at once',
   expect(brainStatusLines(stateWith(-5))[0]).toContain('Осталось времени: 0 с.');
 });
 
-test('the request for the eyes names each kind, the frames, and the longer drive timeout', () => {
+test('the request for the eyes names each kind, the frames, and the time it has left', () => {
   const plain = formatRequestForEyes(stateWith(60_000), {
     id: 'r1',
     questions: [DESCRIBE, TEXT],
+    leftMs: 30_000,
   });
   expect(plain).toContain('1. Опиши своими словами');
   expect(plain).toContain('2. Перепиши дословно текст: «крупная вывеска»');
   expect(plain).toContain('Выданные кадры: 1 (observe 0°), 5 (move 45°).');
   expect(plain).toContain('(look и move): 3');
   expect(plain).toContain('на запрос до 30 с');
-  const drive = formatRequestForEyes(stateWith(60_000, false), { id: 'r2', questions: [DRIVE] });
+  const drive = formatRequestForEyes(stateWith(60_000, false), {
+    id: 'r2',
+    questions: [DRIVE],
+    // Near the end of a round the brain waits less than the usual limit, and the eyes are told so.
+    leftMs: 12_400,
+  });
   expect(drive).toContain('move(heading=45, distance_m=200)');
-  expect(drive).toContain('на запрос до 45 с');
+  expect(drive).toContain('на запрос до 12 с');
   expect(drive).toContain('(look): 3');
   expect(
     formatRequestForEyes(
@@ -80,7 +86,7 @@ test('the request for the eyes names each kind, the frames, and the longer drive
         moveLimit: 1,
         moveEnabled: true,
       } as SessionOptions),
-      { id: 'r3', questions: [DESCRIBE] },
+      { id: 'r3', questions: [DESCRIBE], leftMs: 400 },
     ),
   ).toContain('Кадров пока нет');
 });

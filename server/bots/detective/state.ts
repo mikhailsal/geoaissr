@@ -38,8 +38,17 @@ export interface DetectiveSink {
   step: (turn: number, patch: JournalStepPatch) => void;
   finding: (record: FindingRecord) => void;
   guess: (guess: DetectiveGuess, finalized: boolean) => void;
-  /** A one-time correction, so the host can log the correction rate. */
-  correction?: (info: { role: 'brain' | 'eyes'; tool: string; reason: string }) => void;
+  /**
+   * A correction, so the host can log the correction rate. `missing` (field names) and `code`
+   * are set as in the camera bot's `bot_journal_correction` line where they apply.
+   */
+  correction?: (info: {
+    role: 'brain' | 'eyes';
+    tool: string;
+    reason: string;
+    missing?: readonly string[];
+    code?: string;
+  }) => void;
 }
 
 export interface SessionOptions {

@@ -41,6 +41,10 @@ const DEMONYM_STEMS = [
   'испан',
   'итальян',
   'китай',
+  // The country is in no region, so no name stem covers its cases: «из Китая», «в Китае».
+  'китая',
+  'китае',
+  'китаю',
   'америк',
   'турец',
   'турк',
@@ -263,9 +267,16 @@ function isCommonWord(word: string): boolean {
 }
 
 const LETTERS = /[a-zа-яё]+/gu;
+/** Zero-width characters, soft hyphens and the like: invisible, yet they split a word in two. */
+const FORMAT_CHARS = /\p{Cf}/gu;
+
+/** NFKC folds fullwidth and other compatibility letters into the plain ones the stems use. */
+function plainLetters(text: string): string {
+  return text.normalize('NFKC').replace(FORMAT_CHARS, '');
+}
 
 function words(text: string): string[] {
-  return text.toLowerCase().match(LETTERS) ?? [];
+  return plainLetters(text).toLowerCase().match(LETTERS) ?? [];
 }
 
 function stemOf(word: string): string {
@@ -315,16 +326,27 @@ export const PLACE_MASK = '[…]';
 
 const QUOTED = /«[^»]*»/gu;
 
+function cutWord(text: string, word: string): string {
+  return text.replace(new RegExp(`(?<![a-zа-яё])${word}(?![a-zа-яё])`, 'giu'), PLACE_MASK);
+}
+
 function maskSegment(guard: PlaceGuard, segment: string, masked: string[]): string {
   let out = segment;
-  // Each pass masks every occurrence of one word; the bound only guards against a loop.
-  for (let pass = 0; pass < 20; pass += 1) {
+  // Each pass masks every occurrence of one word, so the text loses a word until none is left.
+  for (;;) {
     const word = guard.findPlaceWord(out);
-    if (word === null) break;
+    if (word === null) return out;
     masked.push(word);
-    out = out.replace(new RegExp(`(?<![a-zа-яё])${word}(?![a-zа-яё])`, 'giu'), PLACE_MASK);
+    let next = cutWord(out, word);
+    if (next === out) {
+      // The word was written with invisible or fullwidth characters: cut it from the plain form.
+      const plain = plainLetters(out);
+      next = cutWord(plain, word);
+      // Still there: the segment is dropped rather than passed on with the name in it.
+      if (next === plain) return PLACE_MASK;
+    }
+    out = next;
   }
-  return out;
 }
 
 /**

@@ -92,7 +92,7 @@ async function main(): Promise<void> {
         ...(result.isError ? { isError: true } : {}),
       };
     } catch {
-      return transportErrorResult(toolName);
+      return transportErrorResult(toolName, ROLE);
     }
   });
 

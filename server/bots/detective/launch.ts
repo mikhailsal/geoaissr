@@ -144,6 +144,7 @@ function createRun(ctx: RunnerCtx, params: RoundBotParams): DetectiveRun {
     },
     setRoundDeadline: (ms) => {
       clock.deadlineAt = ms;
+      session.deadlineMoved();
     },
   };
   return { ctx, params, handle, session, canMove, tokens, usage: {}, usageSeq: 0 };
