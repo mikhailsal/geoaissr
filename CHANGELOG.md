@@ -2,6 +2,18 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.3.3] - 2026-11-24
+
+### Added
+
+- Let a bot play as a Detective. Set «Стиль игры» to «Детектив» in the bot's settings, and the bot runs as two processes of the same model that talk only through the server. The eyes see the frames, describe them, copy signs letter for letter and can drive along the road. The brain never gets an image. It reads the eyes' scene report, asks for descriptions, text or a drive, and places the pin. The server refuses a request phrased as a question or one that names a country, a city or a people, hides place names the eyes write in their own words, and tells the brain how far from the start a frame was taken. A Detective needs the `claude` harness and a round of 90 seconds or more. Otherwise the slot plays Intuit in that round, and the lobby says why.
+- The lobby and the player list mark a Detective bot. Its result card shows the eyes' scene report, every request with its answers and frames, the control check, the bot's confidence and the clue that decided the guess. A line on the card says the brain saw no frames. The token badge splits usage between the brain and the eyes.
+- Edit the bots' start prompts without touching code. They are text files in `server/bots/prompts/`: `intuit.txt`, `detective-brain.txt` and `detective-eyes.txt`. A file is read at every bot launch, so an edit applies from the next round. An unknown variable or an unclosed tag stops that bot's launch, and the host's diagnostics name the file and the problem. Syntax and variables: `server/bots/prompts/README.md`. The Intuit prompt reads the same as before.
+
+### Fixed
+
+- A bot whose final guess is recorded counts as finished («завершил ход») when the round or its time budget ends while its process is still exiting. Before, it was shown as timed out.
+
 ## [0.3.2] - 2026-11-22
 
 ### Added

@@ -164,6 +164,24 @@ The owner put these aside to build the Detective play style first. Nothing here 
 **Effort:** S
 **Priority:** P1
 
+### Detective: notes from the pre-landing review
+
+**What:** Small items the review of PR #26 found below the blocking floor. None of them breaks a round.
+
+- Text inside «…» and answers to text requests are never masked, so a place name can reach the brain inside quotes (`server/bots/detective/guard.ts`). The guard also misses names written with mixed alphabets or in scripts it has no list for.
+- The vision check of a Detective slot runs at the slot's effort, while the eyes play at `low` (`server/bots/vision-check.ts`).
+- The prompts state timings by hand. `detective-brain.txt` says a request with a drive takes «до 30 с», while the eyes get 45 s for it (`detective-eyes.txt` and `server/bots/detective/broker.ts`). The owner tunes these files, so the numbers are left to them.
+- A journal correction is counted as used when a later check refuses the same `ask` (`server/bots/detective/brain.ts`).
+- The bot shows as finished up to 8 s after its brain exits, while the eyes are still reporting tokens (`server/bots/detective/monitor.ts`).
+- `settledIds` and `movesAtDelivery` grow by one entry per request (`server/bots/detective/state.ts`); a round has a few dozen at most.
+- Calls are serialized per role, so a `final_guess` sent in parallel with a waiting `ask` would queue behind it (`server/bots/detective/session.ts`). No CLI in use sends parallel calls.
+- One integration test waits a fixed 700 ms before checking that no second finish event came (`test/detective.integration.test.ts`).
+
+**Why:** Recorded so they are not lost; each is a short fix or a prompt edit.
+
+**Effort:** S
+**Priority:** P3
+
 ### Detective in `eval:bots`
 
 **What:** Let `bun run eval:bots` measure a Detective configuration (a `--style detective` flag, two processes per round, usage summed by role).
