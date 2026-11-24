@@ -1,3 +1,4 @@
+import { roundHarnessProblem } from '../../shared/play-style.ts';
 import { COUNTDOWN_MS, type ClientViewState, type PlayerView } from '../../shared/protocol.ts';
 import { computeFinalRankings } from './results.ts';
 import type { RoomState } from './types.ts';
@@ -15,11 +16,11 @@ export function computeStartBlockedReasons(state: RoomState): string[] {
     reasons.push(`Карта у хоста не загрузилась: ${hostPlayer.mapsError}`);
   }
 
-  const unavailableBot = state.settings.bots.find((b) => {
-    if (!b.enabled) return false;
-    const h = state.availableHarnesses.find((x) => x.id === b.harness);
-    return !h?.available;
-  });
+  // The same check as the round start: a Detective needs the harness of its eyes as well.
+  const duration = state.settings.roundDurationSec;
+  const unavailableBot = state.settings.bots.find(
+    (b) => b.enabled && roundHarnessProblem(b, duration, state.availableHarnesses) !== undefined,
+  );
   if (unavailableBot) {
     reasons.push(`ИИ-бот «${unavailableBot.name}» недоступен в текущей среде`);
   }
@@ -103,6 +104,7 @@ function projectActive(state: RoomState, viewerId: string): ClientViewState['act
       moveLimit: b.moveLimit,
       status: b.status,
       abortReason: b.abortReason,
+      ...(b.playStyle ? { playStyle: b.playStyle } : {}),
     })),
   };
 }

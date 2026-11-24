@@ -14,6 +14,7 @@
     slotNames,
   } from '../lib/wardrobe/catalog';
   import TurnableAvatar from './TurnableAvatar.svelte';
+  import WardrobeFooter from './WardrobeFooter.svelte';
   import WardrobeOptions from './WardrobeOptions.svelte';
 
   interface Props {
@@ -189,21 +190,16 @@
       </div>
     </div>
   </div>
-  <footer>
-    {#if tab === 'appearance' && error}<span role="alert">{error}</span>{/if}
-    <button type="button" class="btn" onclick={closeDialog}
-      >{tab === 'appearance' && !readOnly ? 'Отмена' : 'Закрыть'}</button
-    >
-    {#if tab === 'appearance'}<button
-        type="button"
-        class="btn btn-primary"
-        disabled={readOnly || pending}
-        onclick={() => {
-          onSave({ ...draft });
-        }}>{pending ? 'Сохранение…' : 'Сохранить образ'}</button
-      >
-    {/if}
-  </footer>
+  <WardrobeFooter
+    {tab}
+    {readOnly}
+    {pending}
+    {error}
+    onClose={closeDialog}
+    onSave={() => {
+      onSave({ ...draft });
+    }}
+  />
 </dialog>
 
 <style>
@@ -231,14 +227,12 @@
     background: var(--arc-stroke);
   }
   header,
-  footer,
   .preview-tools {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
   }
-  header,
-  footer {
+  header {
     padding: var(--sp-3) var(--sp-4);
   }
   header {
@@ -383,14 +377,6 @@
     top: var(--sp-1);
     right: var(--sp-1);
   }
-  footer {
-    justify-content: flex-end;
-    border-top: 1px solid var(--line);
-  }
-  footer span {
-    color: var(--signal);
-    margin-right: auto;
-  }
   @media (max-width: 680px) and (orientation: portrait),
     (max-width: 680px) and (min-height: 431px),
     (max-width: 384px) {
@@ -455,7 +441,6 @@
       max-height: 96dvh;
     }
     header,
-    footer,
     .preview-tools,
     .sections {
       padding-block: var(--sp-1);

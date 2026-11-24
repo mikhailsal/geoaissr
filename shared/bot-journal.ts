@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PLAY_STYLES } from './play-style.ts';
 
 /** Limits shared by the tool schemas and the journal that the result card renders. */
 export const FINDING_MAX_LEN = 600;
@@ -68,6 +69,10 @@ export const journalFrameSchema = z.object({
   label: z.string(),
   thumbUrl: z.string(),
   fullUrl: z.string().optional(),
+  /** Detective: the number the eyes know this frame by; report lines and answers cite it. */
+  n: z.number().int().positive().optional(),
+  /** Detective: how the frame was taken; a camera bot's step kind says it for its one frame. */
+  action: z.enum(['observe', 'look', 'move']).optional(),
   params: z
     .object({
       heading: z.number(),
@@ -75,21 +80,67 @@ export const journalFrameSchema = z.object({
       fov: z.number().optional(),
       step: z.number().optional(),
       distanceM: z.number().optional(),
+      fromStartM: z.number().optional(),
     })
     .optional(),
 });
 export type JournalFrame = z.infer<typeof journalFrameSchema>;
 
 /**
+ * One request of a Detective exchange: what the brain asked for and what the eyes answered.
+ * `pending` while the eyes work; `abstained` carries `not_visible`, `unreadable` or `no_road` in
+ * `value`; `timeout` and `eyes_down` carry no value.
+ */
+export const REQUEST_STATUSES = [
+  'pending',
+  'answered',
+  'abstained',
+  'timeout',
+  'eyes_down',
+] as const;
+export type RequestStatus = (typeof REQUEST_STATUSES)[number];
+
+export const journalRequestSchema = z.object({
+  n: z.number().int().positive(),
+  kind: z.enum(['describe', 'text', 'drive']),
+  /** The topic to describe or the text to copy. */
+  text: z.string(),
+  /** Drive requests: where and how far the brain asked to go. */
+  heading: z.number().optional(),
+  distanceM: z.number().optional(),
+  status: z.enum(REQUEST_STATUSES),
+  value: z.string().optional(),
+  confidence: z.enum(['sure', 'unsure']).optional(),
+  frame: z.number().int().positive().optional(),
+});
+export type JournalRequest = z.infer<typeof journalRequestSchema>;
+
+/** One line of the eyes' scene report, as the brain read it. */
+export const journalReportLineSchema = z.object({
+  section: z.string(),
+  text: z.string(),
+  frame: z.number().int().positive(),
+});
+export type JournalReportLine = z.infer<typeof journalReportLineSchema>;
+
+/**
  * One step of a bot's round. `index` equals the thumb `turn` (0 = the free observe).
  * `findingState` is `pending` while the bot is still working, then `recorded`, `missing`
  * (the bot ignored one correction) or `round-ended` (the round closed before the finding).
+ *
+ * A Detective round has step 0 (the start frames, the frames of the text hunt and `report`) and
+ * one `ask` step per exchange: `reason` is the brain's hypothesis, `requests` are its requests
+ * with the eyes' answers, `frames` are the frames the eyes took while answering.
  */
 export const journalStepSchema = z.object({
   index: z.number().int().nonnegative(),
-  kind: z.enum(['observe', 'look', 'move']),
+  kind: z.enum(['observe', 'look', 'move', 'ask']),
   reason: z.string().optional(),
   frames: z.array(journalFrameSchema),
+  requests: z.array(journalRequestSchema).optional(),
+  report: z.array(journalReportLineSchema).optional(),
+  /** The brain marked this exchange as its control check. */
+  control: z.boolean().optional(),
   finding: z.string().optional(),
   findingState: z.enum(FINDING_STATES),
   shifts: z.array(shiftSchema).optional(),
@@ -103,10 +154,22 @@ export const journalStepSchema = z.object({
 });
 export type JournalStep = z.infer<typeof journalStepSchema>;
 
+/** What an engine event may set on a Detective step; an unknown step is opened by it. */
+export type JournalStepPatch = Partial<Pick<JournalStep, 'reason' | 'requests' | 'report'>> & {
+  control?: true;
+};
+
 export const botJournalSchema = z.object({
   steps: z.array(journalStepSchema),
   summary: z.string().optional(),
   finalFinding: z.string().optional(),
+  /** The style the bot played; absent on Intuit rounds and on older results. */
+  style: z.enum(PLAY_STYLES).optional(),
+  /** Detective on agy: the brain's file guard left no record, so its blindness is not proven. */
+  isolation: z.literal('unconfirmed').optional(),
+  /** Detective: how sure the brain was, and the clue that decided. */
+  confidence: z.enum(['country', 'region', 'guess']).optional(),
+  clue: z.string().optional(),
 });
 export type BotJournal = z.infer<typeof botJournalSchema>;
 

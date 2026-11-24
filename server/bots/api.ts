@@ -1,15 +1,15 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import type { BotToolQueue, ToolResponsePayload } from './queue.ts';
+import type { ToolResponsePayload } from './queue.ts';
 
-export interface BotApiRegistration {
-  token: string;
-  queue: BotToolQueue;
+/** What a bot token leads to: a camera bot's tool queue, or one role of a Detective session. */
+export interface BotToolEndpoint {
+  dispatch: (toolName: string, rawArgs: unknown) => Promise<ToolResponsePayload>;
 }
 
 export interface BotToolApiServer {
   port: number;
   baseUrl: string;
-  registerBot: (queue: BotToolQueue) => string;
+  registerBot: (endpoint: BotToolEndpoint) => string;
   unregisterBot: (token: string) => void;
   close: () => void;
 }
@@ -24,9 +24,9 @@ function safeBearerMatch(authHeader: string | null, expectedToken: string): bool
 }
 
 function findQueueByAuth(
-  bots: Map<string, BotToolQueue>,
+  bots: Map<string, BotToolEndpoint>,
   authHeader: string | null,
-): BotToolQueue | null {
+): BotToolEndpoint | null {
   for (const [token, queue] of bots.entries()) {
     if (safeBearerMatch(authHeader, token)) return queue;
   }
@@ -34,11 +34,14 @@ function findQueueByAuth(
 }
 
 export function createBotToolApiServer(): BotToolApiServer {
-  const bots = new Map<string, BotToolQueue>();
+  const bots = new Map<string, BotToolEndpoint>();
 
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
+    // Seconds. A Detective's `ask` and `briefing` hold a request open for up to 45 s with no
+    // bytes on the wire; the connection must not be dropped as idle before the reply.
+    idleTimeout: 120,
     async fetch(req) {
       const url = new URL(req.url);
       if (req.method !== 'POST' || !url.pathname.startsWith('/tool/')) {

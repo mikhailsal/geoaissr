@@ -1,17 +1,9 @@
-import {
-  botNameFromModel,
-  isAutoBotName,
-  PRESET_CONFIGS,
-  personalityTextSchema,
-  type BotImageSize,
-  type DifficultyPreset,
-  type EffortLevel,
-  type PersonalityPreset,
-} from '../../shared/bot-tools.ts';
+import { botNameFromModel, PRESET_CONFIGS, type DifficultyPreset } from '../../shared/bot-tools.ts';
 import { avatarAppearanceSchema, type AvatarAppearance } from '../../shared/avatar.ts';
 import { pickFirstFreeColor } from '../../shared/colors.ts';
 import { MAX_BOTS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { BotSlotConfig, HarnessId, SettingsFile } from '../../shared/storage-schemas.ts';
+import { eyesPatchInvalid, keepVisionCheck, mergeBotSlotPatch } from './bot-slot-patch.ts';
 import type { PlayerState, ReduceOutput, RoomState } from './types.ts';
 
 let botSeqCounter = 0;
@@ -155,80 +147,6 @@ export function handleRemoveBot(state: RoomState, playerId: string, botId: strin
   };
 }
 
-function mergeBotSlotPatch(
-  slot: BotSlotConfig,
-  patch: Record<string, unknown>,
-  availableHarnesses: readonly HarnessCatalogEntry[],
-): BotSlotConfig {
-  const next: BotSlotConfig = { ...slot };
-  // An empty name hands naming back to the model (see the end of this function).
-  const nameFollowsModel =
-    typeof patch.name === 'string'
-      ? patch.name.trim() === ''
-      : isAutoBotName(slot.name, slot.model);
-  if (typeof patch.name === 'string' && !nameFollowsModel) next.name = patch.name;
-  if (typeof patch.color === 'string') next.color = patch.color as BotSlotConfig['color'];
-  if (typeof patch.enabled === 'boolean') next.enabled = patch.enabled;
-  if (typeof patch.harness === 'string') {
-    next.harness = patch.harness as HarnessId;
-  }
-  const activeEntry = availableHarnesses.find((h) => h.id === next.harness);
-  if (!activeEntry || !activeEntry.available) {
-    next.enabled = false;
-    next.disabledReason = activeEntry?.reason ?? `Харнесс ${next.harness} недоступен`;
-  } else {
-    next.disabledReason = undefined;
-    if (typeof patch.harness === 'string') {
-      const firstModel = activeEntry.models[0];
-      if (
-        typeof patch.model !== 'string' &&
-        firstModel &&
-        !activeEntry.models.includes(next.model)
-      ) {
-        next.model = firstModel;
-      }
-    }
-  }
-  if (typeof patch.model === 'string') next.model = patch.model;
-  if (typeof patch.budgetSec === 'number') next.budgetSec = patch.budgetSec;
-  if (typeof patch.personalityPreset === 'string') {
-    next.personalityPreset = patch.personalityPreset as PersonalityPreset;
-  }
-  if (typeof patch.personalityText === 'string') {
-    const parsed = personalityTextSchema.safeParse(patch.personalityText);
-    if (parsed.success) next.personalityText = parsed.data;
-  }
-
-  let changedTuning = false;
-  if (typeof patch.effort === 'string') {
-    next.effort = patch.effort as EffortLevel;
-    changedTuning = true;
-  }
-  if (typeof patch.moveLimit === 'number') {
-    next.moveLimit = patch.moveLimit;
-    changedTuning = true;
-  }
-  if (typeof patch.imageSize === 'number') {
-    next.imageSize = patch.imageSize as BotImageSize;
-    changedTuning = true;
-  }
-  if (changedTuning) {
-    next.difficultyPreset = 'custom';
-  }
-  if (nameFollowsModel && (next.model !== slot.model || typeof patch.name === 'string')) {
-    next.name = botNameFromModel(next.model);
-  }
-  if (
-    next.lastVisionCheck &&
-    (next.lastVisionCheck.model !== next.model ||
-      next.lastVisionCheck.effort !== next.effort ||
-      next.lastVisionCheck.imageSize !== next.imageSize)
-  ) {
-    next.lastVisionCheck = undefined;
-  }
-  return next;
-}
-
 export function handleUpdateBot(
   state: RoomState,
   playerId: string,
@@ -244,6 +162,9 @@ export function handleUpdateBot(
   const appearance =
     patch.avatar === undefined ? undefined : avatarAppearanceSchema.safeParse(patch.avatar);
   if (appearance && !appearance.success) return { state, effects: [], ack: 'invalid' };
+  if (eyesPatchInvalid(existingBot, patch, state.availableHarnesses)) {
+    return { state, effects: [], ack: 'invalid' };
+  }
   const updated = mergeBotSlotPatch(existingBot, patch, state.availableHarnesses);
   if (appearance) updated.avatar = appearance.data;
   const bots = state.settings.bots.map((b, i) => (i === idx ? updated : b));
@@ -268,20 +189,14 @@ export function handleApplyBotPreset(
   const cur = idx >= 0 ? state.settings.bots[idx] : undefined;
   if (!cur) return { state, effects: [], ack: 'invalid' };
   const cfg = PRESET_CONFIGS[preset];
-  const updated: BotSlotConfig = {
+  const tuned: BotSlotConfig = {
     ...cur,
     imageSize: cfg.imageSize,
     moveLimit: cfg.moveLimit,
     effort: cfg.effort,
     difficultyPreset: preset,
-    lastVisionCheck:
-      cur.lastVisionCheck &&
-      cur.lastVisionCheck.model === cur.model &&
-      cur.lastVisionCheck.effort === cfg.effort &&
-      cur.lastVisionCheck.imageSize === cfg.imageSize
-        ? cur.lastVisionCheck
-        : undefined,
   };
+  const updated: BotSlotConfig = { ...tuned, lastVisionCheck: keepVisionCheck(tuned) };
   const bots = state.settings.bots.map((b, i) => (i === idx ? updated : b));
   const settings: SettingsFile = { ...state.settings, bots };
   return {

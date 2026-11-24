@@ -5,7 +5,9 @@ import {
   defaultCommandProbe,
   ensureWorkDir,
   formatUnavailable,
+  geoToolNames,
   getHarnessMeta,
+  MCP_TOOL_TIMEOUT_SEC,
   parseSemverTuple,
   resolveBunBinary,
   resolveMcpToolsPath,
@@ -113,6 +115,7 @@ export const codexAdapter: HarnessAdapter = {
       GEO_BOT_TOKEN_FILE: tokenFile,
       GEO_DELIVERY_MODE: 'mcp',
       GEO_MOVE_ENABLED: opts.moveEnabled ? 'true' : 'false',
+      ...(opts.role ? { GEO_BOT_ROLE: opts.role } : {}),
     };
 
     const args: string[] = [
@@ -132,11 +135,14 @@ export const codexAdapter: HarnessAdapter = {
       `mcp_servers.geo.command=${JSON.stringify(bunBin)}`,
       '-c',
       `mcp_servers.geo.args=${JSON.stringify(['run', mcpPath])}`,
+      '-c',
+      `mcp_servers.geo.tool_timeout_sec=${String(MCP_TOOL_TIMEOUT_SEC)}`,
     ];
     for (const [k, v] of Object.entries(env)) {
       args.push('-c', `mcp_servers.geo.env.${k}=${JSON.stringify(v)}`);
     }
-    for (const tool of ['observe', 'look', 'move', 'final_guess']) {
+    // `codex exec` cannot ask the user, so every game tool of this launch is approved up front.
+    for (const tool of geoToolNames(opts.role)) {
       args.push('-c', `mcp_servers.geo.tools.${tool}.approval_mode="approve"`);
     }
     args.push(

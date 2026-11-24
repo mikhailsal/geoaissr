@@ -1,3 +1,8 @@
+import {
+  resolvePlayStyle,
+  styleFallbacks,
+  type PlayStyleFallback,
+} from '../../shared/play-style.ts';
 import type { AckResult, ClientViewState, QuotaSummaryView } from '../../shared/protocol.ts';
 import type {
   BotSlotConfig,
@@ -35,6 +40,8 @@ export interface ShellDeps {
     target: RoundTarget;
     bots: BotSlotConfig[];
     moveEnabled: boolean;
+    /** Slots set to Detective that play Intuit this round, with the reason; for the log. */
+    styleFallbacks?: Record<string, PlayStyleFallback>;
   }) => void;
   releaseBotObserve: (matchId: string, gen: number, roundNumber: number) => void;
   /** Optional: tells running bots that the round now ends at `atMs` (epoch ms). */
@@ -256,8 +263,11 @@ function runSyncEffect(ctx: EffectContext, effect: EngineEffect, currentState: R
           bots: effect.bots.map((bot) => ({
             ...bot,
             budgetSec: Math.min(bot.budgetSec, currentState.settings.roundDurationSec),
+            // The runner launches the style the engine resolved, never the raw setting.
+            playStyle: resolvePlayStyle(bot, currentState.settings.roundDurationSec).style,
           })),
           moveEnabled: effect.moveEnabled,
+          styleFallbacks: styleFallbacks(effect.bots, currentState.settings.roundDurationSec),
         });
       }
       return;

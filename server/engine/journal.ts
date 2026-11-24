@@ -1,4 +1,4 @@
-import type { BotJournal, JournalStep } from '../../shared/bot-journal.ts';
+import type { BotJournal, JournalStep, JournalStepPatch } from '../../shared/bot-journal.ts';
 import type { BotTurnThumbView } from '../../shared/protocol.ts';
 import { haversineDistanceKm } from '../../shared/score.ts';
 import type { BotRoundState, EngineEvent } from './types.ts';
@@ -15,6 +15,8 @@ export function addThumbToJournal(
     label: thumb.label,
     thumbUrl: thumb.thumbUrl,
     ...(thumb.fullUrl ? { fullUrl: thumb.fullUrl } : {}),
+    // Detective frames carry their number and action: one step holds looks and moves together.
+    ...(thumb.n !== undefined ? { n: thumb.n, action: thumb.action } : {}),
     ...(thumb.params ? { params: thumb.params } : {}),
   };
   const existing = journal.find((s) => s.index === thumb.turn);
@@ -28,6 +30,30 @@ export function addThumbToJournal(
     frames: [frame],
     findingState: 'pending',
     atMs,
+  };
+  return [...journal, step].sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Detective: sets fields on the step `turn`. A step that does not exist yet is an exchange the
+ * brain has just opened (step 0 is opened by the start frames).
+ */
+export function patchJournalStep(
+  journal: readonly JournalStep[],
+  turn: number,
+  patch: JournalStepPatch,
+  atMs: number,
+): JournalStep[] {
+  if (journal.some((s) => s.index === turn)) {
+    return journal.map((s) => (s.index === turn ? { ...s, ...patch } : s));
+  }
+  const step: JournalStep = {
+    index: turn,
+    kind: turn === 0 ? 'observe' : 'ask',
+    frames: [],
+    findingState: 'pending',
+    atMs,
+    ...patch,
   };
   return [...journal, step].sort((a, b) => a.index - b.index);
 }
@@ -66,6 +92,11 @@ export function addFindingToJournal(
   return journal.map((s) => (s.index === event.turn ? applyFinding(s, event, prev) : s));
 }
 
+/** The bot's final guess is recorded (a checkpoint is not one). */
+export function hasFinalGuess(bot: BotRoundState): boolean {
+  return bot.guess !== null && bot.guessFinalized !== false;
+}
+
 /**
  * The journal as the result card gets it. Steps still waiting for a finding when the
  * round is scored are marked `round-ended`.
@@ -74,13 +105,18 @@ export function finalizeJournal(bot: BotRoundState): BotJournal | undefined {
   const steps = (bot.journal ?? []).map((s) =>
     s.findingState === 'pending' ? { ...s, findingState: 'round-ended' as const } : s,
   );
-  const finalized = bot.guess !== null && bot.guessFinalized !== false;
+  const finalized = hasFinalGuess(bot);
   const summary = bot.guess?.summary;
   const lastFinding = finalized ? steps.at(-1)?.finding : undefined;
-  if (steps.length === 0 && !summary) return undefined;
+  // The isolation warning is kept even when the round left nothing else to show.
+  if (steps.length === 0 && !summary && !bot.isolationUnconfirmed) return undefined;
   return {
     steps,
     ...(summary ? { summary } : {}),
     ...(lastFinding ? { finalFinding: lastFinding } : {}),
+    ...(bot.playStyle === 'detective' ? { style: bot.playStyle } : {}),
+    ...(bot.isolationUnconfirmed ? { isolation: 'unconfirmed' as const } : {}),
+    ...(finalized && bot.guess?.confidence ? { confidence: bot.guess.confidence } : {}),
+    ...(finalized && bot.guess?.clue ? { clue: bot.guess.clue } : {}),
   };
 }

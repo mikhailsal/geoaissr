@@ -1,4 +1,5 @@
 import type { EffortLevel } from '../../../shared/bot-tools.ts';
+import type { DetectiveRole } from '../../../shared/detective-tools.ts';
 import type { HarnessCatalogEntry } from '../../../shared/protocol.ts';
 import type { HarnessId } from '../../../shared/storage-schemas.ts';
 
@@ -23,6 +24,8 @@ export interface BotLaunchOptions {
   apiUrl: string;
   botToken: string;
   moveEnabled: boolean;
+  /** Set for the two processes of a Detective bot: the bridge then lists that role's tools. */
+  role?: DetectiveRole;
   mcpScriptPath?: string;
   bunBin?: string;
 }

@@ -2,6 +2,7 @@
   import { ChevronRight } from '@lucide/svelte';
   import type { ClientViewState } from '$shared/protocol';
   import { PRESET_LABELS, RU } from '../i18n/ru';
+  import { fallbackNote, styleSuffix } from '../lib/play-style';
   import Avatar from './Avatar.svelte';
 
   let {
@@ -64,6 +65,7 @@
         {@const label = view.bots.some((other) => other.name === bot.name && other.id !== bot.id)
           ? `ИИ №${index + 1} · ${bot.name}`
           : bot.name}
+        {@const fallback = fallbackNote(bot, view.roundDurationSec)}
         <li>
           <button
             type="button"
@@ -85,10 +87,11 @@
             <span class="identity"
               ><strong>{label}</strong>
               <small
-                >{bot.harness} · {bot.model} · {PRESET_LABELS[bot.difficultyPreset]}{bot.enabled
-                  ? ''
-                  : ' · выключен'}</small
-              >
+                >{bot.harness} · {bot.model} · {PRESET_LABELS[bot.difficultyPreset]}{styleSuffix(
+                  bot,
+                  view.roundDurationSec,
+                )}{bot.enabled ? '' : ' · выключен'}</small
+              >{#if fallback}<small class="warning">{fallback}</small>{/if}
             </span>
             <ChevronRight aria-hidden="true" size={18} />
           </button>

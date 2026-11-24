@@ -60,11 +60,17 @@ The AI opponents use CLI tools that are already installed and signed in on the h
 - **Important about `agy`:** `agy` can technically read the user's files when it runs on the system (unlike `claude`/`codex`, where snapshots are passed only in the memory of the MCP process). Do not keep plaintext secrets or private keys in your home directory; `.env` is passed only to the game process.
 - The lobby has a **«Проверить зрение»** ("Check vision") button for each AI slot — use it after choosing a new model or snapshot size.
 
+Each AI slot has a play style (**«Стиль игры»** in the slot settings). **«Интуит»** is one process that sees the frames and guesses. **«Детектив»** is two processes: the «глаза» see the frames and describe them without naming a place, the «мозг» reads the descriptions, asks for more and places the pin. It runs on `claude`, `codex` and `agy`. By default both processes use the slot's harness and model; under «Глаза детектива» the eyes can run on another harness and model, for example a cheap vision model for the eyes and a strong one for the brain. The brain and the eyes have their own effort («Усилия мозга», «Усилия глаз»); the eyes default to low, which is usually enough to describe frames and keeps their answers fast. A Detective needs a round of at least 90 seconds; otherwise the slot plays Intuit for that match and the lobby says why. It spends tokens for both processes. On `agy` the brain's file guard denies every file read, so the brain cannot open the eyes' frames; if the guard leaves no record, the result card says that isolation was not confirmed.
+
+The bots' start prompts are plain text files in `server/bots/prompts/`. Edit a file and the change applies from the next round, with no restart ([syntax and rules](server/bots/prompts/README.md)).
+
 After a round, open an AI's **«почему?»** card to inspect its step journal: the reason before each action, the finding after it, which region versions were excluded or weakened, and a first-person summary. A **«Черновик»** badge means the latest saved checkpoint (`current_guess`) was scored because the bot ended without a final submission.
 
 The token badge shows CLI-reported usage when available. Its tooltip separates input, output and cached input and identifies the matched OpenRouter model. The dollar value shows three decimal places with **«API-цена для справки»**, using OpenRouter reference prices rather than the host's subscription bill; approximate model matches are labelled. Missing usage, prices or a suitable match appear as **«н/д»**. The model-price list is cached for 24 hours in `openrouter-models-cache.json` in the data directory; failed refreshes use the last readable cache.
 
-The [bot tool and accounting reference](docs/bot-tools.md) describes the step journal fields, checkpoints and final submissions, camera parameters and token normalization. The dry evaluation exercises the runtime and scoring pipeline with fake bots; a live `bun run eval:bots` run measures one real bot configuration on the licensed photo set ([details](docs/evals/README.md)), and neither guarantees how well a model follows the prompt.
+For a Detective the card shows the eyes' report, every exchange between the brain and the eyes, and the token split by process.
+
+The [bot tool and accounting reference](docs/bot-tools.md) describes the step journal fields, checkpoints and final submissions, camera parameters, the Detective play style and token normalization. The dry evaluation exercises the runtime and scoring pipeline with fake bots; a live `bun run eval:bots` run measures one real bot configuration on the licensed photo set ([details](docs/evals/README.md)), and neither guarantees how well a model follows the prompt.
 
 ---
 

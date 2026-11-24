@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { harnessProblem } from '../../shared/play-style.ts';
 import type { HarnessCatalogEntry, TunnelStatusView } from '../../shared/protocol.ts';
 import type { BotSlotConfig, SettingsFile } from '../../shared/storage-schemas.ts';
 import { migrateSavedBotSlot } from '../bots/adapters/shared.ts';
@@ -58,17 +59,12 @@ export function buildInitialSettings(opts: {
     settings.roundDurationSec = opts.cli.durationOverride;
   if (opts.cli.noMoveOverride !== undefined) settings.moveEnabled = !opts.cli.noMoveOverride;
 
-  const availableMap = new Map(opts.availableHarnesses.map((h) => [h.id, h]));
   const prevBots = settings.bots;
   const sanitizedBots: BotSlotConfig[] = prevBots.map((stored) => {
     const slot = migrateSavedBotSlot(stored);
-    const info = availableMap.get(slot.harness);
-    if (!opts.fakeMode && (!info || !info.available)) {
-      return {
-        ...slot,
-        enabled: false,
-        disabledReason: info?.reason ?? `Харнесс ${slot.harness} недоступен`,
-      };
+    const problem = harnessProblem(slot, opts.availableHarnesses);
+    if (!opts.fakeMode && problem) {
+      return { ...slot, enabled: false, disabledReason: problem };
     }
     return slot;
   });

@@ -93,6 +93,16 @@ test('a bot without a journal yields no fake steps', () => {
   expect(finalizeJournal(botWith(undefined, null))).toBeUndefined();
 });
 
+// Value: protects=«Изоляция зрения не подтверждена» on the card of a Detective whose round left no step; fails_when=a journal with no steps and no summary is dropped together with the warning; why_new=an empty journal was always dropped; seam=none; no_claim=how often an agy brain runs without its guard.
+test('a Detective without steps keeps its isolation warning', () => {
+  const bot = {
+    ...botWith(undefined, null),
+    playStyle: 'detective',
+    isolationUnconfirmed: true,
+  } as BotRoundState;
+  expect(finalizeJournal(bot)).toEqual({ steps: [], style: 'detective', isolation: 'unconfirmed' });
+});
+
 // A record written before the journal existed: telemetry only, no journal-era fields.
 const OLD_RECORD = {
   version: 1,

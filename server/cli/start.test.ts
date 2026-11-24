@@ -87,6 +87,54 @@ test('buildInitialSettings disables saved enabled slot when harness is unavailab
   }
 });
 
+// Value: protects=a saved Detective whose eyes CLI is missing is disabled with a reason naming the eyes, and still starts in fake mode; fails_when=only the brain's harness is checked or the reason loses the eyes prefix; why_new=the existing case covers only a missing brain harness; seam=none; no_claim=real harness detection (catalog is hand-built).
+test('buildInitialSettings disables a saved Detective whose eyes harness is missing', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'geo-init-eyes-'));
+  try {
+    const file = path.join(root, 'settings.json');
+    const saved = createDefaultSettings();
+    saved.bots = [
+      {
+        id: 'bot-1',
+        name: 'Сыщик',
+        color: 'p-4',
+        harness: 'claude',
+        model: 'haiku',
+        effort: 'low',
+        moveLimit: 4,
+        imageSize: 400,
+        budgetSec: 120,
+        playStyle: 'detective',
+        eyes: { harness: 'codex', model: 'gpt-6-luna' },
+        personalityPreset: 'neutral',
+        personalityText: '',
+        difficultyPreset: 'amateur',
+        enabled: true,
+      },
+    ];
+    saveSettings(file, saved);
+    const catalog: HarnessCatalogEntry[] = [
+      { id: 'claude', available: true, readsOwnerFiles: false, models: ['haiku'] },
+      { id: 'codex', available: false, reason: 'Не вошёл', readsOwnerFiles: false, models: [] },
+    ];
+    const build = (fakeMode: boolean) =>
+      buildInitialSettings({
+        settingsFile: file,
+        cli: parseStartArgs([]),
+        availableHarnesses: catalog,
+        fakeMode,
+      }).settings.bots[0];
+    expect(build(false)).toMatchObject({
+      enabled: false,
+      disabledReason: 'Глаза детектива: Не вошёл',
+    });
+    // Fake mode launches no CLI, so nothing is missing.
+    expect(build(true)?.enabled).toBe(true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('buildInitialSettings renames old default names and expands saved model aliases', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'geo-init-names-'));
   try {

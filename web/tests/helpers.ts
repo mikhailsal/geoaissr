@@ -24,11 +24,12 @@ function writeTestSettings(
   seedBot: boolean,
   quotaCeilings?: Partial<QuotaCounts>,
   bots?: BotSlotConfig[],
+  roundDurationSec = 60,
 ): void {
   const settings = {
     version: 1,
     rounds,
-    roundDurationSec: 60,
+    roundDurationSec,
     moveEnabled: true,
     region: 'world',
     aiWaitWindowSec: 5,
@@ -110,7 +111,7 @@ async function stopFakeProcess(proc: ChildProcess): Promise<void> {
   });
 }
 
-export async function startIsolatedFakeServer(opts?: {
+interface FakeServerOptions {
   seedBot?: boolean;
   rounds?: number;
   quotaCeilings?: Partial<QuotaCounts>;
@@ -118,9 +119,11 @@ export async function startIsolatedFakeServer(opts?: {
   initialMatches?: MatchRecord[];
   unreadableHistory?: boolean;
   bots?: BotSlotConfig[];
-}): Promise<StartedFakeApp> {
-  const root = mkdtempSync(path.join(tmpdir(), 'geo-pw-e2e-'));
-  const [configDir, dataDir] = [path.join(root, 'config'), path.join(root, 'data')];
+  roundDurationSec?: number;
+}
+
+/** Writes the settings, history and quota files the fixture server starts from. */
+function seedFixtureFiles(configDir: string, dataDir: string, opts?: FakeServerOptions): void {
   if (opts?.unreadableHistory) {
     mkdirSync(path.join(dataDir, 'matches.jsonl'), { recursive: true });
   }
@@ -132,6 +135,7 @@ export async function startIsolatedFakeServer(opts?: {
       Boolean(opts.seedBot),
       opts.quotaCeilings,
       opts.bots,
+      opts.roundDurationSec,
     );
   }
   if (opts?.initialMatches) {
@@ -154,6 +158,12 @@ export async function startIsolatedFakeServer(opts?: {
       'utf8',
     );
   }
+}
+
+export async function startIsolatedFakeServer(opts?: FakeServerOptions): Promise<StartedFakeApp> {
+  const root = mkdtempSync(path.join(tmpdir(), 'geo-pw-e2e-'));
+  const [configDir, dataDir] = [path.join(root, 'config'), path.join(root, 'data')];
+  seedFixtureFiles(configDir, dataDir, opts);
   let proc = launchFakeProcess(configDir, dataDir, 0);
 
   let hostUrl = '';

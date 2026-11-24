@@ -229,7 +229,7 @@ export interface BotToolDefinition {
   inputSchema: Record<string, unknown>;
 }
 
-function toToolJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+export function toToolJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   const compatible = schema as unknown as Parameters<typeof zodToJsonSchema>[0];
   const raw = zodToJsonSchema(compatible, { target: 'jsonSchema7' }) as Record<string, unknown>;
   const { $schema: _removed, ...rest } = raw;

@@ -11,7 +11,15 @@ import type { AvatarAppearance } from '../../shared/avatar.ts';
 import type { RoundCompletion } from '../../shared/round-timing.ts';
 import type { LatLng } from '../../shared/score.ts';
 import type { BotAccounting } from '../../shared/bot-results.ts';
-import type { CurrentGuess, FindingState, JournalStep, Shift } from '../../shared/bot-journal.ts';
+import type {
+  CurrentGuess,
+  FindingState,
+  JournalStep,
+  JournalStepPatch,
+  Shift,
+} from '../../shared/bot-journal.ts';
+import type { GuessConfidence } from '../../shared/detective-tools.ts';
+import type { PlayStyle } from '../../shared/play-style.ts';
 import type {
   BotRoundTelemetry,
   BotSlotConfig,
@@ -61,10 +69,17 @@ export interface BotGuessData {
   /** First-person summary from `final_guess`; absent on checkpoints. */
   summary?: string;
   quip?: string;
+  /** Detective `final_guess` only: how sure the brain is and the clue that decided. */
+  confidence?: GuessConfidence;
+  clue?: string;
 }
 
 export interface BotRoundState extends BotAccounting {
   guessFinalized?: boolean;
+  /** The style this bot really plays in this round, after the fallback rules. */
+  playStyle?: PlayStyle;
+  /** Detective on agy: the brain's file guard left no record (see `bot_isolation_unconfirmed`). */
+  isolationUnconfirmed?: true;
   slotId: string;
   name: string;
   color: BotSlotConfig['color'];
@@ -267,6 +282,16 @@ export type EngineEvent =
       currentGuess?: CurrentGuess;
     }
   | {
+      /** Detective: opens the journal step `turn` or sets fields on it. */
+      type: 'bot_step_patched';
+      matchId: string;
+      gen: number;
+      roundNumber: number;
+      botId: string;
+      turn: number;
+      patch: JournalStepPatch;
+    }
+  | {
       type: 'bot_guess_recorded';
       matchId: string;
       gen: number;
@@ -282,6 +307,17 @@ export type EngineEvent =
       roundNumber: number;
       botId: string;
       accounting: BotAccounting;
+    }
+  | {
+      /**
+       * Detective on agy: the brain called the game's tools, but its file guard left no record, so
+       * nothing proves the brain could not open the eyes' frames.
+       */
+      type: 'bot_isolation_unconfirmed';
+      matchId: string;
+      gen: number;
+      roundNumber: number;
+      botId: string;
     }
   | {
       type: 'bot_finished';

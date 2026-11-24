@@ -1,6 +1,6 @@
 import type { RoundResultEntryView } from '../../shared/protocol.ts';
 import { accountingFields } from './bot-accounting.ts';
-import { finalizeJournal } from './journal.ts';
+import { finalizeJournal, hasFinalGuess } from './journal.ts';
 import {
   calculateRoundScore,
   computeHumanVsAiRound,
@@ -23,6 +23,28 @@ import type {
 
 type UnrankedEntry = Omit<RoundResultEntryView, 'rank'>;
 
+/**
+ * A bot that is still `thinking` when its time is up. With its final guess in, it has played the
+ * round: only its processes were still exiting (a Detective waits for its eyes to report their
+ * tokens), so it is done, not timed out. Without one it is aborted with `timeoutReason`.
+ */
+export function closeThinkingBot(
+  bot: BotRoundState,
+  now: number,
+  timeoutReason: { abort: string; termination: string },
+): BotRoundState {
+  if (hasFinalGuess(bot)) {
+    return { ...bot, status: 'done', terminationReason: 'завершил ход', finishedAt: now };
+  }
+  return {
+    ...bot,
+    status: 'aborted',
+    abortReason: timeoutReason.abort,
+    terminationReason: timeoutReason.termination,
+    finishedAt: now,
+  };
+}
+
 function finalizeRoundBots(
   bots: Record<string, BotRoundState>,
   now: number,
@@ -35,14 +57,12 @@ function finalizeRoundBots(
   const abortedBots: Array<{ name: string; reason: string }> = [];
   for (const [id, bot] of Object.entries(bots)) {
     if (bot.status === 'thinking') {
-      finalizedBots[id] = {
-        ...bot,
-        status: 'aborted',
-        abortReason: timeoutReason,
-        terminationReason: timeoutReason,
-        finishedAt: now,
-      };
-      abortedBots.push({ name: bot.name, reason: timeoutReason });
+      const closed = closeThinkingBot(bot, now, {
+        abort: timeoutReason,
+        termination: timeoutReason,
+      });
+      finalizedBots[id] = closed;
+      if (closed.status === 'aborted') abortedBots.push({ name: bot.name, reason: timeoutReason });
     } else {
       finalizedBots[id] = bot;
       if (bot.status === 'aborted') {

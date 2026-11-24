@@ -43,7 +43,12 @@
         size="md"
       />
       <div>
-        <h3 class="bot-name">{entry.name}</h3>
+        <h3 class="bot-name">
+          {entry.name}
+          {#if entry.journal?.style === 'detective'}
+            <span class="style-tag">{RU.playStyle.detective}</span>
+          {/if}
+        </h3>
         <p class="metrics">
           {formatPointsRu(entry.roundScore)}
           {#if entry.distanceKm !== null}
@@ -127,6 +132,17 @@
   .bot-name {
     margin: 0;
     font-size: 1rem;
+  }
+
+  .style-tag {
+    margin-left: var(--sp-1);
+    padding: 0 var(--sp-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--paper-dim);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    white-space: nowrap;
   }
 
   .metrics {

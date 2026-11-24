@@ -1,12 +1,15 @@
 <script lang="ts">
   import type { ParticipantColorId } from '$shared/colors';
+  import { slotHarnesses, visionSubject } from '$shared/play-style';
+  import BotPlayStyle from './BotPlayStyle.svelte';
+  import BotSlotAdvanced from './BotSlotAdvanced.svelte';
   import ParticipantColorPicker from './ParticipantColorPicker.svelte';
   import type { DifficultyPreset } from '$shared/bot-tools';
   import type { HarnessCatalogEntry } from '$shared/protocol';
   import type { BotSlotConfig } from '$shared/storage-schemas';
   import type { VisionToast } from '../lib/game-store.svelte';
   import { formatSecondsOnly } from '../i18n/format';
-  import { EFFORT_LABELS, PERSONALITY_LABELS, PRESET_LABELS, RU } from '../i18n/ru';
+  import { EFFORT_LABELS, PRESET_LABELS, RU } from '../i18n/ru';
 
   interface Props {
     config: BotSlotConfig;
@@ -15,6 +18,8 @@
     isCheckingVision: boolean;
     visionToast?: VisionToast;
     isHost: boolean;
+    /** The match's round duration: it caps the bot's budget and decides the play style. */
+    roundDurationSec: number;
     onUpdate: (patch: Record<string, unknown>) => void;
     onApplyPreset: (preset: Exclude<DifficultyPreset, 'custom'>) => void;
     onCheckVision: () => void;
@@ -29,6 +34,7 @@
     isCheckingVision,
     visionToast,
     isHost,
+    roundDurationSec,
     onUpdate,
     onApplyPreset,
     onCheckVision,
@@ -38,15 +44,17 @@
 
   let draftName = $state('');
   let draftModel = $state('');
-  let draftPersonality = $state('');
   let customModelMode = $state(false);
 
   const selectedHarness = $derived(availableHarnesses.find((h) => h.id === slot.harness));
   const modelChoices = $derived(selectedHarness?.models ?? []);
+  const isDetective = $derived(slot.playStyle === 'detective');
+  // A Detective's check tests its eyes: it counts while their model and effort are unchanged.
+  const visionTarget = $derived(visionSubject(slot));
   const checkMatchesSettings = $derived(
     slot.lastVisionCheck !== undefined &&
-      slot.lastVisionCheck.model === slot.model &&
-      slot.lastVisionCheck.effort === slot.effort &&
+      slot.lastVisionCheck.model === visionTarget.model &&
+      slot.lastVisionCheck.effort === visionTarget.effort &&
       slot.lastVisionCheck.imageSize === slot.imageSize,
   );
   const visionSlowWarning = $derived(
@@ -58,7 +66,6 @@
   $effect(() => {
     draftName = slot.name;
     draftModel = slot.model;
-    draftPersonality = slot.personalityText;
     customModelMode = !modelChoices.includes(slot.model);
   });
 
@@ -75,23 +82,16 @@
       onUpdate({ model: clean });
     }
   }
-
-  function commitPersonalityText(): void {
-    const clean = draftPersonality.replace(/[\r\n]+/g, ' ').slice(0, 200);
-    if (clean !== slot.personalityText) {
-      onUpdate({ personalityText: clean });
-    }
-  }
 </script>
 
 <div class="bot-editor">
   {#if slot.disabledReason}
-    <p class="warn-line" role="status">{slot.disabledReason}</p>
+    <p class="slot-warn" role="status">{slot.disabledReason}</p>
   {/if}
 
-  <div class="row-2">
-    <label class="field">
-      <span class="lbl">Имя бота</span>
+  <div class="slot-row">
+    <label class="slot-field">
+      <span class="slot-label">Имя бота</span>
       <input
         type="text"
         class="field-input"
@@ -105,8 +105,8 @@
       />
     </label>
 
-    <label class="field toggle-field">
-      <span class="lbl">Участвует</span>
+    <label class="slot-field toggle-field">
+      <span class="slot-label">Участвует</span>
       <button
         type="button"
         class="btn"
@@ -133,9 +133,9 @@
     }}
   />
 
-  <div class="row-2">
-    <label class="field">
-      <span class="lbl">CLI-харнесс</span>
+  <div class="slot-row">
+    <label class="slot-field">
+      <span class="slot-label">{isDetective ? RU.playStyle.brainHarness : 'CLI-харнесс'}</span>
       <select
         class="field-select"
         disabled={!isHost}
@@ -152,8 +152,10 @@
       </select>
     </label>
 
-    <div class="field">
-      <label class="lbl" for="model-{slot.id}">Модель</label>
+    <div class="slot-field">
+      <label class="slot-label" for="model-{slot.id}"
+        >{isDetective ? RU.playStyle.brainModel : 'Модель'}</label
+      >
       {#if modelChoices.length > 0 && !customModelMode}
         <select
           id="model-{slot.id}"
@@ -204,12 +206,14 @@
     </div>
   </div>
 
-  {#if slot.harness === 'agy'}
-    <p class="warn-line" role="note">{RU.lobby.agyPrivacyWarning}</p>
+  {#if slotHarnesses(slot).includes('agy')}
+    <p class="slot-warn" role="note">{RU.lobby.agyPrivacyWarning}</p>
   {/if}
 
-  <div class="preset-bar" role="group" aria-label="Уровень сложности бота">
-    <span class="lbl">Сложность ({PRESET_LABELS[slot.difficultyPreset]})</span>
+  <BotPlayStyle config={slot} {availableHarnesses} {roundDurationSec} {isHost} {onUpdate} />
+
+  <div class="slot-group" role="group" aria-label="Уровень сложности бота">
+    <span class="slot-label">Сложность ({PRESET_LABELS[slot.difficultyPreset]})</span>
     <div class="preset-btns">
       {#each ['novice', 'amateur', 'master'] as const as preset (preset)}
         <button
@@ -227,9 +231,9 @@
     </div>
   </div>
 
-  <div class="row-2">
-    <label class="field">
-      <span class="lbl">Усилия (effort)</span>
+  <div class="slot-row">
+    <label class="slot-field">
+      <span class="slot-label">{isDetective ? RU.playStyle.brainEffort : 'Усилия (effort)'}</span>
       <select
         class="field-select"
         disabled={!isHost}
@@ -244,8 +248,8 @@
       </select>
     </label>
 
-    <label class="field">
-      <span class="lbl">
+    <label class="slot-field">
+      <span class="slot-label">
         Лимит ходов: {slot.moveLimit === 0 ? RU.lobby.turnZeroLabel : slot.moveLimit}
       </span>
       <input
@@ -260,78 +264,11 @@
           if (Number.isFinite(val)) onUpdate({ moveLimit: Math.max(0, Math.min(20, val)) });
         }}
       />
-      <span class="hint">{RU.lobby.turnHint}</span>
+      <span class="slot-hint">{RU.lobby.turnHint}</span>
     </label>
   </div>
 
-  <details class="advanced">
-    <summary>{RU.lobby.advanced}</summary>
-    <div class="row-2 adv-grid">
-      <label class="field">
-        <span class="lbl">Размер снимка</span>
-        <select
-          class="field-select"
-          disabled={!isHost}
-          value={String(slot.imageSize)}
-          onchange={(e) => {
-            onUpdate({ imageSize: Number(e.currentTarget.value) });
-          }}
-        >
-          <option value="256">256 px</option>
-          <option value="400">400 px</option>
-          <option value="640">640 px</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="lbl">Бюджет раунда (с)</span>
-        <input
-          type="number"
-          class="field-input"
-          min={60}
-          max={600}
-          disabled={!isHost}
-          value={slot.budgetSec}
-          onchange={(e) => {
-            const val = Number.parseInt(e.currentTarget.value, 10);
-            if (Number.isFinite(val)) onUpdate({ budgetSec: Math.max(60, Math.min(600, val)) });
-          }}
-        />
-      </label>
-
-      <label class="field">
-        <span class="lbl">Характер</span>
-        <select
-          class="field-select"
-          disabled={!isHost}
-          value={slot.personalityPreset}
-          onchange={(e) => {
-            onUpdate({ personalityPreset: e.currentTarget.value });
-          }}
-        >
-          {#each ['neutral', 'braggart', 'humble', 'scientist'] as const as p (p)}
-            <option value={p}>{PERSONALITY_LABELS[p]}</option>
-          {/each}
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="lbl">Свой тон (до 200 символов)</span>
-        <input
-          type="text"
-          class="field-input"
-          maxlength={200}
-          disabled={!isHost}
-          placeholder="Например: любит дорожные знаки"
-          bind:value={draftPersonality}
-          onblur={commitPersonalityText}
-          onkeydown={(e) => {
-            if (e.key === 'Enter') commitPersonalityText();
-          }}
-        />
-      </label>
-    </div>
-  </details>
+  <BotSlotAdvanced config={slot} {isHost} {onUpdate} />
 
   <div class="vision-row">
     <button
@@ -370,7 +307,7 @@
   </div>
 
   {#if visionSlowWarning && slot.lastVisionCheck}
-    <p class="warn-line" role="note">
+    <p class="slot-warn" role="note">
       Проверка заняла {formatSecondsOnly(slot.lastVisionCheck.elapsedMs / 1000)} — больше половины бюджета
       ({slot.budgetSec} с). Увеличьте бюджет или выберите более быструю модель.
     </p>
@@ -387,55 +324,15 @@
     background-color: var(--asphalt-900);
   }
 
-  .row-2 {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: var(--sp-3);
-  }
-
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .lbl {
-    font-size: 0.85rem;
-    color: var(--paper-dim);
-  }
-
-  .hint {
-    font-size: 0.78rem;
-    color: var(--paper-dim);
-  }
-
   .custom-model-row {
     display: flex;
     gap: var(--sp-2);
-  }
-
-  .preset-bar {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
   }
 
   .preset-btns {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
-  }
-
-  .advanced summary {
-    cursor: pointer;
-    color: var(--paper-dim);
-    min-height: var(--control-h);
-    display: flex;
-    align-items: center;
-  }
-
-  .adv-grid {
-    margin-top: var(--sp-2);
   }
 
   .vision-row {
@@ -449,13 +346,5 @@
     flex: 1;
     font-size: 0.86rem;
     color: var(--paper-dim);
-  }
-
-  .warn-line {
-    margin: 0;
-    padding: 0.45rem 0.65rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--paint);
-    font-size: 0.85rem;
   }
 </style>

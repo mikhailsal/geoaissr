@@ -112,6 +112,7 @@ export const claudeAdapter: HarnessAdapter = {
       deliveryMode: 'mcp',
       moveEnabled: opts.moveEnabled,
       workDir: cwd,
+      role: opts.role,
     });
     const cfgPath = path.join(cwd, 'mcp-config.json');
     writeJsonFile(

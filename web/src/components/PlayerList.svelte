@@ -50,6 +50,7 @@
             {:else if bot.status === 'aborted'}
               {RU.round.abortedTag}
             {:else}
+              {#if bot.playStyle === 'detective'}{RU.playStyle.detective.toLowerCase()} ·{/if}
               ход {bot.turnsUsed}/{bot.moveLimit}
             {/if}
           </span>

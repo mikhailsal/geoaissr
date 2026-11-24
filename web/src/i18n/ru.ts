@@ -137,6 +137,31 @@ export const RU = {
     abortedTag: 'оборван',
     loadingTag: 'загружает панораму',
   },
+  playStyle: {
+    label: 'Стиль игры',
+    intuit: 'Интуит',
+    detective: 'Детектив',
+    brain: 'Мозг',
+    eyes: 'Глаза',
+    intuitHint: 'Один процесс: сам смотрит кадры и ставит точку',
+    detectiveHint:
+      'Два процесса: «глаза» видят кадры и описывают их, «мозг» кадров не видит, рассуждает по описаниям и ставит точку. Токены считаются за оба. «Проверить зрение» проверяет глаза',
+    minBudgetHint: (minSec: number) => `Детективу нужно не меньше ${minSec} с`,
+    fallbackBudget: (roundSec: number, minSec: number) =>
+      `Раунд длится ${roundSec} с, а Детективу нужно не меньше ${minSec} с: в этой партии бот сыграет как Интуит`,
+    eyesLegend: 'Глаза детектива',
+    eyesHarness: 'CLI-харнесс глаз',
+    eyesModel: 'Модель глаз',
+    eyesSameAsBrain: (harness: string, model: string) => `как у мозга (${harness} · ${model})`,
+    eyesEffort: 'Усилия глаз (effort)',
+    eyesHint:
+      'Глаза описывают кадры: обычно хватает низких усилий, и они отвечают быстрее. Усилия мозга задаются ниже',
+    brainEffort: 'Усилия мозга (effort)',
+    brainHarness: 'CLI-харнесс мозга',
+    brainModel: 'Модель мозга',
+    isolationUnconfirmed:
+      'Изоляция зрения не подтверждена: защита agy не оставила записей, и мозг мог открыть кадры глаз',
+  },
   results: {
     correctCountry: (country: string) => `Правильный ответ: ${country}`,
     noAnswersAtAll: 'Никто не ответил',

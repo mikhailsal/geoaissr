@@ -1,4 +1,5 @@
 import type { BotCostEstimate, BotTokenUsage } from '../../shared/bot-results.ts';
+import type { PlayStyleFallback } from '../../shared/play-style.ts';
 import type { BotSlotConfig, RegionId } from '../../shared/storage-schemas.ts';
 import type { EngineEvent, RoundTarget } from '../engine/types.ts';
 import type { BotImageService } from '../images/bot-image-service.ts';
@@ -25,6 +26,8 @@ export interface BotRunner {
     target: RoundTarget;
     bots: BotSlotConfig[];
     moveEnabled: boolean;
+    /** Slots set to Detective that play Intuit this round, with the reason; logged, not acted on. */
+    styleFallbacks?: Record<string, PlayStyleFallback>;
   }) => void;
   releaseObserve: (matchId: string, gen: number, roundNumber: number) => void;
   /** The engine shortened the round: remaining time and the urgent nudge use `atMs` from now on. */

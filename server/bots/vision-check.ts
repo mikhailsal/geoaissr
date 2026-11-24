@@ -3,6 +3,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import type { BotImageSize } from '../../shared/bot-tools.ts';
+import { visionSubject } from '../../shared/play-style.ts';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
 import { joinUnder } from '../paths.ts';
 import { redactSecrets } from '../errors.ts';
@@ -132,7 +133,9 @@ export async function runVisionCheck(opts: {
   }
   const workDir = joinUnder(opts.runDir, `vision-${opts.slot.id}-${t0}`);
   const visionState = { sawDigits: false };
-  const adapter = getHarnessAdapter(opts.slot.harness);
+  // A Detective sees through its eyes: their harness, model and effort are what is checked.
+  const subject = visionSubject(opts.slot);
+  const adapter = getHarnessAdapter(subject.harness);
   const q = buildVisionQueue(digits, visionState, opts.slot.imageSize);
   const token = opts.api.registerBot(q);
   // Everything after registerBot sits in the try so a failed spawn still releases token and dir.
@@ -140,8 +143,8 @@ export async function runVisionCheck(opts: {
     mkdirSync(workDir, { recursive: true });
     const spec = adapter.buildLaunchSpec({
       workDir,
-      model: opts.slot.model,
-      effort: opts.slot.effort,
+      model: subject.model,
+      effort: subject.effort,
       prompt: buildVisionCheckPrompt(adapter.deliveryMode, opts.slot.imageSize),
       apiUrl: opts.api.baseUrl,
       botToken: token,

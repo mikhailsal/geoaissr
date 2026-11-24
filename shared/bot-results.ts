@@ -22,6 +22,10 @@ export interface BotCostEstimate {
 /** Optional fields preserve older in-memory and saved round views. */
 export interface BotAccounting {
   tokenUsage?: BotTokenUsage;
+  /** Detective only: the usage of each process; `tokenUsage` is their sum. */
+  roleUsage?: { brain?: BotTokenUsage; eyes?: BotTokenUsage };
+  /** Detective only: the model each process ran on. */
+  roleModels?: { brain: string; eyes: string };
   costUsd?: number | null;
   matchedModelId?: string;
   isApproximateMatch?: boolean;
@@ -33,7 +37,19 @@ export interface BotTurnThumbView {
   label: string;
   thumbUrl: string;
   fullUrl?: string;
-  /** `distanceM` is set on a long move: the road distance it covered, in metres. */
-  params?: { heading: number; pitch?: number; fov?: number; step?: number; distanceM?: number };
+  /** Detective: the number the eyes know this frame by («кадр 5»). */
+  n?: number;
+  /**
+   * `distanceM` is set on a long move: the road distance it covered, in metres. `fromStartM` is
+   * set on a frame taken away from the start: the straight-line distance to it, in metres.
+   */
+  params?: {
+    heading: number;
+    pitch?: number;
+    fov?: number;
+    step?: number;
+    distanceM?: number;
+    fromStartM?: number;
+  };
   hypothesis?: string;
 }
