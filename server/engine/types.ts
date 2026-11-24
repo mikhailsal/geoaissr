@@ -2,6 +2,7 @@ import type {
   BotTurnThumbView,
   ClientViewState,
   HarnessCatalogEntry,
+  LobbySettingsPatch,
   LobbySummary,
   QuotaSummaryView,
   RoundResultEntryView,
@@ -212,12 +213,7 @@ export type EngineEvent =
   | {
       type: 'update_lobby';
       playerId: string;
-      patch: Partial<
-        Pick<
-          SettingsFile,
-          'rounds' | 'roundDurationSec' | 'moveEnabled' | 'region' | 'aiWaitWindowSec'
-        >
-      >;
+      patch: LobbySettingsPatch;
     }
   | { type: 'add_bot'; playerId: string }
   | { type: 'remove_bot'; playerId: string; botId: string }

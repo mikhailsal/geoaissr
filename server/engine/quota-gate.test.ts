@@ -38,6 +38,7 @@ function makeLobby(quotaSummary: QuotaSummaryView): RoomState {
       roundDurationSec: 60,
       moveEnabled: true,
       aiWaitWindowSec: 30,
+      showMatchStandings: true,
       bots: [],
     },
     quotaSummary,

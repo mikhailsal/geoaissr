@@ -76,7 +76,10 @@ export const lobbySettingsPatchSchema = z.object({
   moveEnabled: z.boolean().optional(),
   region: z.enum(REGION_IDS).optional(),
   aiWaitWindowSec: z.number().int().min(0).max(120).optional(),
+  showMatchStandings: z.boolean().optional(),
 });
+
+export type LobbySettingsPatch = z.infer<typeof lobbySettingsPatchSchema>;
 
 export const updateLobbyMessageSchema = z.object({
   type: z.literal('update_lobby'),
@@ -313,6 +316,7 @@ export interface ClientViewState {
   moveEnabled: boolean;
   region: RegionId;
   aiWaitWindowSec: number;
+  showMatchStandings: boolean;
   startBlockedReasons: string[];
   settingsNotice?: string;
   quotaWarning?: string;
@@ -351,7 +355,12 @@ export interface ClientViewState {
     targetLng: number;
     countryNameRu: string;
     entries: RoundResultEntryView[];
-    matchLeaders: string[];
+    matchStandings?: {
+      id: string;
+      name: string;
+      rank: number;
+      totalScore: number;
+    }[];
     humanVsAi: {
       visible: boolean;
       humansRound: number;

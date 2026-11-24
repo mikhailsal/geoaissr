@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ClientViewState } from '$shared/protocol';
+  import type { ClientViewState, LobbySettingsPatch } from '$shared/protocol';
   import { REGION_IDS, type RegionId } from '$shared/storage-schemas';
   import { formatRoundsRu, formatSecondsOnly } from '../i18n/format';
   import { REGION_LABELS, RU } from '../i18n/ru';
@@ -9,13 +9,7 @@
     view: ClientViewState;
     minDurationSec: number;
     hostName: string;
-    onUpdateLobby: (patch: {
-      rounds?: number;
-      roundDurationSec?: number;
-      moveEnabled?: boolean;
-      region?: RegionId;
-      aiWaitWindowSec?: number;
-    }) => void;
+    onUpdateLobby: (patch: LobbySettingsPatch) => void;
     onConfirmQuotaReset: () => void;
   }
 
@@ -99,6 +93,18 @@
           <option value={reg}>{REGION_LABELS[reg]}</option>
         {/each}
       </select>
+    </label>
+
+    <label class="standings-option full-span">
+      <input
+        type="checkbox"
+        checked={view.showMatchStandings}
+        disabled={!view.viewerIsHost}
+        onchange={(e) => {
+          onUpdateLobby({ showMatchStandings: e.currentTarget.checked });
+        }}
+      />
+      <span>{RU.lobby.showMatchStandings}</span>
     </label>
 
     {#if view.bots.some((b) => b.enabled)}
@@ -186,6 +192,17 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+  }
+
+  .standings-option {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: 2.5rem;
+  }
+
+  .standings-option input {
+    accent-color: var(--paint);
   }
 
   .full-span {

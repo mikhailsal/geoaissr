@@ -6,7 +6,7 @@ Notable changes to this locally run application are recorded here. Releases are 
 
 ### Changed
 
-- See the match leader after each round. The results table shows the points each participant earned that round and their running total. When players share first place under the final standings rules, the results name all of them.
+- Round results open on the scores for that round. Players can switch to «Рейтинг за игру» to see the cumulative standings, ranked by the same rules as the final results. Hosts can turn off «Показывать рейтинг между раундами» in the lobby to save the overall standings for the end of the game.
 
 ## [0.3.4] - 2026-11-24
 

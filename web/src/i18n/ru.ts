@@ -83,6 +83,7 @@ export const RU = {
     roundsLabel: 'Раунды',
     durationLabel: 'Время раунда (с)',
     moveLabel: 'Движение по панораме',
+    showMatchStandings: 'Показывать рейтинг между раундами',
     moveOn: 'вкл',
     moveOff: 'выкл',
     regionLabel: 'Регион',

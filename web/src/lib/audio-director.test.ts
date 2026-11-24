@@ -89,7 +89,6 @@ function resultsAt(finishedAt: number, confirmedIds: string[] = []): ClientViewS
     targetLat: 48.8566,
     targetLng: 2.3522,
     countryNameRu: 'Франция',
-    matchLeaders: [],
     entries: [],
     completion: { finishedAt, confirmedIds },
     humanVsAi: { visible: false, humansRound: 0, aiRound: 0, humansTotal: 0, aiTotal: 0 },

@@ -84,6 +84,8 @@ export const settingsFileSchema = z.object({
   moveEnabled: z.boolean(),
   region: z.enum(REGION_IDS),
   aiWaitWindowSec: z.number().int().min(0).max(120),
+  /** Absent in older settings files: show standings after each completed round. */
+  showMatchStandings: z.boolean().default(true),
   bots: z.array(botSlotConfigSchema).max(3),
   quotaCeilings: z
     .object({
@@ -104,6 +106,7 @@ export function createDefaultSettings(): SettingsFile {
     moveEnabled: true,
     region: 'world',
     aiWaitWindowSec: 20,
+    showMatchStandings: true,
     bots: [],
   };
 }

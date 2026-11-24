@@ -14,6 +14,7 @@ function makeBaseRoom(): RoomState {
     roundDurationSec: 90,
     moveEnabled: true,
     aiWaitWindowSec: 30,
+    showMatchStandings: true,
     bots: [],
   };
   const harnesses: HarnessCatalogEntry[] = [
@@ -166,7 +167,7 @@ test('startBlockedReasons blocks quota exceeded and host mapsError in real mode'
   expect(reduce(s, { type: 'start_match', playerId: 'h' }, 301).ack).toBe('invalid');
 });
 
-test('round results and final screen reveal scores and perRound botCards', () => {
+function finishRoundWithBot() {
   let s = makeBaseRoom();
   s = reduce(
     s,
@@ -213,6 +214,11 @@ test('round results and final screen reveal scores and perRound botCards', () =>
     { type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 48.0, lng: 2.0 },
     5000,
   ).state;
+  return { state: s, botId };
+}
+
+test('round results and final screen reveal scores and perRound botCards', () => {
+  const { state: s, botId } = finishRoundWithBot();
   expect(s.phase).toBe('ROUND_RESULTS');
 
   const resView = projectView(s, 'h');
@@ -220,13 +226,50 @@ test('round results and final screen reveal scores and perRound botCards', () =>
   expect(resView.results).toMatchObject({
     completion: { finishedAt: 5000, confirmedIds: ['h', botId] },
   });
-  expect(resView.results?.entries.find((e) => e.isAi)?.roundScore).toBe(5000);
+  expect(resView.results?.entries.find((entry) => entry.isAi)?.roundScore).toBe(5000);
 
-  s = reduce(s, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 6000).state;
-  const finalView = projectView(s, 'h');
+  const finalState = reduce(s, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 6000).state;
+  const finalView = projectView(finalState, 'h');
   expect(finalView.phase).toBe('FINAL');
   expect(finalView.final?.standings[0]?.isAi).toBe(true);
   expect(finalView.final?.standings[0]?.perRound[0]?.botCard?.explanation).toBe('Эйфелева башня');
+});
+
+test('between-round standings follow final tie rules and the host visibility setting', () => {
+  const { state: s, botId } = finishRoundWithBot();
+  const resView = projectView(s, 'h');
+  const botEntry = resView.results?.entries.find((entry) => entry.isAi);
+  const hostEntry = resView.results?.entries.find((entry) => entry.id === 'h');
+  if (!hostEntry || !botEntry) throw new Error('Expected host and bot results');
+  expect(resView.results?.matchStandings).toEqual([
+    {
+      id: botId,
+      name: botEntry.name,
+      rank: 1,
+      totalScore: 5000,
+    },
+    { id: 'h', name: 'Хост', rank: 2, totalScore: hostEntry.roundScore },
+  ]);
+
+  const tied = {
+    ...s,
+    playedRounds: s.playedRounds.map((round) => ({
+      ...round,
+      entriesByParticipant: Object.fromEntries(
+        Object.entries(round.entriesByParticipant).map(([id, entry]) => [
+          id,
+          { ...entry, roundScore: 100, distanceKm: 0 },
+        ]),
+      ),
+    })),
+  };
+  expect(projectView(tied, 'h').results?.matchStandings?.map((entry) => entry.rank)).toEqual([
+    1, 1,
+  ]);
+  expect(
+    projectView({ ...s, settings: { ...s.settings, showMatchStandings: false } }, 'h').results
+      ?.matchStandings,
+  ).toBeUndefined();
 });
 
 // Value: protects=authoritative result completion time and participants; fails_when=scored pins, drafts or failed bots enter confirmation metadata; why_new=score rows do not distinguish confirmations; seam=none; no_claim=client audio playback.
