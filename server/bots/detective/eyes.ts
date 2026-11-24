@@ -41,6 +41,14 @@ function preReportLeft(s: SessionState): number {
   return Math.min(PRE_REPORT_ACTIONS, s.opts.moveLimit) - s.turnsUsed;
 }
 
+/**
+ * The journal step a frame belongs to: the request the eyes received, or the report before the
+ * first one. Not the brain's latest ask: that one may have opened after the eyes' request closed.
+ */
+function eyesTurn(s: SessionState): number {
+  return s.eyesRequest?.turn ?? 0;
+}
+
 function imageBlocks(imgs: readonly RenderedBotImage[], firstN: number): ToolReply['images'] {
   return imgs.map((img, i) => ({
     name: `frame-${firstN + i}.jpg`,
@@ -91,7 +99,7 @@ function afterObserveText(s: SessionState): string {
 export async function handleObserve(s: SessionState): Promise<ToolReply> {
   await s.opts.waitStart(s.abort.signal);
   if (roundOver(s)) return { text: ROUND_OVER_TEXT };
-  const turn = s.asks;
+  const turn = eyesTurn(s);
   try {
     const views = await s.opts.imageService.getObserveViews({
       target: s.opts.target,
@@ -122,6 +130,13 @@ function paidActionProblem(s: SessionState): ToolReply | null {
       `До отчёта можно сделать не больше ${PRE_REPORT_ACTIONS} платных ходов. Ход не списан: сдай отчёт (report), остальные ходы — по просьбам напарника.`,
     );
   }
+  // The brain no longer waits for this request: a frame now would answer nothing and cost a turn
+  // the next request may need.
+  if (s.eyesRequest && s.broker.current()?.id !== s.eyesRequest.id) {
+    return errorReply(
+      'Запрос, над которым ты работал, уже закрыт (ответ принят или время вышло). Ход не списан: вызови next_request.',
+    );
+  }
   return null;
 }
 
@@ -140,7 +155,7 @@ export async function handleLook(s: SessionState, args: unknown): Promise<ToolRe
   const fov = parsed.data.fov ?? 90;
   const pos = s.opts.tracker.getPosition();
   // Read before the camera work: the brain may open the next exchange while the frame renders.
-  const turn = s.asks;
+  const turn = eyesTurn(s);
   try {
     const view = await s.opts.imageService.getLookView({
       panoId: pos.panoId,
@@ -179,7 +194,7 @@ export async function handleMove(s: SessionState, args: unknown): Promise<ToolRe
   const prev = tracker.getPosition();
   const distanceM = parsed.data.distance_m;
   const far = distanceM !== undefined;
-  const turn = s.asks;
+  const turn = eyesTurn(s);
   try {
     const res = await tracker.stepToward(parsed.data.heading, {
       signal: s.abort.signal,
@@ -244,6 +259,8 @@ export async function handleNextRequest(s: SessionState): Promise<ToolReply> {
   if (roundOver(s)) return { text: ROUND_OVER_TEXT };
   if (!request) return { text: 'Запросов пока нет. Вызови next_request снова.' };
   if (!s.movesAtDelivery.has(request.id)) s.movesAtDelivery.set(request.id, s.movesDone);
+  // Only one request is open at a time, and it is the brain's latest ask.
+  if (s.eyesRequest?.id !== request.id) s.eyesRequest = { id: request.id, turn: s.asks };
   return { text: formatRequestForEyes(s, request) };
 }
 

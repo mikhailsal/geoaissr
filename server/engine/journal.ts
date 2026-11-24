@@ -108,7 +108,8 @@ export function finalizeJournal(bot: BotRoundState): BotJournal | undefined {
   const finalized = hasFinalGuess(bot);
   const summary = bot.guess?.summary;
   const lastFinding = finalized ? steps.at(-1)?.finding : undefined;
-  if (steps.length === 0 && !summary) return undefined;
+  // The isolation warning is kept even when the round left nothing else to show.
+  if (steps.length === 0 && !summary && !bot.isolationUnconfirmed) return undefined;
   return {
     steps,
     ...(summary ? { summary } : {}),

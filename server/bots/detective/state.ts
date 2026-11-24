@@ -85,6 +85,8 @@ export interface SessionState {
   movesAtDelivery: Map<string, number>;
   /** Accepted asks so far; the journal step of ask number k has index k. */
   asks: number;
+  /** The request the eyes last received and its journal step; null before the first one. */
+  eyesRequest: { id: string; turn: number } | null;
   controlAsked: boolean;
   /** The report as the brain reads it, once the eyes filed it. */
   report: JournalReportLine[] | null;
@@ -120,6 +122,7 @@ export function createSessionState(opts: SessionOptions): SessionState {
     movesDone: 0,
     movesAtDelivery: new Map(),
     asks: 0,
+    eyesRequest: null,
     controlAsked: false,
     report: null,
     reportWaiters: [],

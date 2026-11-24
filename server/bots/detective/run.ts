@@ -49,11 +49,12 @@ export function roleEffort(slot: BotSlotConfig, role: DetectiveRole): EffortLeve
 }
 
 /**
- * The price of the tokens so far: each role at its own model. Unknown when a role's price is.
- * The matched model ids are listed once each.
+ * The price of the tokens so far: each role at its own model. Unknown when a role's price is,
+ * including a role that has reported no usage yet or had none to report: the price of one process
+ * alone would read as the bot's whole price. The matched model ids are listed once each.
  */
-async function estimateRoles(
-  run: DetectiveRun,
+export async function estimateRoles(
+  run: { ctx: Pick<RunnerCtx, 'estimateCost'>; params: { slot: BotSlotConfig } },
   roleUsage: DetectiveRun['usage'],
 ): Promise<BotCostEstimate | null> {
   const { estimateCost } = run.ctx;
@@ -66,9 +67,9 @@ async function estimateRoles(
     }),
   );
   const ids = [...new Set(parts.flatMap((p) => (p.matchedModelId ? [p.matchedModelId] : [])))];
-  const costs = parts.map((p) => p.costUsd);
+  const costs = parts.flatMap((p) => (p.costUsd === null ? [] : [p.costUsd]));
   return {
-    costUsd: costs.every((c) => c !== null) ? costs.reduce<number>((a, c) => a + c, 0) : null,
+    costUsd: costs.length === DETECTIVE_ROLES.length ? costs.reduce((a, c) => a + c, 0) : null,
     ...(ids.length > 0 ? { matchedModelId: ids.join(' + ') } : {}),
     ...(parts.some((p) => p.isApproximateMatch) ? { isApproximateMatch: true } : {}),
   };

@@ -61,7 +61,9 @@ export function migrateSavedBotSlot(stored: BotSlotConfig): BotSlotConfig {
 
 /** Full model id for a saved alias ("haiku" -> "claude-haiku-5-5"); other names pass through. */
 export function resolveModelAlias(harness: HarnessId, model: string): string {
-  return getHarnessMeta(harness).modelAliases?.[model] ?? model;
+  const aliases = getHarnessMeta(harness).modelAliases;
+  // Own keys only: a saved model named like an object method ("constructor") stays a string.
+  return aliases && Object.hasOwn(aliases, model) ? (aliases[model] ?? model) : model;
 }
 
 export function getHarnessMeta(id: HarnessId): HarnessMetaEntry {

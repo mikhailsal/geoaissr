@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { ASK, REPORT, answerCurrent, briefed, makeSession } from './test-helpers.ts';
+import { ASK, REPORT, answerCurrent, briefed, makeSession, until } from './test-helpers.ts';
 
 const DRIVE_ASK = {
   ...ASK,
@@ -134,4 +134,34 @@ test('a drive is refused when movement is off, when two are asked or when no pai
   const none = await spent.session.call('brain', 'ask', DRIVE_ASK);
   expect(none.text).toContain('не осталось платных ходов');
   for (const t of [off, two, spent]) expect(t.session.state.asks).toBe(0);
+});
+
+// Value: protects=a frame belongs to the request the eyes received, and a request the brain no longer waits for costs no turn; fails_when=a late camera action files its frame under the brain's next ask or spends the turn that ask needs; why_new=frames took the number of the brain's latest ask; seam=an answered request stands in for one that timed out (both leave the broker with the next ask open); no_claim=how long a real CLI takes to drive.
+test('a camera action for a closed request is refused, and frames go to the request the eyes hold', async () => {
+  const { session, log } = await briefed();
+  const first = session.call('brain', 'ask', ASK);
+  const answered = await answerCurrent(session, [
+    { n: 1, value: 'not_visible' },
+    { n: 2, value: 'not_visible' },
+  ]);
+  expect(answered.isError).toBeUndefined();
+  await first;
+  // The brain opens the next exchange before the eyes ask for it.
+  const second = session.call('brain', 'ask', DRIVE_ASK);
+  await until(() => session.state.broker.hasPending());
+  const late = await session.call('eyes', 'move', { heading: 0, distance_m: 600 });
+  expect(late.isError).toBe(true);
+  expect(late.text).toContain('уже закрыт');
+  expect(session.state.turnsUsed).toBe(0);
+  // Once the eyes hold the drive request, its frame is filed under its own step.
+  await session.call('eyes', 'next_request', {});
+  const moved = await session.call('eyes', 'move', { heading: 0, distance_m: 600 });
+  expect(moved.isError).toBeUndefined();
+  expect(log.frames.at(-1)).toMatchObject({ turn: 2, action: 'move' });
+  const ack = await answerCurrent(session, [
+    { n: 1, value: 'синий указатель', confidence: 'sure', frame: 5 },
+    { n: 2, value: 'not_visible' },
+  ]);
+  expect(ack.isError).toBeUndefined();
+  expect((await second).text).toContain('синий указатель');
 });
