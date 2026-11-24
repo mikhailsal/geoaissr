@@ -5,7 +5,7 @@ import path from 'node:path';
 import { defaultAvatar } from '../../shared/avatar.ts';
 import { formatProfileToken } from '../../shared/profile-token.ts';
 import type { ServerMessage } from '../../shared/protocol.ts';
-import type { StoredProfile } from '../../shared/storage-schemas.ts';
+import { createDefaultSettings, type StoredProfile } from '../../shared/storage-schemas.ts';
 import { createRoomShell } from '../engine/shell.ts';
 import { createInitialRoomState } from '../engine/types.ts';
 import { createThumbStore } from '../http/thumbs.ts';
@@ -29,13 +29,10 @@ function fixture(dir: string, suffix = '') {
     matchId: 'profile-test',
     fakeMode: true,
     settings: {
-      version: 1,
-      region: 'world',
+      ...createDefaultSettings(),
       rounds: 1,
       roundDurationSec: 60,
-      moveEnabled: true,
       aiWaitWindowSec: 0,
-      bots: [],
     },
     quotaSummary: buildQuotaSummaryForRoom(quota, { rounds: 1 }),
     tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },

@@ -89,6 +89,7 @@ function buildSecInitialState(fakeMode: boolean) {
       roundDurationSec: 60,
       moveEnabled: true,
       aiWaitWindowSec: 30,
+      showMatchStandings: true,
       bots: [],
     },
     quotaSummary: {
@@ -332,6 +333,7 @@ test('spectators are excluded from final rankings and pre-join state is masked',
       roundDurationSec: 60,
       moveEnabled: false,
       aiWaitWindowSec: 30,
+      showMatchStandings: true,
       bots: [],
     },
     quotaSummary: {
@@ -591,6 +593,7 @@ test('RoomShell confirm_quota_reset keeps the gate closed when persisting fails'
         roundDurationSec: 60,
         moveEnabled: true,
         aiWaitWindowSec: 30,
+        showMatchStandings: true,
         bots: [],
       },
       quotaSummary: baseSummary,

@@ -118,6 +118,7 @@ test('migration function transforms v0 schema to v1', () => {
       migrations: {},
     });
     expect(resOk.status).toBe('ok');
+    expect(resOk.value.showMatchStandings).toBe(true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -121,6 +121,14 @@ function forViewer<T extends { diagnosticsTail?: string }>(entry: T, viewerIsHos
 function projectResults(state: RoomState, viewerIsHost: boolean): ClientViewState['results'] {
   const res = state.results;
   if (state.phase !== 'ROUND_RESULTS' || !res) return undefined;
+  const matchStandings = state.settings.showMatchStandings
+    ? computeFinalRankings(state).map(({ rank, item }) => ({
+        id: item.id,
+        name: item.name,
+        rank,
+        totalScore: item.totalScore,
+      }))
+    : undefined;
   return {
     completion: res.completion,
     targetLat: res.target.lat,
@@ -132,6 +140,7 @@ function projectResults(state: RoomState, viewerIsHost: boolean): ClientViewStat
         ? (state.wins6h.byBotId[entry.id] ?? 0)
         : (state.wins6h.byProfileId[state.players[entry.id]?.profileId ?? ''] ?? 0),
     })),
+    ...(matchStandings ? { matchStandings } : {}),
     humanVsAi: res.humanVsAi,
   };
 }
@@ -201,6 +210,7 @@ export function projectView(state: RoomState, viewerId: string): ClientViewState
     moveEnabled: state.settings.moveEnabled,
     region: state.settings.region,
     aiWaitWindowSec: state.settings.aiWaitWindowSec,
+    showMatchStandings: state.settings.showMatchStandings,
     startBlockedReasons: computeStartBlockedReasons(state),
     settingsNotice: state.settingsNotice,
     quotaWarning: state.quotaWarning,

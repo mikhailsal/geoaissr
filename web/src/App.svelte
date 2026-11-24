@@ -2,8 +2,11 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import type { DifficultyPreset } from '$shared/bot-tools';
   import type { ParticipantColorId } from '$shared/colors';
-  import { COUNTDOWN_MS, type RoundResultEntryView } from '$shared/protocol';
-  import type { RegionId } from '$shared/storage-schemas';
+  import {
+    COUNTDOWN_MS,
+    type LobbySettingsPatch,
+    type RoundResultEntryView,
+  } from '$shared/protocol';
   import ProfileModal from './components/ProfileModal.svelte';
   import ProfileEditor from './components/ProfileEditor.svelte';
   import StatusBanner from './components/StatusBanner.svelte';
@@ -68,13 +71,7 @@
   const handleJoin = (nick: string, color: ParticipantColorId): void => {
     store.join(nick, color);
   };
-  const handleUpdateLobby = (patch: {
-    rounds?: number;
-    roundDurationSec?: number;
-    moveEnabled?: boolean;
-    region?: RegionId;
-    aiWaitWindowSec?: number;
-  }): void => {
+  const handleUpdateLobby = (patch: LobbySettingsPatch): void => {
     if (patch.roundDurationSec !== undefined && patch.roundDurationSec !== view?.roundDurationSec) {
       audioPlayer.cue('tick');
     }

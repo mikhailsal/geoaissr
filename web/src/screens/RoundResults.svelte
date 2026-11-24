@@ -4,6 +4,8 @@
   import Avatar from '../components/Avatar.svelte';
   import BotCard from '../components/BotCard.svelte';
   import HostMenu from '../components/HostMenu.svelte';
+  import ResultsTabs from '../components/ResultsTabs.svelte';
+  import MatchStandings from '../components/MatchStandings.svelte';
   import ResultsMap from '../components/ResultsMap.svelte';
   import { formatDistanceRu, formatNumberRu } from '../i18n/format';
   import { attachGlobalKeys, prefersReducedMotion } from '../lib/keys';
@@ -36,6 +38,7 @@
   }: Props = $props();
 
   let selectedId = $state<string | null>(null);
+  let activeTab = $state<'round' | 'standings'>('round');
   let revealCount = $state(0);
   let lastTriggerBtn = $state<HTMLButtonElement | null>(null);
 
@@ -44,11 +47,13 @@
   const myEntry = $derived(res?.entries.find((e) => e.id === view.viewerId));
   const anyoneAnswered = $derived(res?.entries.some((e) => e.lat !== null) ?? false);
   const isFinalRound = $derived(view.roundNumber >= view.totalRounds);
+  const matchStandings = $derived(res?.matchStandings ?? []);
 
   $effect(() => {
     if (!roundKey) return;
     const count = untrack(() => res?.entries.length ?? 0);
     selectedId = null;
+    activeTab = 'round';
     if (count === 0 || prefersReducedMotion()) {
       revealCount = count;
       return;
@@ -70,6 +75,11 @@
     onCloseBotCard();
     lastTriggerBtn?.focus();
     lastTriggerBtn = null;
+  }
+
+  function selectTab(tab: typeof activeTab): void {
+    activeTab = tab;
+    if (tab === 'standings') onCloseBotCard();
   }
 
   $effect(() => {
@@ -113,6 +123,7 @@
         revealNowCount={revealCount}
         onSelectEntry={(entry: RoundResultEntryView) => {
           selectedId = entry.id;
+          activeTab = 'round';
           if (entry.isAi) onSelectBotCard(view.roundNumber, entry);
         }}
         {onMapLoaded}
@@ -120,7 +131,7 @@
       />
     </section>
 
-    <section class="panel table-pane" aria-label="Таблица раунда">
+    <section class="panel table-pane" aria-label="Результаты раунда">
       <header class="summary-head">
         <div>
           <h1 class="display-title round-title">
@@ -146,95 +157,117 @@
         {/if}
       </header>
 
-      {#if !anyoneAnswered}
-        <p class="muted" role="status">{RU.results.noAnswersAtAll}</p>
+      {#if matchStandings.length}
+        <ResultsTabs {activeTab} {selectTab} />
       {/if}
 
-      <div class="table-scroll">
-        <table class="results-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Участник</th>
-              <th>Дистанция</th>
-              <th class="num-col">Очки</th>
-              <th class="act-col"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each res.entries as entry (entry.id)}
-              {@const cardOpen = activeBotCard?.entry.id === entry.id}
-              {#snippet whyButton()}
-                <button
-                  type="button"
-                  class="btn why-btn"
-                  aria-expanded={cardOpen}
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    selectedId = entry.id;
-                    if (cardOpen) {
-                      closeAndRestoreFocus();
-                    } else {
-                      lastTriggerBtn = e.currentTarget;
-                      onSelectBotCard(view.roundNumber, entry);
-                    }
-                  }}
-                >
-                  {cardOpen ? RU.results.hideWhyBtn : RU.results.whyBtn}
-                </button>
-              {/snippet}
-              <tr
-                class:selected-row={selectedId === entry.id}
-                onclick={() => (selectedId = entry.id)}
-              >
-                <td class="rank-cell">{entry.rank}</td>
-                <td>
-                  <div class="player-cell">
-                    <Avatar
-                      wins6h={entry.wins6h}
-                      name={entry.name}
-                      colorId={entry.color}
-                      isAi={entry.isAi}
-                      size="sm"
-                    />
-                    <span class="p-name">{entry.name}</span>
-                  </div>
-                  <!-- On a narrow table the trigger moves under the name so it is never off screen. -->
-                  {#if entry.isAi}<div class="why-inline">{@render whyButton()}</div>{/if}
-                </td>
-                <td>
-                  {#if entry.distanceKm !== null}
-                    {formatDistanceRu(entry.distanceKm)}
-                  {:else}
-                    <span class="muted"
-                      >{entry.isAi ? RU.results.noBotGuess : RU.results.noHumanAnswer}</span
-                    >
-                    {#if entry.isAi && entry.terminationReason && entry.terminationReason !== 'normal'}
-                      <span class="muted">· {entry.terminationReason}</span>
-                    {/if}
-                  {/if}
-                </td>
-                <td class="num-col"><strong>{formatNumberRu(entry.roundScore)}</strong></td>
-                <td class="act-col">
-                  {#if entry.isAi}{@render whyButton()}{/if}
-                </td>
-              </tr>
+      {#if activeTab === 'round'}
+        <div
+          id="round-results-panel"
+          role={matchStandings.length ? 'tabpanel' : 'region'}
+          aria-labelledby={matchStandings.length ? 'round-results-tab' : undefined}
+          aria-label={matchStandings.length ? undefined : 'Результаты раунда'}
+          class="tab-panel"
+        >
+          {#if !anyoneAnswered}
+            <p class="muted" role="status">{RU.results.noAnswersAtAll}</p>
+          {/if}
 
-              {#if cardOpen && activeBotCard}
-                <tr class="bot-card-row">
-                  <td colspan={5}>
-                    <BotCard
-                      {entry}
-                      roundNumber={view.roundNumber}
-                      onClose={closeAndRestoreFocus}
-                    />
-                  </td>
+          <div class="table-scroll">
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th aria-label="Место в раунде">#</th>
+                  <th>Участник</th>
+                  <th>Дистанция</th>
+                  <th class="num-col">За раунд</th>
+                  <th class="act-col"></th>
                 </tr>
-              {/if}
-            {/each}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {#each res.entries as entry (entry.id)}
+                  {@const cardOpen = activeBotCard?.entry.id === entry.id}
+                  {#snippet whyButton()}
+                    <button
+                      type="button"
+                      class="btn why-btn"
+                      aria-expanded={cardOpen}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        selectedId = entry.id;
+                        if (cardOpen) {
+                          closeAndRestoreFocus();
+                        } else {
+                          lastTriggerBtn = e.currentTarget;
+                          onSelectBotCard(view.roundNumber, entry);
+                        }
+                      }}
+                    >
+                      {cardOpen ? RU.results.hideWhyBtn : RU.results.whyBtn}
+                    </button>
+                  {/snippet}
+                  <tr
+                    class:selected-row={selectedId === entry.id}
+                    onclick={() => (selectedId = entry.id)}
+                  >
+                    <td class="rank-cell">{entry.rank}</td>
+                    <td>
+                      <div class="player-cell">
+                        <Avatar
+                          wins6h={entry.wins6h}
+                          name={entry.name}
+                          colorId={entry.color}
+                          isAi={entry.isAi}
+                          size="sm"
+                        />
+                        <span class="p-name">{entry.name}</span>
+                      </div>
+                      {#if entry.isAi}<div class="why-inline">{@render whyButton()}</div>{/if}
+                    </td>
+                    <td>
+                      {#if entry.distanceKm !== null}
+                        {formatDistanceRu(entry.distanceKm)}
+                      {:else}
+                        <span class="muted"
+                          >{entry.isAi ? RU.results.noBotGuess : RU.results.noHumanAnswer}</span
+                        >
+                        {#if entry.isAi && entry.terminationReason && entry.terminationReason !== 'normal'}
+                          <span class="muted">· {entry.terminationReason}</span>
+                        {/if}
+                      {/if}
+                    </td>
+                    <td class="num-col">{formatNumberRu(entry.roundScore)}</td>
+                    <td class="act-col">
+                      {#if entry.isAi}{@render whyButton()}{/if}
+                    </td>
+                  </tr>
+
+                  {#if cardOpen && activeBotCard}
+                    <tr class="bot-card-row">
+                      <td colspan={5}>
+                        <BotCard
+                          {entry}
+                          roundNumber={view.roundNumber}
+                          onClose={closeAndRestoreFocus}
+                        />
+                      </td>
+                    </tr>
+                  {/if}
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {:else}
+        <div
+          id="match-standings-panel"
+          role="tabpanel"
+          aria-labelledby="match-standings-tab"
+          class="tab-panel"
+        >
+          <MatchStandings standings={matchStandings} />
+        </div>
+      {/if}
 
       <footer class="next-footer">
         {#if !view.viewerIsHost}
@@ -288,12 +321,6 @@
     pointer-events: auto;
   }
 
-  .country-pill {
-    padding: 0.55rem 0.9rem;
-    font-weight: 700;
-    background-color: var(--asphalt-900);
-  }
-
   .table-pane {
     min-width: 0;
     border-radius: 0;
@@ -305,6 +332,12 @@
     flex-direction: column;
     gap: var(--sp-3);
     min-height: 0;
+  }
+
+  .country-pill {
+    padding: 0.55rem 0.9rem;
+    font-weight: 700;
+    background-color: var(--asphalt-900);
   }
 
   .summary-head {
@@ -320,11 +353,8 @@
     color: var(--paint);
   }
 
-  .personal-line,
-  .muted {
-    margin: 0.25rem 0 0;
-    color: var(--paper-dim);
-    font-size: 0.9rem;
+  .p-name {
+    overflow-wrap: anywhere;
   }
 
   .hva-box {
@@ -346,11 +376,25 @@
     font-family: var(--font-display);
   }
 
+  .personal-line,
+  .muted {
+    margin: 0.25rem 0 0;
+    color: var(--paper-dim);
+    font-size: 0.9rem;
+  }
+
   .table-scroll {
     container-type: inline-size;
     flex: 1;
     overflow: auto;
     min-height: 0;
+  }
+
+  .tab-panel {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
   }
 
   .results-table {
@@ -428,13 +472,9 @@
   }
 
   @media (max-width: 899px) {
-    .map-top-bar {
-      flex-wrap: wrap;
-    }
-
     .results-layout {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: 42dvh 1fr;
+      grid-template-rows: 42dvh auto;
       height: auto;
       min-height: 100dvh;
       overflow: visible;
