@@ -38,6 +38,14 @@ export const visionCheckRecordSchema = z.object({
 
 export type VisionCheckRecord = z.infer<typeof visionCheckRecordSchema>;
 
+export const botModelSchema = z.string().trim().min(1).max(120);
+
+/** The CLI and the model of one process, for the eyes of a Detective that differ from the brain. */
+export const roleModelSchema = z.object({
+  harness: z.enum(HARNESS_IDS),
+  model: botModelSchema,
+});
+
 /** Bot ids become directory names under the run dir, so only path-safe characters are allowed. */
 export const botSlotIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
@@ -48,13 +56,15 @@ export const botSlotConfigSchema = z.object({
   color: z.enum(PARTICIPANT_COLOR_IDS),
   enabled: z.boolean(),
   harness: z.enum(HARNESS_IDS),
-  model: z.string().trim().min(1).max(120),
+  model: botModelSchema,
   effort: z.enum(EFFORT_LEVELS),
   moveLimit: z.number().int().min(0).max(20),
   imageSize: z.union([z.literal(256), z.literal(400), z.literal(640)]),
   budgetSec: z.number().int().min(60).max(600),
   /** Absent in settings saved before the Detective style existed: those bots play Intuit. */
   playStyle: z.enum(PLAY_STYLES).optional(),
+  /** Detective only: where the eyes run. Absent means on the brain's harness and model. */
+  eyes: roleModelSchema.optional(),
   difficultyPreset: z.enum(DIFFICULTY_PRESETS),
   personalityPreset: z.enum(PERSONALITY_PRESETS),
   personalityText: personalityTextSchema,

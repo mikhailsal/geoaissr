@@ -24,6 +24,8 @@ export interface BotAccounting {
   tokenUsage?: BotTokenUsage;
   /** Detective only: the usage of each process; `tokenUsage` is their sum. */
   roleUsage?: { brain?: BotTokenUsage; eyes?: BotTokenUsage };
+  /** Detective only: the model each process ran on. */
+  roleModels?: { brain: string; eyes: string };
   costUsd?: number | null;
   matchedModelId?: string;
   isApproximateMatch?: boolean;

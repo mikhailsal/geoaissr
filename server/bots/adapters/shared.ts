@@ -2,8 +2,12 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { HarnessCatalogEntry } from '../../../shared/protocol.ts';
-import { botNameFromModel, isAutoBotName } from '../../../shared/bot-tools.ts';
-import type { DetectiveRole } from '../../../shared/detective-tools.ts';
+import {
+  botNameFromModel,
+  getBotToolDefinitions,
+  isAutoBotName,
+} from '../../../shared/bot-tools.ts';
+import { getDetectiveToolNames, type DetectiveRole } from '../../../shared/detective-tools.ts';
 import type { BotSlotConfig, HarnessId } from '../../../shared/storage-schemas.ts';
 import harnessesMeta from './harnesses.json' with { type: 'json' };
 import type { CommandProbe, HarnessAdapter } from './types.ts';
@@ -34,12 +38,24 @@ export function withDefaultFirst(models: readonly string[], defaultModel: string
  */
 export function migrateSavedBotSlot(stored: BotSlotConfig): BotSlotConfig {
   const model = resolveModelAlias(stored.harness, stored.model);
+  const eyes = stored.eyes && {
+    ...stored.eyes,
+    model: resolveModelAlias(stored.eyes.harness, stored.eyes.model),
+  };
   const check = stored.lastVisionCheck;
+  // The check of a Detective tested its eyes, so it may name the eyes' model.
+  const checkModel =
+    check?.model === stored.model
+      ? model
+      : check?.model === stored.eyes?.model
+        ? eyes?.model
+        : null;
   return {
     ...stored,
     model,
+    ...(eyes ? { eyes } : {}),
     name: isAutoBotName(stored.name, stored.model) ? botNameFromModel(model) : stored.name,
-    lastVisionCheck: check?.model === stored.model ? { ...check, model } : check,
+    lastVisionCheck: check && checkModel ? { ...check, model: checkModel } : check,
   };
 }
 
@@ -89,6 +105,20 @@ export function resolveBunBinary(override?: string): string {
   if (override) return override;
   if (process.execPath) return process.execPath;
   return Bun.which('bun') ?? 'bun';
+}
+
+/**
+ * The longest a CLI waits for one call of the game's tools. `ask`, `briefing` and `next_request`
+ * of a Detective block for up to 45 s, so the client must not give up well before that.
+ */
+export const MCP_TOOL_TIMEOUT_SEC = 120;
+
+/**
+ * Every tool name the bridge may list for a launch: the tools of a Detective role, or of a camera
+ * bot. Movement is included either way; a tool the bridge does not list is never called.
+ */
+export function geoToolNames(role: DetectiveRole | undefined): string[] {
+  return role ? getDetectiveToolNames(role) : getBotToolDefinitions().map((t) => t.name);
 }
 
 export function buildSharedMcpEnv(opts: {

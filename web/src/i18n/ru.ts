@@ -149,8 +149,15 @@ export const RU = {
     minBudgetHint: (minSec: number) => `Детективу нужно не меньше ${minSec} с`,
     fallbackBudget: (roundSec: number, minSec: number) =>
       `Раунд длится ${roundSec} с, а Детективу нужно не меньше ${minSec} с: в этой партии бот сыграет как Интуит`,
-    fallbackHarness: (supported: string, harness: string) =>
-      `Детектив пока работает только с ${supported}: с харнессом ${harness} бот сыграет как Интуит`,
+    eyesLegend: 'Глаза детектива',
+    eyesHarness: 'CLI-харнесс глаз',
+    eyesModel: 'Модель глаз',
+    eyesSameAsBrain: (harness: string, model: string) => `как у мозга (${harness} · ${model})`,
+    eyesHint: 'Глаза смотрят кадры с низкими усилиями (effort low); мозг — с усилиями слота',
+    brainHarness: 'CLI-харнесс мозга',
+    brainModel: 'Модель мозга',
+    isolationUnconfirmed:
+      'Изоляция зрения не подтверждена: защита agy не оставила записей, и мозг мог открыть кадры глаз',
   },
   results: {
     correctCountry: (country: string) => `Правильный ответ: ${country}`,

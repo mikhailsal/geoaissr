@@ -13,11 +13,53 @@ import { resolveAppPaths } from '../server/paths.ts';
 import { spawnManaged } from '../server/proc/spawn.ts';
 import { saveHarnessVerifiedEntry } from '../server/storage/harness-verified.ts';
 import { createQuotaManager } from '../server/storage/quota.ts';
+import { verifyDetective } from './test-harness-detective.ts';
 
-function parseArgs(argv: readonly string[]): { only?: HarnessId } {
-  const idx = argv.indexOf('--only');
-  const only = idx >= 0 ? (argv[idx + 1] as HarnessId | undefined) : undefined;
-  return { only };
+interface HarnessArgs {
+  only?: HarnessId;
+  /** `--detective`: one Detective round instead of the Intuit checks. */
+  detective: boolean;
+  /** `--eyes <harness>`: where the Detective's eyes run; the brain runs on `--only`. */
+  eyes?: HarnessId;
+}
+
+function flagValue(argv: readonly string[], flag: string): HarnessId | undefined {
+  const idx = argv.indexOf(flag);
+  return idx >= 0 ? (argv[idx + 1] as HarnessId | undefined) : undefined;
+}
+
+function parseArgs(argv: readonly string[]): HarnessArgs {
+  const only = flagValue(argv, '--only');
+  const eyes = flagValue(argv, '--eyes');
+  return {
+    ...(only ? { only } : {}),
+    ...(eyes ? { eyes } : {}),
+    detective: argv.includes('--detective'),
+  };
+}
+
+/** `--detective`: one live Detective round per available harness, or the one pair asked for. */
+async function runDetectiveChecks(
+  args: HarnessArgs,
+  catalog: readonly { id: HarnessId; available: boolean }[],
+  root: string,
+): Promise<boolean> {
+  const ready = new Set(catalog.filter((h) => h.available).map((h) => h.id));
+  const brains = args.only ? [args.only] : [...ready];
+  let allOk = true;
+  for (const brain of brains) {
+    const eyes = args.eyes ?? brain;
+    if (!ready.has(brain) || !ready.has(eyes)) {
+      console.error(
+        `[detective ${brain}+${eyes}] харнесс недоступен (проверьте \`bun run doctor\`)`,
+      );
+      allOk = false;
+      continue;
+    }
+    const ok = await verifyDetective({ brain: { harness: brain }, eyes: { harness: eyes } }, root);
+    if (!ok) allOk = false;
+  }
+  return allOk;
 }
 
 async function runIsolationCanaryCheck(id: HarnessId, root: string): Promise<boolean> {
@@ -138,10 +180,12 @@ async function verifyOneHarness(
 }
 
 async function main(): Promise<void> {
-  const { only } = parseArgs(Bun.argv.slice(2));
+  const args = parseArgs(Bun.argv.slice(2));
+  const { only } = args;
   const root = mkdtempSync(path.join(tmpdir(), 'geo-test-harness-'));
   try {
     const catalog = detectAllHarnesses();
+    if (args.detective) process.exit((await runDetectiveChecks(args, catalog, root)) ? 0 : 3);
     const versions = resolveInstalledCliVersions(catalog);
     const targets = catalog.filter((h) => h.available && (!only || h.id === only));
     if (targets.length === 0) {

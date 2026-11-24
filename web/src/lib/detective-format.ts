@@ -1,5 +1,8 @@
 import type { BotJournal, JournalReportLine, JournalRequest } from '$shared/bot-journal';
+import type { BotAccounting } from '$shared/bot-results';
 import { REPORT_SECTIONS } from '../../../shared/detective-report';
+import { formatNumberRu } from '../i18n/format';
+import { RU } from '../i18n/ru';
 
 /** Texts of the Detective play style on the result card: the report and the brain–eyes exchange. */
 
@@ -81,4 +84,22 @@ export function reportGroups(lines: readonly JournalReportLine[]): ReportGroup[]
     title: ru,
     lines: lines.filter((line) => line.section === id),
   })).filter((group) => group.lines.length > 0);
+}
+
+/**
+ * «Мозг: 3 140 · Глаза: 4 580»: the tokens of each process of a Detective. The models are named
+ * only when the two processes ran on different ones. Null for a bot that played Intuit.
+ */
+export function roleTokensLine(
+  accounting: Pick<BotAccounting, 'roleUsage' | 'roleModels'>,
+): string | null {
+  const { roleUsage, roleModels } = accounting;
+  if (!roleUsage) return null;
+  const named = roleModels && roleModels.brain !== roleModels.eyes ? roleModels : undefined;
+  const part = (role: 'brain' | 'eyes', label: string): string => {
+    const usage = roleUsage[role];
+    const model = named ? ` (${named[role]})` : '';
+    return `${label}${model}: ${usage ? formatNumberRu(usage.totalTokens) : 'н/д'}`;
+  };
+  return `${part('brain', RU.playStyle.brain)} · ${part('eyes', RU.playStyle.eyes)}`;
 }

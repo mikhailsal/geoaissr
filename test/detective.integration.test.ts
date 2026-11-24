@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, test } from 'bun:test';
 import type { JournalStep } from '../shared/bot-journal.ts';
+import type { BotCostEstimate, BotTokenUsage } from '../shared/bot-results.ts';
 import type { BotSlotConfig } from '../shared/storage-schemas.ts';
 import { createBotImageService } from '../server/images/bot-image-service.ts';
 import { createBotRunner, type CustomBotLaunchBuilder } from '../server/bots/runner.ts';
@@ -79,7 +80,13 @@ interface Round {
 
 /** Starts one Detective bot for one round and hands the round to `play`. */
 async function withDetective(
-  opts: { fakeMode: boolean; moveEnabled?: boolean; launch?: CustomBotLaunchBuilder },
+  opts: {
+    fakeMode: boolean;
+    moveEnabled?: boolean;
+    launch?: CustomBotLaunchBuilder;
+    slot?: Partial<BotSlotConfig>;
+    estimateCost?: (model: string, usage: BotTokenUsage) => Promise<BotCostEstimate>;
+  },
   play: (round: Round) => Promise<void>,
 ): Promise<void> {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-detective-int-'));
@@ -101,6 +108,7 @@ async function withDetective(
     imageService: images,
     locationService: loc,
     dispatch: (e) => events.push(e),
+    ...(opts.estimateCost ? { estimateCost: opts.estimateCost } : {}),
     ...(launch
       ? {
           buildCustomLaunchSpec: (params) => {
@@ -119,7 +127,7 @@ async function withDetective(
       roundNumber: 1,
       target,
       moveEnabled: opts.moveEnabled ?? true,
-      bots: [SLOT],
+      bots: [{ ...SLOT, ...opts.slot }],
     });
     runner.releaseObserve('m-d', 1, 1);
     await play({ dir, events, tokens, apiUrl: () => runner.getApiBaseUrl() });
@@ -248,23 +256,34 @@ test('the bridge hides the drive from both roles when movement is off', async ()
   });
 });
 
-/** A stand-in for a CLI: it calls the tool API as its role would and prints usage like claude. */
-function scriptedCli(body: string, usage: { input: number; output: number }): string {
+/** The last line a CLI prints: its token usage, in the format of claude or of codex. */
+function usageLine(usage: { input: number; output: number; codex?: boolean }): string {
+  const counters = { input_tokens: usage.input, output_tokens: usage.output };
+  return JSON.stringify(
+    usage.codex
+      ? { type: 'turn.completed', usage: { ...counters, cached_input_tokens: 0 } }
+      : { type: 'result', usage: counters },
+  );
+}
+
+/** A stand-in for a CLI: it calls the tool API as its role would and prints its usage. */
+function scriptedCli(
+  body: string,
+  usage: { input: number; output: number; codex?: boolean },
+): string {
   return [
     'const [url, token] = process.argv.slice(1);',
     "const call = async (tool, args = {}) => (await fetch(url + '/tool/' + tool, { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(args) })).json();",
     body,
-    `process.stdout.write(JSON.stringify({ type: 'result', usage: { input_tokens: ${usage.input}, output_tokens: ${usage.output} } }));`,
+    `process.stdout.write(${JSON.stringify(usageLine(usage))});`,
   ].join('\n');
 }
 
 const GUESS = `{ lat: 48.1, lng: 11.5, summary: 'Я прочитал отчёт.', finding: 'Вывеска решила.', confidence: 'region', clue: 'Вывеска.' }`;
-const EYES_CLI = scriptedCli(
-  `await call('observe');
+const EYES_BODY = `await call('observe');
    await call('report', ${JSON.stringify(REPORT)});
-   for (;;) { const r = await call('next_request'); if (r.text.includes('Раунд окончен')) break; }`,
-  { input: 400, output: 40 },
-);
+   for (;;) { const r = await call('next_request'); if (r.text.includes('Раунд окончен')) break; }`;
+const EYES_CLI = scriptedCli(EYES_BODY, { input: 400, output: 40 });
 /** The brain reads the report and guesses twice: the first call gets the control reminder. */
 const BRAIN_CLI = scriptedCli(
   `for (;;) { const r = await call('briefing'); if (!r.text.includes('ещё не готов')) break; }
@@ -295,6 +314,7 @@ test('two processes play a round; the bot finishes after both, with the tokens o
         brain: { inputTokens: 250, outputTokens: 60, cachedInputTokens: 0, totalTokens: 310 },
         eyes: { inputTokens: 400, outputTokens: 40, cachedInputTokens: 0, totalTokens: 440 },
       },
+      roleModels: { brain: 'claude-haiku-5-5', eyes: 'claude-haiku-5-5' },
       costUsd: null,
     });
     const final = events.filter((e) => e.type === 'bot_guess_recorded').at(-1);
@@ -348,4 +368,63 @@ test('a role whose CLI cannot start fails the launch once and stops the other ro
     await Bun.sleep(700);
     expect(events.filter((e) => e.type === 'bot_finished')).toHaveLength(1);
   });
+});
+
+test('the eyes run on another harness and model; each role is read and priced as its own', async () => {
+  const launched: Record<string, string> = {};
+  const launch: CustomBotLaunchBuilder = (params) => {
+    launched[params.role ?? 'brain'] = `${params.slot.harness} · ${params.slot.model}`;
+    const eyes = scriptedCli(EYES_BODY, { input: 400, output: 40, codex: true });
+    return cliLaunch({ brain: BRAIN_CLI, eyes })(params);
+  };
+  const PRICE_PER_TOKEN: Record<string, number> = { 'claude-haiku-5-5': 0.01, 'gpt-6-luna': 0.001 };
+  const estimateCost = (model: string, usage: BotTokenUsage): Promise<BotCostEstimate> =>
+    Promise.resolve({
+      costUsd: usage.totalTokens * (PRICE_PER_TOKEN[model] ?? 0),
+      matchedModelId: model,
+    });
+  const slot = { eyes: { harness: 'codex', model: 'gpt-6-luna' } } as const;
+  await withDetective({ fakeMode: false, launch, slot, estimateCost }, async ({ events }) => {
+    await waitFinished(events);
+    expect(launched).toEqual({ brain: 'claude · claude-haiku-5-5', eyes: 'codex · gpt-6-luna' });
+    // The codex usage line of the eyes is read by the codex parser, not lost. The price of the
+    // pair arrives in its own accounting event once both estimates are in.
+    const priced = (): Extract<EngineEvent, { type: 'bot_accounting' }> | undefined =>
+      events.findLast(
+        (e): e is Extract<EngineEvent, { type: 'bot_accounting' }> =>
+          e.type === 'bot_accounting' && e.accounting.matchedModelId?.includes('+') === true,
+      );
+    const deadline = Date.now() + 5_000;
+    while (!priced() && Date.now() < deadline) await Bun.sleep(10);
+    const last = priced()?.accounting;
+    expect(last?.roleUsage?.eyes?.totalTokens).toBe(440);
+    expect(last?.roleModels).toEqual({ brain: 'claude-haiku-5-5', eyes: 'gpt-6-luna' });
+    expect(last?.costUsd).toBeCloseTo(310 * 0.01 + 440 * 0.001, 6);
+    expect(last?.matchedModelId).toBe('claude-haiku-5-5 + gpt-6-luna');
+  });
+});
+
+// Value: protects=the warning that an agy brain ran without its file guard; fails_when=a brain on agy with an empty guard audit plays a round that looks isolated, or a guarded brain is flagged; why_new=the brain could only run on claude before; seam=the audit file stands in for agy's PreToolUse hook; no_claim=that agy runs the hook.
+test('an agy brain whose guard left no record is flagged; one with a record is not', async () => {
+  const AUDIT = `require('node:fs').mkdirSync('.agents/plugins/geo', { recursive: true });
+     require('node:fs').writeFileSync('.agents/plugins/geo/tool-audit.jsonl', '{"tool":"mcp_geo_geo_briefing"}\n');`;
+  const brain = (guarded: boolean): string =>
+    scriptedCli(
+      `${guarded ? AUDIT : ''}
+       for (;;) { const r = await call('briefing'); if (!r.text.includes('ещё не готов')) break; }
+       await call('final_guess', ${GUESS});
+       await call('final_guess', ${GUESS});`,
+      { input: 250, output: 60 },
+    );
+  for (const guarded of [false, true]) {
+    const launch = cliLaunch({ brain: brain(guarded), eyes: EYES_CLI });
+    await withDetective(
+      { fakeMode: false, launch, slot: { harness: 'agy' } },
+      async ({ events }) => {
+        await waitFinished(events);
+        const flagged = events.filter((e) => e.type === 'bot_isolation_unconfirmed');
+        expect(flagged).toHaveLength(guarded ? 0 : 1);
+      },
+    );
+  }
 });

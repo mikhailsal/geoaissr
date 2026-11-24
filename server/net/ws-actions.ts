@@ -7,6 +7,8 @@ import {
   type ClientMessage,
   type ServerMessage,
 } from '../../shared/protocol.ts';
+import { visionSubject } from '../../shared/play-style.ts';
+import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
 import type { BotRunner } from '../bots/runner.ts';
 import type { RoomShell } from '../engine/shell.ts';
 import { buildQuotaSummaryForRoom, type QuotaManager } from '../storage/quota.ts';
@@ -114,6 +116,18 @@ export interface VisionCheckActionDeps {
   onVisionResult?: (msg: Extract<ServerMessage, { type: 'vision_check_result' }>) => void;
 }
 
+/** The check tested one process (the eyes of a Detective): it counts while that one is unchanged. */
+function sameVisionSubject(tested: BotSlotConfig, live: BotSlotConfig): boolean {
+  const a = visionSubject(tested);
+  const b = visionSubject(live);
+  return (
+    a.harness === b.harness &&
+    a.model === b.model &&
+    a.effort === b.effort &&
+    tested.imageSize === live.imageSize
+  );
+}
+
 /** Validate host authority, deduplicate in-flight checks per slot, and launch async vision check. */
 export function handleVisionCheckMsg(deps: VisionCheckActionDeps): void {
   const { shell, botRunner, inflightVisionChecks, playerId, msg, sendAck, onVisionResult } = deps;
@@ -150,14 +164,8 @@ export function handleVisionCheckMsg(deps: VisionCheckActionDeps): void {
     }
     const cur = shell.getState();
     const live = cur.settings.bots.find((b) => b.id === snap.id);
-    if (
-      cur.phase !== 'LOBBY' ||
-      !live ||
-      live.harness !== snap.harness ||
-      live.model !== snap.model ||
-      live.effort !== snap.effort ||
-      live.imageSize !== snap.imageSize
-    ) {
+    const tested = visionSubject(snap);
+    if (cur.phase !== 'LOBBY' || !live || !sameVisionSubject(snap, live)) {
       onVisionResult?.({
         type: 'vision_check_result',
         serverNow: Date.now(),
@@ -174,8 +182,8 @@ export function handleVisionCheckMsg(deps: VisionCheckActionDeps): void {
       check: {
         passed: outcome.passed,
         elapsedMs: outcome.elapsedMs,
-        model: snap.model,
-        effort: snap.effort,
+        model: tested.model,
+        effort: tested.effort,
         imageSize: snap.imageSize,
         error: outcome.passed ? undefined : outcome.message,
         checkedAt: new Date().toISOString(),

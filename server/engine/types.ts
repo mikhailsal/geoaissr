@@ -78,6 +78,8 @@ export interface BotRoundState extends BotAccounting {
   guessFinalized?: boolean;
   /** The style this bot really plays in this round, after the fallback rules. */
   playStyle?: PlayStyle;
+  /** Detective on agy: the brain's file guard left no record (see `bot_isolation_unconfirmed`). */
+  isolationUnconfirmed?: true;
   slotId: string;
   name: string;
   color: BotSlotConfig['color'];
@@ -305,6 +307,17 @@ export type EngineEvent =
       roundNumber: number;
       botId: string;
       accounting: BotAccounting;
+    }
+  | {
+      /**
+       * Detective on agy: the brain called the game's tools, but its file guard left no record, so
+       * nothing proves the brain could not open the eyes' frames.
+       */
+      type: 'bot_isolation_unconfirmed';
+      matchId: string;
+      gen: number;
+      roundNumber: number;
+      botId: string;
     }
   | {
       type: 'bot_finished';

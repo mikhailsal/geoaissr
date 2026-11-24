@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ParticipantColorId } from '$shared/colors';
+  import { slotHarnesses, visionSubject } from '$shared/play-style';
   import BotPlayStyle from './BotPlayStyle.svelte';
   import BotSlotAdvanced from './BotSlotAdvanced.svelte';
   import ParticipantColorPicker from './ParticipantColorPicker.svelte';
@@ -47,10 +48,13 @@
 
   const selectedHarness = $derived(availableHarnesses.find((h) => h.id === slot.harness));
   const modelChoices = $derived(selectedHarness?.models ?? []);
+  const isDetective = $derived(slot.playStyle === 'detective');
+  // A Detective's check tests its eyes: it counts while their model and effort are unchanged.
+  const visionTarget = $derived(visionSubject(slot));
   const checkMatchesSettings = $derived(
     slot.lastVisionCheck !== undefined &&
-      slot.lastVisionCheck.model === slot.model &&
-      slot.lastVisionCheck.effort === slot.effort &&
+      slot.lastVisionCheck.model === visionTarget.model &&
+      slot.lastVisionCheck.effort === visionTarget.effort &&
       slot.lastVisionCheck.imageSize === slot.imageSize,
   );
   const visionSlowWarning = $derived(
@@ -131,7 +135,7 @@
 
   <div class="row-2">
     <label class="field">
-      <span class="lbl">CLI-харнесс</span>
+      <span class="lbl">{isDetective ? RU.playStyle.brainHarness : 'CLI-харнесс'}</span>
       <select
         class="field-select"
         disabled={!isHost}
@@ -149,7 +153,9 @@
     </label>
 
     <div class="field">
-      <label class="lbl" for="model-{slot.id}">Модель</label>
+      <label class="lbl" for="model-{slot.id}"
+        >{isDetective ? RU.playStyle.brainModel : 'Модель'}</label
+      >
       {#if modelChoices.length > 0 && !customModelMode}
         <select
           id="model-{slot.id}"
@@ -200,11 +206,11 @@
     </div>
   </div>
 
-  {#if slot.harness === 'agy'}
+  {#if slotHarnesses(slot).includes('agy')}
     <p class="warn-line" role="note">{RU.lobby.agyPrivacyWarning}</p>
   {/if}
 
-  <BotPlayStyle config={slot} {roundDurationSec} {isHost} {onUpdate} />
+  <BotPlayStyle config={slot} {availableHarnesses} {roundDurationSec} {isHost} {onUpdate} />
 
   <div class="preset-bar" role="group" aria-label="Уровень сложности бота">
     <span class="lbl">Сложность ({PRESET_LABELS[slot.difficultyPreset]})</span>

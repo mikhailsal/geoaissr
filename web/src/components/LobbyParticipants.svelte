@@ -2,7 +2,7 @@
   import { ChevronRight } from '@lucide/svelte';
   import type { ClientViewState } from '$shared/protocol';
   import { PRESET_LABELS, RU } from '../i18n/ru';
-  import { fallbackNote, playedStyle } from '../lib/play-style';
+  import { fallbackNote, styleSuffix } from '../lib/play-style';
   import Avatar from './Avatar.svelte';
 
   let {
@@ -87,12 +87,10 @@
             <span class="identity"
               ><strong>{label}</strong>
               <small
-                >{bot.harness} · {bot.model} · {PRESET_LABELS[bot.difficultyPreset]}{playedStyle(
+                >{bot.harness} · {bot.model} · {PRESET_LABELS[bot.difficultyPreset]}{styleSuffix(
                   bot,
                   view.roundDurationSec,
-                ) === 'detective'
-                  ? ` · ${RU.playStyle.detective}`
-                  : ''}{bot.enabled ? '' : ' · выключен'}</small
+                )}{bot.enabled ? '' : ' · выключен'}</small
               >{#if fallback}<small class="warning">{fallback}</small>{/if}
             </span>
             <ChevronRight aria-hidden="true" size={18} />

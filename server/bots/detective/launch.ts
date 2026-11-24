@@ -8,6 +8,7 @@ import { cleanupBotHandle, createGatePair, type ActiveBotHandle } from '../proce
 import { effectiveRemainingSec } from '../runner-handlers.ts';
 import type { RoundBotParams, RunnerCtx } from '../runner-types.ts';
 import { startFakeDetective } from './fake.ts';
+import { createIsolationCheck } from './isolation.ts';
 import { startDetectiveProcesses } from './monitor.ts';
 import type { DetectiveRun } from './run.ts';
 import { createDetectiveSession, type DetectiveSession } from './session.ts';
@@ -52,12 +53,18 @@ function engineSink(ctx: RunnerCtx, params: RoundBotParams): DetectiveSink {
   };
 }
 
+/** Set once the run exists: runs before each call of the role, ahead of the session. */
+interface EndpointHooks {
+  beforeBrainCall?: () => void;
+}
+
 /** The tool endpoint of one role: every call is logged, and a crash becomes an error reply. */
 function roleEndpoint(
   ctx: RunnerCtx,
   params: RoundBotParams,
   session: DetectiveSession,
   role: DetectiveRole,
+  hooks: EndpointHooks,
 ): BotToolEndpoint {
   const { matchId, gen, roundNumber, slot } = params;
   return {
@@ -66,6 +73,7 @@ function roleEndpoint(
       let ok = false;
       let error: string | undefined;
       try {
+        if (role === 'brain') hooks.beforeBrainCall?.();
         const reply = await session.call(role, tool, args);
         ok = !reply.isError;
         return reply;
@@ -122,9 +130,10 @@ function createRun(ctx: RunnerCtx, params: RoundBotParams): DetectiveRun {
     waitStart: gate.waitObserveRelease,
     sink: engineSink(ctx, params),
   });
+  const hooks: EndpointHooks = {};
   const tokens = {
-    brain: ctx.api.registerBot(roleEndpoint(ctx, params, session, 'brain')),
-    eyes: ctx.api.registerBot(roleEndpoint(ctx, params, session, 'eyes')),
+    brain: ctx.api.registerBot(roleEndpoint(ctx, params, session, 'brain', hooks)),
+    eyes: ctx.api.registerBot(roleEndpoint(ctx, params, session, 'eyes', hooks)),
   };
   const handle: ActiveBotHandle = {
     matchId,
@@ -147,7 +156,19 @@ function createRun(ctx: RunnerCtx, params: RoundBotParams): DetectiveRun {
       session.deadlineMoved();
     },
   };
-  return { ctx, params, handle, session, canMove, tokens, usage: {}, usageSeq: 0 };
+  const run: DetectiveRun = {
+    ctx,
+    params,
+    handle,
+    session,
+    canMove,
+    tokens,
+    usage: {},
+    usageSeq: 0,
+  };
+  const isolationCheck = createIsolationCheck(run);
+  if (isolationCheck) hooks.beforeBrainCall = isolationCheck;
+  return run;
 }
 
 /**

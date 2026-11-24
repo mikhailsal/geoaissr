@@ -65,3 +65,6 @@ models. Keep the text and the rules in step:
   are a convention between the two prompts only: both files name them, so change them together.
 - The eyes may spend at most three paid actions before the report, and every ask of the brain
   waits up to 30 seconds for the answer (45 with a drive).
+- On `agy` the eyes receive frames as files in their work directory and must open them with
+  `read_file` (the `fileDelivery` flag of `detective-eyes.txt`). The file guard lets the eyes read
+  only that directory and the brain no file at all, whatever the prompt says.

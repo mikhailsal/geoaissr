@@ -108,7 +108,9 @@ function renderShipped(): string[] {
     [0, false],
   ] as const) {
     out.push(buildDetectiveBrainPrompt({ ...BRAIN, moveLimit, canMove }));
-    out.push(buildDetectiveEyesPrompt({ moveLimit, canMove }));
+    for (const fileDelivery of [true, false]) {
+      out.push(buildDetectiveEyesPrompt({ moveLimit, canMove, fileDelivery }));
+    }
   }
   return out;
 }
@@ -129,7 +131,7 @@ test('the shipped prompt files render for every setting, with no tag or blank li
 });
 
 test('the Detective prompts follow the movement setting', () => {
-  const withMove = { moveLimit: 4, canMove: true };
+  const withMove = { moveLimit: 4, canMove: true, fileDelivery: false };
   const brain = buildDetectiveBrainPrompt({ ...BRAIN, ...withMove });
   expect(brain).toContain('"kind": "drive"');
   expect(brain).toContain('диагональ региона около 20015 км');
@@ -139,12 +141,20 @@ test('the Detective prompts follow the movement setting', () => {
   const eyes = buildDetectiveEyesPrompt(withMove);
   expect(eyes).toContain('observe, look, move, report, next_request и answer');
   expect(eyes).toContain('до отчёта — не больше 3, за весь раунд — не больше 4');
-  const still = { moveLimit: 2, canMove: false };
+  const still = { moveLimit: 2, canMove: false, fileDelivery: false };
   expect(buildDetectiveBrainPrompt({ ...BRAIN, ...still })).not.toContain('drive');
   const stillEyes = buildDetectiveEyesPrompt(still);
   expect(stillEyes).not.toContain('move');
   expect(stillEyes).toContain('до отчёта — не больше 2, за весь раунд — не больше 2');
-  const none = { moveLimit: 0, canMove: false };
+  const none = { moveLimit: 0, canMove: false, fileDelivery: false };
   expect(buildDetectiveBrainPrompt({ ...BRAIN, ...none })).toContain('нет платных ходов');
   expect(buildDetectiveEyesPrompt(none)).toContain('Платных ходов в этой партии нет');
+});
+
+test('the eyes on agy are told to open the frame files, and only those', () => {
+  const opts = { moveLimit: 4, canMove: true };
+  const files = buildDetectiveEyesPrompt({ ...opts, fileDelivery: true });
+  expect(files).toContain('read_file только для файлов кадров');
+  expect(files).toContain('сразу прочитай их через read_file');
+  expect(buildDetectiveEyesPrompt({ ...opts, fileDelivery: false })).not.toContain('read_file');
 });

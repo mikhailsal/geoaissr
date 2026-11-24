@@ -1,4 +1,9 @@
-import type { BotTokenUsage } from '../../../shared/bot-results.ts';
+import path from 'node:path';
+import type { BotCostEstimate, BotTokenUsage } from '../../../shared/bot-results.ts';
+import type { EffortLevel } from '../../../shared/bot-tools.ts';
+import type { DetectiveRole } from '../../../shared/detective-tools.ts';
+import { EYES_EFFORT, eyesModel, type RoleModel } from '../../../shared/play-style.ts';
+import type { BotSlotConfig } from '../../../shared/storage-schemas.ts';
 import type { ActiveBotHandle } from '../process.ts';
 import type { RoundBotParams, RunnerCtx } from '../runner-types.ts';
 import { sumUsage } from './procs.ts';
@@ -28,13 +33,54 @@ export function runIds(run: DetectiveRun): {
   return { matchId, gen, roundNumber, botId: slot.id };
 }
 
+/** Each role in its own directory: siblings, so a guard on one never covers the other. */
+export function roleWorkDir(botWorkDir: string, role: DetectiveRole): string {
+  return path.join(botWorkDir, role);
+}
+
+/** Where each role runs: the brain on the slot's harness and model, the eyes on theirs. */
+export function roleModels(slot: BotSlotConfig): Record<DetectiveRole, RoleModel> {
+  return { brain: { harness: slot.harness, model: slot.model }, eyes: eyesModel(slot) };
+}
+
+/** The brain thinks at the slot's effort; describing frames needs little thinking. */
+export function roleEffort(slot: BotSlotConfig, role: DetectiveRole): EffortLevel {
+  return role === 'brain' ? slot.effort : EYES_EFFORT;
+}
+
+/**
+ * The price of the tokens so far: each role at its own model. Unknown when a role's price is.
+ * The matched model ids are listed once each.
+ */
+async function estimateRoles(
+  run: DetectiveRun,
+  roleUsage: DetectiveRun['usage'],
+): Promise<BotCostEstimate | null> {
+  const { estimateCost } = run.ctx;
+  if (!estimateCost) return null;
+  const models = roleModels(run.params.slot);
+  const parts = await Promise.all(
+    (['brain', 'eyes'] as const).flatMap((role) => {
+      const usage = roleUsage[role];
+      return usage ? [estimateCost(models[role].model, usage)] : [];
+    }),
+  );
+  const ids = [...new Set(parts.flatMap((p) => (p.matchedModelId ? [p.matchedModelId] : [])))];
+  const costs = parts.map((p) => p.costUsd);
+  return {
+    costUsd: costs.every((c) => c !== null) ? costs.reduce<number>((a, c) => a + c, 0) : null,
+    ...(ids.length > 0 ? { matchedModelId: ids.join(' + ') } : {}),
+    ...(parts.some((p) => p.isApproximateMatch) ? { isApproximateMatch: true } : {}),
+  };
+}
+
 /**
  * Reports the tokens of one finished process. The badge shows the sum of both processes, so every
  * report carries the running sum and replaces the previous one.
  */
 export function reportRoleUsage(
   run: DetectiveRun,
-  role: 'brain' | 'eyes',
+  role: DetectiveRole,
   usage: BotTokenUsage | null,
 ): void {
   if (!usage) return;
@@ -43,23 +89,19 @@ export function reportRoleUsage(
   const seq = run.usageSeq;
   const roleUsage = { ...run.usage };
   const tokenUsage = sumUsage(Object.values(roleUsage));
+  const models = roleModels(run.params.slot);
+  const accounting = {
+    tokenUsage,
+    roleUsage,
+    roleModels: { brain: models.brain.model, eyes: models.eyes.model },
+  };
   const { ctx } = run;
   const ids = runIds(run);
-  ctx.dispatch({
-    type: 'bot_accounting',
-    ...ids,
-    accounting: { tokenUsage, roleUsage, costUsd: null },
-  });
-  if (!ctx.estimateCost) return;
-  void Promise.resolve()
-    .then(() => ctx.estimateCost?.(run.params.slot.model, tokenUsage))
+  ctx.dispatch({ type: 'bot_accounting', ...ids, accounting: { ...accounting, costUsd: null } });
+  void estimateRoles(run, roleUsage)
     .then((estimate) => {
       if (!estimate || seq !== run.usageSeq) return;
-      ctx.dispatch({
-        type: 'bot_accounting',
-        ...ids,
-        accounting: { tokenUsage, roleUsage, ...estimate },
-      });
+      ctx.dispatch({ type: 'bot_accounting', ...ids, accounting: { ...accounting, ...estimate } });
     })
     .catch(() => undefined);
 }

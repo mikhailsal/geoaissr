@@ -8,7 +8,7 @@ import {
 } from './bot-tools.ts';
 import { PARTICIPANT_COLOR_IDS } from './colors.ts';
 import { PLAY_STYLES } from './play-style.ts';
-import { HARNESS_IDS } from './storage-schemas.ts';
+import { botModelSchema, HARNESS_IDS } from './storage-schemas.ts';
 
 /** Client messages the host sends to manage bot slots in the lobby. */
 
@@ -24,12 +24,21 @@ export const botSlotPatchSchema = z.object({
   color: z.enum(PARTICIPANT_COLOR_IDS).optional(),
   enabled: z.boolean().optional(),
   harness: z.enum(HARNESS_IDS).optional(),
-  model: z.string().trim().min(1).max(120).optional(),
+  model: botModelSchema.optional(),
   effort: z.enum(EFFORT_LEVELS).optional(),
   moveLimit: z.number().int().min(0).max(20).optional(),
   imageSize: z.union([z.literal(256), z.literal(400), z.literal(640)]).optional(),
   budgetSec: z.number().int().min(60).max(600).optional(),
   playStyle: z.enum(PLAY_STYLES).optional(),
+  /**
+   * The eyes of a Detective: their own harness, and a model of that harness (the server picks the
+   * harness's first model when it is left out). `null` puts the eyes back on the brain's model.
+   */
+  eyes: z
+    .object({ harness: z.enum(HARNESS_IDS), model: botModelSchema.optional() })
+    .strict()
+    .nullable()
+    .optional(),
   personalityPreset: z.enum(PERSONALITY_PRESETS).optional(),
   personalityText: personalityTextSchema.optional(),
 });

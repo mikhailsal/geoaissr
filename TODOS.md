@@ -128,12 +128,13 @@ The owner put these aside to build the Detective play style first. Nothing here 
 
 ### Flaky tests in CI
 
-**What:** Fix four tests that fail from time to time on unchanged code.
+**What:** Fix five tests that fail from time to time on unchanged code.
 
 - `server/proc/spawn.test.ts`, "stops entire detached process group": it reads the pid file as soon as the file exists, before the shell has written the pid. A fix (wait for a positive pid) is on the branch of PR #24, commit `e6079b0`.
 - `web/tests/lobby-characters.spec.ts:228`, avatar drag: it expects exactly 4 `avatar_turn` messages and sometimes gets 5. The cause is not established.
 - `web/tests/lobby-character-inspection.spec.ts:128`, AI tabs.
 - `web/tests/audio.spec.ts`, lobby music hand-off: GitHub issue #21.
+- `web/tests/audio.spec.ts:282`, native lobby music loop: in a full local run on 2026-11-24 a source ended 2 ms before the next one was scheduled to start (`ended` 5.5554 s, start 5.5578 s). It passed on the rerun.
 
 **Why:** Each failure costs a CI rerun of about 10 minutes and hides real failures.
 
@@ -157,19 +158,29 @@ The owner put these aside to build the Detective play style first. Nothing here 
 
 **What:** Play a few Detective rounds with a real model and read the logs: does the brain wait for the report, how many requests fit into a round, do the eyes obey the report format, does a drive finish inside 45 seconds.
 
-**Why:** The Detective mode is checked with unit tests, scripted CLI processes over the real MCP bridge and the fake pair. No real model has played a round of it in the game. The timings in the prompts («отчёт приходит на 20–30-й секунде», «один запрос занимает около 10 с») come from the spike on still photos, not from the game.
+**Why:** The owner has played one match with a Detective on `claude`, and `bun run test:harness --detective` has played one round on fake images on each of `claude`, `codex` and `agy` and one mixed pair (2026-11-24). Nobody has read the logs of those rounds against the prompts yet. The timings in the prompts («отчёт приходит на 20–30-й секунде», «один запрос занимает около 10 с») come from the spike on still photos, not from the game.
 
 **Context:** Prompts are in `server/bots/prompts/`. `bot_tool_call` records in the daily log carry the `role`. A paid run needs the owner's approval.
 
 **Effort:** S
 **Priority:** P1
 
+### Token usage of `agy` in long rounds
+
+**What:** Read the usage counters of a long `agy` session correctly. In a 110-second Detective round the eyes on `agy` reported `input_tokens` 63 803, `cache_read_tokens` 452 978 and `total_tokens` 65 161. The parser expects the cache reads to be part of the input, as in a one-turn session, refuses the record as `invalid`, and the badge shows «н/д».
+
+**Why:** Every `agy` bot that runs more than a few turns, Intuit or Detective, shows no tokens and no price. Whether `input_tokens` is the uncached input of all turns or the context of the last turn is not known, so the right sum cannot be guessed from one record.
+
+**Context:** `normalize` in `server/bots/usage.ts`, the `harness_usage` records in the daily log, the `agy` headless docs. Needs a few `agy` sessions of known length to settle the meaning.
+
+**Effort:** S
+**Priority:** P2
+
 ### Detective: notes from the pre-landing review
 
 **What:** Small items the review of PR #26 found below the blocking floor. None of them breaks a round.
 
 - Text inside «…» and answers to text requests are never masked, so a place name can reach the brain inside quotes (`server/bots/detective/guard.ts`). The guard also misses names written with mixed alphabets or in scripts it has no list for.
-- The vision check of a Detective slot runs at the slot's effort, while the eyes play at `low` (`server/bots/vision-check.ts`).
 - The prompts state timings by hand. `detective-brain.txt` says a request with a drive takes «до 30 с», while the eyes get 45 s for it (`detective-eyes.txt` and `server/bots/detective/broker.ts`). The owner tunes these files, so the numbers are left to them.
 - A journal correction is counted as used when a later check refuses the same `ask` (`server/bots/detective/brain.ts`).
 - The bot shows as finished up to 8 s after its brain exits, while the eyes are still reporting tokens (`server/bots/detective/monitor.ts`).
@@ -192,17 +203,6 @@ The owner put these aside to build the Detective play style first. Nothing here 
 
 **Effort:** M
 **Priority:** P2
-
-### Detective for `codex` and `agy`
-
-**What:** Run the two-process launch with the `codex` and `agy` harnesses and add them to `DETECTIVE_HARNESSES`.
-
-**Why:** A slot with one of these harnesses set to Detective plays Intuit. `agy` delivers frames as files, which the eyes prompt does not describe yet.
-
-**Context:** `shared/play-style.ts`, `server/bots/detective/procs.ts`, `server/bots/adapters/`.
-
-**Effort:** M
-**Priority:** P3
 
 ### Roads and rural places in the eval set
 

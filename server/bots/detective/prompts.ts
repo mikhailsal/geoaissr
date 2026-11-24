@@ -37,7 +37,10 @@ export function buildDetectiveBrainPrompt(opts: DetectivePromptOptions): string 
 }
 
 export function buildDetectiveEyesPrompt(
-  opts: Pick<DetectivePromptOptions, 'moveLimit' | 'canMove'>,
+  opts: Pick<DetectivePromptOptions, 'moveLimit' | 'canMove'> & {
+    /** The eyes' harness saves frames as files (agy) instead of sending them in the reply. */
+    fileDelivery: boolean;
+  },
 ): string {
   return loadPrompt('detective-eyes.txt', {
     moveLimit: opts.moveLimit,
@@ -45,5 +48,6 @@ export function buildDetectiveEyesPrompt(
     moveDistanceMax: MOVE_DISTANCE_MAX_M,
     moveEnabled: opts.canMove,
     hasTurns: opts.moveLimit > 0,
+    fileDelivery: opts.fileDelivery,
   });
 }

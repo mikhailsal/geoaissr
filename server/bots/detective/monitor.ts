@@ -1,17 +1,23 @@
-import path from 'node:path';
-import type { EffortLevel } from '../../../shared/bot-tools.ts';
+import type { DetectiveRole } from '../../../shared/detective-tools.ts';
 import { getRegionDiagonalKm } from '../../../shared/regions.ts';
+import { getHarnessAdapter } from '../adapters/index.ts';
 import { logBotDiagnostic } from '../diagnostics.ts';
 import { cleanupBotHandle, dispatchBotLaunchFailure, maskDiagnostics } from '../process.ts';
 import { REGION_LABELS_RU } from '../runner-types.ts';
+import { attachAgyAudits } from './isolation.ts';
 import { spawnRole, type RoleExit, type RoleProcess } from './procs.ts';
 import { buildDetectiveBrainPrompt, buildDetectiveEyesPrompt } from './prompts.ts';
-import { reportRoleUsage, runIds, type DetectiveRun } from './run.ts';
+import {
+  reportRoleUsage,
+  roleEffort,
+  roleModels,
+  roleWorkDir,
+  runIds,
+  type DetectiveRun,
+} from './run.ts';
 
 /** Starts the two CLI processes of a Detective bot and follows them to their exits. */
 
-/** Describing frames needs no long thinking; the spikes measured the eyes at low effort. */
-const EYES_EFFORT: EffortLevel = 'low';
 /**
  * After the brain is done the eyes get this long to read «Раунд окончен» and exit on their own:
  * a CLI reports its token usage only when it exits normally. The bot counts as finished after
@@ -19,9 +25,10 @@ const EYES_EFFORT: EffortLevel = 'low';
  */
 export const EYES_GRACE_MS = 8_000;
 
-function logIdentity(run: DetectiveRun, role: string): Record<string, unknown> {
+function logIdentity(run: DetectiveRun, role: DetectiveRole | 'monitor'): Record<string, unknown> {
   const { matchId, gen, roundNumber, slot } = run.params;
-  return { matchId, gen, roundNumber, slotId: slot.id, harness: slot.harness, role };
+  const harness = role === 'monitor' ? slot.harness : roleModels(slot)[role].harness;
+  return { matchId, gen, roundNumber, slotId: slot.id, harness, role };
 }
 
 /** Read through a function: the engine can stop the bot during any await. */
@@ -58,13 +65,22 @@ function failLaunch(run: DetectiveRun, proc: RoleProcess): void {
 }
 
 function logExit(run: DetectiveRun, exit: RoleExit, extra: Record<string, unknown>): void {
+  const identity = logIdentity(run, exit.role);
   logBotDiagnostic(run.ctx.logger, 'harness_end', {
-    ...logIdentity(run, exit.role),
+    ...identity,
     durationMs: exit.durationMs,
     exitCode: exit.code,
     signal: exit.signal,
     tokenUsage: exit.usage,
     ...extra,
+  });
+  // The same usage record as an Intuit bot writes: why the tokens of a role are missing, if they are.
+  logBotDiagnostic(run.ctx.logger, 'harness_usage', {
+    ...identity,
+    model: roleModels(run.params.slot)[exit.role].model,
+    ...exit.usageDiagnostics,
+    rawCounterScope: identity.harness === 'codex' ? 'last-turn' : 'terminal',
+    tokenUsage: exit.usage,
   });
 }
 
@@ -145,6 +161,7 @@ export function startDetectiveProcesses(run: DetectiveRun, graceMs = EYES_GRACE_
   const { ctx, params, handle } = run;
   const { slot, target } = params;
   const shared = { moveLimit: slot.moveLimit, canMove: run.canMove };
+  const models = roleModels(slot);
   const brainPrompt = buildDetectiveBrainPrompt({
     ...shared,
     regionLabelRu: REGION_LABELS_RU[target.region],
@@ -153,24 +170,28 @@ export function startDetectiveProcesses(run: DetectiveRun, graceMs = EYES_GRACE_
     personalityPreset: slot.personalityPreset,
     personalityText: slot.personalityText,
   });
-  const eyesPrompt = buildDetectiveEyesPrompt(shared);
+  const eyesPrompt = buildDetectiveEyesPrompt({
+    ...shared,
+    fileDelivery: getHarnessAdapter(models.eyes.harness).deliveryMode === 'file',
+  });
   try {
     ctx.logger?.registerSecrets([], [run.tokens.brain, run.tokens.eyes]);
   } catch {
     // Diagnostic setup must not prevent a bot from launching.
   }
-  const spawn = (role: 'brain' | 'eyes', prompt: string, effort: EffortLevel): RoleProcess => {
+  const spawn = (role: DetectiveRole, prompt: string): RoleProcess => {
+    const effort = roleEffort(slot, role);
     logBotDiagnostic(ctx.logger, 'harness_start', {
       ...logIdentity(run, role),
-      model: slot.model,
+      model: models[role].model,
       effort,
       playStyle: 'detective',
     });
-    const token = run.tokens[role];
     const proc = spawnRole(ctx, params, {
+      ...models[role],
       role,
-      workDir: path.join(handle.workDir, role),
-      token,
+      workDir: roleWorkDir(handle.workDir, role),
+      token: run.tokens[role],
       prompt,
       effort,
       canMove: run.canMove,
@@ -178,8 +199,9 @@ export function startDetectiveProcesses(run: DetectiveRun, graceMs = EYES_GRACE_
     handle.extraProcs = [...(handle.extraProcs ?? []), proc.proc];
     return proc;
   };
-  const eyes = spawn('eyes', eyesPrompt, EYES_EFFORT);
-  const brain = spawn('brain', brainPrompt, slot.effort);
+  attachAgyAudits(run);
+  const eyes = spawn('eyes', eyesPrompt);
+  const brain = spawn('brain', brainPrompt);
   const logFailure = (err: unknown): void => {
     logBotDiagnostic(ctx.logger, 'harness_monitor_error', {
       ...logIdentity(run, 'monitor'),

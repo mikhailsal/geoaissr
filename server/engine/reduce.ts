@@ -67,6 +67,7 @@ function handleBotEvent(state: RoomState, event: EngineEvent, now: number): Redu
     event.type !== 'bot_guess_recorded' &&
     event.type !== 'bot_finding' &&
     event.type !== 'bot_step_patched' &&
+    event.type !== 'bot_isolation_unconfirmed' &&
     event.type !== 'bot_finished'
   ) {
     return { state, effects: [] };
@@ -93,6 +94,8 @@ function handleBotEvent(state: RoomState, event: EngineEvent, now: number): Redu
     updatedBot = { ...bot, journal };
   } else if (event.type === 'bot_finding') {
     updatedBot = { ...bot, journal: addFindingToJournal(bot.journal ?? [], event) };
+  } else if (event.type === 'bot_isolation_unconfirmed') {
+    updatedBot = { ...bot, isolationUnconfirmed: true };
   } else if (event.type === 'bot_guess_recorded') {
     if (bot.guessFinalized) return { state, effects: [] };
     updatedBot = {
@@ -350,6 +353,7 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
     case 'bot_guess_recorded':
     case 'bot_finding':
     case 'bot_step_patched':
+    case 'bot_isolation_unconfirmed':
     case 'bot_finished':
       return handleBotEvent(state, event, now);
     case 'bot_accounting':

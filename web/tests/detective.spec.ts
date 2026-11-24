@@ -83,8 +83,59 @@ test('the host sets a bot to Detective and the lobby says when it will play Intu
   }
 });
 
-async function playRoundToResults(page: Page, hostUrl: string): Promise<void> {
-  await enterLobby(page, hostUrl);
+// protects=the host's choice of where a Detective's eyes run: «как у мозга» or a harness and model of their own, shown in the participants list and on the token line of the result card; fails_when=the picker is missing for a Detective, the model select does not follow the harness, the agy warning is not shown for agy eyes, or the card hides which model spent which tokens; no_claim=what the real CLIs do.
+test('the host runs the eyes of a Detective on another harness and model', async ({ page }) => {
+  const server = await startIsolatedFakeServer({
+    rounds: 1,
+    roundDurationSec: 120,
+    bots: [DETECTIVE_BOT],
+  });
+  try {
+    await enterLobby(page, server.hostUrl);
+    await openBotSettings(page, 'Шерлок');
+    await expect(page.getByLabel('CLI-харнесс мозга')).toBeVisible();
+    const eyes = page.getByRole('group', { name: 'Глаза детектива' });
+    const harness = eyes.getByLabel('CLI-харнесс глаз');
+    await expect(harness).toHaveValue('__brain__');
+    await expect(eyes.getByLabel('Модель глаз')).toHaveCount(0);
+
+    await harness.selectOption('agy');
+    await expect(page.getByText(/^Читает файлы владельца/)).toBeVisible();
+    await expect(eyes.getByLabel('Модель глаз')).toHaveValue('gemini-3.8-flash-low');
+    // Back to the brain's model: the model select goes away.
+    await harness.selectOption('__brain__');
+    await expect(eyes.getByLabel('Модель глаз')).toHaveCount(0);
+    await harness.selectOption('codex');
+    const model = eyes.getByLabel('Модель глаз');
+    await expect(model).toHaveValue('gpt-6-luna');
+    await model.selectOption('gpt-5.4');
+    await expect(model).toHaveValue('gpt-5.4');
+    await expect(page.getByText(/^Читает файлы владельца/)).toHaveCount(0);
+    await assertAxeClean(page, 'BotEyesPicker');
+    await page.keyboard.press('Escape');
+
+    const roster = page.getByRole('dialog', { name: 'Участники', exact: true });
+    await expect(roster.getByText(/· Детектив, глаза: codex · gpt-5\.4/)).toBeVisible();
+    await closeLobbyDialog(roster);
+
+    await playRoundToResults(page, server.hostUrl, { entered: true });
+    await page.getByRole('button', { name: 'почему?' }).first().click();
+    const card = page.locator('.bot-card');
+    await card.getByRole('button', { name: 'Расход токенов и оценка стоимости' }).click();
+    await expect(
+      card.getByRole('region', { name: 'Расход токенов и оценка стоимости' }),
+    ).toContainText(/Мозг \(claude-haiku-5-5\): 3\s140 · Глаза \(gpt-5\.4\): 4\s580/);
+  } finally {
+    await server.stop();
+  }
+});
+
+async function playRoundToResults(
+  page: Page,
+  hostUrl: string,
+  opts: { entered?: boolean } = {},
+): Promise<void> {
+  if (!opts.entered) await enterLobby(page, hostUrl);
   await page.getByRole('button', { name: 'Начать' }).click();
   const map = page.getByTestId('fake-guess-map').locator('canvas');
   await expect(map).toBeVisible({ timeout: 12_000 });

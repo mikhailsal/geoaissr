@@ -114,6 +114,7 @@ export function finalizeJournal(bot: BotRoundState): BotJournal | undefined {
     ...(summary ? { summary } : {}),
     ...(lastFinding ? { finalFinding: lastFinding } : {}),
     ...(bot.playStyle === 'detective' ? { style: bot.playStyle } : {}),
+    ...(bot.isolationUnconfirmed ? { isolation: 'unconfirmed' as const } : {}),
     ...(finalized && bot.guess?.confidence ? { confidence: bot.guess.confidence } : {}),
     ...(finalized && bot.guess?.clue ? { clue: bot.guess.clue } : {}),
   };

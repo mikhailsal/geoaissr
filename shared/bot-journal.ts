@@ -165,6 +165,8 @@ export const botJournalSchema = z.object({
   finalFinding: z.string().optional(),
   /** The style the bot played; absent on Intuit rounds and on older results. */
   style: z.enum(PLAY_STYLES).optional(),
+  /** Detective on agy: the brain's file guard left no record, so its blindness is not proven. */
+  isolation: z.literal('unconfirmed').optional(),
   /** Detective: how sure the brain was, and the clue that decided. */
   confidence: z.enum(['country', 'region', 'guess']).optional(),
   clue: z.string().optional(),

@@ -1,12 +1,14 @@
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { getBotToolDefinitions, MODEL_EFFORT_SUFFIX } from '../../../shared/bot-tools.ts';
+import { MODEL_EFFORT_SUFFIX } from '../../../shared/bot-tools.ts';
+import type { DetectiveRole } from '../../../shared/detective-tools.ts';
 import type { HarnessCatalogEntry } from '../../../shared/protocol.ts';
 import {
   buildSharedMcpEnv,
   defaultCommandProbe,
   ensureWorkDir,
   formatUnavailable,
+  geoToolNames,
   getHarnessMeta,
   parseSemverTuple,
   resolveBunBinary,
@@ -41,9 +43,6 @@ export function agyEffortArgs(model: string, effort: string): string[] {
   return MODEL_EFFORT_SUFFIX.test(model) ? [] : ['--effort', effort];
 }
 
-/** Only the game's own MCP tools pass the guard; other servers loaded from the owner's config do not. */
-const GEO_TOOL_NAMES = getBotToolDefinitions().map((t) => t.name);
-
 /** PreToolUse attempts, consumed by the bot runner before its work directory is removed. */
 export function agyToolAuditPath(workDir: string): string {
   return path.join(workDir, '.agents', 'plugins', 'geo', 'tool-audit.jsonl');
@@ -71,7 +70,15 @@ function buildAgyAuditLines(): string[] {
   ];
 }
 
-function buildAgyGuardScript(realWorkDir: string): string {
+/**
+ * The PreToolUse guard of one launch. Only the game's own MCP tools of this launch pass; other
+ * servers loaded from the owner's config do not. Files may be read only inside the work directory,
+ * where the frames land. The brain of a Detective gets no file at all: its frames go to the eyes,
+ * whose work directory is a sibling, not a child, of the brain's.
+ */
+function buildAgyGuardScript(realWorkDir: string, role: DetectiveRole | undefined): string {
+  const geoTools = geoToolNames(role).map((t) => `mcp_geo_geo_${t}`);
+  const readsFiles = role !== 'brain';
   return [
     `import path from 'node:path';`,
     `import { appendFileSync, closeSync, existsSync, openSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';`,
@@ -91,9 +98,9 @@ function buildAgyGuardScript(realWorkDir: string): string {
     `  const s = srvVals.length === 1 || (srvVals.length > 1 && srvVals.every((v) => v === srvVals[0])) ? String(srvVals[0] ?? '') : '';`,
     `  auditServer = safeName(s);`,
     `  auditMcpTool = safeName(a.ToolName ?? a.toolName ?? a.tool_name);`,
-    `  const geoTools = new Set(${JSON.stringify(GEO_TOOL_NAMES.map((t) => `mcp_geo_geo_${t}`))});`,
+    `  const geoTools = new Set(${JSON.stringify(geoTools)});`,
     `  allow = geoTools.has(n) || (n === 'call_mcp_tool' && (s === 'geo_geo' || s === 'geo'));`,
-    `  if (!allow && (n === 'read_file' || n === 'view_file')) {`,
+    `  if (!allow && ${JSON.stringify(readsFiles)} && (n === 'read_file' || n === 'view_file')) {`,
     `    const pathKeys = ['Path', 'path', 'file_path', 'target_file', 'TargetFile', 'uri'];`,
     `    const rawPaths = pathKeys.map((k) => a[k]).filter((v): v is string => typeof v === 'string');`,
     `    const raw = rawPaths.length > 0 && rawPaths.every((v) => v === rawPaths[0]) ? rawPaths[0] : null;`,
@@ -166,6 +173,7 @@ export const agyAdapter: HarnessAdapter = {
       deliveryMode: 'file',
       moveEnabled: opts.moveEnabled,
       workDir: realWd,
+      role: opts.role,
     });
 
     const pluginDir = path.join(realWd, '.agents', 'plugins', 'geo');
@@ -180,7 +188,7 @@ export const agyAdapter: HarnessAdapter = {
     );
 
     const guardPath = path.join(pluginDir, 'guard.ts');
-    writeFileSync(guardPath, buildAgyGuardScript(realWd), 'utf8');
+    writeFileSync(guardPath, buildAgyGuardScript(realWd, opts.role), 'utf8');
     writeJsonFile(path.join(pluginDir, 'hooks.json'), {
       'geo-only': {
         PreToolUse: [

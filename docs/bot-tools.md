@@ -87,7 +87,7 @@ The advertised time budget is capped by the round duration. Every tool response 
 
 ## Detective play style
 
-A bot slot has a play style. **Intuit** (the default) is everything above: one process sees the frames and guesses. **Detective** splits the bot into two processes of the same model that talk only through the server:
+A bot slot has a play style. **Intuit** (the default) is everything above: one process sees the frames and guesses. **Detective** splits the bot into two processes that talk only through the server:
 
 - the **eyes** see the frames and describe them. They never name a place;
 - the **brain** reads the descriptions, asks for more and places the pin. It never receives an image.
@@ -96,10 +96,15 @@ The split is there to stop a model from seeing what its own guess expects. The e
 
 ### When a slot plays Detective
 
-`shared/play-style.ts` decides per round (`resolvePlayStyle`). A slot set to Detective plays Intuit, and the lobby says why, when:
+`shared/play-style.ts` decides per round (`resolvePlayStyle`). A slot set to Detective plays Intuit, and the lobby says why, when the round is shorter than 90 seconds (`DETECTIVE_MIN_BUDGET_SEC`). The round duration caps the bot's budget, and a report plus two requests do not fit into less. The lobby also keeps the budget of a Detective slot at 90 seconds or more.
 
-- its harness is not `claude`. Only that harness has run the two-process launch (`DETECTIVE_HARNESSES`);
-- the round is shorter than 90 seconds (`DETECTIVE_MIN_BUDGET_SEC`). The round duration caps the bot's budget, and a report plus two requests do not fit into less. The lobby also keeps the budget of a Detective slot at 90 seconds or more.
+### Where each process runs
+
+The Detective runs on `claude`, `codex` and `agy`. The brain runs on the slot's harness and model at the slot's effort. The eyes run on the same harness and model unless the slot sets `eyes: {harness, model}` («Глаза детектива» in the slot settings); they always play at effort `low`. The eyes' harness must be available too: a slot whose eyes harness is missing is disabled in the lobby, and a round does not launch it. «Проверить зрение» of a Detective slot tests the eyes: their harness and model at `low`.
+
+Each process has its own work directory, `<bot dir>/brain` and `<bot dir>/eyes`. On `agy` the eyes get their frames as files in their directory and read them with `read_file`; the prompt says so (`fileDelivery`). The file guard of an `agy` process lets the eyes read only their own directory and lets the brain read no file at all. `claude` and `codex` processes get no file tools. The guard writes a record before every tool call. If the brain runs on `agy` and its first call reaches the server with no record, the guard did not run: the server logs `harness_monitor_error` with `isolationUnconfirmed`, and the result card says «Изоляция зрения не подтверждена» instead of «Мозг не видел кадров».
+
+`codex` gets the tools of its role approved up front and a 120-second MCP call timeout (`MCP_TOOL_TIMEOUT_SEC`); Claude Code reads the same limit from `MCP_TOOL_TIMEOUT`. An `ask` with a drive waits up to 45 seconds, so the default limits of the CLIs would cut it.
 
 ### Tools by role
 
@@ -145,7 +150,7 @@ The codes are described in [errors](./errors.md#GEO_DETECTIVE_QUESTION_FORM).
 
 ### Processes and the round end
 
-The server owns the deadline, both tokens and both processes. The brain runs at the slot's effort, the eyes at `low`. If the eyes exit early, pending and later requests come back as `eyes_down` and the brain is told to send its final guess. The round counts the bot as finished when the brain has exited and the eyes have exited too or 8 seconds have passed; the eyes are then stopped. This keeps the token usage of both processes on the badge. A process that cannot start fails the launch for the round («сбой запуска»). If the brain exits without a final guess, the latest `current_guess` is scored, as for an Intuit bot. A bot whose final guess is recorded counts as finished («завершил ход») even if the round or its budget ends while its processes are still exiting; this holds for Intuit bots too.
+The server owns the deadline, both tokens and both processes. If the eyes exit early, pending and later requests come back as `eyes_down` and the brain is told to send its final guess. The round counts the bot as finished when the brain has exited and the eyes have exited too or 8 seconds have passed; the eyes are then stopped. This keeps the token usage of both processes on the badge. A process that cannot start fails the launch for the round («сбой запуска»). If the brain exits without a final guess, the latest `current_guess` is scored, as for an Intuit bot. A bot whose final guess is recorded counts as finished («завершил ход») even if the round or its budget ends while its processes are still exiting; this holds for Intuit bots too.
 
 ### Prompts
 
@@ -159,7 +164,7 @@ With `--fake` a scripted brain and scripted eyes play through the real session: 
 
 Normalized `inputTokens` includes cached reads; `cachedInputTokens` is a subset. `totalTokens` is normalized input plus output. Claude input includes its separately reported cache creation and cache reads. Codex already includes cached reads in its input count. AGY's reported total determines whether its raw input already includes cache reads or reports them separately, so cached input is counted once. Ambiguous or contradictory AGY usage is unavailable. See its [official headless documentation](https://antigravity.google/docs/cli/headless/#read-the-results) for the raw counters. Terminal totals are used without also summing intermediate snapshots. Missing or invalid usage is unavailable. Codex skips unrelated oversized lines and discards accumulated counters when a malformed, truncated or oversized terminal event is identifiable in its bounded prefix.
 
-A Detective bot reports the sum of its two processes as `tokenUsage` and the parts as `roleUsage: {brain?, eyes?}`; the price estimate uses the sum, and the badge tooltip shows the split («Мозг», «Глаза»).
+A Detective bot reports the sum of its two processes as `tokenUsage`, the parts as `roleUsage: {brain?, eyes?}` and the model of each process as `roleModels: {brain, eyes}`. Each part is priced at its own model and the prices are added; the price is unknown when the price of either part is. The badge tooltip shows the split («Мозг», «Глаза»), with the model names when the two processes ran on different ones.
 
 A paid game turn counts a successful `look` or `move`, not a model request. Observation, checkpoint and final submissions and image-file reads can require further model exchanges and repeated input processing even when only one paid turn is used.
 

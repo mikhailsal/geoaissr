@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { buildQuotaMetric } from '../storage/quota.ts';
+import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
 import { patchJournalStep } from './journal.ts';
 import { reduce } from './reduce.ts';
@@ -22,7 +23,17 @@ const TARGET: RoundTarget = {
   fakeSceneIndex: 0,
 };
 
-function makeRoom(roundDurationSec: number): RoomState {
+const CLAUDE: HarnessCatalogEntry = {
+  id: 'claude',
+  available: true,
+  readsOwnerFiles: false,
+  models: ['haiku'],
+};
+
+function makeRoom(
+  roundDurationSec: number,
+  availableHarnesses: HarnessCatalogEntry[] = [CLAUDE],
+): RoomState {
   const settings: SettingsFile = {
     version: 1,
     region: 'world',
@@ -56,9 +67,7 @@ function makeRoom(roundDurationSec: number): RoomState {
       sufficient: true,
     },
     tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },
-    availableHarnesses: [
-      { id: 'claude', available: true, readsOwnerFiles: false, models: ['haiku'] },
-    ],
+    availableHarnesses,
   });
   return reduce(
     base,
@@ -68,8 +77,12 @@ function makeRoom(roundDurationSec: number): RoomState {
 }
 
 /** A lobby with one bot; returns the room and the bot's id. */
-function withBot(roundDurationSec: number): { room: RoomState; botId: string } {
-  const room = reduce(makeRoom(roundDurationSec), { type: 'add_bot', playerId: 'h' }, 110).state;
+function withBot(
+  roundDurationSec: number,
+  availableHarnesses?: HarnessCatalogEntry[],
+): { room: RoomState; botId: string } {
+  const base = makeRoom(roundDurationSec, availableHarnesses);
+  const room = reduce(base, { type: 'add_bot', playerId: 'h' }, 110).state;
   return { room, botId: room.settings.bots[0]?.id ?? '' };
 }
 
@@ -272,4 +285,116 @@ test('the bot budget ending stops the processes of an answered bot without calli
     status: 'aborted',
     terminationReason: 'истек бюджет времени',
   });
+});
+
+const CODEX: HarnessCatalogEntry = {
+  id: 'codex',
+  available: true,
+  readsOwnerFiles: false,
+  models: ['gpt-6-luna', 'gpt-6-sol'],
+};
+const AGY_MISSING: HarnessCatalogEntry = {
+  id: 'agy',
+  available: false,
+  reason: 'agy не найден',
+  readsOwnerFiles: true,
+  models: [],
+};
+
+/** A Detective in the lobby with claude, codex and a missing agy. */
+function detectiveLobby(): { room: RoomState; botId: string } {
+  const { room, botId } = withBot(120, [CLAUDE, CODEX, AGY_MISSING]);
+  return { room: patchBot(room, botId, { playStyle: 'detective' }), botId };
+}
+
+// Value: protects=the host's choice of where the eyes of a Detective run; fails_when=the eyes land on a missing harness, lose their model on an unrelated edit, or keep a model after «как у мозга»; why_new=the eyes had no settings of their own; seam=none; no_claim=how the picker renders.
+test('the eyes move to a harness of their own, keep their model and come back to the brain', () => {
+  const { room, botId } = detectiveLobby();
+  const onCodex = patchBot(room, botId, { eyes: { harness: 'codex' } });
+  // No model named: the first one of the harness.
+  expect(onCodex.settings.bots[0]?.eyes).toEqual({ harness: 'codex', model: 'gpt-6-luna' });
+  const sol = patchBot(onCodex, botId, { eyes: { harness: 'codex', model: 'gpt-6-sol' } });
+  expect(sol.settings.bots[0]?.eyes?.model).toBe('gpt-6-sol');
+  // The same harness again keeps the chosen model; an edit of the brain leaves the eyes alone.
+  const again = patchBot(sol, botId, { eyes: { harness: 'codex' }, effort: 'high' });
+  expect(again.settings.bots[0]).toMatchObject({
+    effort: 'high',
+    enabled: true,
+    eyes: { harness: 'codex', model: 'gpt-6-sol' },
+  });
+  const back = patchBot(again, botId, { eyes: null });
+  expect(back.settings.bots[0]?.eyes).toBeUndefined();
+  // A harness that is not installed is refused, and the slot is unchanged.
+  const refused = reduce(
+    back,
+    { type: 'update_bot', playerId: 'h', botId, patch: { eyes: { harness: 'agy' } } },
+    130,
+  );
+  expect(refused.ack).toBe('invalid');
+  expect(refused.state.settings.bots[0]?.eyes).toBeUndefined();
+});
+
+test('a stored vision check of a Detective follows its eyes, not its brain', () => {
+  const { room, botId } = detectiveLobby();
+  const split = patchBot(room, botId, { eyes: { harness: 'codex' } });
+  const bot = split.settings.bots[0];
+  const check = {
+    passed: true,
+    elapsedMs: 900,
+    model: 'gpt-6-luna',
+    effort: 'low' as const,
+    imageSize: bot?.imageSize ?? 400,
+    checkedAt: '2026-11-24T10:00:00.000Z',
+  };
+  const checked = reduce(split, { type: 'update_bot_vision_check', botId, check }, 140).state;
+  // The brain thinks harder: the eyes still see at low effort, so the check still counts.
+  const brainEdit = patchBot(checked, botId, { effort: 'high' });
+  expect(brainEdit.settings.bots[0]?.lastVisionCheck).toEqual(check);
+  const eyesEdit = patchBot(brainEdit, botId, { eyes: { harness: 'codex', model: 'gpt-6-sol' } });
+  expect(eyesEdit.settings.bots[0]?.lastVisionCheck).toBeUndefined();
+});
+
+test('a Detective whose eyes harness is gone stays in the lobby, and so does its round', () => {
+  const { room, botId } = detectiveLobby();
+  const split = patchBot(room, botId, { eyes: { harness: 'codex' } });
+  const gone = {
+    ...split,
+    availableHarnesses: [CLAUDE, { ...CODEX, available: false, reason: 'codex не найден' }],
+  };
+  // The next edit of the slot says why it cannot play.
+  const edited = patchBot(gone, botId, { name: 'Сыщик' });
+  expect(edited.settings.bots[0]).toMatchObject({
+    enabled: false,
+    disabledReason: 'Глаза детектива: codex не найден',
+  });
+  // A round started anyway does not launch the bot.
+  const played = startRound(gone);
+  expect(played.room.loadingOrActive?.bots[botId]).toBeUndefined();
+  expect(played.effects.some((e) => e.type === 'start_bot_processes')).toBe(false);
+});
+
+test('a brain that could open the frames is marked on the result card', () => {
+  const { room, botId, ids } = roundWithGuess(true);
+  const marked = reduce(room, { type: 'bot_isolation_unconfirmed', ...ids }, 20_000).state;
+  const s = reduce(
+    reduce(marked, { type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 1, lng: 1 }, 21_000)
+      .state,
+    { type: 'bot_finished', ...ids, aborted: false, reason: 'завершил ход' },
+    22_000,
+  ).state;
+  const journal = s.results?.entries.find((e) => e.id === botId)?.journal;
+  expect(journal).toMatchObject({ style: 'detective', isolation: 'unconfirmed' });
+  const clean = roundWithGuess(true);
+  const plain = reduce(
+    reduce(
+      clean.room,
+      { type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 1, lng: 1 },
+      21_000,
+    ).state,
+    { type: 'bot_finished', ...clean.ids, aborted: false, reason: 'завершил ход' },
+    22_000,
+  ).state;
+  expect(plain.results?.entries.find((e) => e.id === clean.botId)?.journal?.isolation).toBe(
+    undefined,
+  );
 });

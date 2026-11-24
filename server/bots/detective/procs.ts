@@ -3,20 +3,15 @@ import path from 'node:path';
 import type { BotTokenUsage } from '../../../shared/bot-results.ts';
 import type { EffortLevel } from '../../../shared/bot-tools.ts';
 import type { DetectiveRole } from '../../../shared/detective-tools.ts';
+import type { RoleModel } from '../../../shared/play-style.ts';
 import { formatStderrTail } from '../../log.ts';
 import { spawnManaged, type ManagedProcess } from '../../proc/spawn.ts';
 import { getHarnessAdapter } from '../adapters/index.ts';
-import { buildSanitizedChildEnv } from '../adapters/shared.ts';
+import { buildSanitizedChildEnv, MCP_TOOL_TIMEOUT_SEC } from '../adapters/shared.ts';
 import type { RoundBotParams, RunnerCtx } from '../runner-types.ts';
-import { createUsageParser } from '../usage.ts';
+import { createUsageParser, type UsageDiagnostics } from '../usage.ts';
 
 /** Launches one role of a Detective bot as a one-shot CLI process behind the MCP bridge. */
-
-/**
- * `ask`, `briefing` and `next_request` block for up to 45 s. The CLI's own MCP timeout must stay
- * well above that, or the client gives up on a call the server is still answering.
- */
-const MCP_TOOL_TIMEOUT_MS = 120_000;
 
 export interface RoleExit {
   role: DetectiveRole;
@@ -25,6 +20,8 @@ export interface RoleExit {
   code: number | null;
   signal: NodeJS.Signals | null;
   usage: BotTokenUsage | null;
+  /** What the usage parser saw: why `usage` is null, when it is. */
+  usageDiagnostics: UsageDiagnostics;
   stderrTail: string[];
   durationMs: number;
 }
@@ -39,7 +36,7 @@ export interface RoleProcess {
 export function spawnRole(
   ctx: RunnerCtx,
   params: RoundBotParams,
-  role: {
+  role: RoleModel & {
     role: DetectiveRole;
     workDir: string;
     token: string;
@@ -48,7 +45,8 @@ export function spawnRole(
     canMove: boolean;
   },
 ): RoleProcess {
-  const { slot } = params;
+  // Each role runs on its own harness and model; the rest of the slot is shared.
+  const slot = { ...params.slot, harness: role.harness, model: role.model };
   mkdirSync(role.workDir, { recursive: true });
   const spec = ctx.buildCustomLaunchSpec
     ? ctx.buildCustomLaunchSpec({
@@ -59,9 +57,9 @@ export function spawnRole(
         prompt: role.prompt,
         role: role.role,
       })
-    : getHarnessAdapter(slot.harness).buildLaunchSpec({
+    : getHarnessAdapter(role.harness).buildLaunchSpec({
         workDir: role.workDir,
-        model: slot.model,
+        model: role.model,
         effort: role.effort,
         prompt: role.prompt,
         apiUrl: ctx.api.baseUrl,
@@ -69,12 +67,13 @@ export function spawnRole(
         moveEnabled: role.canMove,
         role: role.role,
       });
-  const parser = createUsageParser(slot.harness);
+  const parser = createUsageParser(role.harness);
   const startedAtMs = Date.now();
   const proc = spawnManaged({
     cmd: spec.cmd,
     cwd: path.resolve(spec.cwd),
-    env: { ...buildSanitizedChildEnv(), MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_MS) },
+    // Claude Code reads its MCP call timeout from the environment; the other CLIs ignore it.
+    env: { ...buildSanitizedChildEnv(), MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_SEC * 1000) },
     stdinText: spec.stdinText,
     kind: 'bot',
     childrenFile: ctx.childrenFile,
@@ -94,6 +93,7 @@ export function spawnRole(
       code: exit.code,
       signal: exit.signal,
       usage,
+      usageDiagnostics: parser.getDiagnostics(),
       stderrTail: formatStderrTail(proc.getStderr(), 50),
       durationMs: Date.now() - startedAtMs,
     };

@@ -1,6 +1,12 @@
 import { expect, test } from 'bun:test';
 import type { JournalRequest } from '$shared/bot-journal';
-import { answerLine, confidenceLine, reportGroups, requestLine } from './detective-format';
+import {
+  answerLine,
+  confidenceLine,
+  reportGroups,
+  requestLine,
+  roleTokensLine,
+} from './detective-format';
 
 function request(partial: Partial<JournalRequest>): JournalRequest {
   return { n: 1, kind: 'describe', text: 'разметка', status: 'answered', ...partial };
@@ -57,4 +63,21 @@ test('the final confidence is spelled out', () => {
   expect(confidenceLine('region')).toBe('Уверенность: уверен в регионе');
   expect(confidenceLine('guess')).toBe('Уверенность: догадка');
   expect(confidenceLine(undefined)).toBeNull();
+});
+
+test('the token line splits a Detective by process and names the models only when they differ', () => {
+  const usage = (totalTokens: number) => ({
+    inputTokens: totalTokens,
+    outputTokens: 0,
+    cachedInputTokens: 0,
+    totalTokens,
+  });
+  const roleUsage = { brain: usage(3140), eyes: usage(4580) };
+  const same = { brain: 'claude-haiku-5-5', eyes: 'claude-haiku-5-5' };
+  expect(roleTokensLine({ roleUsage, roleModels: same })).toMatch(/^Мозг: 3\s140 · Глаза: 4\s580$/);
+  const split = { brain: 'claude-opus-5-5', eyes: 'gpt-6-luna' };
+  expect(roleTokensLine({ roleUsage: { brain: usage(10) }, roleModels: split })).toBe(
+    'Мозг (claude-opus-5-5): 10 · Глаза (gpt-6-luna): н/д',
+  );
+  expect(roleTokensLine({})).toBeNull();
 });
