@@ -129,6 +129,45 @@ textarea {
   color: var(--paper-dim);
 }
 
+/* The bot slot form (BotSlotEditor, BotPlayStyle, BotEyesPicker) shares one set of rules. */
+.slot-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--sp-3);
+}
+
+.slot-field,
+.slot-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.slot-field {
+  gap: var(--sp-1);
+}
+
+.slot-group {
+  gap: var(--sp-2);
+}
+
+.slot-label {
+  font-size: 0.85rem;
+  color: var(--paper-dim);
+}
+
+.slot-hint {
+  font-size: 0.78rem;
+  color: var(--paper-dim);
+}
+
+.slot-warn {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--paint);
+  font-size: 0.85rem;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

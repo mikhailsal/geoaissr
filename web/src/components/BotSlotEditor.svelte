@@ -86,12 +86,12 @@
 
 <div class="bot-editor">
   {#if slot.disabledReason}
-    <p class="warn-line" role="status">{slot.disabledReason}</p>
+    <p class="slot-warn" role="status">{slot.disabledReason}</p>
   {/if}
 
-  <div class="row-2">
-    <label class="field">
-      <span class="lbl">Имя бота</span>
+  <div class="slot-row">
+    <label class="slot-field">
+      <span class="slot-label">Имя бота</span>
       <input
         type="text"
         class="field-input"
@@ -105,8 +105,8 @@
       />
     </label>
 
-    <label class="field toggle-field">
-      <span class="lbl">Участвует</span>
+    <label class="slot-field toggle-field">
+      <span class="slot-label">Участвует</span>
       <button
         type="button"
         class="btn"
@@ -133,9 +133,9 @@
     }}
   />
 
-  <div class="row-2">
-    <label class="field">
-      <span class="lbl">{isDetective ? RU.playStyle.brainHarness : 'CLI-харнесс'}</span>
+  <div class="slot-row">
+    <label class="slot-field">
+      <span class="slot-label">{isDetective ? RU.playStyle.brainHarness : 'CLI-харнесс'}</span>
       <select
         class="field-select"
         disabled={!isHost}
@@ -152,8 +152,8 @@
       </select>
     </label>
 
-    <div class="field">
-      <label class="lbl" for="model-{slot.id}"
+    <div class="slot-field">
+      <label class="slot-label" for="model-{slot.id}"
         >{isDetective ? RU.playStyle.brainModel : 'Модель'}</label
       >
       {#if modelChoices.length > 0 && !customModelMode}
@@ -207,13 +207,13 @@
   </div>
 
   {#if slotHarnesses(slot).includes('agy')}
-    <p class="warn-line" role="note">{RU.lobby.agyPrivacyWarning}</p>
+    <p class="slot-warn" role="note">{RU.lobby.agyPrivacyWarning}</p>
   {/if}
 
   <BotPlayStyle config={slot} {availableHarnesses} {roundDurationSec} {isHost} {onUpdate} />
 
-  <div class="preset-bar" role="group" aria-label="Уровень сложности бота">
-    <span class="lbl">Сложность ({PRESET_LABELS[slot.difficultyPreset]})</span>
+  <div class="slot-group" role="group" aria-label="Уровень сложности бота">
+    <span class="slot-label">Сложность ({PRESET_LABELS[slot.difficultyPreset]})</span>
     <div class="preset-btns">
       {#each ['novice', 'amateur', 'master'] as const as preset (preset)}
         <button
@@ -231,9 +231,9 @@
     </div>
   </div>
 
-  <div class="row-2">
-    <label class="field">
-      <span class="lbl">Усилия (effort)</span>
+  <div class="slot-row">
+    <label class="slot-field">
+      <span class="slot-label">Усилия (effort)</span>
       <select
         class="field-select"
         disabled={!isHost}
@@ -248,8 +248,8 @@
       </select>
     </label>
 
-    <label class="field">
-      <span class="lbl">
+    <label class="slot-field">
+      <span class="slot-label">
         Лимит ходов: {slot.moveLimit === 0 ? RU.lobby.turnZeroLabel : slot.moveLimit}
       </span>
       <input
@@ -264,7 +264,7 @@
           if (Number.isFinite(val)) onUpdate({ moveLimit: Math.max(0, Math.min(20, val)) });
         }}
       />
-      <span class="hint">{RU.lobby.turnHint}</span>
+      <span class="slot-hint">{RU.lobby.turnHint}</span>
     </label>
   </div>
 
@@ -307,7 +307,7 @@
   </div>
 
   {#if visionSlowWarning && slot.lastVisionCheck}
-    <p class="warn-line" role="note">
+    <p class="slot-warn" role="note">
       Проверка заняла {formatSecondsOnly(slot.lastVisionCheck.elapsedMs / 1000)} — больше половины бюджета
       ({slot.budgetSec} с). Увеличьте бюджет или выберите более быструю модель.
     </p>
@@ -324,37 +324,9 @@
     background-color: var(--asphalt-900);
   }
 
-  .row-2 {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: var(--sp-3);
-  }
-
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .lbl {
-    font-size: 0.85rem;
-    color: var(--paper-dim);
-  }
-
-  .hint {
-    font-size: 0.78rem;
-    color: var(--paper-dim);
-  }
-
   .custom-model-row {
     display: flex;
     gap: var(--sp-2);
-  }
-
-  .preset-bar {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
   }
 
   .preset-btns {
@@ -374,13 +346,5 @@
     flex: 1;
     font-size: 0.86rem;
     color: var(--paper-dim);
-  }
-
-  .warn-line {
-    margin: 0;
-    padding: 0.45rem 0.65rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--paint);
-    font-size: 0.85rem;
   }
 </style>

@@ -26,11 +26,11 @@
   );
 </script>
 
-<fieldset class="eyes">
-  <legend class="lbl">{RU.playStyle.eyesLegend}</legend>
-  <div class="row-2">
-    <label class="field">
-      <span class="lbl">{RU.playStyle.eyesHarness}</span>
+<fieldset class="eyes slot-group">
+  <legend class="slot-label">{RU.playStyle.eyesLegend}</legend>
+  <div class="slot-row">
+    <label class="slot-field">
+      <span class="slot-label">{RU.playStyle.eyesHarness}</span>
       <select
         class="field-select"
         disabled={!isHost}
@@ -53,8 +53,8 @@
 
     {#if slot.eyes}
       {@const eyes = slot.eyes}
-      <label class="field">
-        <span class="lbl">{RU.playStyle.eyesModel}</span>
+      <label class="slot-field">
+        <span class="slot-label">{RU.playStyle.eyesModel}</span>
         <select
           class="field-select"
           disabled={!isHost}
@@ -70,39 +70,14 @@
       </label>
     {/if}
   </div>
-  <span class="hint">{RU.playStyle.eyesHint}</span>
+  <span class="slot-hint">{RU.playStyle.eyesHint}</span>
 </fieldset>
 
 <style>
   .eyes {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
     margin: 0;
     padding: var(--sp-2) var(--sp-3) var(--sp-3);
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
-  }
-
-  .row-2 {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: var(--sp-3);
-  }
-
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .lbl {
-    font-size: 0.85rem;
-    color: var(--paper-dim);
-  }
-
-  .hint {
-    font-size: 0.78rem;
-    color: var(--paper-dim);
   }
 </style>

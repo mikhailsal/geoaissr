@@ -21,8 +21,8 @@
   const fallback = $derived(fallbackNote(slot, roundDurationSec));
 </script>
 
-<div class="style-bar" role="group" aria-label={RU.playStyle.label}>
-  <span class="lbl">{RU.playStyle.label}</span>
+<div class="slot-group" role="group" aria-label={RU.playStyle.label}>
+  <span class="slot-label">{RU.playStyle.label}</span>
   <div class="style-btns">
     {#each PLAY_STYLES as style (style)}
       <button
@@ -39,7 +39,7 @@
       </button>
     {/each}
   </div>
-  <span class="hint">
+  <span class="slot-hint">
     {#if selected === 'detective'}
       {RU.playStyle.detectiveHint}. {DETECTIVE_BUDGET_HINT}
     {:else}
@@ -47,7 +47,7 @@
     {/if}
   </span>
   {#if fallback}
-    <p class="warn-line" role="note">{fallback}</p>
+    <p class="slot-warn" role="note">{fallback}</p>
   {/if}
   {#if selected === 'detective'}
     <BotEyesPicker config={slot} {availableHarnesses} {isHost} {onUpdate} />
@@ -55,33 +55,9 @@
 </div>
 
 <style>
-  .style-bar {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-
   .style-btns {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
-  }
-
-  .lbl {
-    font-size: 0.85rem;
-    color: var(--paper-dim);
-  }
-
-  .hint {
-    font-size: 0.78rem;
-    color: var(--paper-dim);
-  }
-
-  .warn-line {
-    margin: 0;
-    padding: 0.45rem 0.65rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--paint);
-    font-size: 0.85rem;
   }
 </style>

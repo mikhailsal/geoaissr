@@ -114,3 +114,16 @@ export function resolvePlayStyle(slot: StyleSlot, roundDurationSec: number): Res
   }
   return { style: 'detective' };
 }
+
+/**
+ * Why the slot cannot play a round of this duration: the harness check for the style it would
+ * really play there. A Detective that falls back to Intuit needs only the brain's harness.
+ */
+export function roundHarnessProblem(
+  slot: RoleSlot & StyleSlot,
+  roundDurationSec: number,
+  catalog: readonly Pick<HarnessCatalogEntry, 'id' | 'available' | 'reason'>[],
+): string | undefined {
+  const { style } = resolvePlayStyle(slot, roundDurationSec);
+  return harnessProblem({ ...slot, playStyle: style }, catalog);
+}

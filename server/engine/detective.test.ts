@@ -4,7 +4,7 @@ import type { HarnessCatalogEntry } from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
 import { patchJournalStep } from './journal.ts';
 import { reduce } from './reduce.ts';
-import { projectView } from './view.ts';
+import { computeStartBlockedReasons, projectView } from './view.ts';
 import {
   createInitialRoomState,
   type EngineEffect,
@@ -354,23 +354,53 @@ test('a stored vision check of a Detective follows its eyes, not its brain', () 
   expect(eyesEdit.settings.bots[0]?.lastVisionCheck).toBeUndefined();
 });
 
-test('a Detective whose eyes harness is gone stays in the lobby, and so does its round', () => {
+// Value: protects=«Проверить зрение» results stay tied to the CLI that ran them; fails_when=the eyes move to another harness that lists the same model id and the old check still shows as passed; why_new=the stored check names no harness and only the model was compared; seam=none; no_claim=how a real agy install names its models.
+test('a vision check does not follow the eyes to another harness with the same model id', () => {
+  const agy: HarnessCatalogEntry = { ...AGY_MISSING, available: true, models: ['haiku'] };
+  const { room, botId } = withBot(120, [CLAUDE, CODEX, agy]);
+  const detective = patchBot(room, botId, { playStyle: 'detective' });
+  const model = detective.settings.bots[0]?.model ?? '';
+  const check = {
+    passed: true,
+    elapsedMs: 900,
+    model,
+    effort: 'low' as const,
+    imageSize: detective.settings.bots[0]?.imageSize ?? 400,
+    checkedAt: '2026-11-24T10:00:00.000Z',
+  };
+  const checked = reduce(detective, { type: 'update_bot_vision_check', botId, check }, 140).state;
+  // The brain's own harness with the same model: the eyes did not change, the check stays.
+  const same = patchBot(checked, botId, { eyes: { harness: 'claude', model } });
+  expect(same.settings.bots[0]?.lastVisionCheck).toEqual(check);
+  const moved = patchBot(same, botId, { eyes: { harness: 'agy', model } });
+  expect(moved.settings.bots[0]?.eyes).toEqual({ harness: 'agy', model });
+  expect(moved.settings.bots[0]?.lastVisionCheck).toBeUndefined();
+});
+
+test('a Detective whose eyes harness is gone blocks the start and is disabled on edit', () => {
   const { room, botId } = detectiveLobby();
   const split = patchBot(room, botId, { eyes: { harness: 'codex' } });
   const gone = {
     ...split,
     availableHarnesses: [CLAUDE, { ...CODEX, available: false, reason: 'codex не найден' }],
   };
-  // The next edit of the slot says why it cannot play.
+  // The lobby names the bot, as it does for a missing brain harness, and the match does not start.
+  const reasons = computeStartBlockedReasons(gone);
+  expect(reasons).toHaveLength(1);
+  expect(reasons[0]).toMatch(/^ИИ-бот «.+» недоступен в текущей среде$/);
+  const start = reduce(gone, { type: 'start_match', playerId: 'h' }, 1000);
+  expect(start.ack).toBe('invalid');
+  expect(start.effects.some((e) => e.type === 'start_bot_processes')).toBe(false);
+  // The next edit of the slot says why it cannot play, and the start is free again.
   const edited = patchBot(gone, botId, { name: 'Сыщик' });
   expect(edited.settings.bots[0]).toMatchObject({
     enabled: false,
     disabledReason: 'Глаза детектива: codex не найден',
   });
-  // A round started anyway does not launch the bot.
-  const played = startRound(gone);
-  expect(played.room.loadingOrActive?.bots[botId]).toBeUndefined();
-  expect(played.effects.some((e) => e.type === 'start_bot_processes')).toBe(false);
+  expect(computeStartBlockedReasons(edited)).toEqual([]);
+  // A Detective in a round too short for it plays Intuit and needs only the brain's harness.
+  const short = { ...gone, settings: { ...gone.settings, roundDurationSec: 60 } };
+  expect(computeStartBlockedReasons(short)).toEqual([]);
 });
 
 test('a brain that could open the frames is marked on the result card', () => {

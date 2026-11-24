@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { BotCostEstimate, BotTokenUsage } from '../../../shared/bot-results.ts';
 import type { EffortLevel } from '../../../shared/bot-tools.ts';
-import type { DetectiveRole } from '../../../shared/detective-tools.ts';
+import { DETECTIVE_ROLES, type DetectiveRole } from '../../../shared/detective-tools.ts';
 import { EYES_EFFORT, eyesModel, type RoleModel } from '../../../shared/play-style.ts';
 import type { BotSlotConfig } from '../../../shared/storage-schemas.ts';
 import type { ActiveBotHandle } from '../process.ts';
@@ -60,7 +60,7 @@ async function estimateRoles(
   if (!estimateCost) return null;
   const models = roleModels(run.params.slot);
   const parts = await Promise.all(
-    (['brain', 'eyes'] as const).flatMap((role) => {
+    DETECTIVE_ROLES.flatMap((role) => {
       const usage = roleUsage[role];
       return usage ? [estimateCost(models[role].model, usage)] : [];
     }),

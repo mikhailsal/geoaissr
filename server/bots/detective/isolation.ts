@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs';
-import type { DetectiveRole } from '../../../shared/detective-tools.ts';
+import { DETECTIVE_ROLES, type DetectiveRole } from '../../../shared/detective-tools.ts';
 import { agyToolAuditPath } from '../adapters/agy.ts';
 import { logAgyToolAttempts, logBotDiagnostic } from '../diagnostics.ts';
 import { roleModels, roleWorkDir, runIds, type DetectiveRun } from './run.ts';
@@ -53,7 +53,7 @@ export function createIsolationCheck(run: DetectiveRun): (() => void) | undefine
 export function attachAgyAudits(run: DetectiveRun): void {
   const { params, handle } = run;
   const models = roleModels(params.slot);
-  const agyRoles = (['brain', 'eyes'] as const).filter((role) => models[role].harness === 'agy');
+  const agyRoles = DETECTIVE_ROLES.filter((role) => models[role].harness === 'agy');
   if (agyRoles.length === 0) return;
   handle.flushDiagnostics = () => {
     for (const role of agyRoles) flushRoleAudit(run, role);

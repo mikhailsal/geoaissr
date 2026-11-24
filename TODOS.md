@@ -110,6 +110,17 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 **Priority:** P3
 **Depends on:** milestone M4
 
+### Lobby captions below 14 px
+
+**What:** Raise the label and caption sizes of the lobby bot settings to the 14 px minimum of `DESIGN.md`. The slot form rules in `web/src/styles/global.css` (`.slot-label` 0.85rem, `.slot-hint` 0.78rem) and the same sizes in `BotSlotAdvanced`, `BotCard`, `HostMenu` and other lobby components are below it.
+
+**Why:** Small grey text on the dark lobby is hard to read. Raising one component alone would make it stand out, so all of them change in one pass.
+
+**Context:** Found by the design review of PR #26 (2026-11-24); the owner chose to keep the current sizes in that PR.
+
+**Effort:** S
+**Priority:** P3
+
 ### Human guess versus bot pin trail on the results map
 
 **What:** On the results screen, draw the bot's pin trail (its `current_guess` after each step) next to the human's pin, so a player sees where the bot's belief moved and where their own guess sat.
@@ -187,6 +198,7 @@ The owner put these aside to build the Detective play style first. Nothing here 
 - `settledIds` and `movesAtDelivery` grow by one entry per request (`server/bots/detective/state.ts`); a round has a few dozen at most.
 - Calls are serialized per role, so a `final_guess` sent in parallel with a waiting `ask` would queue behind it (`server/bots/detective/session.ts`). No CLI in use sends parallel calls.
 - One integration test waits a fixed 700 ms before checking that no second finish event came (`test/detective.integration.test.ts`).
+- A drive request has no direct broker test for a timeout, the eyes going down, the session closing or a late answer (`server/bots/detective/broker.ts`); the same paths are tested for the other request kinds.
 
 **Why:** Recorded so they are not lost; each is a short fix or a prompt edit.
 

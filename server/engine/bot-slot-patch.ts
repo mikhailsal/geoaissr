@@ -162,6 +162,9 @@ export function mergeBotSlotPatch(
   if (nameFollowsModel && (next.model !== slot.model || typeof patch.name === 'string')) {
     next.name = botNameFromModel(next.model);
   }
-  next.lastVisionCheck = keepVisionCheck(next);
+  // The stored check does not name its harness: one run by another CLI does not count, even
+  // when that CLI lists the same model id.
+  next.lastVisionCheck =
+    visionSubject(slot).harness === visionSubject(next).harness ? keepVisionCheck(next) : undefined;
   return next;
 }

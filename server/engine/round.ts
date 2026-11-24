@@ -1,5 +1,5 @@
 import { normalizeLongitude } from '../../shared/bot-tools.ts';
-import { harnessProblem, resolvePlayStyle } from '../../shared/play-style.ts';
+import { resolvePlayStyle, roundHarnessProblem } from '../../shared/play-style.ts';
 import { COUNTDOWN_MS, PANO_LOAD_TIMEOUT_MS, ROUND_INTRO_MS } from '../../shared/protocol.ts';
 import { finishActiveRoundToResults } from './results.ts';
 import type {
@@ -20,12 +20,7 @@ function buildInitialBotsForRound(state: RoomState): {
   const duration = state.settings.roundDurationSec;
   // A bot plays only when every harness of the style it plays is ready: a Detective may need two.
   const enabledBots = state.settings.bots.filter(
-    (b) =>
-      b.enabled &&
-      harnessProblem(
-        { ...b, playStyle: resolvePlayStyle(b, duration).style },
-        state.availableHarnesses,
-      ) === undefined,
+    (b) => b.enabled && roundHarnessProblem(b, duration, state.availableHarnesses) === undefined,
   );
 
   const bots: Record<string, BotRoundState> = {};
