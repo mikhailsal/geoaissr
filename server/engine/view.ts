@@ -132,6 +132,9 @@ function projectResults(state: RoomState, viewerIsHost: boolean): ClientViewStat
         ? (state.wins6h.byBotId[entry.id] ?? 0)
         : (state.wins6h.byProfileId[state.players[entry.id]?.profileId ?? ''] ?? 0),
     })),
+    matchLeaders: computeFinalRankings(state)
+      .filter(({ rank }) => rank === 1)
+      .map(({ item }) => item.name),
     humanVsAi: res.humanVsAi,
   };
 }

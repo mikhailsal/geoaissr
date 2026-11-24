@@ -351,6 +351,7 @@ export interface ClientViewState {
     targetLng: number;
     countryNameRu: string;
     entries: RoundResultEntryView[];
+    matchLeaders: string[];
     humanVsAi: {
       visible: boolean;
       humansRound: number;

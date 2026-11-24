@@ -2,6 +2,12 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.3.5] - 2026-11-24
+
+### Changed
+
+- See the match leader after each round. The results table shows the points each participant earned that round and their running total. When players share first place under the final standings rules, the results name all of them.
+
 ## [0.3.4] - 2026-11-24
 
 ### Changed

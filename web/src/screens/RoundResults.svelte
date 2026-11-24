@@ -126,6 +126,12 @@
           <h1 class="display-title round-title">
             {RU.round.roundTitle(view.roundNumber, view.totalRounds)}
           </h1>
+          {#if res.matchLeaders.length}
+            <p class="match-lead">
+              {res.matchLeaders.length === 1 ? 'Лидер партии' : 'Лидеры партии'}:
+              <strong>{res.matchLeaders.join(', ')}</strong>
+            </p>
+          {/if}
           {#if myEntry}
             <p class="personal-line">
               Ваш результат: {formatNumberRu(myEntry.roundScore)} очков
@@ -154,16 +160,29 @@
         <table class="results-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th aria-label="Место в раунде">#</th>
               <th>Участник</th>
-              <th>Дистанция</th>
-              <th class="num-col">Очки</th>
+              <th class="distance-col">Дистанция</th>
+              <th class="num-col">За раунд</th>
+              <th class="num-col">Всего</th>
               <th class="act-col"></th>
             </tr>
           </thead>
           <tbody>
             {#each res.entries as entry (entry.id)}
               {@const cardOpen = activeBotCard?.entry.id === entry.id}
+              {#snippet distance()}
+                {#if entry.distanceKm !== null}
+                  {formatDistanceRu(entry.distanceKm)}
+                {:else}
+                  <span class="muted"
+                    >{entry.isAi ? RU.results.noBotGuess : RU.results.noHumanAnswer}</span
+                  >
+                  {#if entry.isAi && entry.terminationReason && entry.terminationReason !== 'normal'}
+                    <span class="muted">· {entry.terminationReason}</span>
+                  {/if}
+                {/if}
+              {/snippet}
               {#snippet whyButton()}
                 <button
                   type="button"
@@ -199,22 +218,17 @@
                     />
                     <span class="p-name">{entry.name}</span>
                   </div>
+                  <div class="distance-inline">
+                    <span class="sr-only">Дистанция: </span>{@render distance()}
+                  </div>
                   <!-- On a narrow table the trigger moves under the name so it is never off screen. -->
                   {#if entry.isAi}<div class="why-inline">{@render whyButton()}</div>{/if}
                 </td>
-                <td>
-                  {#if entry.distanceKm !== null}
-                    {formatDistanceRu(entry.distanceKm)}
-                  {:else}
-                    <span class="muted"
-                      >{entry.isAi ? RU.results.noBotGuess : RU.results.noHumanAnswer}</span
-                    >
-                    {#if entry.isAi && entry.terminationReason && entry.terminationReason !== 'normal'}
-                      <span class="muted">· {entry.terminationReason}</span>
-                    {/if}
-                  {/if}
+                <td class="distance-col">
+                  {@render distance()}
                 </td>
-                <td class="num-col"><strong>{formatNumberRu(entry.roundScore)}</strong></td>
+                <td class="num-col">{formatNumberRu(entry.roundScore)}</td>
+                <td class="num-col"><strong>{formatNumberRu(entry.totalScore)}</strong></td>
                 <td class="act-col">
                   {#if entry.isAi}{@render whyButton()}{/if}
                 </td>
@@ -222,7 +236,7 @@
 
               {#if cardOpen && activeBotCard}
                 <tr class="bot-card-row">
-                  <td colspan={5}>
+                  <td colspan={6}>
                     <BotCard
                       {entry}
                       roundNumber={view.roundNumber}
@@ -320,6 +334,15 @@
     color: var(--paint);
   }
 
+  .match-lead {
+    margin: var(--sp-1) 0 0;
+    overflow-wrap: anywhere;
+  }
+
+  .p-name {
+    overflow-wrap: anywhere;
+  }
+
   .personal-line,
   .muted {
     margin: 0.25rem 0 0;
@@ -391,6 +414,23 @@
     min-height: 44px;
     padding: 0 0.65rem;
     font-size: 0.85rem;
+  }
+
+  .distance-inline {
+    display: none;
+    color: var(--paper-dim);
+    font-size: var(--text-xs);
+    overflow-wrap: anywhere;
+  }
+
+  @container (max-width: 360px) {
+    .distance-inline {
+      display: block;
+    }
+
+    .distance-col {
+      display: none;
+    }
   }
 
   .why-inline {
