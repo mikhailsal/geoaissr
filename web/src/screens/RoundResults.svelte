@@ -474,8 +474,10 @@
   @media (max-width: 899px) {
     .results-layout {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: 42dvh 1fr;
+      grid-template-rows: 42dvh auto;
+      height: auto;
       min-height: 100dvh;
+      overflow: visible;
     }
   }
 </style>

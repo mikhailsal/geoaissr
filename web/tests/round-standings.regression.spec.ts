@@ -101,7 +101,13 @@ test('round results default to per-round scores and reveal ordered match standin
     }
     expectDescendingRankedTotals(firstStandings);
 
+    await page.setViewportSize({ width: 653, height: 280 });
+    const lastScore = page.getByTestId('match-standings-table').getByRole('row').last();
+    await lastScore.scrollIntoViewIfNeeded();
+    await expect(lastScore).toBeInViewport({ ratio: 0.9 });
+
     await page.getByRole('button', { name: 'Дальше', exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 720 });
     await finishRound(page);
     const roundTwo = await readRoundScores(page);
     await expect(page.getByRole('tab', { name: 'Раунд' })).toHaveAttribute('aria-selected', 'true');
