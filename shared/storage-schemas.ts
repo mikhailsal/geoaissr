@@ -65,6 +65,8 @@ export const botSlotConfigSchema = z.object({
   playStyle: z.enum(PLAY_STYLES).optional(),
   /** Detective only: where the eyes run. Absent means on the brain's harness and model. */
   eyes: roleModelSchema.optional(),
+  /** Detective only: the effort the eyes look at. Absent means low (`EYES_EFFORT`). */
+  eyesEffort: z.enum(EFFORT_LEVELS).optional(),
   difficultyPreset: z.enum(DIFFICULTY_PRESETS),
   personalityPreset: z.enum(PERSONALITY_PRESETS),
   personalityText: personalityTextSchema,

@@ -159,6 +159,8 @@ export function mergeBotSlotPatch(
   if (changedTuning) {
     next.difficultyPreset = 'custom';
   }
+  // The presets tune the brain only, so the eyes' effort leaves the preset as it is.
+  if (typeof patch.eyesEffort === 'string') next.eyesEffort = patch.eyesEffort as EffortLevel;
   if (nameFollowsModel && (next.model !== slot.model || typeof patch.name === 'string')) {
     next.name = botNameFromModel(next.model);
   }

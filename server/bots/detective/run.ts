@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { BotCostEstimate, BotTokenUsage } from '../../../shared/bot-results.ts';
 import type { EffortLevel } from '../../../shared/bot-tools.ts';
 import { DETECTIVE_ROLES, type DetectiveRole } from '../../../shared/detective-tools.ts';
-import { EYES_EFFORT, eyesModel, type RoleModel } from '../../../shared/play-style.ts';
+import { eyesEffortOf, eyesModel, type RoleModel } from '../../../shared/play-style.ts';
 import type { BotSlotConfig } from '../../../shared/storage-schemas.ts';
 import type { ActiveBotHandle } from '../process.ts';
 import type { RoundBotParams, RunnerCtx } from '../runner-types.ts';
@@ -43,9 +43,9 @@ export function roleModels(slot: BotSlotConfig): Record<DetectiveRole, RoleModel
   return { brain: { harness: slot.harness, model: slot.model }, eyes: eyesModel(slot) };
 }
 
-/** The brain thinks at the slot's effort; describing frames needs little thinking. */
+/** The brain thinks at the slot's effort, the eyes at their own (low unless the host set one). */
 export function roleEffort(slot: BotSlotConfig, role: DetectiveRole): EffortLevel {
-  return role === 'brain' ? slot.effort : EYES_EFFORT;
+  return role === 'brain' ? slot.effort : eyesEffortOf(slot);
 }
 
 /**

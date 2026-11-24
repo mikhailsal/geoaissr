@@ -2,7 +2,7 @@
 import { expect, test } from 'bun:test';
 import type { BotCostEstimate, BotTokenUsage } from '../../../shared/bot-results.ts';
 import type { BotSlotConfig } from '../../../shared/storage-schemas.ts';
-import { estimateRoles } from './run.ts';
+import { estimateRoles, roleEffort } from './run.ts';
 
 const SLOT: BotSlotConfig = {
   id: 's',
@@ -52,4 +52,12 @@ test('the price stays unknown while one process has no usage to price', async ()
   expect(brainOnly?.matchedModelId).toBe('claude-haiku-5-5');
   const eyesOnly = await estimateRoles(run, { eyes: tokens(400) });
   expect(eyesOnly?.costUsd).toBeNull();
+});
+
+// Value: protects=each process of a Detective launches at its own effort; fails_when=the eyes launch at the brain's effort or ignore eyesEffort; why_new=the eyes had one fixed effort; seam=none; no_claim=how a CLI reads the effort flag.
+test('the brain launches at the slot effort and the eyes at theirs, low by default', () => {
+  expect(roleEffort(SLOT, 'brain')).toBe('medium');
+  expect(roleEffort(SLOT, 'eyes')).toBe('low');
+  expect(roleEffort({ ...SLOT, eyesEffort: 'high' }, 'eyes')).toBe('high');
+  expect(roleEffort({ ...SLOT, eyesEffort: 'high' }, 'brain')).toBe('medium');
 });

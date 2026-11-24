@@ -12,7 +12,10 @@ export type PlayStyle = (typeof PLAY_STYLES)[number];
 /** Below this budget the scene report and two requests do not fit into the round. */
 export const DETECTIVE_MIN_BUDGET_SEC = 90;
 
-/** Describing frames needs no long thinking; the spikes measured the eyes at low effort. */
+/**
+ * The eyes' effort when the slot sets none: describing frames needs no long thinking, and the
+ * spikes measured the eyes at low effort.
+ */
 export const EYES_EFFORT: EffortLevel = 'low';
 
 /** Why a bot set to Detective plays Intuit in this match. */
@@ -44,11 +47,18 @@ export interface RoleSlot {
   effort: EffortLevel;
   /** Detective only: the eyes' own CLI and model; absent means the brain's. */
   eyes?: RoleModel | undefined;
+  /** Detective only: the eyes' effort; absent means `EYES_EFFORT`. */
+  eyesEffort?: EffortLevel | undefined;
 }
 
 /** Where the eyes of a Detective run: their own harness and model, or the brain's. */
 export function eyesModel(slot: RoleSlot): RoleModel {
   return slot.eyes ?? { harness: slot.harness, model: slot.model };
+}
+
+/** The effort the eyes of a Detective look at; the brain thinks at the slot's `effort`. */
+export function eyesEffortOf(slot: RoleSlot): EffortLevel {
+  return slot.eyesEffort ?? EYES_EFFORT;
 }
 
 /** The eyes run on another CLI or model than the brain. */
@@ -86,7 +96,7 @@ export function harnessProblem(
  * eyes, at the effort they play with.
  */
 export function visionSubject(slot: RoleSlot): RoleModel & { effort: EffortLevel } {
-  if (slot.playStyle === 'detective') return { ...eyesModel(slot), effort: EYES_EFFORT };
+  if (slot.playStyle === 'detective') return { ...eyesModel(slot), effort: eyesEffortOf(slot) };
   return { harness: slot.harness, model: slot.model, effort: slot.effort };
 }
 

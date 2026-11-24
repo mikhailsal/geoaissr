@@ -110,6 +110,12 @@ test('the host runs the eyes of a Detective on another harness and model', async
     await expect(model).toHaveValue('gpt-6-luna');
     await model.selectOption('gpt-5.4');
     await expect(model).toHaveValue('gpt-5.4');
+    // The eyes have their own effort, low by default; the brain's keeps its own label.
+    const eyesEffort = eyes.getByLabel('Усилия глаз (effort)');
+    await expect(eyesEffort).toHaveValue('low');
+    await eyesEffort.selectOption('medium');
+    await expect(eyesEffort).toHaveValue('medium');
+    await expect(page.getByLabel('Усилия мозга (effort)')).toBeVisible();
     await expect(page.getByText(/^Читает файлы владельца/)).toHaveCount(0);
     await assertAxeClean(page, 'BotEyesPicker');
     await page.keyboard.press('Escape');

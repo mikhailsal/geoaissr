@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { HarnessCatalogEntry } from '$shared/protocol';
+  import { EFFORT_LEVELS } from '$shared/bot-tools';
+  import { eyesEffortOf } from '$shared/play-style';
   import type { BotSlotConfig } from '$shared/storage-schemas';
-  import { RU } from '../i18n/ru';
+  import { EFFORT_LABELS, RU } from '../i18n/ru';
 
   /** Where the eyes of a Detective run: on the brain's model, or on a harness and model of their own. */
   interface Props {
@@ -69,6 +71,22 @@
         </select>
       </label>
     {/if}
+
+    <label class="slot-field">
+      <span class="slot-label">{RU.playStyle.eyesEffort}</span>
+      <select
+        class="field-select"
+        disabled={!isHost}
+        value={eyesEffortOf(slot)}
+        onchange={(e) => {
+          onUpdate({ eyesEffort: e.currentTarget.value });
+        }}
+      >
+        {#each EFFORT_LEVELS as lvl (lvl)}
+          <option value={lvl}>{EFFORT_LABELS[lvl]}</option>
+        {/each}
+      </select>
+    </label>
   </div>
   <span class="slot-hint">{RU.playStyle.eyesHint}</span>
 </fieldset>

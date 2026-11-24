@@ -354,6 +354,29 @@ test('a stored vision check of a Detective follows its eyes, not its brain', () 
   expect(eyesEdit.settings.bots[0]?.lastVisionCheck).toBeUndefined();
 });
 
+// Value: protects=the eyes' effort is a setting of its own; fails_when=the patch ignores eyesEffort, marks the brain's preset as custom, or a vision check made at the old eyes effort still counts; why_new=the eyes always looked at low; seam=none; no_claim=how the picker renders.
+test('the eyes of a Detective get their own effort, and a check at the old one stops counting', () => {
+  const { room, botId } = detectiveLobby();
+  const bot = room.settings.bots[0];
+  const check = {
+    passed: true,
+    elapsedMs: 900,
+    model: bot?.model ?? '',
+    effort: 'low' as const,
+    imageSize: bot?.imageSize ?? 400,
+    checkedAt: '2026-11-24T10:00:00.000Z',
+  };
+  const checked = reduce(room, { type: 'update_bot_vision_check', botId, check }, 140).state;
+  const preset = checked.settings.bots[0]?.difficultyPreset;
+  const medium = patchBot(checked, botId, { eyesEffort: 'medium' });
+  expect(medium.settings.bots[0]).toMatchObject({
+    eyesEffort: 'medium',
+    effort: bot?.effort,
+    difficultyPreset: preset,
+  });
+  expect(medium.settings.bots[0]?.lastVisionCheck).toBeUndefined();
+});
+
 // Value: protects=«Проверить зрение» results stay tied to the CLI that ran them; fails_when=the eyes move to another harness that lists the same model id and the old check still shows as passed; why_new=the stored check names no harness and only the model was compared; seam=none; no_claim=how a real agy install names its models.
 test('a vision check does not follow the eyes to another harness with the same model id', () => {
   const agy: HarnessCatalogEntry = { ...AGY_MISSING, available: true, models: ['haiku'] };

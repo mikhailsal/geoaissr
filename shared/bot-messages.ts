@@ -39,6 +39,8 @@ export const botSlotPatchSchema = z.object({
     .strict()
     .nullable()
     .optional(),
+  /** The effort the eyes of a Detective look at; the brain keeps `effort`. */
+  eyesEffort: z.enum(EFFORT_LEVELS).optional(),
   personalityPreset: z.enum(PERSONALITY_PRESETS).optional(),
   personalityText: personalityTextSchema.optional(),
 });

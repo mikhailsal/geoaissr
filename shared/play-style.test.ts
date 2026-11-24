@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import {
   DETECTIVE_MIN_BUDGET_SEC,
   eyesDiffer,
+  eyesEffortOf,
   eyesModel,
   resolvePlayStyle,
   slotHarnesses,
@@ -80,5 +81,17 @@ test('the vision check tests the eyes of a Detective at their low effort', () =>
     harness: 'claude',
     model: 'claude-opus-5-5',
     effort: 'high',
+  });
+});
+
+// Value: protects=the host's choice of how hard the eyes of a Detective think, separate from the brain; fails_when=the eyes ignore eyesEffort and stay at low, or the brain's effort leaks into the eyes; why_new=the eyes had one fixed effort; seam=none; no_claim=which efforts a CLI accepts.
+test('the eyes of a Detective look at their own effort, low when the slot sets none', () => {
+  const split = { ...BRAIN, eyes: { harness: 'codex', model: 'gpt-6-luna' } } as const;
+  expect(eyesEffortOf(split)).toBe('low');
+  expect(eyesEffortOf({ ...split, eyesEffort: 'medium' })).toBe('medium');
+  expect(visionSubject({ ...split, eyesEffort: 'medium' })).toEqual({
+    harness: 'codex',
+    model: 'gpt-6-luna',
+    effort: 'medium',
   });
 });

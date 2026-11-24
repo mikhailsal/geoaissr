@@ -233,7 +233,7 @@
 
   <div class="slot-row">
     <label class="slot-field">
-      <span class="slot-label">Усилия (effort)</span>
+      <span class="slot-label">{isDetective ? RU.playStyle.brainEffort : 'Усилия (effort)'}</span>
       <select
         class="field-select"
         disabled={!isHost}

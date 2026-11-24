@@ -153,7 +153,10 @@ export const RU = {
     eyesHarness: 'CLI-харнесс глаз',
     eyesModel: 'Модель глаз',
     eyesSameAsBrain: (harness: string, model: string) => `как у мозга (${harness} · ${model})`,
-    eyesHint: 'Глаза смотрят кадры с низкими усилиями (effort low); мозг — с усилиями слота',
+    eyesEffort: 'Усилия глаз (effort)',
+    eyesHint:
+      'Глаза описывают кадры: обычно хватает низких усилий, и они отвечают быстрее. Усилия мозга задаются ниже',
+    brainEffort: 'Усилия мозга (effort)',
     brainHarness: 'CLI-харнесс мозга',
     brainModel: 'Модель мозга',
     isolationUnconfirmed:
