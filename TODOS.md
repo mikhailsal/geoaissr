@@ -88,6 +88,26 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 **Priority:** P2
 **Depends on:** nothing
 
+### Airports map: notes from the outside review
+
+**What:** Items the adversarial passes of the PR #29 review raised below the blocking floor. They were recorded, not fixed in that PR.
+
+- The Detective place guard builds its word list from the region countries only. The airports map adds 62 countries and territories (Singapore, Hong Kong, Malta and others), so in a round there the eyes can name the country and the brain receives it unmasked. Add the names of every country a map can produce, with a test in both directions (`server/bots/detective/guard.ts`, `airportCountry` in `server/maps/airports.ts`).
+- A panorama inside the 5 km zone can sit across a border from its airport: a street in La Línea, Spain, 1 km from Gibraltar airport is shown and saved as Gibraltar. The round is named after the airport's country by design; show the panorama's own country when finer borders can tell the two apart (`prepareAirportLocation` in `server/location.ts`).
+- When the Street View metadata service is down, a round spends its whole budget (90 lookups, two requests each, 5 s timeout) before it fails, and the error says no panorama was found. The region maps do the same. Stop both loops after a few transport failures in a row and report a network error (`server/location.ts`).
+- `sampleAirportProbe` does not wrap the longitude, so a probe next to the 180th meridian (Fiji, Chukotka, Kiribati) can leave the range and waste a lookup. Wrap it into [-180, 180] and clamp the latitude (`server/maps/airports.ts`).
+- `bun run build:airports` turns a blank coordinate into 0, accepts a header-only CSV and an unfinished quoted field, and writes the dataset in place. Skip rows with a blank coordinate, reject an implausibly small result and an unfinished quote, and write through a temporary file (`scripts/build-airports.ts`). The committed dataset has no zero coordinate.
+- Going back to 0.3.4 after picking the airports map makes the old release move `settings.json` to `settings.json.bad` and start with defaults. Decide with the «Карта» and «Регион» split whether new map ids bump the settings version (`shared/storage-schemas.ts`, `server/storage/migrate.ts`).
+- If the host ends a bot match while the location search is still running, `prepareRound` still requests the four start images before the engine drops the stale result. Check the match generation first (`server/cli/start-runtime.ts`). This is the same for every map.
+- In `--fake` mode the airports map returns the usual fake scenes, so the keyless development path does not show the 5 km rule (`createFakeLocationService` in `server/location.ts`).
+- The settings-file half of the schema test in `shared/regions.test.ts` uses an incomplete fixture that never parses. Start from `createDefaultSettings()`, check that parsing keeps `region: 'airports'` and that an unknown region is rejected.
+
+**Why:** Recorded so they are not lost. The first two change what a player or a bot sees; the rest are hardening.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** nothing
+
 ### Match recovery after a server restart
 
 **What:** Save the room state to disk and resume the match after a crash or restart.
