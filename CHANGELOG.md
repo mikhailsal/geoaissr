@@ -13,6 +13,12 @@ Notable changes to this locally run application are recorded here. Releases are 
 
 - `bun run check` no longer runs out of memory when the checkout holds agent worktrees in `.claude/worktrees`. ESLint, Prettier and git skip that folder.
 
+## [0.3.5] - 2026-11-24
+
+### Changed
+
+- Round results open on the scores for that round. Players can switch to «Рейтинг за игру» to see the cumulative standings, ranked by the same rules as the final results. Hosts can turn off «Показывать рейтинг между раундами» in the lobby to save the overall standings for the end of the game.
+
 ## [0.3.4] - 2026-11-24
 
 ### Changed

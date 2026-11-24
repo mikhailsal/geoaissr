@@ -32,7 +32,7 @@ export function backupUnreadableFile(filePath: string, suffix = '.bad'): string 
 export function migrateObject<T>(opts: {
   rawText: string;
   filePath: string;
-  schema: z.ZodType<T>;
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>;
   defaultValue: () => T;
   migrations: Record<number, MigrationFn>;
   currentVersion?: number;

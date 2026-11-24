@@ -13,6 +13,7 @@ function makeSettings(overrides: Partial<SettingsFile> = {}): SettingsFile {
     roundDurationSec: 90,
     moveEnabled: true,
     aiWaitWindowSec: 30,
+    showMatchStandings: true,
     bots: [],
     ...overrides,
   };
@@ -116,7 +117,17 @@ test('non-host cannot mutate lobby or start match', () => {
   expect(reduce(s, { type: 'update_lobby', playerId: 'g', patch: { rounds: 5 } }, 102).ack).toBe(
     'forbidden',
   );
-  expect(reduce(s, { type: 'start_match', playerId: 'g' }, 103).ack).toBe('forbidden');
+  const hostUpdate = reduce(
+    s,
+    { type: 'update_lobby', playerId: 'h', patch: { showMatchStandings: false } },
+    103,
+  );
+  expect(hostUpdate.ack).toBe('ok');
+  expect(hostUpdate.state.settings.showMatchStandings).toBe(false);
+  expect(hostUpdate.effects).toEqual([
+    { type: 'save_settings', settings: hostUpdate.state.settings },
+  ]);
+  expect(reduce(s, { type: 'start_match', playerId: 'g' }, 104).ack).toBe('forbidden');
 });
 
 test('loading waits for connected humans and the full audio intro before counting down', () => {

@@ -1,7 +1,11 @@
 import { botNameFromModel, PRESET_CONFIGS, type DifficultyPreset } from '../../shared/bot-tools.ts';
 import { avatarAppearanceSchema, type AvatarAppearance } from '../../shared/avatar.ts';
 import { pickFirstFreeColor } from '../../shared/colors.ts';
-import { MAX_BOTS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
+import {
+  MAX_BOTS,
+  type HarnessCatalogEntry,
+  type LobbySettingsPatch,
+} from '../../shared/protocol.ts';
 import type { BotSlotConfig, HarnessId, SettingsFile } from '../../shared/storage-schemas.ts';
 import { eyesPatchInvalid, keepVisionCheck, mergeBotSlotPatch } from './bot-slot-patch.ts';
 import type { PlayerState, ReduceOutput, RoomState } from './types.ts';
@@ -62,9 +66,7 @@ function enforceMinRoundWithBots(settings: SettingsFile): {
 export function handleUpdateLobby(
   state: RoomState,
   playerId: string,
-  patch: Partial<
-    Pick<SettingsFile, 'rounds' | 'roundDurationSec' | 'moveEnabled' | 'region' | 'aiWaitWindowSec'>
-  >,
+  patch: LobbySettingsPatch,
 ): ReduceOutput {
   if (state.phase !== 'LOBBY') return { state, effects: [], ack: 'forbidden' };
   const player = state.players[playerId];

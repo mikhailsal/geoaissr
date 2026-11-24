@@ -9,8 +9,7 @@
   import LobbyStage from '../components/LobbyStage.svelte';
   import type { DifficultyPreset } from '$shared/bot-tools';
   import type { ParticipantColorId } from '$shared/colors';
-  import type { ClientViewState } from '$shared/protocol';
-  import type { RegionId } from '$shared/storage-schemas';
+  import type { ClientViewState, LobbySettingsPatch } from '$shared/protocol';
   import BotSlotEditor from '../components/BotSlotEditor.svelte';
   import HostMenu from '../components/HostMenu.svelte';
   import LobbySettingsPanel from '../components/LobbySettingsPanel.svelte';
@@ -26,13 +25,7 @@
     starting: boolean;
     checkingVisionBotId: string | null;
     visionToastByBot: Record<string, VisionToast | undefined>;
-    onUpdateLobby: (patch: {
-      rounds?: number;
-      roundDurationSec?: number;
-      moveEnabled?: boolean;
-      region?: RegionId;
-      aiWaitWindowSec?: number;
-    }) => void;
+    onUpdateLobby: (patch: LobbySettingsPatch) => void;
     onAddBot: () => void;
     onRemoveBot: (botId: string) => void;
     onUpdateBot: (botId: string, patch: Record<string, unknown>) => void;

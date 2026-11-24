@@ -1,6 +1,7 @@
 import type { ParticipantColorId } from '$shared/colors';
 import type { DifficultyPreset } from '$shared/bot-tools';
-import type { HarnessId, RegionId } from '$shared/storage-schemas';
+import type { LobbySettingsPatch } from '$shared/protocol';
+import type { HarnessId } from '$shared/storage-schemas';
 import type { GeoWsClient } from './ws-client';
 
 export abstract class GameCommands {
@@ -10,13 +11,7 @@ export abstract class GameCommands {
     this.client.sendSequenced('reset_bot_wins', { botId });
   }
 
-  updateLobby(patch: {
-    rounds?: number;
-    roundDurationSec?: number;
-    moveEnabled?: boolean;
-    region?: RegionId;
-    aiWaitWindowSec?: number;
-  }): void {
+  updateLobby(patch: LobbySettingsPatch): void {
     this.client.sendSequenced('update_lobby', { patch });
   }
 
