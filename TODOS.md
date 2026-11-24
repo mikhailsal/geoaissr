@@ -205,6 +205,46 @@ The owner put these aside to build the Detective play style first. Nothing here 
 **Effort:** S
 **Priority:** P3
 
+### Detective: notes from the outside review
+
+**What:** Items the outside voices and the adversarial passes of the PR #26 review raised below the blocking floor. The owner chose to record them, not fix them in that PR.
+
+- The `agy` file guard is checked only when the brain first calls a game tool, and a missing record only marks the round «Изоляция зрения не подтверждена»; the round goes on and the guess counts. The eyes process has no such check. A fail-closed option would refuse the brain's guess (or stop it) when the record is missing. The owner kept the warning for now (`server/bots/detective/isolation.ts`, `server/bots/adapters/agy.ts`).
+- With a `codex` brain and `agy` eyes, the frames are files in the eyes' directory. The brain runs read-only and without a shell, but its image viewer may still be on, nothing confirms it cannot open those files, and the round is not marked. Check with `bun run test:harness --detective --only codex --eyes agy`, then turn the viewer off or refuse the pair (`server/bots/adapters/codex.ts`, `server/bots/detective/isolation.ts`).
+- The eyes always run at low effort, but an `agy` model whose name ends in an effort (`…-medium`) fixes its own, so the low flag is dropped and both the round and «Проверить зрение» run at that model's effort. Pick the low variant of the model or refuse the pair, also when the eyes inherit the brain's model (`server/bots/detective/run.ts`, `server/bots/adapters/agy.ts`).
+- The guard keeps any place word that stands next to a script noun, even across punctuation: «Флаг Японии; буквы латинские», «Япония письмо» and «вывеска в Токио буквы» all reach the brain unchanged. Limit the exception to adjectives, as in «грузинское письмо» (`isScriptName` in `server/bots/detective/guard.ts`).
+- The guard knows no Latin city names, and a letter with a diacritic splits a word: «Tokyo», «Zürich» and «Japón» pass. Fold diacritics before matching and add Latin city stems. In the other direction it refuses ordinary words that equal a city stem, such as «дели», «лос» and «рим»; a refused `ask` costs the brain time.
+- A saved Detective whose eyes CLI is missing is disabled at startup and on any slot edit, although in a round under 90 seconds it would play Intuit with the brain alone. Startup and slot edits should use the round-aware check that the round engine uses (`server/cli/start-runtime.ts`, `server/engine/bot-slot-patch.ts`).
+- Each repeated `observe` renders four new frames that no journal step references; enough repeats can push other frames out of the thumbnail cache. The panoramas themselves are cached, so no Google request is repeated (`server/bots/detective/eyes.ts`, `server/http/thumbs.ts`).
+- When the round deadline finalizes a bot that is waiting for its eyes to exit, the other players do not hear its confirmation cue: `completion.confirmedIds` is built from the state before the finalization (`server/engine/results.ts`).
+- A broken tag inside an inactive `{{#if}}` branch of a prompt file is dropped without an error and shows up only when the bot moves to a harness with the other delivery mode. Check the whole file before choosing branches (`server/bots/prompt-files.ts`).
+- `bun run test:harness --detective` passes when the eyes filed no report and no request was answered, and passes with no harness installed. It should require a report and one answered request, and fail when there is nothing to run (`scripts/test-harness-detective.ts`, `scripts/test-harness.ts`).
+- When the engine throws while it records the bot's finish, the cleanup of the bot (its tokens, handle and work directory) is skipped until the engine stops the bot. Run it in a `finally` (`onBrainExit` in `server/bots/detective/monitor.ts`).
+- A brain that exits cleanly after a checkpoint (an `ask` with `current_guess`, or a refused `final_guess`) is reported as «завершил ход», although its guess was not final. The checkpoint is scored as the fallback guess either way; confirm the label is what the owner wants (`brainOutcome` in `server/bots/detective/monitor.ts`).
+- The eyes' model is checked only for length, not against the harness's model list; the brain's model has the same gap (`server/engine/bot-slot-patch.ts`).
+
+**Why:** Recorded so they are not lost. The first item is a decision the owner may revisit; the rest are short fixes.
+
+**Effort:** M
+**Priority:** P2
+
+### Detective: result card and settings layout
+
+**What:** Five design notes from the outside review of PR #26.
+
+- «кадр N» in the report and in the answers is plain text. It should open that frame, or say that the frame is missing.
+- In a round under 90 seconds the saved style «Детектив» stays highlighted and its eyes settings stay editable, while the style that will play is a note below the help text. Show «В этой партии: Интуит» next to the selector, with a way to the round length setting.
+- «Запрос N» headings do not say what the request was about. Add a short topic and keep the number and the control check label.
+- The brain's harness and model sit above the style choice, the eyes inside it, and the brain's effort lower down as «Усилия (effort)». Group the two roles under the style choice.
+- The token badge shows a count while only one process has reported; the missing one appears as «н/д» only in the tooltip. Mark the badge as partial until both have reported. The price already stays unknown until then.
+
+**Why:** Players check the clues behind a guess through the frames, and the host needs to see which style will play.
+
+**Context:** `web/src/components/StepReport.svelte`, `StepExchange.svelte`, `StepFrames.svelte`, `BotPlayStyle.svelte`, `JournalStep.svelte`, `web/src/lib/journal-format.ts`, `BotSlotEditor.svelte`, `BotAccounting.svelte`.
+
+**Effort:** M
+**Priority:** P3
+
 ### Detective in `eval:bots`
 
 **What:** Let `bun run eval:bots` measure a Detective configuration (a `--style detective` flag, two processes per round, usage summed by role).
