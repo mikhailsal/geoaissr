@@ -3,9 +3,11 @@ web/dist/
 dist/
 .geoaissr-dev/
 .gstack/
+.claude/
 PLAN.md
 TODOS.md
 shared/regions.data.json
+server/maps/airports.data.json
 playwright-report/
 test-results/
 vendor/orbit-rig/*.js

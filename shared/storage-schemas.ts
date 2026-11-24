@@ -15,7 +15,8 @@ import { PLAY_STYLES } from './play-style.ts';
 export const HARNESS_IDS = ['codex', 'claude', 'agy'] as const;
 export type HarnessId = (typeof HARNESS_IDS)[number];
 
-export const REGION_IDS = [
+/** Areas drawn from country polygons: the whole world and the six continents. */
+export const POLYGON_REGION_IDS = [
   'world',
   'europe',
   'asia',
@@ -24,7 +25,18 @@ export const REGION_IDS = [
   'africa',
   'oceania',
 ] as const;
+export type PolygonRegionId = (typeof POLYGON_REGION_IDS)[number];
+
+/** Worldwide maps drawn from a list of points instead of country polygons. */
+export const POINT_MAP_IDS = ['airports'] as const;
+export type PointMapId = (typeof POINT_MAP_IDS)[number];
+
+export const REGION_IDS = [...POLYGON_REGION_IDS, ...POINT_MAP_IDS] as const;
 export type RegionId = (typeof REGION_IDS)[number];
+
+export function isPointMapId(region: RegionId): region is PointMapId {
+  return (POINT_MAP_IDS as readonly string[]).includes(region);
+}
 
 export const visionCheckRecordSchema = z.object({
   passed: z.boolean(),

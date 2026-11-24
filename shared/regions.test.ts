@@ -9,7 +9,7 @@ import {
   samplePointInPolygon,
   sampleWeightedItem,
 } from './regions.ts';
-import { REGION_IDS } from './storage-schemas.ts';
+import { POLYGON_REGION_IDS, REGION_IDS } from './storage-schemas.ts';
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -22,7 +22,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-test('all 7 regions have expected constant diagonals in shared/regions.ts', () => {
+test('all 7 polygon regions have expected constant diagonals and point maps use the world scale', () => {
   expect(REGION_DIAGONALS_KM).toEqual({
     world: 14916.862,
     europe: 6080.843,
@@ -35,6 +35,7 @@ test('all 7 regions have expected constant diagonals in shared/regions.ts', () =
   for (const region of REGION_IDS) {
     expect(getRegionDiagonalKm(region)).toBeGreaterThan(5000);
   }
+  expect(getRegionDiagonalKm('airports')).toBe(REGION_DIAGONALS_KM.world);
 });
 
 test('findCountryAtPoint resolves Russian NAME_RU for major locations', () => {
@@ -51,7 +52,7 @@ test('world countries exclude Antarctica and each country has valid polygons', (
 
 test('sampling inside each region produces points inside country polygons', () => {
   const rng = mulberry32(42);
-  for (const region of REGION_IDS) {
+  for (const region of POLYGON_REGION_IDS) {
     const weighted = getWeightedCountriesForRegion(region);
     expect(weighted.length).toBeGreaterThanOrEqual(5);
     const pickedCountry = sampleWeightedItem(weighted, rng);

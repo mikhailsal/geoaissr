@@ -1,9 +1,9 @@
 import rawData from './regions.data.json' with { type: 'json' };
-import { haversineDistanceKm, type LatLng } from './score.ts';
-import type { RegionId } from './storage-schemas.ts';
+import { WORLD_DIAGONAL_KM, haversineDistanceKm, type LatLng } from './score.ts';
+import { isPointMapId, type PolygonRegionId, type RegionId } from './storage-schemas.ts';
 
 type LngLat = [number, number];
-type PolyContinent = Exclude<RegionId, 'world'>;
+type PolyContinent = Exclude<PolygonRegionId, 'world'>;
 
 export interface RegionPolygon {
   region: PolyContinent;
@@ -21,17 +21,18 @@ export interface RegionCountry {
 
 interface RawRegionsDataset {
   version: number;
-  diagonalsKm: Record<RegionId, number>;
+  diagonalsKm: Record<PolygonRegionId, number>;
   countries: RegionCountry[];
 }
 
 const dataset = rawData as RawRegionsDataset;
 
-export const REGION_DIAGONALS_KM: Readonly<Record<RegionId, number>> = dataset.diagonalsKm;
+export const REGION_DIAGONALS_KM: Readonly<Record<PolygonRegionId, number>> = dataset.diagonalsKm;
 export const REGION_COUNTRIES: readonly RegionCountry[] = dataset.countries;
 
+/** Point maps span the whole world, so they score on the world scale. */
 export function getRegionDiagonalKm(region: RegionId): number {
-  return REGION_DIAGONALS_KM[region];
+  return isPointMapId(region) ? WORLD_DIAGONAL_KM : REGION_DIAGONALS_KM[region];
 }
 
 export function pointInRing(lng: number, lat: number, ring: readonly LngLat[]): boolean {
@@ -93,7 +94,7 @@ export interface WeightedCountry {
 }
 
 export function getWeightedCountriesForRegion(
-  region: RegionId,
+  region: PolygonRegionId,
   excludeCountryIds: ReadonlySet<string> = new Set(),
 ): WeightedCountry[] {
   const all: WeightedCountry[] = [];
