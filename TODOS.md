@@ -28,6 +28,66 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 **Priority:** P3
 **Depends on:** milestone M1
 
+### Cities map: cities of 500 thousand and more, inside their real dense outline
+
+**What:** A map whose rounds start inside the dense built-up part of a large city: not only the centre, and not the outskirts that look like villages.
+
+**Why:** The owner's request of 2026-11-24. The first map of this kind, «Аэропорты мира», shipped as a point list; cities need outlines, so they were split off.
+
+**Context:** Measured on 2026-11-24 against the GHSL Urban Centre Database R2024A V1.2 (European Commission JRC, CC BY 4.0; the 6.6 MB `GHS_UCDB_THEME_GENERAL_CHARACTERISTICS_GLOBE_R2024A` package holds the outlines, names, area and 2025 population). An urban centre is the contiguous area above 1,500 people per km². 1,114 centres hold 500 thousand people or more, 900 of them outside China (no Google coverage there); their outlines total 73 thousand vertices. The equal-area radius follows `r_km = 0.0174 * population^0.435` (5.3 km at 500 thousand, 19 km at 10 million), but a disc of that radius around the centre is only 74% dense area on the median (Istanbul 47%, Mumbai 43%), so the owner chose the real outlines over discs. The package is a GeoPackage in Mollweide (ESRI:54009): `bun:sqlite` reads it and the inverse projection is closed-form; a trial parse reproduced the listed areas within 1%. Known traps: about 70 centres in India, Bangladesh and the Nile valley are dense countryside, not cities (the largest GeoNames place inside is under 150 thousand), and giant merged outlines (Dhaka, Jakarta) need a cap on the distance from the core city, starting at 1.5 times the formula radius. GeoNames `cities15000` (CC BY 4.0) supplies the core point; its own populations are not reliable at this scale (district totals attached to towns).
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** nothing; easier after the «Карта» and «Регион» split below
+
+### Standard-mode balance: fewer empty roads, with the current sampler kept as its own map
+
+**What:** In the standard mode about half of the rounds start in or near a settlement. The current sampler stays selectable as a separate map (working name «Глушь»).
+
+**Why:** The owner finds the standard mode too empty. In 76 played rounds (21 matches up to 2026-11-24) 3 started within 3 km of a town of 15 thousand people or more; the median distance to such a town was 29 km.
+
+**Context:** `server/location.ts` picks a country by `area^0.65`, a uniform point in its polygon and the nearest panorama within 5 km, so a lone road through empty land wins most rolls. Candidates, cheapest first: (1) a smaller search radius, which favours dense road networks and needs no data, to be measured before anything else; (2) a share of rolls aimed at GeoNames places of 15 thousand people or more in the picked country; (3) a street-grid probe: eight free metadata lookups 150 m around the found panorama, where a street grid answers six to eight times and a lone road twice. The country distribution must stay as it is. Tune by measurement (see the `maps:sample` item), not by feel.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** the «Карта» and «Регион» split below (to keep the old sampler selectable)
+
+### Separate «Карта» and «Регион» settings, single countries, and a lobby check for empty combinations
+
+**What:** «Карта» (where points come from: standard, cities, airports, themed sets) becomes its own lobby setting next to «Регион» (world, continent or one country), so they combine: «Аэропорты × Россия», «Города × Азия». The lobby shows a combination with no points as unavailable instead of failing at round start.
+
+**Why:** Agreed with the owner on 2026-11-24. «Аэропорты мира» shipped as one more entry of the region list to fit a 30-minute window; that list cannot express combinations.
+
+**Context:** `airports` is a `POINT_MAP_IDS` entry of `REGION_IDS` in `shared/storage-schemas.ts`. Moving it to a map setting needs a migration for saved settings and for `region: "airports"` in old match records. `shared/protocol.ts` is at 499 of 500 lines: split it before adding a field. The 175 countries of `shared/regions.data.json` already carry Russian names; a country needs its own scoring diagonal (add it to `scripts/build-regions.ts`), otherwise every guess in a small country scores near 5000. The airports data is already grouped by ISO country code, so a continent or country filter is a lookup.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** nothing
+
+### Themed maps from data already at hand: capitals, megacities, high altitude, north, retro
+
+**What:** Five more maps chosen by the owner on 2026-11-24: «Столицы» (241 capitals in GeoNames), «Мегаполисы» (72 urban centres of 5 million or more outside China), «Высокогорье» (130 cities of 100 thousand or more above 2,000 m, from the GeoNames elevation field), «Север» (everything at 60° N and above) and «Ретро» (panoramas captured before 2012; the capture date comes in the free metadata answer).
+
+**Why:** Each is a filter or a point list on machinery the cities and airports maps already need.
+
+**Context:** «Север» needs no data: a latitude filter on the polygon sampler. «Ретро» has an unknown acceptance rate: measure it before shipping, or the round preparation may crawl. Not chosen for now: a host-typed city list, stadiums, Formula 1 circuits, UNESCO sites.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** the cities map and the «Карта» and «Регион» split above
+
+### `maps:sample`: measure a map before shipping it
+
+**What:** A command that rolls N live locations for a map and region and prints the mix: share of rounds in settlements, distance to the nearest town, lookups and seconds per round, and Google Maps links for a look by eye.
+
+**Why:** Metadata lookups are free, so a map can be tuned on numbers. The current standard balance was set by feel and came out at 3 town rounds in 76.
+
+**Context:** A throwaway version of this check ran for «Аэропорты мира» on 2026-11-24: 14 rounds, 32 lookups, 0.7 s per round, every panorama within 5 km of an airport. Follow the `scripts/eval-bots.ts` conventions for flags and output.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** nothing
+
 ### Match recovery after a server restart
 
 **What:** Save the room state to disk and resume the match after a crash or restart.
