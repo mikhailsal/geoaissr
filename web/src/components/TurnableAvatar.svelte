@@ -140,7 +140,8 @@
   button {
     position: absolute;
     inset: 0;
-    width: 100%;
+    margin-inline: auto;
+    width: var(--turn-target-width, 100%);
     height: 100%;
     min-height: 0;
     padding: 0;
