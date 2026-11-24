@@ -2,6 +2,12 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.3.4] - 2026-11-24
+
+### Changed
+
+- See all six lobby avatars at a larger size on wide screens. Groups of four to six stand on staggered podiums, with your character front and center and the players behind visible between their neighbors.
+
 ## [0.3.3] - 2026-11-24
 
 ### Added
