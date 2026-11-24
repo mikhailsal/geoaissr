@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MediaQuery } from 'svelte/reactivity';
   import { Eye, Rotate3d, Shirt } from '@lucide/svelte';
   import type { AvatarAppearance } from '$shared/avatar';
   import type { ParticipantColorId } from '$shared/colors';
@@ -41,7 +42,7 @@
   } = $props();
   const name = $derived(member.slotLabel ?? member.name);
   // Percent from the lineup's left edge. Each row gets its own horizontal spacing.
-  const columns = [
+  const compactColumns = [
     [],
     [50],
     [50, 78],
@@ -50,7 +51,17 @@
     [50, 16, 84, 31, 69],
     [50, 16, 84, 17, 83, 50],
   ];
-  const column = $derived(columns[count]?.[position] ?? 50);
+  const wideStage = new MediaQuery(
+    '(min-width: 760px) and (min-height: 481px) and (min-aspect-ratio: 6/5)',
+  );
+  // Stagger the rear podiums between the shoulders of the foreground players.
+  const wideColumns: Record<number, number[]> = {
+    4: [50, 18, 80, 35],
+    5: [50, 16, 84, 33, 67],
+    6: [50, 24, 84, 37, 67, 10],
+  };
+  const ensemble = $derived(wideStage.current && count >= 4);
+  const column = $derived((ensemble ? wideColumns : compactColumns)[count]?.[position] ?? 50);
   const facingYaw = $derived((50 - column) * 0.012);
   const caption = $derived(
     member.slotLabel ?? `${member.name} · ${self ? 'Вы' : member.ai ? 'ИИ' : 'Игрок'}`,
@@ -60,6 +71,7 @@
 <article
   aria-label={name}
   class="performer pos-{position}"
+  class:ensemble
   class:crowded={count >= 4}
   class:away={!member.available}
   data-gesture={gesture?.kind}
@@ -146,6 +158,30 @@
     height: 46%;
     bottom: 54%;
     z-index: 1;
+  }
+  .ensemble {
+    --turn-target-width: 62%;
+  }
+  .ensemble.pos-0 {
+    width: 36%;
+    height: 95%;
+    bottom: 1%;
+  }
+  .ensemble.pos-1,
+  .ensemble.pos-2 {
+    width: 30%;
+    height: 81%;
+    bottom: 9%;
+  }
+  .ensemble.pos-3,
+  .ensemble.pos-4,
+  .ensemble.pos-5 {
+    width: 25%;
+    height: 67%;
+    bottom: 27%;
+  }
+  .ensemble.pos-5 {
+    width: 20%;
   }
   .figure {
     width: 100%;
