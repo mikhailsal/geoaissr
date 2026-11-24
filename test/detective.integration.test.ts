@@ -14,6 +14,7 @@ import {
   patchJournalStep,
 } from '../server/engine/journal.ts';
 import type { EngineEvent } from '../server/engine/types.ts';
+import type { LogEventType, ServerLogger } from '../server/log.ts';
 import { createThumbStore } from '../server/http/thumbs.ts';
 import { createFakeLocationService } from '../server/location.ts';
 import { createQuotaManager } from '../server/storage/quota.ts';
@@ -70,6 +71,25 @@ async function waitGone(target: string): Promise<boolean> {
   return !existsSync(target);
 }
 
+interface LoggedEvent {
+  event: LogEventType;
+  data: Record<string, unknown>;
+}
+
+/** A logger that keeps what the runner writes; redaction is the identity. */
+function recordingLogger(): { logger: ServerLogger; logged: LoggedEvent[] } {
+  const logged: LoggedEvent[] = [];
+  const logger: ServerLogger = {
+    log: (event, data) => void logged.push({ event, data }),
+    writeCrash: () => '',
+    pruneOld: () => 0,
+    registerSecrets: () => undefined,
+    redact: (text) => text,
+    getLogsDir: () => '',
+  };
+  return { logger, logged };
+}
+
 interface Round {
   dir: string;
   events: EngineEvent[];
@@ -86,6 +106,7 @@ async function withDetective(
     launch?: CustomBotLaunchBuilder;
     slot?: Partial<BotSlotConfig>;
     estimateCost?: (model: string, usage: BotTokenUsage) => Promise<BotCostEstimate>;
+    logger?: ServerLogger;
   },
   play: (round: Round) => Promise<void>,
 ): Promise<void> {
@@ -109,6 +130,7 @@ async function withDetective(
     locationService: loc,
     dispatch: (e) => events.push(e),
     ...(opts.estimateCost ? { estimateCost: opts.estimateCost } : {}),
+    ...(opts.logger ? { logger: opts.logger } : {}),
     ...(launch
       ? {
           buildCustomLaunchSpec: (params) => {
@@ -370,6 +392,7 @@ test('a role whose CLI cannot start fails the launch once and stops the other ro
   });
 });
 
+// Value: protects=each Detective role writes its harness_usage record under its own harness, model and raw-counter scope; fails_when=the record names the brain's harness or model for the eyes, or codex loses its last-turn scope; why_new=the exchange accounting asserts tokens, not the diagnostic log; seam=none; no_claim=real CLI usage output (scripted CLIs).
 test('the eyes run on another harness and model; each role is read and priced as its own', async () => {
   const launched: Record<string, string> = {};
   const launch: CustomBotLaunchBuilder = (params) => {
@@ -384,30 +407,42 @@ test('the eyes run on another harness and model; each role is read and priced as
       matchedModelId: model,
     });
   const slot = { eyes: { harness: 'codex', model: 'gpt-6-luna' } } as const;
-  await withDetective({ fakeMode: false, launch, slot, estimateCost }, async ({ events }) => {
-    await waitFinished(events);
-    expect(launched).toEqual({ brain: 'claude · claude-haiku-5-5', eyes: 'codex · gpt-6-luna' });
-    // The codex usage line of the eyes is read by the codex parser, not lost. The price of the
-    // pair arrives in its own accounting event once both estimates are in.
-    const priced = (): Extract<EngineEvent, { type: 'bot_accounting' }> | undefined =>
-      events.findLast(
-        (e): e is Extract<EngineEvent, { type: 'bot_accounting' }> =>
-          e.type === 'bot_accounting' && e.accounting.matchedModelId?.includes('+') === true,
-      );
-    const deadline = Date.now() + 5_000;
-    while (!priced() && Date.now() < deadline) await Bun.sleep(10);
-    const last = priced()?.accounting;
-    expect(last?.roleUsage?.eyes?.totalTokens).toBe(440);
-    expect(last?.roleModels).toEqual({ brain: 'claude-haiku-5-5', eyes: 'gpt-6-luna' });
-    expect(last?.costUsd).toBeCloseTo(310 * 0.01 + 440 * 0.001, 6);
-    expect(last?.matchedModelId).toBe('claude-haiku-5-5 + gpt-6-luna');
-  });
+  const { logger, logged } = recordingLogger();
+  await withDetective(
+    { fakeMode: false, launch, slot, estimateCost, logger },
+    async ({ events }) => {
+      await waitFinished(events);
+      // Each role writes its usage record under its own harness and model; only codex reports a
+      // last-turn counter.
+      const usage = logged
+        .filter((l) => l.event === 'harness_usage')
+        .map((l) => [l.data.role, l.data.harness, l.data.model, l.data.rawCounterScope]);
+      expect(usage).toHaveLength(2);
+      expect(usage).toContainEqual(['brain', 'claude', 'claude-haiku-5-5', 'terminal']);
+      expect(usage).toContainEqual(['eyes', 'codex', 'gpt-6-luna', 'last-turn']);
+      expect(launched).toEqual({ brain: 'claude · claude-haiku-5-5', eyes: 'codex · gpt-6-luna' });
+      // The codex usage line of the eyes is read by the codex parser, not lost. The price of the
+      // pair arrives in its own accounting event once both estimates are in.
+      const priced = (): Extract<EngineEvent, { type: 'bot_accounting' }> | undefined =>
+        events.findLast(
+          (e): e is Extract<EngineEvent, { type: 'bot_accounting' }> =>
+            e.type === 'bot_accounting' && e.accounting.matchedModelId?.includes('+') === true,
+        );
+      const deadline = Date.now() + 5_000;
+      while (!priced() && Date.now() < deadline) await Bun.sleep(10);
+      const last = priced()?.accounting;
+      expect(last?.roleUsage?.eyes?.totalTokens).toBe(440);
+      expect(last?.roleModels).toEqual({ brain: 'claude-haiku-5-5', eyes: 'gpt-6-luna' });
+      expect(last?.costUsd).toBeCloseTo(310 * 0.01 + 440 * 0.001, 6);
+      expect(last?.matchedModelId).toBe('claude-haiku-5-5 + gpt-6-luna');
+    },
+  );
 });
 
-// Value: protects=the warning that an agy brain ran without its file guard; fails_when=a brain on agy with an empty guard audit plays a round that looks isolated, or a guarded brain is flagged; why_new=the brain could only run on claude before; seam=the audit file stands in for agy's PreToolUse hook; no_claim=that agy runs the hook.
+// Value: protects=the warning that an agy brain ran without its file guard, and the audit of every agy role copied into the log at cleanup; fails_when=an unguarded agy brain looks isolated, a guarded one is flagged, or an agy role's audit is not flushed; why_new=the brain could only run on claude before; seam=the audit file stands in for agy's PreToolUse hook; no_claim=that agy runs the hook.
 test('an agy brain whose guard left no record is flagged; one with a record is not', async () => {
   const AUDIT = `require('node:fs').mkdirSync('.agents/plugins/geo', { recursive: true });
-     require('node:fs').writeFileSync('.agents/plugins/geo/tool-audit.jsonl', '{"tool":"mcp_geo_geo_briefing"}\n');`;
+     require('node:fs').writeFileSync('.agents/plugins/geo/tool-audit.jsonl', '{"tool":"mcp_geo_geo_briefing"}\\n');`;
   const brain = (guarded: boolean): string =>
     scriptedCli(
       `${guarded ? AUDIT : ''}
@@ -418,12 +453,23 @@ test('an agy brain whose guard left no record is flagged; one with a record is n
     );
   for (const guarded of [false, true]) {
     const launch = cliLaunch({ brain: brain(guarded), eyes: EYES_CLI });
+    const { logger, logged } = recordingLogger();
     await withDetective(
-      { fakeMode: false, launch, slot: { harness: 'agy' } },
+      { fakeMode: false, launch, slot: { harness: 'agy' }, logger },
       async ({ events }) => {
         await waitFinished(events);
         const flagged = events.filter((e) => e.type === 'bot_isolation_unconfirmed');
         expect(flagged).toHaveLength(guarded ? 0 : 1);
+        // The audit of the agy role is copied into the log when the work directory goes (the
+        // stand-in record has no timestamp, so the copy reports it as invalid). The eyes run on
+        // agy too but wrote no audit: their copy logs nothing.
+        const copies = (): LoggedEvent[] =>
+          logged.filter((l) => l.event === 'harness_monitor_error' && 'invalidRecords' in l.data);
+        const deadline = Date.now() + 3_000;
+        while (guarded && copies().length === 0 && Date.now() < deadline) await Bun.sleep(10);
+        expect(copies().map((l) => [l.data.role, l.data.harness, l.data.invalidRecords])).toEqual(
+          guarded ? [['brain', 'agy', 1]] : [],
+        );
       },
     );
   }

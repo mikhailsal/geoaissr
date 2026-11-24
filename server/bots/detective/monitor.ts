@@ -181,6 +181,7 @@ export function startDetectiveProcesses(run: DetectiveRun, graceMs = EYES_GRACE_
   }
   const spawn = (role: DetectiveRole, prompt: string): RoleProcess => {
     const effort = roleEffort(slot, role);
+    const token = run.tokens[role];
     logBotDiagnostic(ctx.logger, 'harness_start', {
       ...logIdentity(run, role),
       model: models[role].model,
@@ -191,7 +192,7 @@ export function startDetectiveProcesses(run: DetectiveRun, graceMs = EYES_GRACE_
       ...models[role],
       role,
       workDir: roleWorkDir(handle.workDir, role),
-      token: run.tokens[role],
+      token,
       prompt,
       effort,
       canMove: run.canMove,

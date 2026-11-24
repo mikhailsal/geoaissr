@@ -89,3 +89,43 @@ test('vision check accepts the matching summary, rejects wrong digits', async ()
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Value: protects=the vision check of a Detective launches its eyes, on their harness, model and effort; fails_when=the check spawns the brain's harness or model, or the brain's effort; why_new=the existing case checks only a plain slot; seam=none; no_claim=a real CLI sees the digits (the launch spec is a stub that exits at once).
+test('the vision check of a Detective runs on the eyes, not on the brain', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-vision-eyes-'));
+  const api = createBotToolApiServer();
+  const brainAdapter = getHarnessAdapter('claude');
+  const eyesAdapter = getHarnessAdapter('codex');
+  const brainLaunch = spyOn(brainAdapter, 'buildLaunchSpec');
+  const eyesLaunch = spyOn(eyesAdapter, 'buildLaunchSpec').mockImplementation((opts) => ({
+    cwd: opts.workDir,
+    deliveryMode: 'mcp',
+    cmd: [process.execPath, '-e', ''],
+  }));
+  const slot = {
+    id: 'bot',
+    harness: 'claude',
+    model: 'brain-model',
+    effort: 'high',
+    imageSize: 256,
+    playStyle: 'detective',
+    eyes: { harness: 'codex', model: 'eyes-model' },
+  } as BotSlotConfig;
+  try {
+    await runVisionCheck({
+      runDir: dir,
+      childrenFile: path.join(dir, 'children.json'),
+      fakeMode: false,
+      api,
+      slot,
+    });
+    expect(brainLaunch).not.toHaveBeenCalled();
+    expect(eyesLaunch).toHaveBeenCalledTimes(1);
+    expect(eyesLaunch.mock.calls[0]?.[0]).toMatchObject({ model: 'eyes-model', effort: 'low' });
+  } finally {
+    brainLaunch.mockRestore();
+    eyesLaunch.mockRestore();
+    api.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
