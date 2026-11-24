@@ -14,6 +14,7 @@ Notable changes to this locally run application are recorded here. Releases are 
 
 ### Changed
 
+- The AI settings tab of the character window says «Изменения сохраняются сразу» and closes with «Готово», because each change there is saved at once. Before, it offered only «Закрыть», while the wardrobe tab of the same window had «Сохранить образ».
 - Bots judge the driving side only by other cars and road signs. A car whose back is seen drives away from the camera, one whose front is seen drives towards it, and the half of the road each uses gives the side. The camera's own lane no longer counts, because the frames face north, east, south and west and the direction the camera car drove is unknown. This applies to Intuit, to the Detective's eyes and to what the brain asks them.
 
 ### Fixed

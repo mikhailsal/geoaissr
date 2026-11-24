@@ -71,6 +71,9 @@ test('foreign wardrobe, profile and AI settings show the owner’s controls and 
     await expect(robot.getByRole('button', { name: 'Проверить зрение' })).toBeDisabled();
     await expect(robot.getByRole('button', { name: 'Сбросить победы Клод' })).toBeDisabled();
     await expect(robot.getByRole('button', { name: 'Удалить', exact: true })).toBeDisabled();
+    // A guest changes nothing here, so nothing is saved: plain «Закрыть».
+    await expect(robot.getByText('Изменения сохраняются сразу')).toHaveCount(0);
+    await expect(robot.getByRole('button', { name: 'Закрыть', exact: true })).toBeVisible();
     await expect(robot.getByRole('button', { name: 'Повернуть на 360°: Клод' })).toBeEnabled();
   } finally {
     await guest.close();
@@ -166,7 +169,9 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
     const imageSize = dialog.getByLabel('Размер снимка');
     await imageSize.scrollIntoViewIfNeeded();
     await expect(imageSize).toBeInViewport({ ratio: 1 });
-    await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    // The AI settings apply on every change: the tab says so and ends with «Готово».
+    await expect(dialog.getByText('Изменения сохраняются сразу')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Готово', exact: true }).click();
     await expect(dialog).toBeHidden();
   } finally {
     await server.stop();

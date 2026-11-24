@@ -69,6 +69,7 @@ Curve: `cubic-bezier(0.16, 1, 0.3, 1)`, no bounce.
 ## Avatars, markers and states
 
 - The lobby stage and wardrobe display the participant’s dressed Orbit character. Select the nameplate to inspect the character.
+- The look in the wardrobe is a draft, and the footer offers «Отмена» and «Сохранить образ». The AI settings tab of the same modal applies every change at once, so for the host its footer shows the caption «Изменения сохраняются сразу» in the slot hint style and a primary «Готово» button. A viewer who cannot edit sees «Закрыть».
 - Compact human avatars show the first letter of the nickname inside a circle.
 - Compact AI avatars show the initial and a chip icon inside a square with a `6px` corner radius.
 - **Recent wins:** a meaningful trophy icon and a 14px count beside participant avatars, with an accessible name describing the six-hour window. Profile editing sits beside the viewer's identity; final-result administration stays below the standings.
