@@ -1,9 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 /** OurAirports publishes its data into the public domain: https://ourairports.com/data/ */
 const SOURCE_URL = 'https://davidmegginson.github.io/ourairports-data/airports.csv';
-const CACHE_PATH = '/tmp/ourairports-airports.csv';
 const KEPT_TYPES = new Set(['large_airport', 'medium_airport']);
 
 export interface AirportsDataset {
@@ -88,13 +87,11 @@ export function buildAirports(csvText: string): AirportsDataset {
   };
 }
 
+/** Always downloads: a cached copy in a shared temp folder could be stale or planted. */
 async function loadCsv(): Promise<string> {
-  if (existsSync(CACHE_PATH)) return readFileSync(CACHE_PATH, 'utf8');
   const res = await fetch(SOURCE_URL);
   if (!res.ok) throw new Error(`Failed to fetch OurAirports CSV: HTTP ${res.status}`);
-  const text = await res.text();
-  writeFileSync(CACHE_PATH, text);
-  return text;
+  return res.text();
 }
 
 if (import.meta.main) {

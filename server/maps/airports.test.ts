@@ -4,7 +4,7 @@ import { createLocationService } from '../location.ts';
 import {
   AIRPORT_SNAP_RADIUS_M,
   AIRPORT_ZONE_KM,
-  airportCountryNameRu,
+  airportCountry,
   getAirportCountryGroups,
   isInsideAirportZone,
   isoCodesOfCountryIds,
@@ -71,8 +71,60 @@ test('probes stay inside the airport zone and lean towards the airport', () => {
   expect(isInsideAirportZone({ lat: 0, lng: 0 }, { lat: 0.05, lng: 0 })).toBe(false);
 });
 
-test('a country without a polygon gets its Russian name from the ISO code', () => {
-  expect(airportCountryNameRu('SG')).toBe('Сингапур');
+test('a round takes its country from the airport, with the regions id when the regions know it', () => {
+  expect(airportCountry('DK')).toEqual({ id: 'DNK', nameRu: 'Дания' });
+  // Singapore has no polygon in the regions dataset.
+  expect(airportCountry('SG')).toEqual({ id: 'iso:SG', nameRu: 'Сингапур' });
+});
+
+/** Street View metadata double: answers every lookup with a panorama `shiftLat` degrees north. */
+function metadataService(shiftLat: number, seed: number) {
+  const requests: URLSearchParams[] = [];
+  const svc = createLocationService({
+    serverKey: 'test-key',
+    rng: mulberry32(seed),
+    fetchImpl: (url) => {
+      const params = new URL(url).searchParams;
+      requests.push(params);
+      const [lat = 0, lng = 0] = (params.get('location') ?? '').split(',').map(Number);
+      const body = {
+        status: 'OK',
+        pano_id: `pano-${requests.length}`,
+        copyright: '© Google',
+        location: { lat: lat + shiftLat, lng },
+      };
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    },
+  });
+  return { svc, requests };
+}
+
+test('an airport in a country without a polygon is not named after a played neighbour', async () => {
+  // Every country but Singapore is played, Malaysia among them. The nearest polygon to a
+  // Singapore panorama is Malaysia's.
+  const played = getAirportCountryGroups()
+    .filter((group) => group.iso !== 'SG')
+    .map((group) => airportCountry(group.iso).id);
+  const { svc, requests } = metadataService(0, 3);
+
+  const target = await svc.prepareRoundLocation({ region: 'airports', excludeCountryIds: played });
+  expect(requests.length).toBe(1);
+  expect(target.countryId).toBe('iso:SG');
+  expect(target.countryNameRu).toBe('Сингапур');
+});
+
+test('airports map gives up after 90 lookups when no panorama is inside a zone', async () => {
+  // Every answer is about 33 km north of the probe.
+  const { svc, requests } = metadataService(0.3, 5);
+
+  const outcome = await svc
+    .prepareRoundLocation({ region: 'airports', excludeCountryIds: [] })
+    .then(
+      () => 'resolved',
+      (err: unknown) => (err instanceof Error ? err.message : String(err)),
+    );
+  expect(outcome).toContain('рядом с аэропортом за 90 попыток');
+  expect(requests.length).toBe(90);
 });
 
 test('airports map rejects a panorama outside the zone and accepts one inside it', async () => {
@@ -102,5 +154,61 @@ test('airports map rejects a panorama outside the zone and accepts one inside it
   expect(target.panoId).toBe('pano-2');
   expect(target.region).toBe('airports');
   expect(target.countryNameRu.length).toBeGreaterThan(0);
+  expect(nearestAirportKm(target)).toBeLessThanOrEqual(AIRPORT_ZONE_KM);
+});
+
+/** Street View metadata double that answers lookup number n with `answers[n]`, then echoes the probe. */
+function scriptedService(answers: ((probe: { lat: number; lng: number }) => Response)[]) {
+  let calls = 0;
+  const svc = createLocationService({
+    serverKey: 'test-key',
+    rng: mulberry32(13),
+    fetchImpl: (url) => {
+      const [lat = 0, lng = 0] = (new URL(url).searchParams.get('location') ?? '')
+        .split(',')
+        .map(Number);
+      const answer = answers[calls];
+      calls += 1;
+      if (answer) return Promise.resolve(answer({ lat, lng }));
+      const body = {
+        status: 'OK',
+        pano_id: `pano-${calls}`,
+        copyright: '© Google',
+        location: { lat, lng },
+      };
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    },
+  });
+  return { svc, calls: () => calls };
+}
+
+// Value: protects=a Google key or quota error fails the airports round at once with its code; fails_when=the GeoError is swallowed and the loop retries;
+// why_new=existing airports tests only cover answers that parse; seam=none; no_claim=real Google responses (fetch double; unit only)
+test('airports map fails the round with the GeoError of a denied lookup instead of retrying', async () => {
+  const { svc, calls } = scriptedService([() => new Response('denied', { status: 403 })]);
+
+  const err = await svc.prepareRoundLocation({ region: 'airports', excludeCountryIds: [] }).then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(Error);
+  expect((err as { code?: string }).code).toBe('GEO_GOOGLE_KEY_DENIED');
+  expect(calls()).toBe(1);
+});
+
+// Value: protects=a failed lookup or a ZERO_RESULTS answer costs one attempt and the next valid answer is accepted; fails_when=such a failure aborts the round or is accepted;
+// why_new=the existing tests never make a lookup throw or return an invalid payload; seam=none; no_claim=real Google responses (fetch double; unit only)
+test('airports map skips a failed lookup and a ZERO_RESULTS answer, then accepts a valid one', async () => {
+  const fail = (): Response => {
+    throw new Error('network down');
+  };
+  const zero = (): Response =>
+    new Response(JSON.stringify({ status: 'ZERO_RESULTS' }), { status: 200 });
+  // The first attempt burns both fetch tries of the retry wrapper.
+  const { svc, calls } = scriptedService([fail, fail, zero]);
+
+  const target = await svc.prepareRoundLocation({ region: 'airports', excludeCountryIds: [] });
+  expect(calls()).toBe(4);
+  expect(target.panoId).toBe('pano-4');
   expect(nearestAirportKm(target)).toBeLessThanOrEqual(AIRPORT_ZONE_KM);
 });

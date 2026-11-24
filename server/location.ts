@@ -11,8 +11,7 @@ import type { RoundTarget } from './engine/types.ts';
 import { GeoError } from './errors.ts';
 import {
   AIRPORT_SNAP_RADIUS_M,
-  airportCountryId,
-  airportCountryNameRu,
+  airportCountry,
   getAirportCountryGroups,
   isInsideAirportZone,
   isoCodesOfCountryIds,
@@ -118,9 +117,7 @@ async function prepareAirportLocation(
   input: { region: PointMapId; excludeCountryIds: readonly string[] },
   deps: { queryMetadata: LocationService['queryMetadata']; rng: () => number },
 ): Promise<RoundTarget> {
-  const playedIso = isoCodesOfCountryIds(input.excludeCountryIds);
-  const groups = getAirportCountryGroups(playedIso);
-  const allowedIso = new Set(groups.map((group) => group.iso));
+  const groups = getAirportCountryGroups(isoCodesOfCountryIds(input.excludeCountryIds));
   for (let attempt = 0; attempt < AIRPORT_MAX_ATTEMPTS; attempt += 1) {
     const pick = sampleAirportProbe(groups, deps.rng);
     const raw = await deps
@@ -132,15 +129,14 @@ async function prepareAirportLocation(
     if (!raw) continue;
     const valid = validateMetadataPayload(raw);
     if (!valid || !isInsideAirportZone(pick.airport, valid)) continue;
-    const country = findCountryAtPoint({ lat: valid.lat, lng: valid.lng });
-    // An airport near a border can snap into a country already played in this match.
-    if (country && playedIso.has(country.iso) && !allowedIso.has(country.iso)) continue;
+    // The round belongs to the airport's country, also when the panorama is across a border.
+    const country = airportCountry(pick.iso);
     return {
       panoId: valid.panoId,
       lat: valid.lat,
       lng: valid.lng,
-      countryId: country?.id ?? airportCountryId(pick.iso),
-      countryNameRu: country?.nameRu ?? airportCountryNameRu(pick.iso),
+      countryId: country.id,
+      countryNameRu: country.nameRu,
       region: input.region,
       fakeSceneIndex: 0,
     };

@@ -30,3 +30,27 @@ test('buildAirports keeps large and medium airports with scheduled service', () 
 test('buildAirports reports a missing column by name', () => {
   expect(() => buildAirports('"id","type"\n1,"large_airport"\n')).toThrow('latitude_deg');
 });
+
+// Value: protects=rows with a bad country code or out-of-range coordinates never reach the dataset; fails_when=either guard is removed;
+// why_new=the existing fixture only drops rows by type, service and non-numeric coordinates; seam=none; no_claim=real OurAirports data (inline CSV)
+test('buildAirports drops rows with a bad country code or out-of-range coordinates', () => {
+  const csv = [
+    '"id","type","name","latitude_deg","longitude_deg","iso_country","scheduled_service"',
+    '1,"large_airport","Good",10,20,"de","yes"',
+    '2,"large_airport","Three letters",11,21,"DEU","yes"',
+    '3,"large_airport","No country",12,22,"","yes"',
+    '4,"large_airport","Bad latitude",91,23,"FR","yes"',
+    '5,"large_airport","Bad longitude",13,181,"FR","yes"',
+  ].join('\n');
+  expect(buildAirports(csv).airports).toEqual({ DE: [[10, 20]] });
+});
+
+// Value: protects=the generator rejects an empty download and keeps a last row without a newline; fails_when=the empty check or the final flush is removed;
+// why_new=existing tests always end the CSV with data followed by no check of the tail; seam=none; no_claim=real OurAirports data (inline CSV)
+test('buildAirports fails on an empty CSV and parseCsv keeps a last row without a newline', () => {
+  expect(() => buildAirports('')).toThrow('OurAirports CSV is empty');
+  expect(parseCsv('a,b\n1,2')).toEqual([
+    ['a', 'b'],
+    ['1', '2'],
+  ]);
+});

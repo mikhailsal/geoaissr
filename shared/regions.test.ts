@@ -9,7 +9,8 @@ import {
   samplePointInPolygon,
   sampleWeightedItem,
 } from './regions.ts';
-import { POLYGON_REGION_IDS, REGION_IDS } from './storage-schemas.ts';
+import { lobbySettingsPatchSchema } from './protocol.ts';
+import { POLYGON_REGION_IDS, REGION_IDS, settingsFileSchema } from './storage-schemas.ts';
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -69,4 +70,14 @@ test('sampling inside each region produces points inside country polygons', () =
       pointInRing(firstVertex[0], firstVertex[1], poly.ring) || findCountryAtPoint(pt) !== null,
     ).toBe(true);
   }
+});
+
+// Value: protects=the lobby patch and settings file schemas accept the airports point map and reject unknown regions; fails_when=a point map id is dropped from REGION_IDS or the schema;
+// why_new=no test validates a region at the schema boundary; seam=none; no_claim=server handling of the region (schema only)
+test('lobby patch and settings schemas accept the airports region and reject unknown ones', () => {
+  expect(lobbySettingsPatchSchema.safeParse({ region: 'airports' }).success).toBe(true);
+  expect(lobbySettingsPatchSchema.safeParse({ region: 'atlantis' }).success).toBe(false);
+  const file = settingsFileSchema.safeParse({ version: 1, region: 'airports' });
+  const regionIssues = file.error?.issues.filter((issue) => issue.path[0] === 'region') ?? [];
+  expect(regionIssues).toEqual([]);
 });

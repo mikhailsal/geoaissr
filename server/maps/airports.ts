@@ -51,16 +51,26 @@ export function isoCodesOfCountryIds(countryIds: Iterable<string>): Set<string> 
   return codes;
 }
 
-export function airportCountryId(iso: string): string {
-  return `${ISO_ID_PREFIX}${iso}`;
-}
-
-export function airportCountryNameRu(iso: string): string {
+function airportCountryNameRu(iso: string): string {
   try {
     return new Intl.DisplayNames(['ru'], { type: 'region' }).of(iso) ?? iso;
   } catch {
     return iso;
   }
+}
+
+const REGION_COUNTRY_BY_ISO = new Map(REGION_COUNTRIES.map((country) => [country.iso, country]));
+
+/**
+ * The country of a round at an airport, taken from the airport's own ISO code. The regions
+ * polygons are too coarse for this: they have no shape for 62 of the 233 countries with airports
+ * and put Copenhagen in Sweden. A country the regions dataset knows keeps its id and name from
+ * there, so a match that mixes maps still sees one country as one id.
+ */
+export function airportCountry(iso: string): { id: string; nameRu: string } {
+  const known = REGION_COUNTRY_BY_ISO.get(iso);
+  if (known) return { id: known.id, nameRu: known.nameRu };
+  return { id: `${ISO_ID_PREFIX}${iso}`, nameRu: airportCountryNameRu(iso) };
 }
 
 /**
