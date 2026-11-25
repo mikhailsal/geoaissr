@@ -11,7 +11,8 @@ import { createInitialRoomState, type RoomState, type RoundTarget } from './type
 
 function makeSettings(overrides: Partial<SettingsFile> = {}): SettingsFile {
   return {
-    version: 1,
+    version: 2,
+    map: 'standard',
     region: 'world',
     rounds: 2,
     roundDurationSec: 90,
@@ -76,6 +77,7 @@ function makeTarget(round = 1): RoundTarget {
     lng: 37.61,
     countryId: round === 1 ? '643-eu' : '250',
     countryNameRu: round === 1 ? 'Россия' : 'Франция',
+    map: 'standard',
     region: 'world',
     fakeSceneIndex: round - 1,
   };

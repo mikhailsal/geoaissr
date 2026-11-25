@@ -62,6 +62,7 @@ test('a long move through the bot API costs one turn and reports its distance', 
   });
   try {
     const target = await locationService.prepareRoundLocation({
+      map: 'standard',
       region: 'world',
       excludeCountryIds: [],
     });

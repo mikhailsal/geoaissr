@@ -1,5 +1,7 @@
+import { emptyMapRegionReason } from '../../shared/map-availability.ts';
 import { roundHarnessProblem } from '../../shared/play-style.ts';
 import { COUNTDOWN_MS, type ClientViewState, type PlayerView } from '../../shared/protocol.ts';
+import { getRegionLabelRu } from '../../shared/regions.ts';
 import { computeFinalRankings } from './results.ts';
 import type { RoomState } from './types.ts';
 
@@ -24,6 +26,9 @@ export function computeStartBlockedReasons(state: RoomState): string[] {
   if (unavailableBot) {
     reasons.push(`ИИ-бот «${unavailableBot.name}» недоступен в текущей среде`);
   }
+  const { map, region } = state.settings;
+  const emptyReason = emptyMapRegionReason(map, region, getRegionLabelRu(region));
+  if (emptyReason) reasons.push(emptyReason);
   return reasons;
 }
 
@@ -208,6 +213,7 @@ export function projectView(state: RoomState, viewerId: string): ClientViewState
     totalRounds: state.settings.rounds,
     roundDurationSec: state.settings.roundDurationSec,
     moveEnabled: state.settings.moveEnabled,
+    map: state.settings.map,
     region: state.settings.region,
     aiWaitWindowSec: state.settings.aiWaitWindowSec,
     showMatchStandings: state.settings.showMatchStandings,

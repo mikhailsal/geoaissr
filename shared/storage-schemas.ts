@@ -10,7 +10,11 @@ import {
   personalityTextSchema,
 } from './bot-tools.ts';
 import { PARTICIPANT_COLOR_IDS } from './colors.ts';
+import { MAP_IDS } from './maps.ts';
 import { PLAY_STYLES } from './play-style.ts';
+import { regionIdSchema } from './region-ids.ts';
+
+export { AREA_REGION_IDS, type AreaRegionId, type RegionId } from './region-ids.ts';
 
 export const PUSH_SECONDS_MIN = 1;
 export const PUSH_SECONDS_MAX = 60;
@@ -19,29 +23,6 @@ export const pushSecondsSchema = z.number().int().min(PUSH_SECONDS_MIN).max(PUSH
 
 export const HARNESS_IDS = ['codex', 'claude', 'agy'] as const;
 export type HarnessId = (typeof HARNESS_IDS)[number];
-
-/** Areas drawn from country polygons: the whole world and the six continents. */
-export const POLYGON_REGION_IDS = [
-  'world',
-  'europe',
-  'asia',
-  'north_america',
-  'south_america',
-  'africa',
-  'oceania',
-] as const;
-export type PolygonRegionId = (typeof POLYGON_REGION_IDS)[number];
-
-/** Worldwide maps drawn from a list of points instead of country polygons. */
-export const POINT_MAP_IDS = ['airports'] as const;
-export type PointMapId = (typeof POINT_MAP_IDS)[number];
-
-export const REGION_IDS = [...POLYGON_REGION_IDS, ...POINT_MAP_IDS] as const;
-export type RegionId = (typeof REGION_IDS)[number];
-
-export function isPointMapId(region: RegionId): region is PointMapId {
-  return (POINT_MAP_IDS as readonly string[]).includes(region);
-}
 
 export const visionCheckRecordSchema = z.object({
   passed: z.boolean(),
@@ -94,12 +75,18 @@ export const botSlotConfigSchema = z.object({
 
 export type BotSlotConfig = z.infer<typeof botSlotConfigSchema>;
 
+/** Version of `settings.json`. Version 2 split the map from the region. */
+export const SETTINGS_FILE_VERSION = 2;
+
 export const settingsFileSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(SETTINGS_FILE_VERSION),
   rounds: z.number().int().min(1).max(20),
   roundDurationSec: z.number().int().min(30).max(600),
   moveEnabled: z.boolean(),
-  region: z.enum(REGION_IDS),
+  /** The pool of places a round can start in. */
+  map: z.enum(MAP_IDS),
+  /** Narrows the map to the world, a continent or one country. */
+  region: regionIdSchema,
   aiWaitWindowSec: z.number().int().min(0).max(120),
   /** Absent in older settings files: show standings after each completed round. */
   showMatchStandings: z.boolean().default(true),
@@ -123,10 +110,11 @@ export type SettingsFile = z.infer<typeof settingsFileSchema>;
 
 export function createDefaultSettings(): SettingsFile {
   return {
-    version: 1,
+    version: SETTINGS_FILE_VERSION,
     rounds: 5,
     roundDurationSec: 120,
     moveEnabled: true,
+    map: 'standard',
     region: 'world',
     aiWaitWindowSec: 20,
     showMatchStandings: true,
@@ -135,6 +123,14 @@ export function createDefaultSettings(): SettingsFile {
     allowBotPush: true,
     bots: [],
   };
+}
+
+/**
+ * Version 1 kept the airports map among the regions. Used for the settings file and for match
+ * records: both stored `region` the same way.
+ */
+export function splitLegacyRegion(region: unknown): { map: string; region: unknown } {
+  return region === 'airports' ? { map: 'airports', region: 'world' } : { map: 'standard', region };
 }
 
 export const quotaFileSchema = z.object({
@@ -194,12 +190,25 @@ export const matchParticipantSummarySchema = z.object({
   totalDistanceKm: z.number().nonnegative(),
 });
 
-export const matchRecordSchema = z.object({
-  version: z.literal(1),
+/** Version of a line in `matches.jsonl`. Version 2 added the map. */
+export const MATCH_RECORD_VERSION = 2;
+
+/** A version 1 line had no map: the airports map was stored as its region. */
+function upgradeLegacyMatchRecord(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null || !('version' in raw) || raw.version !== 1) {
+    return raw;
+  }
+  const legacy = raw as Record<string, unknown>;
+  return { ...legacy, ...splitLegacyRegion(legacy.region), version: MATCH_RECORD_VERSION };
+}
+
+const currentMatchRecordSchema = z.object({
+  version: z.literal(MATCH_RECORD_VERSION),
   matchId: z.string(),
   startedAt: z.string(),
   endedAt: z.string(),
-  region: z.enum(REGION_IDS),
+  map: z.enum(MAP_IDS),
+  region: regionIdSchema,
   plannedRounds: z.number().int().positive(),
   playedRounds: z.number().int().nonnegative(),
   moveEnabled: z.boolean(),
@@ -212,7 +221,10 @@ export const matchRecordSchema = z.object({
   rounds: z.array(matchRoundRecordSchema),
 });
 
-export type MatchRecord = z.infer<typeof matchRecordSchema>;
+/** Reads a line of any supported version and gives it back in the current one. */
+export const matchRecordSchema = z.preprocess(upgradeLegacyMatchRecord, currentMatchRecordSchema);
+
+export type MatchRecord = z.infer<typeof currentMatchRecordSchema>;
 
 export const harnessVerifiedEntrySchema = z.object({
   cliVersion: z.string(),

@@ -15,7 +15,7 @@ import {
 import { buildBotRoundPrompt } from './prompt.ts';
 import { createBotToolQueue, type BotToolQueue } from './queue.ts';
 import { buildRoundHandlers } from './runner-handlers.ts';
-import { REGION_LABELS_RU, type RoundBotParams, type RunnerCtx } from './runner-types.ts';
+import { describePlayAreaRu, type RoundBotParams, type RunnerCtx } from './runner-types.ts';
 
 function startBotExecution(
   ctx: RunnerCtx,
@@ -47,7 +47,7 @@ function startBotExecution(
   const adapter = getHarnessAdapter(slot.harness);
   const prompt = buildBotRoundPrompt({
     botName: slot.name,
-    regionLabelRu: REGION_LABELS_RU[target.region],
+    regionLabelRu: describePlayAreaRu(target),
     moveEnabled,
     moveLimit: slot.moveLimit,
     budgetSec: slot.budgetSec,

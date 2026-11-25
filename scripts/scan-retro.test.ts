@@ -1,0 +1,105 @@
+import { expect, test } from 'bun:test';
+import type { MetadataClient } from '../server/location/metadata.ts';
+import { seededRng } from '../server/maps/rng.ts';
+import { REGION_COUNTRIES, findCountryAtPoint } from '../shared/regions.ts';
+import {
+  MIN_OLD_FOUND,
+  measureCountry,
+  pickScanCountries,
+  scanRetro,
+  selectRetroCountries,
+} from './scan-retro.ts';
+
+/** A metadata double: every lookup finds a panorama at the probe, old ones only north of 50°. */
+function northIsOld(seen: { lat: number; lng: number; radiusM: number }[] = []) {
+  const find: MetadataClient['find'] = (pos, radiusM) => {
+    seen.push({ ...pos, radiusM });
+    return Promise.resolve({
+      panoId: `p-${seen.length}`,
+      lat: pos.lat,
+      lng: pos.lng,
+      year: pos.lat > 50 ? 2009 : 2021,
+    });
+  };
+  return { find, seen };
+}
+
+// Value: protects=the measurement sends exactly the asked number of lookups into the country, half at settlements and half at open land, like a retro round; fails_when=lookups leave the country or one kind of probe is dropped;
+// why_new=the scan is new; seam=none; no_claim=what Google answers (metadata double)
+test('a country is measured with town and open-land lookups inside it', async () => {
+  const { find, seen } = northIsOld();
+  const stat = await measureCountry('EST', 40, find, seededRng(5));
+  expect(stat).toEqual({ lookups: 40, old: 40 });
+  expect(seen.length).toBe(40);
+  expect(seen.filter((probe) => probe.radiusM === 750).length).toBe(20);
+  expect(seen.filter((probe) => probe.radiusM === 5000).length).toBe(20);
+  const open = seen.filter((probe) => probe.radiusM === 5000);
+  expect(open.every((probe) => findCountryAtPoint(probe)?.id === 'EST')).toBe(true);
+});
+
+// Value: protects=the measurement counts only an old panorama a retro round would take; fails_when=an old panorama across the border or outside the settlement puts a country on the retro map where its rounds cannot be found;
+// why_new=the scan counted every old panorama a lookup returned; seam=none; no_claim=what Google answers (metadata double)
+test('an old panorama a round would reject is not counted', async () => {
+  const seen: number[] = [];
+  // Every lookup snaps to the same old panorama in Riga, across the border from Estonia.
+  const find: MetadataClient['find'] = (_pos, radiusM) => {
+    seen.push(radiusM);
+    return Promise.resolve({ panoId: 'riga', lat: 56.95, lng: 24.1, year: 2009 });
+  };
+  expect(findCountryAtPoint({ lat: 56.95, lng: 24.1 })?.id).toBe('LVA');
+  const stat = await measureCountry('EST', 24, find, seededRng(7));
+  expect(stat).toEqual({ lookups: 24, old: 0 });
+  expect(seen.length).toBe(24);
+});
+
+// Value: protects=the second pass goes only to countries where the first one found an old panorama, and the two passes add up; fails_when=every country gets the long pass or the first pass is thrown away;
+// why_new=the scan is new; seam=none; no_claim=what Google answers (metadata double)
+test('the scan looks closer only where the first pass found an old panorama', async () => {
+  const { find } = northIsOld();
+  const reported: string[] = [];
+  const stats = await scanRetro({
+    countryIds: ['EST', 'PRT'],
+    find,
+    rng: seededRng(6),
+    firstPass: 24,
+    secondPass: 36,
+    onCountry: (id) => reported.push(id),
+  });
+  expect(stats).toEqual({ EST: { lookups: 60, old: 60 }, PRT: { lookups: 24, old: 0 } });
+  expect(reported).toEqual(['EST', 'PRT']);
+});
+
+// Value: protects=only countries with enough old panoramas stay on the retro map; fails_when=a country with one lucky lookup is kept and its rounds take hundreds of lookups;
+// why_new=the scan is new; seam=none; no_claim=the threshold being right for play (measured separately)
+test('a country needs enough old panoramas to stay on the retro map', () => {
+  const stats = {
+    EST: { lookups: 480, old: 140 },
+    NOR: { lookups: 480, old: MIN_OLD_FOUND },
+    MEX: { lookups: 480, old: MIN_OLD_FOUND - 1 },
+    EGY: { lookups: 120, old: 0 },
+  };
+  expect(Object.keys(selectRetroCountries(stats))).toEqual(['EST', 'NOR']);
+  expect(Object.keys(selectRetroCountries(stats, 100))).toEqual(['EST']);
+});
+
+// Value: protects=a scan of some countries cannot replace the tracked retro dataset, and a mistyped country id stops the scan instead of writing a dataset with no countries; fails_when=--only without --out is accepted, or an unknown id is dropped without a word;
+// why_new=the scan is new; seam=none; no_claim=the file write itself (dataset-io test)
+test('a partial scan needs its own output file and known country ids', () => {
+  expect(pickScanCountries(undefined, undefined).length).toBe(REGION_COUNTRIES.length);
+  expect(pickScanCountries('IRL,EST', '/tmp/part.json')).toEqual(
+    REGION_COUNTRIES.map((country) => country.id).filter((id) => id === 'EST' || id === 'IRL'),
+  );
+  expect(() => pickScanCountries('EST,XXX', '/tmp/part.json')).toThrow('no such country: XXX');
+  expect(() => pickScanCountries('est', '/tmp/part.json')).toThrow('no such country: est');
+  expect(() => pickScanCountries('EST', undefined)).toThrow('--only needs --out');
+  // Naming the tracked dataset as the output is the same as leaving --out away.
+  for (const tracked of [
+    'server/maps/retro.data.json',
+    './scripts/../server/maps/retro.data.json',
+  ]) {
+    expect(() => pickScanCountries('EST', tracked)).toThrow('--only needs --out');
+  }
+  // An empty list is a mistake (an unset shell variable), not a scan of the world.
+  expect(() => pickScanCountries('', undefined)).toThrow('no country given');
+  expect(() => pickScanCountries(',', '/tmp/part.json')).toThrow('no country given');
+});

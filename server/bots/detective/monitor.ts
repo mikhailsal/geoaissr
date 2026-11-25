@@ -3,7 +3,7 @@ import { getRegionDiagonalKm } from '../../../shared/regions.ts';
 import { getHarnessAdapter } from '../adapters/index.ts';
 import { logBotDiagnostic } from '../diagnostics.ts';
 import { cleanupBotHandle, dispatchBotLaunchFailure, maskDiagnostics } from '../process.ts';
-import { REGION_LABELS_RU } from '../runner-types.ts';
+import { describePlayAreaRu } from '../runner-types.ts';
 import { attachAgyAudits } from './isolation.ts';
 import { spawnRole, type RoleExit, type RoleProcess } from './procs.ts';
 import { buildDetectiveBrainPrompt, buildDetectiveEyesPrompt } from './prompts.ts';
@@ -164,7 +164,7 @@ export function startDetectiveProcesses(run: DetectiveRun, graceMs = EYES_GRACE_
   const models = roleModels(slot);
   const brainPrompt = buildDetectiveBrainPrompt({
     ...shared,
-    regionLabelRu: REGION_LABELS_RU[target.region],
+    regionLabelRu: describePlayAreaRu(target),
     regionDiagonalKm: getRegionDiagonalKm(target.region),
     budgetSec: slot.budgetSec,
     personalityPreset: slot.personalityPreset,

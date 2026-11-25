@@ -1,6 +1,10 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { matchRecordSchema, type MatchRecord } from '../../shared/storage-schemas.ts';
+import {
+  MATCH_RECORD_VERSION,
+  matchRecordSchema,
+  type MatchRecord,
+} from '../../shared/storage-schemas.ts';
 
 export function appendMatchRecord(matchesFile: string, record: MatchRecord): void {
   const validated = matchRecordSchema.parse(record);
@@ -40,7 +44,7 @@ export function readMatchRecords(matchesFile: string): ReadMatchesResult {
     }
     const ver =
       typeof parsed === 'object' && parsed !== null && 'version' in parsed ? parsed.version : null;
-    if (typeof ver === 'number' && ver > 1) {
+    if (typeof ver === 'number' && ver > MATCH_RECORD_VERSION) {
       skippedNewer += 1;
       continue;
     }

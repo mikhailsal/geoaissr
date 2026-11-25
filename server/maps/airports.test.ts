@@ -1,80 +1,84 @@
 import { expect, test } from 'bun:test';
 import { haversineDistanceKm } from '../../shared/score.ts';
 import { createLocationService } from '../location.ts';
-import {
-  AIRPORT_SNAP_RADIUS_M,
-  AIRPORT_ZONE_KM,
-  airportCountry,
-  getAirportCountryGroups,
-  isInsideAirportZone,
-  isoCodesOfCountryIds,
-  sampleAirportProbe,
-} from './airports.ts';
+import { AIRPORT_SNAP_RADIUS_M, AIRPORT_ZONE_KM } from './airports.ts';
+import { countryForIso, isoCodesOfCountryIds } from './countries.ts';
+import { seededRng as mulberry32 } from './rng.ts';
+import { getSourceGroups } from './sources.ts';
 
-function mulberry32(seed: number): () => number {
-  let a = seed;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+/** The airports of the whole world, grouped by country. */
+function airportGroups() {
+  return getSourceGroups('airports', 'world');
 }
 
 function nearestAirportKm(pos: { lat: number; lng: number }): number {
   let best = Infinity;
-  for (const group of getAirportCountryGroups()) {
-    for (const [lat, lng] of group.airports) {
-      best = Math.min(best, haversineDistanceKm(pos, { lat, lng }));
+  for (const group of airportGroups()) {
+    for (const airport of group.sources) {
+      best = Math.min(best, haversineDistanceKm(pos, airport.centre));
     }
   }
   return best;
 }
 
 test('airports dataset holds valid coordinates for more than 3000 airports', () => {
-  const groups = getAirportCountryGroups();
-  const all = groups.flatMap((group) => group.airports);
+  const groups = airportGroups();
+  const all = groups.flatMap((group) => group.sources.map((airport) => airport.centre));
   expect(all.length).toBeGreaterThan(3000);
   expect(groups.every((group) => /^[A-Z]{2}$/.test(group.iso))).toBe(true);
-  expect(all.every(([lat, lng]) => Math.abs(lat) <= 90 && Math.abs(lng) <= 180)).toBe(true);
+  expect(all.every(({ lat, lng }) => Math.abs(lat) <= 90 && Math.abs(lng) <= 180)).toBe(true);
 });
 
 test('country weights grow slower than the airport count', () => {
-  const groups = getAirportCountryGroups();
+  const groups = airportGroups();
   const total = groups.reduce((sum, group) => sum + group.weight, 0);
   const usa = groups.find((group) => group.iso === 'US');
   expect(usa).toBeDefined();
   expect((usa?.weight ?? total) / total).toBeLessThan(0.08);
 });
 
-test('countries already played are skipped, unless nothing else is left', () => {
+test('countries already played are skipped, unless nothing else is left', async () => {
   const played = isoCodesOfCountryIds(['USA', 'iso:SG']);
   expect([...played].sort()).toEqual(['SG', 'US']);
-  const groups = getAirportCountryGroups(played);
-  expect(groups.some((group) => group.iso === 'US' || group.iso === 'SG')).toBe(false);
-  const everything = new Set(getAirportCountryGroups().map((group) => group.iso));
-  expect(getAirportCountryGroups(everything).length).toBe(everything.size);
+  const { svc } = metadataService(0, 17);
+  for (let i = 0; i < 40; i += 1) {
+    const target = await svc.prepareRoundLocation({
+      map: 'airports',
+      region: 'world',
+      excludeCountryIds: ['USA', 'iso:SG'],
+    });
+    expect(['USA', 'iso:SG']).not.toContain(target.countryId);
+  }
+  const everything = airportGroups().map((group) => countryForIso(group.iso).id);
+  const target = await svc.prepareRoundLocation({
+    map: 'airports',
+    region: 'world',
+    excludeCountryIds: everything,
+  });
+  expect(everything).toContain(target.countryId);
 });
 
 test('probes stay inside the airport zone and lean towards the airport', () => {
   const rng = mulberry32(7);
-  const groups = getAirportCountryGroups();
+  const airports = airportGroups().flatMap((group) => group.sources);
   let near = 0;
   for (let i = 0; i < 400; i += 1) {
-    const pick = sampleAirportProbe(groups, rng);
-    const distance = haversineDistanceKm(pick.airport, pick.probe);
+    const airport = airports[Math.floor(rng() * airports.length)];
+    if (!airport) throw new Error('no airport');
+    const distance = haversineDistanceKm(airport.centre, airport.probe(rng));
     expect(distance).toBeLessThanOrEqual(AIRPORT_ZONE_KM * 1.01);
     if (distance <= AIRPORT_ZONE_KM / 2) near += 1;
   }
   expect(near).toBeGreaterThan(160);
-  expect(isInsideAirportZone({ lat: 0, lng: 0 }, { lat: 0.05, lng: 0 })).toBe(false);
+  const any = airports[0];
+  // About 5.6 km north of the airport: outside its zone.
+  expect(any?.accepts({ lat: any.centre.lat + 0.05, lng: any.centre.lng })).toBe(false);
 });
 
 test('a round takes its country from the airport, with the regions id when the regions know it', () => {
-  expect(airportCountry('DK')).toEqual({ id: 'DNK', nameRu: 'Дания' });
+  expect(countryForIso('DK')).toEqual({ id: 'DNK', nameRu: 'Дания' });
   // Singapore has no polygon in the regions dataset.
-  expect(airportCountry('SG')).toEqual({ id: 'iso:SG', nameRu: 'Сингапур' });
+  expect(countryForIso('SG')).toEqual({ id: 'iso:SG', nameRu: 'Сингапур' });
 });
 
 /** Street View metadata double: answers every lookup with a panorama `shiftLat` degrees north. */
@@ -102,12 +106,16 @@ function metadataService(shiftLat: number, seed: number) {
 test('an airport in a country without a polygon is not named after a played neighbour', async () => {
   // Every country but Singapore is played, Malaysia among them. The nearest polygon to a
   // Singapore panorama is Malaysia's.
-  const played = getAirportCountryGroups()
+  const played = airportGroups()
     .filter((group) => group.iso !== 'SG')
-    .map((group) => airportCountry(group.iso).id);
+    .map((group) => countryForIso(group.iso).id);
   const { svc, requests } = metadataService(0, 3);
 
-  const target = await svc.prepareRoundLocation({ region: 'airports', excludeCountryIds: played });
+  const target = await svc.prepareRoundLocation({
+    map: 'airports',
+    region: 'world',
+    excludeCountryIds: played,
+  });
   expect(requests.length).toBe(1);
   expect(target.countryId).toBe('iso:SG');
   expect(target.countryNameRu).toBe('Сингапур');
@@ -118,12 +126,12 @@ test('airports map gives up after 90 lookups when no panorama is inside a zone',
   const { svc, requests } = metadataService(0.3, 5);
 
   const outcome = await svc
-    .prepareRoundLocation({ region: 'airports', excludeCountryIds: [] })
+    .prepareRoundLocation({ map: 'airports', region: 'world', excludeCountryIds: [] })
     .then(
       () => 'resolved',
       (err: unknown) => (err instanceof Error ? err.message : String(err)),
     );
-  expect(outcome).toContain('рядом с аэропортом за 90 попыток');
+  expect(outcome).toContain('карта «Аэропорты мира», регион «Весь мир», 90 попыток');
   expect(requests.length).toBe(90);
 });
 
@@ -148,11 +156,16 @@ test('airports map rejects a panorama outside the zone and accepts one inside it
     },
   });
 
-  const target = await svc.prepareRoundLocation({ region: 'airports', excludeCountryIds: [] });
+  const target = await svc.prepareRoundLocation({
+    map: 'airports',
+    region: 'world',
+    excludeCountryIds: [],
+  });
   expect(requests.length).toBe(2);
   expect(requests[0]?.get('radius')).toBe(String(AIRPORT_SNAP_RADIUS_M));
   expect(target.panoId).toBe('pano-2');
-  expect(target.region).toBe('airports');
+  expect(target.map).toBe('airports');
+  expect(target.region).toBe('world');
   expect(target.countryNameRu.length).toBeGreaterThan(0);
   expect(nearestAirportKm(target)).toBeLessThanOrEqual(AIRPORT_ZONE_KM);
 });
@@ -187,10 +200,12 @@ function scriptedService(answers: ((probe: { lat: number; lng: number }) => Resp
 test('airports map fails the round with the GeoError of a denied lookup instead of retrying', async () => {
   const { svc, calls } = scriptedService([() => new Response('denied', { status: 403 })]);
 
-  const err = await svc.prepareRoundLocation({ region: 'airports', excludeCountryIds: [] }).then(
-    () => null,
-    (e: unknown) => e,
-  );
+  const err = await svc
+    .prepareRoundLocation({ map: 'airports', region: 'world', excludeCountryIds: [] })
+    .then(
+      () => null,
+      (e: unknown) => e,
+    );
   expect(err).toBeInstanceOf(Error);
   expect((err as { code?: string }).code).toBe('GEO_GOOGLE_KEY_DENIED');
   expect(calls()).toBe(1);
@@ -207,7 +222,11 @@ test('airports map skips a failed lookup and a ZERO_RESULTS answer, then accepts
   // The first attempt burns both fetch tries of the retry wrapper.
   const { svc, calls } = scriptedService([fail, fail, zero]);
 
-  const target = await svc.prepareRoundLocation({ region: 'airports', excludeCountryIds: [] });
+  const target = await svc.prepareRoundLocation({
+    map: 'airports',
+    region: 'world',
+    excludeCountryIds: [],
+  });
   expect(calls()).toBe(4);
   expect(target.panoId).toBe('pano-4');
   expect(nearestAirportKm(target)).toBeLessThanOrEqual(AIRPORT_ZONE_KM);

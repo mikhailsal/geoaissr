@@ -10,6 +10,7 @@ import {
   renderPromptTemplate,
 } from './prompt-files.ts';
 import { buildBotRoundPrompt } from './prompt.ts';
+import { describePlayAreaRu } from './runner-types.ts';
 
 test('variables, blocks with else, nested blocks and comments render as plain text', () => {
   const template = [
@@ -157,4 +158,35 @@ test('the eyes on agy are told to open the frame files, and only those', () => {
   expect(files).toContain('read_file только для файлов кадров');
   expect(files).toContain('сразу прочитай их через read_file');
   expect(buildDetectiveEyesPrompt({ ...opts, fileDelivery: false })).not.toContain('read_file');
+});
+
+// Value: protects=a bot is told the map of the match, and the standard map's prompt carries no extra words; fails_when=the map note is dropped, or the standard prompt changes and old eval runs stop being comparable;
+// why_new=a match had no map; seam=none; no_claim=what a model does with the note
+test('the prompt names the map of the match, except the standard one', () => {
+  expect(describePlayAreaRu({ map: 'standard', region: 'world' })).toBe('Весь мир');
+  expect(describePlayAreaRu({ map: 'standard', region: 'country:JPN' })).toBe('Япония');
+  expect(describePlayAreaRu({ map: 'capitals', region: 'europe' })).toBe(
+    'Европа; карта «Столицы»: только столицы стран',
+  );
+  const base = { ...INTUIT, moveEnabled: false, deliveryMode: 'mcp' as const };
+  const standard = buildBotRoundPrompt({
+    ...base,
+    regionLabelRu: describePlayAreaRu({ map: 'standard', region: 'europe' }),
+  });
+  expect(standard).toContain('(регион партии: Европа).');
+  expect(standard).not.toContain('карта «');
+  const airports = buildBotRoundPrompt({
+    ...base,
+    regionLabelRu: describePlayAreaRu({ map: 'airports', region: 'europe' }),
+  });
+  expect(airports).toContain(
+    '(регион партии: Европа; карта «Аэропорты мира»: не дальше 5 км от аэропорта с регулярными рейсами).',
+  );
+  const brain = buildDetectiveBrainPrompt({
+    ...BRAIN,
+    moveLimit: 4,
+    canMove: true,
+    regionLabelRu: describePlayAreaRu({ map: 'north', region: 'world' }),
+  });
+  expect(brain).toContain('регион партии: Весь мир; карта «Север»: только севернее 60°');
 });

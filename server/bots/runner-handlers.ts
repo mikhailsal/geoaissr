@@ -3,7 +3,7 @@ import type { RenderedBotImage } from '../images/bot-image-service.ts';
 import { normalizeHeadingDeg } from '../images/label.ts';
 import type { MoveResult, MoveTracker } from './move.ts';
 import type { BotSessionHandlers, ToolResponsePayload } from './queue.ts';
-import { REGION_LABELS_RU, type RoundBotParams, type RunnerCtx } from './runner-types.ts';
+import { describePlayAreaRu, type RoundBotParams, type RunnerCtx } from './runner-types.ts';
 import { dispatchObserveThumbs, makeThumb } from './thumbs.ts';
 
 function toImageBlocks(
@@ -175,7 +175,7 @@ export function buildRoundHandlers(
           views,
         );
         return {
-          text: `Стартовые 4 кадра (С, В, Ю, З). Регион: ${REGION_LABELS_RU[target.region]}, макс. масштаб D ≈ ${Math.round(getRegionDiagonalKm(target.region))} км.`,
+          text: `Стартовые 4 кадра (С, В, Ю, З). Регион: ${describePlayAreaRu(target)}, макс. масштаб D ≈ ${Math.round(getRegionDiagonalKm(target.region))} км.`,
           images: toImageBlocks(views),
         };
       } catch (err) {

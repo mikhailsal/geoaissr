@@ -20,6 +20,7 @@ import type {
   Shift,
 } from '../../shared/bot-journal.ts';
 import type { GuessConfidence } from '../../shared/detective-tools.ts';
+import type { MapId } from '../../shared/maps.ts';
 import type { PlayStyle } from '../../shared/play-style.ts';
 import type {
   BotRoundTelemetry,
@@ -54,6 +55,7 @@ export interface RoundTarget {
   lng: number;
   countryId: string;
   countryNameRu: string;
+  map: MapId;
   region: RegionId;
   fakeSceneIndex: number;
 }
@@ -353,6 +355,7 @@ export type EngineEffect =
       matchId: string;
       gen: number;
       roundNumber: number;
+      map: MapId;
       region: RegionId;
       excludeCountryIds: string[];
       withBots: boolean;

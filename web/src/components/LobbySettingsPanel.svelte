@@ -1,13 +1,12 @@
 <script lang="ts">
   import type { ClientViewState, LobbySettingsPatch } from '$shared/protocol';
-  import {
-    PUSH_SECONDS_MAX,
-    PUSH_SECONDS_MIN,
-    REGION_IDS,
-    type RegionId,
-  } from '$shared/storage-schemas';
+  import { isMapAvailable } from '$shared/map-availability';
+  import { MAP_DESCRIPTIONS_RU, MAP_IDS, MAP_LABELS_RU, type MapId } from '$shared/maps';
+  import { AREA_REGION_IDS, type RegionId } from '$shared/region-ids';
+  import { AREA_REGION_LABELS_RU, getRegionLabelRu, listCountryRegions } from '$shared/regions';
+  import { PUSH_SECONDS_MAX, PUSH_SECONDS_MIN } from '$shared/storage-schemas';
   import { formatRoundsRu, formatSecondsOnly } from '../i18n/format';
-  import { REGION_LABELS, RU } from '../i18n/ru';
+  import { RU } from '../i18n/ru';
   import QuotaMetric from './QuotaMetric.svelte';
 
   interface Props {
@@ -19,6 +18,14 @@
   }
 
   let { view, minDurationSec, hostName, onUpdateLobby, onConfirmQuotaReset }: Props = $props();
+
+  const countryRegions = listCountryRegions();
+  const openCountries = $derived(
+    countryRegions.filter((country) => isMapAvailable(view.map, country.region)),
+  );
+  const closedCountries = $derived(
+    countryRegions.filter((country) => !isMapAvailable(view.map, country.region)),
+  );
 
   function commitNumber(
     input: HTMLInputElement,
@@ -69,6 +76,61 @@
       />
     </label>
 
+    <label class="field full-span">
+      <span class="lbl">{RU.lobby.mapLabel}</span>
+      <select
+        class="field-select"
+        data-testid="map-select"
+        disabled={!view.viewerIsHost}
+        value={view.map}
+        onchange={(e) => {
+          onUpdateLobby({ map: e.currentTarget.value as MapId });
+        }}
+      >
+        {#each MAP_IDS as id (id)}
+          {@const available = isMapAvailable(id, view.region)}
+          <option value={id} disabled={!available && id !== view.map}>
+            {MAP_LABELS_RU[id]}{available ? '' : ` (${RU.lobby.mapEmptyInRegion})`}
+          </option>
+        {/each}
+      </select>
+      <span class="hint" data-testid="map-description">{MAP_DESCRIPTIONS_RU[view.map]}</span>
+    </label>
+
+    <label class="field region-field">
+      <span class="lbl">{RU.lobby.regionLabel}</span>
+      <select
+        class="field-select"
+        data-testid="region-select"
+        disabled={!view.viewerIsHost}
+        value={view.region}
+        onchange={(e) => {
+          onUpdateLobby({ region: e.currentTarget.value as RegionId });
+        }}
+      >
+        {#each AREA_REGION_IDS as id (id)}
+          {@const available = isMapAvailable(view.map, id)}
+          <option value={id} disabled={!available && id !== view.region}>
+            {AREA_REGION_LABELS_RU[id]}{available ? '' : ` (${RU.lobby.regionEmptyOnMap})`}
+          </option>
+        {/each}
+        <optgroup label={RU.lobby.regionCountriesGroup}>
+          {#each openCountries as country (country.region)}
+            <option value={country.region}>{country.nameRu}</option>
+          {/each}
+        </optgroup>
+        {#if closedCountries.length > 0}
+          <optgroup label={RU.lobby.regionCountriesEmptyGroup}>
+            {#each closedCountries as country (country.region)}
+              <option value={country.region} disabled={country.region !== view.region}>
+                {country.nameRu}
+              </option>
+            {/each}
+          </optgroup>
+        {/if}
+      </select>
+    </label>
+
     <div class="field">
       <span class="lbl">{RU.lobby.moveLabel}</span>
       <button
@@ -83,22 +145,6 @@
         {view.moveEnabled ? RU.lobby.moveOn : RU.lobby.moveOff}
       </button>
     </div>
-
-    <label class="field">
-      <span class="lbl">{RU.lobby.regionLabel}</span>
-      <select
-        class="field-select"
-        disabled={!view.viewerIsHost}
-        value={view.region}
-        onchange={(e) => {
-          onUpdateLobby({ region: e.currentTarget.value as RegionId });
-        }}
-      >
-        {#each REGION_IDS as reg (reg)}
-          <option value={reg}>{REGION_LABELS[reg]}</option>
-        {/each}
-      </select>
-    </label>
 
     <label class="standings-option full-span">
       <input
@@ -220,7 +266,8 @@
     {:else}
       <p class="muted" role="status">
         {RU.lobby.onlyHostCanStartPrefix}{hostName} · {formatRoundsRu(view.totalRounds)} ·
-        {formatSecondsOnly(view.roundDurationSec)} · {REGION_LABELS[view.region]}
+        {formatSecondsOnly(view.roundDurationSec)} · {MAP_LABELS_RU[view.map]} ·
+        {getRegionLabelRu(view.region)}
       </p>
     {/if}
   </div>
@@ -258,6 +305,13 @@
 
   .full-span {
     grid-column: 1 / -1;
+  }
+
+  /* A long country name needs the whole row on a phone. */
+  @media (max-width: 600px) and (orientation: portrait) {
+    .region-field {
+      grid-column: 1 / -1;
+    }
   }
 
   .lbl,

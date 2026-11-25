@@ -8,7 +8,8 @@ import { projectView } from './view.ts';
 
 function makeBaseRoom(): RoomState {
   const settings: SettingsFile = {
-    version: 1,
+    version: 2,
+    map: 'standard',
     region: 'world',
     rounds: 1,
     roundDurationSec: 90,
@@ -56,6 +57,7 @@ const TARGET: RoundTarget = {
   lng: 2.3522,
   countryId: '250',
   countryNameRu: 'Франция',
+  map: 'standard',
   region: 'world',
   fakeSceneIndex: 0,
 };

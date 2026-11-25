@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { getHarnessAdapter } from '../../server/bots/adapters/index.ts';
 import { buildBotRoundPrompt } from '../../server/bots/prompt.ts';
-import { REGION_LABELS_RU } from '../../server/bots/runner-types.ts';
+import { describePlayAreaRu } from '../../server/bots/runner-types.ts';
 import { getBotToolDefinitions } from '../../shared/bot-tools.ts';
 import type { HarnessId } from '../../shared/storage-schemas.ts';
 
@@ -22,7 +22,7 @@ export function buildEvalPrompt(opts: {
 }): string {
   return buildBotRoundPrompt({
     botName: EVAL_BOT_NAME,
-    regionLabelRu: REGION_LABELS_RU.world,
+    regionLabelRu: describePlayAreaRu({ map: 'standard', region: 'world' }),
     moveEnabled: false,
     moveLimit: opts.moveLimit,
     budgetSec: opts.budgetSec,

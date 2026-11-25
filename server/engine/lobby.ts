@@ -6,6 +6,7 @@ import {
   type HarnessCatalogEntry,
   type LobbySettingsPatch,
 } from '../../shared/protocol.ts';
+import { isKnownRegion } from '../../shared/regions.ts';
 import type { BotSlotConfig, HarnessId, SettingsFile } from '../../shared/storage-schemas.ts';
 import { eyesPatchInvalid, keepVisionCheck, mergeBotSlotPatch } from './bot-slot-patch.ts';
 import type { PlayerState, ReduceOutput, RoomState } from './types.ts';
@@ -74,19 +75,27 @@ export function handleUpdateLobby(
 
   const hasEnabledBot = state.settings.bots.some((b) => b.enabled);
   let requestedDuration = patch.roundDurationSec ?? state.settings.roundDurationSec;
-  let notice: string | undefined;
+  // One patch can be corrected twice; the host reads about both.
+  const notices: string[] = [];
   if (hasEnabledBot && requestedDuration < 60) {
     requestedDuration = 60;
-    notice = 'Длительность раунда не может быть меньше 60 с при включённых ИИ';
+    notices.push('Длительность раунда не может быть меньше 60 с при включённых ИИ');
   }
 
+  // A country this build does not know (a stale client, a forged message) keeps the old region.
+  let region = state.settings.region;
+  if (patch.region !== undefined) {
+    if (isKnownRegion(patch.region)) region = patch.region;
+    else notices.push('Такого региона нет в этой версии игры. Обновите страницу');
+  }
   const nextSettings: SettingsFile = {
     ...state.settings,
     ...patch,
+    region,
     roundDurationSec: requestedDuration,
   };
   return {
-    state: { ...state, settings: nextSettings, settingsNotice: notice },
+    state: { ...state, settings: nextSettings, settingsNotice: notices.join('. ') || undefined },
     effects: [{ type: 'save_settings', settings: nextSettings }],
     ack: 'ok',
   };

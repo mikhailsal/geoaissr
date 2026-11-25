@@ -1,5 +1,5 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { writeDatasetFile } from './lib/dataset-io.ts';
 
 /** OurAirports publishes its data into the public domain: https://ourairports.com/data/ */
 const SOURCE_URL = 'https://davidmegginson.github.io/ourairports-data/airports.csv';
@@ -37,6 +37,7 @@ export function parseCsv(text: string): string[][] {
       field = '';
     } else if (ch !== '\r') field += ch;
   }
+  if (quoted) throw new Error('CSV ends inside a quoted field: the download is cut short');
   if (field.length > 0 || row.length > 0) {
     row.push(field);
     rows.push(row);
@@ -48,8 +49,14 @@ function roundCoord(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
+/** A real download keeps over 3000 airports; far fewer means a broken or cut file. */
+const MIN_EXPECTED_AIRPORTS = 2000;
+
 /** Keeps large and medium airports with scheduled passenger service. */
-export function buildAirports(csvText: string): AirportsDataset {
+export function buildAirports(
+  csvText: string,
+  minExpected = MIN_EXPECTED_AIRPORTS,
+): AirportsDataset {
   const [header, ...rows] = parseCsv(csvText);
   if (!header) throw new Error('OurAirports CSV is empty');
   const column = (name: string): number => {
@@ -67,8 +74,12 @@ export function buildAirports(csvText: string): AirportsDataset {
   for (const row of rows) {
     if (!KEPT_TYPES.has(row[typeAt] ?? '') || row[scheduledAt] !== 'yes') continue;
     const iso = (row[isoAt] ?? '').toUpperCase();
-    const lat = Number(row[latAt]);
-    const lng = Number(row[lngAt]);
+    // A blank cell must not turn into 0: Number('') is 0, so check the text first.
+    const rawLat = (row[latAt] ?? '').trim();
+    const rawLng = (row[lngAt] ?? '').trim();
+    if (rawLat === '' || rawLng === '') continue;
+    const lat = Number(rawLat);
+    const lng = Number(rawLng);
     if (!/^[A-Z]{2}$/.test(iso) || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
     if (Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
     const list = byIso.get(iso) ?? [];
@@ -76,6 +87,12 @@ export function buildAirports(csvText: string): AirportsDataset {
     byIso.set(iso, list);
   }
 
+  const total = [...byIso.values()].reduce((sum, list) => sum + list.length, 0);
+  if (total < minExpected) {
+    throw new Error(
+      `OurAirports CSV holds ${total} usable airports, expected at least ${minExpected}`,
+    );
+  }
   const airports: Record<string, [number, number][]> = {};
   for (const iso of [...byIso.keys()].sort()) {
     airports[iso] = (byIso.get(iso) ?? []).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -97,8 +114,7 @@ async function loadCsv(): Promise<string> {
 if (import.meta.main) {
   const data = buildAirports(await loadCsv());
   const outPath = path.resolve(import.meta.dir, '../server/maps/airports.data.json');
-  mkdirSync(path.dirname(outPath), { recursive: true });
-  writeFileSync(outPath, `${JSON.stringify(data)}\n`);
+  writeDatasetFile(outPath, data);
   const total = Object.values(data.airports).reduce((sum, list) => sum + list.length, 0);
   console.log(
     'Generated',

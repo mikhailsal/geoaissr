@@ -156,6 +156,7 @@ export async function runEvalRound(opts: {
       lng: sample.lng,
       countryId: 'EVAL',
       countryNameRu: sample.countryNameRu,
+      map: 'standard',
       region: 'world',
       fakeSceneIndex: 0,
     };

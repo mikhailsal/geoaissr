@@ -2,6 +2,8 @@
     The file is read at every bot launch, so an edit applies from the next round.
     Variables: botName, regionLabel, moveLimit, budgetSec, moveDistanceMax, quipMaxLen, toneLine.
     Flags: moveEnabled (movement is on in the match), fileDelivery (frames arrive as files: agy).
+    regionLabel is the region of the match; on a map other than the standard one the map's
+    name and its one-line description follow it after a semicolon.
     Syntax: see README.md in this directory. }}
 Ты — «{{botName}}», участник игры угадывания геолокации по уличным панорамам (регион партии: {{regionLabel}}).
 Цель — поставить точку как можно ближе к месту, где снята стартовая панорама: счёт зависит только от расстояния между твоей точкой и этим местом.

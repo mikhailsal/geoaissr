@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { createPlaceGuard, maskPlaceWords } from './guard.ts';
+import { PLACE_MASK, createPlaceGuard, maskPlaceWords } from './guard.ts';
 
 const guard = createPlaceGuard();
 
@@ -107,4 +107,83 @@ test('invisible characters and fullwidth letters do not hide a place name', () =
     'дома как в […], вывеска «Токио банк»',
   );
   expect(guard.findPlaceWord('как в Китае')).toBe('китае');
+});
+
+// Value: protects=the guard catches the island and city states the point maps reach, in the cases a sentence uses; fails_when=the names of countries without a polygon stop feeding the guard;
+// why_new=the guard only knew the countries of the regions dataset, and the airports and capitals maps go beyond it; seam=none; no_claim=names of cities and airports themselves
+test('the guard blocks the small states and territories of the point maps', () => {
+  expect(guard.findPlaceWord('похоже на Сингапур')).toBe('сингапур');
+  expect(guard.findPlaceWord('вывеска как на Мальте')).toBe('мальте');
+  expect(guard.findPlaceWord('такси как в Гонконге')).toBe('гонконге');
+  expect(guard.findPlaceWord('пляж как на Мальдивах')).toBe('мальдивах');
+  expect(guard.findPlaceWord('это Монако')).toBe('монако');
+  expect(guard.findPlaceWord('остров Маврикий')).toBe('маврикий');
+  expect(guard.findPlaceWord('номера как в Бахрейне')).toBe('бахрейне');
+  expect(guard.findPlaceWord('андоррский флаг')).toBe('андоррский');
+  expect(guard.findPlaceWord('флаг Самоа')).toBe('самоа');
+  expect(guard.findPlaceWord('Каймановы острова')).toBe('каймановы');
+});
+
+// Value: protects=a territory whose every word is too ordinary to block alone is still blocked when written whole, and masked in what the eyes write; fails_when=the brain can name San Marino or Christmas Island to its partner word for word;
+// why_new=the territory names were matched word by word only, and these names have no word of their own; seam=none; no_claim=every spelling of a name (the dictionary form and its cases)
+test('the guard blocks a territory name made of ordinary words when it is written whole', () => {
+  expect(guard.findPlaceWord('флаг Сан-Марино')).toBe('марино');
+  expect(guard.findPlaceWord('похоже на Сен-Мартен')).toBe('мартен');
+  expect(guard.findPlaceWord('аэропорт Синт-Мартена')).toBe('мартена');
+  expect(guard.findPlaceWord('это остров Рождества')).toBe('рождества');
+  expect(guard.findPlaceWord('пляж на островах Кука')).toBe('кука');
+  expect(guard.findPlaceWord('остров Святой Елены')).toBe('елены');
+  expect(guard.findPlaceWord('номера как на острове Мэн')).toBe('мэн');
+  expect(guard.findPlaceWord('Кокосовые острова')).toBe('кокосовые');
+  expect(maskPlaceWords(guard, 'вывеска, как в Сан-Марино').text).toBe(
+    `вывеска, как в Сан-${PLACE_MASK}`,
+  );
+  for (const text of ['остров на реке', 'праздник Рождества', 'сан у священника', 'мэн в шляпе']) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
+});
+
+// Value: protects=a territory name is caught in the short spelling the dataset itself uses; fails_when=only the full words are matched, so «о-в Мэн» reaches the eyes and comes back unmasked;
+// why_new=the whole-name match expanded the dictionary side only; seam=none; no_claim=other ways to shorten a name (the dataset's own spelling)
+test('the guard blocks a territory name in the short spelling of the dataset', () => {
+  expect(guard.findPlaceWord('номера как на о-в Мэн')).toBe('мэн');
+  expect(guard.findPlaceWord('Кокосовые о-ва')).toBe('кокосовые');
+  expect(guard.findPlaceWord('флаг о-ва Кука')).toBe('кука');
+  expect(maskPlaceWords(guard, 'паром на о-в Мэн').text).toBe(`паром на о-в ${PLACE_MASK}`);
+  for (const text of ['о-в на реке', 'вид на о-ва', 'мэн в шляпе']) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
+});
+
+// Value: protects=a short territory name is caught in its other cases; fails_when=a five-letter name is matched letter for letter, so «флаг Арубы» and «как на Тонге» pass while «Аруба» is blocked;
+// why_new=short names kept every letter, to spare «самолёт» next to «Самоа»; seam=none; no_claim=names of four letters or fewer («Саба») and every ordinary word (the listed ones)
+test('the guard blocks a short territory name in its other cases', () => {
+  expect(guard.findPlaceWord('флаг Арубы')).toBe('арубы');
+  expect(guard.findPlaceWord('пляж как на Тонге')).toBe('тонге');
+  expect(guard.findPlaceWord('порт Сент-Люсии')).toBe('люсии');
+  expect(guard.findPlaceWord('это Аруба')).toBe('аруба');
+  expect(guard.findPlaceWord('острова Самоа')).toBe('самоа');
+  for (const text of ['самолёт над полем', 'самовар на столе', 'тонкая линия', 'арка у дороги']) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
+});
+
+// Value: protects=ordinary words that start like a small territory's name still pass; fails_when=the territory stems get as short as the country stems and mask scene words;
+// why_new=the territory names are new to the guard; seam=none; no_claim=every word of the language (the listed ones)
+test('ordinary words that look like a small territory pass the guard', () => {
+  for (const text of [
+    'самолёт над полем',
+    'монастырь на холме',
+    'мальчик у дороги',
+    'в сентябре и в марте',
+    'кокосовые пальмы',
+    'красная кайма на знаке',
+    'знаки с белыми каймами',
+    'пристань и марина',
+    'комод, тумба и стул',
+    'внешние стены и малые окна',
+    'южные и северные склоны',
+  ]) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
 });

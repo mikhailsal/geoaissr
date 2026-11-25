@@ -1,16 +1,4 @@
-import type { RegionId } from '$shared/storage-schemas';
 import type { DifficultyPreset, PersonalityPreset } from '$shared/bot-tools';
-
-export const REGION_LABELS: Record<RegionId, string> = {
-  world: 'Весь мир',
-  europe: 'Европа',
-  asia: 'Азия',
-  north_america: 'Северная Америка',
-  south_america: 'Южная Америка',
-  africa: 'Африка',
-  oceania: 'Океания',
-  airports: 'Аэропорты мира (до 5 км)',
-};
 
 export const PRESET_LABELS: Record<DifficultyPreset, string> = {
   novice: 'Новичок',
@@ -92,7 +80,12 @@ export const RU = {
     allowBotPush: 'Разрешить ИИ пушить',
     moveOn: 'вкл',
     moveOff: 'выкл',
+    mapLabel: 'Карта',
+    mapEmptyInRegion: 'нет в выбранном регионе',
     regionLabel: 'Регион',
+    regionCountriesGroup: 'Страны',
+    regionCountriesEmptyGroup: 'Нет на выбранной карте',
+    regionEmptyOnMap: 'нет на выбранной карте',
     waitWindowLabel: 'Ожидание ИИ (с)',
     waitWindowHint: 'но не раньше 60-й секунды',
     pushedWaitWindowHint: (seconds: number) => `После пуша у ИИ останется не больше ${seconds} с.`,

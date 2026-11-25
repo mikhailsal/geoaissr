@@ -184,6 +184,7 @@ test('fake bot runner dispatches aborted bot_finished when fake sequence rejects
         lng: 0,
         countryId: '0',
         countryNameRu: 'Тест',
+        map: 'standard',
         region: 'world',
         fakeSceneIndex: 0,
       },

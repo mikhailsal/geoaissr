@@ -29,6 +29,7 @@ test('dataset service renders look crops and rejects move', async () => {
         lng: 0,
         countryId: 'X',
         countryNameRu: 'Т',
+        map: 'standard',
         region: 'world',
         fakeSceneIndex: 0,
       },
@@ -102,6 +103,7 @@ test('prepareStartViews rejects a frame that does not decode', async () => {
       lng: 0,
       countryId: 'X',
       countryNameRu: 'Т',
+      map: 'standard' as const,
       region: 'world' as const,
       fakeSceneIndex: 0,
     };

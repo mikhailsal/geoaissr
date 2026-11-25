@@ -16,6 +16,7 @@ export const TARGET: RoundTarget = {
   lng: 139,
   countryId: 'JP',
   countryNameRu: 'Япония',
+  map: 'standard',
   region: 'world',
   fakeSceneIndex: 0,
 };

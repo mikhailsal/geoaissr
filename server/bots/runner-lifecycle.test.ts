@@ -59,6 +59,7 @@ async function withRunner(
 
 async function roundParams() {
   const target = await createFakeLocationService().prepareRoundLocation({
+    map: 'standard',
     region: 'world',
     excludeCountryIds: [],
   });

@@ -11,3 +11,7 @@ server/maps/airports.data.json
 playwright-report/
 test-results/
 vendor/orbit-rig/*.js
+server/maps/places.data.json
+server/maps/cities.data.json
+server/maps/retro.data.json
+shared/map-availability.data.json

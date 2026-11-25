@@ -142,7 +142,11 @@ async function verifyOneHarness(
       `[${id}] vision: passed=${vision.passed} (${vision.elapsedMs} ms) — ${vision.message}`,
     );
 
-    const target = await loc.prepareRoundLocation({ region: 'europe', excludeCountryIds: [] });
+    const target = await loc.prepareRoundLocation({
+      map: 'standard',
+      region: 'europe',
+      excludeCountryIds: [],
+    });
     await img.prepareStartViews(target);
     runner.startRoundBots({
       matchId: `harness-${id}`,

@@ -46,7 +46,11 @@ test('runner checkpoints incomplete final then accepts complete correction', asy
     }),
   });
   try {
-    const target = await location.prepareRoundLocation({ region: 'world', excludeCountryIds: [] });
+    const target = await location.prepareRoundLocation({
+      map: 'standard',
+      region: 'world',
+      excludeCountryIds: [],
+    });
     runner.startRoundBots({
       matchId: 'm1',
       gen: 1,

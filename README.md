@@ -74,6 +74,30 @@ The [bot tool and accounting reference](docs/bot-tools.md) describes the step jo
 
 ---
 
+## Maps and regions
+
+The host picks two things in **Настройки партии**: the **Карта** (map), which is the pool of places a round can start in, and the **Регион** (region), which narrows any map to the whole world, a continent or one country. A line under the map select says what the map holds; the AI opponents are told the same.
+
+| Map              | Where a round starts                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| «Стандартная»    | Half of the rounds in a town or village, half at a random point of a country             |
+| «Глушь»          | Random points by country area: mostly roads far from any town                            |
+| «Города»         | The dense built-up area of a city of 500 thousand people or more                         |
+| «Мегаполисы»     | The same, for cities of 5 million people or more                                         |
+| «Столицы»        | National capitals, every country equally likely                                          |
+| «Аэропорты мира» | Within 5 km of an airport with scheduled flights                                         |
+| «Высокогорье»    | Cities of 100 thousand people or more above 2,000 m                                      |
+| «Север»          | North of 60° N                                                                           |
+| «Ретро»          | Panoramas shot before 2012, in the 28 countries where Google still serves enough of them |
+
+Not every map has places everywhere: there are no cities above 2,000 m in Europe, and «Север» reaches eight countries. The lobby greys out a map that is empty in the chosen region and a region the chosen map does not reach. Scores are scaled to the region, so a guess 100 km off costs far more in a one-country match than in a world match.
+
+The same settings can be given at start, for example `bun run start -- --map capitals --region europe` or `--region country:FRA` (a country is named by its three-letter code, as in the lobby's list).
+
+The place lists are built from open data and committed to the repository; no Street View image is stored. Sources: country outlines from [Natural Earth](https://www.naturalearthdata.com/) (public domain); towns, capitals and elevations from [GeoNames](https://www.geonames.org/) (CC BY 4.0); city outlines from the [GHSL Urban Centre Database R2024A](https://human-settlement.emergency.copernicus.eu/) of the European Commission's Joint Research Centre (CC BY 4.0); airports from [OurAirports](https://ourairports.com/data/) (public domain).
+
+---
+
 ## Commands
 
 | Command                                                  | Purpose                                                                                                  |
@@ -90,6 +114,7 @@ The [bot tool and accounting reference](docs/bot-tools.md) describes the step jo
 | `bun run test:harness -- --only claude`                  | Live smoke test of a specific AI harness through MCP                                                     |
 | `bun run test:tunnel -- --hold-sec 5`                    | Live check of the `cloudflared` Quick Tunnel and DNS readiness                                           |
 | `bun run eval:bots -- --dry --repeats 1`                 | Offline dry run of the bot evaluation ([details](docs/evals/README.md))                                  |
+| `bun run maps:sample -- --map cities --region europe`    | Rolls live rounds of a map and region and prints the mix (free metadata lookups; `--help` for flags)     |
 
 ---
 
