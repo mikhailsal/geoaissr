@@ -32,6 +32,7 @@ export default tseslint.config(
       'dist/**',
       '.geoaissr-dev/**',
       '.gstack/**',
+      '.claude/**',
       'playwright-report/**',
       'test-results/**',
       'eslint.config.js',

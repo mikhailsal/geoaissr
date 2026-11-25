@@ -6,9 +6,17 @@ import {
   type RegionPolygon,
   type WeightedCountry,
 } from '../shared/regions.ts';
-import type { RegionId } from '../shared/storage-schemas.ts';
+import { isPointMapId, type PointMapId, type RegionId } from '../shared/storage-schemas.ts';
 import type { RoundTarget } from './engine/types.ts';
 import { GeoError } from './errors.ts';
+import {
+  AIRPORT_SNAP_RADIUS_M,
+  airportCountry,
+  getAirportCountryGroups,
+  isInsideAirportZone,
+  isoCodesOfCountryIds,
+  sampleAirportProbe,
+} from './maps/airports.ts';
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -102,6 +110,42 @@ function validateMetadataPayload(data: SvMetadataResponse): {
   return { panoId: data.pano_id, lat: data.location.lat, lng: data.location.lng };
 }
 
+const AIRPORT_MAX_ATTEMPTS = 90;
+
+/** Finds a panorama inside the 5 km zone of an airport with scheduled service. */
+async function prepareAirportLocation(
+  input: { region: PointMapId; excludeCountryIds: readonly string[] },
+  deps: { queryMetadata: LocationService['queryMetadata']; rng: () => number },
+): Promise<RoundTarget> {
+  const groups = getAirportCountryGroups(isoCodesOfCountryIds(input.excludeCountryIds));
+  for (let attempt = 0; attempt < AIRPORT_MAX_ATTEMPTS; attempt += 1) {
+    const pick = sampleAirportProbe(groups, deps.rng);
+    const raw = await deps
+      .queryMetadata(pick.probe.lat, pick.probe.lng, AIRPORT_SNAP_RADIUS_M)
+      .catch((err: unknown) => {
+        if (err instanceof GeoError) throw err;
+        return null;
+      });
+    if (!raw) continue;
+    const valid = validateMetadataPayload(raw);
+    if (!valid || !isInsideAirportZone(pick.airport, valid)) continue;
+    // The round belongs to the airport's country, also when the panorama is across a border.
+    const country = airportCountry(pick.iso);
+    return {
+      panoId: valid.panoId,
+      lat: valid.lat,
+      lng: valid.lng,
+      countryId: country.id,
+      countryNameRu: country.nameRu,
+      region: input.region,
+      fakeSceneIndex: 0,
+    };
+  }
+  throw new Error(
+    `Не удалось найти уличную панораму Google рядом с аэропортом за ${AIRPORT_MAX_ATTEMPTS} попыток`,
+  );
+}
+
 export function createLocationService(opts: {
   serverKey: string;
   fetchImpl?: FetchLike;
@@ -129,9 +173,13 @@ export function createLocationService(opts: {
     region: RegionId;
     excludeCountryIds: readonly string[];
   }): Promise<RoundTarget> {
+    const { region } = input;
+    if (isPointMapId(region)) {
+      return prepareAirportLocation({ ...input, region }, { queryMetadata, rng });
+    }
     const exclude = new Set(input.excludeCountryIds);
     for (let series = 0; series < 3; series += 1) {
-      const candidates = getWeightedCountriesForRegion(input.region, exclude);
+      const candidates = getWeightedCountriesForRegion(region, exclude);
       const allowedIds = new Set(candidates.map((c) => c.country.id));
       for (let attempt = 0; attempt < 30; attempt += 1) {
         const picked = sampleWeightedItem(candidates, rng);

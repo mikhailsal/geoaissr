@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { WORLD_DIAGONAL_KM, haversineDistanceKm } from '../shared/score.ts';
-import type { RegionId } from '../shared/storage-schemas.ts';
+import type { PolygonRegionId } from '../shared/storage-schemas.ts';
 
 type LngLat = [number, number];
 type Ring = LngLat[];
-type PolyContinent = Exclude<RegionId, 'world'>;
+type PolyContinent = Exclude<PolygonRegionId, 'world'>;
 
 interface RawFeature {
   properties: {
@@ -38,7 +38,7 @@ export interface CompactCountry {
 
 export interface RegionsDataset {
   version: 1;
-  diagonalsKm: Record<RegionId, number>;
+  diagonalsKm: Record<PolygonRegionId, number>;
   countries: CompactCountry[];
 }
 
@@ -250,7 +250,7 @@ export async function buildRegions(): Promise<RegionsDataset> {
     }
   }
 
-  const diagonalsKm: Record<RegionId, number> = {
+  const diagonalsKm: Record<PolygonRegionId, number> = {
     world: WORLD_DIAGONAL_KM,
     europe: computeRegionDiagonal(regionBuckets.europe),
     asia: computeRegionDiagonal(regionBuckets.asia),

@@ -10,12 +10,12 @@
 A single root `package.json` (no workspaces):
 
 - `shared/` — protocol, zod schemas, regions, colors, scoring, bot tool schemas. Imports nothing from other folders.
-- `server/` — game server on Bun (`engine/`, `net/`, `proc/`, `storage/`, `bots/`, `images/`, `tunnel/`, `cli/`, `dev/`, `http/`). Does not import `web/` or `bot-tools/`.
+- `server/` — game server on Bun (`engine/`, `net/`, `proc/`, `storage/`, `bots/`, `images/`, `tunnel/`, `cli/`, `dev/`, `http/`, `maps/`). Does not import `web/` or `bot-tools/`.
   - `server/bots/prompts/` — the bots' start prompts as plain text files (`intuit.txt`, `detective-brain.txt`, `detective-eyes.txt`), read at every bot launch. Change prompt wording there, not in code; the tag syntax is in that folder's `README.md`. `bun run test` renders every file for every setting.
   - `server/bots/detective/` — the Detective play style: two processes per bot (brain and eyes) and the session between them. Rules and tools: [docs/bot-tools.md](./docs/bot-tools.md).
 - `web/` — frontend on Svelte 5 + Vite. Imports only from `shared/` and packages.
 - `bot-tools/` — MCP stdio bridge to `127.0.0.1:BOT_PORT`. Imports only from `shared/` and packages.
-- `scripts/` — check, region build, hook and eval scripts.
+- `scripts/` — check, region and airport build, hook and eval scripts.
 - `spikes/` — throwaway M0 spike code (subject to the same limits and checks; deleted after M1).
 - `test/` — integration tests and the fake MCP harness.
 

@@ -1,6 +1,6 @@
 {
   "name": "geoaissr",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,7 +19,8 @@
     "hooks:install": "bun run scripts/install-hooks.ts",
     "setup:dev": "bun run scripts/setup-dev.ts",
     "eval:bots": "bun run scripts/eval-bots.ts",
-    "build:regions": "bun run scripts/build-regions.ts"
+    "build:regions": "bun run scripts/build-regions.ts",
+    "build:airports": "bun run scripts/build-airports.ts"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.2.0",
