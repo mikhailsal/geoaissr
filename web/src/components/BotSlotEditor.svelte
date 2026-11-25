@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { hasTerminalControlCharacters } from '$shared/display-name';
   import type { ParticipantColorId } from '$shared/colors';
   import { slotHarnesses, visionSubject } from '$shared/play-style';
   import BotPlayStyle from './BotPlayStyle.svelte';
@@ -43,6 +44,7 @@
   }: Props = $props();
 
   let draftName = $state('');
+  const invalidName = $derived(hasTerminalControlCharacters(draftName));
   let draftModel = $state('');
   let customModelMode = $state(false);
 
@@ -71,7 +73,7 @@
 
   function commitName(): void {
     const clean = draftName.trim().slice(0, 24); // empty: the server names the bot after its model
-    if (clean !== slot.name) {
+    if (!invalidName && clean !== slot.name) {
       onUpdate({ name: clean });
     }
   }
@@ -97,6 +99,7 @@
         class="field-input"
         maxlength={24}
         disabled={!isHost}
+        aria-invalid={invalidName}
         bind:value={draftName}
         onblur={commitName}
         onkeydown={(e) => {
@@ -105,6 +108,8 @@
       />
     </label>
 
+    {#if invalidName && isHost}<span class="slot-warn" role="status">{RU.join.invalidName}</span
+      >{/if}
     <label class="slot-field toggle-field">
       <span class="slot-label">Участвует</span>
       <button

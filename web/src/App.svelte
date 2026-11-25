@@ -83,6 +83,9 @@
   const handleRemoveBot = (botId: string): void => {
     store.removeBot(botId);
   };
+  const handleReleaseGuestSeat = (playerId: string): void => {
+    store.releaseGuestSeat(playerId);
+  };
   const handleUpdateBot = (botId: string, patch: Record<string, unknown>): void => {
     store.updateBot(botId, patch);
   };
@@ -243,6 +246,7 @@
       onUpdateLobby={handleUpdateLobby}
       onAddBot={handleAddBot}
       onRemoveBot={handleRemoveBot}
+      onReleaseGuestSeat={handleReleaseGuestSeat}
       onUpdateBot={handleUpdateBot}
       onApplyBotPreset={handleApplyBotPreset}
       onCheckBotVision={handleCheckBotVision}

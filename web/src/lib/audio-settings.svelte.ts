@@ -67,7 +67,7 @@ export function bindAudioProfile(
 ): void {
   sync.bind(profile, sender);
 }
-export function audioProfileAck(ack: { seq: number; result: string; message?: string }): void {
+export function audioProfileAck(ack: { seq: number; result: string; retryAfterMs?: number }): void {
   sync.ack(ack);
 }
 export function disconnectAudioProfile(): void {

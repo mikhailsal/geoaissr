@@ -24,6 +24,7 @@ export class AudioProfileSync {
   private sender: AudioSender | null = null;
   private flight: { seq: number; revision: number } | null = null;
   private revision = 0;
+  private retryAt = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private error: string | null = null;
 
@@ -86,14 +87,26 @@ export class AudioProfileSync {
   flush(): void {
     clearTimeout(this.timer);
     if (!this.profileId || !this.sender || !this.cache.pending || this.flight) return;
+    const waitMs = this.retryAt - Date.now();
+    if (waitMs > 0) {
+      this.timer = setTimeout(() => {
+        this.flush();
+      }, waitMs);
+      return;
+    }
     const result = this.sender({ ...this.cache.preferences });
     if (result.sent) this.flight = { seq: result.seq, revision: this.revision };
   }
 
-  ack(ack: { seq: number; result: string; message?: string }): void {
+  ack(ack: { seq: number; result: string; retryAfterMs?: number }): void {
     if (!this.profileId || !this.flight || this.flight.seq !== ack.seq) return;
     const sentRevision = this.flight.revision;
     this.flight = null;
+    if (ack.result === 'rate_limited') {
+      this.retryAt = Date.now() + Math.max(1, ack.retryAfterMs ?? 2000);
+      this.flush();
+      return;
+    }
     if (ack.result !== 'ok') {
       this.error = 'Не удалось сохранить звук в профиле.';
       this.emit();
@@ -134,6 +147,7 @@ export class AudioProfileSync {
   }
 
   private cancel(): void {
+    this.retryAt = 0;
     clearTimeout(this.timer);
     this.flight = null;
     this.revision++;

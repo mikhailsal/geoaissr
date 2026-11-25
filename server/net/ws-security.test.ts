@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { DEFAULT_AUDIO_PREFERENCES } from '../../shared/audio-preferences.ts';
 import type { ParticipantColorId } from '../../shared/colors.ts';
 import type { ClientViewState, ServerMessage } from '../../shared/protocol.ts';
 import type { BotRunner } from '../bots/runner.ts';
@@ -838,6 +839,75 @@ test('secret restore attaches legacy profile once and reports authoritative iden
     for (const client of clients) client.ws.close();
     shell.dispose();
     srv.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('simultaneous guest registrations share the last available guest place', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-last-place-'));
+  const { shell, srv } = createSecServer(dir, 'local', true);
+  try {
+    for (let i = 0; i < 6; i++) {
+      shell.dispatch({
+        type: 'player_join',
+        playerId: `existing-${i}`,
+        name: `Игрок ${i}`,
+        secret: crypto.randomUUID(),
+        color: 'p-1',
+        isHost: false,
+      });
+    }
+    const url = `ws://127.0.0.1:${srv.port}/ws`;
+    const guests = await Promise.all([connectWs(url), connectWs(url)]);
+    for (const guest of guests) {
+      guest.ws.send(JSON.stringify({ type: 'hello', token: 'guest-tok' }));
+      await messageOfType(guest, 'state');
+    }
+    for (const [index, guest] of guests.entries()) {
+      guest.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: `Гость ${index}`, color: 'p-2' }));
+    }
+    const replies = await Promise.all(
+      guests.map(async (guest) => {
+        let reply = await guest.nextMsg();
+        while (reply?.type === 'state') reply = await guest.nextMsg();
+        return reply;
+      }),
+    );
+    expect(replies.map((reply) => reply?.type).sort()).toEqual(['join_error', 'join_ok']);
+    expect(replies.find((reply) => reply?.type === 'join_error')).toMatchObject({
+      code: 'room_full',
+    });
+    expect(shell.getState().playerOrder).toHaveLength(7);
+  } finally {
+    srv.stop();
+    shell.dispose();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a returning profile receives a retry delay while its save budget is exhausted', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-profile-save-'));
+  const { shell, srv, profiles } = createSecServer(dir, 'local', true);
+  try {
+    const profile = await profiles.create({ nick: 'Лиса', color: 'p-1', role: 'guest' });
+    const client = await connectWs(`ws://127.0.0.1:${srv.port}/ws`);
+    client.ws.send(JSON.stringify({ type: 'profile_login', profileToken: profile.profileToken }));
+    await messageOfType(client, 'profile_login_ok');
+    for (let i = 0; i < 8; i++) expect(profiles.admitWrite(profile.profileId)).toBe(true);
+    client.ws.send(
+      JSON.stringify({
+        type: 'update_audio_preferences',
+        seq: 1,
+        preferences: DEFAULT_AUDIO_PREFERENCES,
+      }),
+    );
+    const ack = await messageOfType(client, 'ack');
+    expect(ack).toMatchObject({ seq: 1, result: 'rate_limited' });
+    expect(ack.retryAfterMs).toBeGreaterThan(0);
+    expect(profiles.getById(profile.profileId)?.audioPreferences).toBeUndefined();
+  } finally {
+    srv.stop();
+    shell.dispose();
     rmSync(dir, { recursive: true, force: true });
   }
 });

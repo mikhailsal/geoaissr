@@ -844,3 +844,38 @@ test('delayed logout clears credentials re-saved by the logged-out profile recon
     await server.stop();
   }
 });
+
+test('host can free an offline lobby seat and the guest can return by code', async ({
+  browser,
+}) => {
+  const server = await startIsolatedFakeServer();
+  const host = await browser.newPage();
+  const guest = await browser.newPage();
+  const returned = await browser.newPage();
+  try {
+    await join(host, server.hostUrl, 'Хост');
+    await guest.goto(server.guestUrl);
+    const name = guest.getByLabel('Ваше имя');
+    await name.fill('Ли\u202eса');
+    await expect(guest.getByRole('button', { name: 'Войти', exact: true })).toBeDisabled();
+    await expect(guest.getByText('Удалите из имени управляющие символы.')).toBeVisible();
+    await name.fill('Лиса');
+    await guest.getByRole('button', { name: 'Войти', exact: true }).click();
+    const code = await codeOf(guest);
+    const dialog = await openLobbyDialog(host, 'Участники');
+    const release = dialog.getByRole('button', { name: 'Освободить место: Лиса' });
+    await expect(dialog.getByRole('heading', { name: 'ИГРОКИ 2 из 8' })).toBeVisible();
+    await expect(release).toHaveCount(0);
+    await guest.close();
+    await release.click();
+    await expect(dialog.getByRole('heading', { name: 'ИГРОКИ 1 из 8' })).toBeVisible();
+    await login(returned, server.baseUrl, code);
+    await expect(dialog.getByRole('heading', { name: 'ИГРОКИ 2 из 8' })).toBeVisible();
+    expect((await savedProfile(returned)).nick).toBe('Лиса');
+  } finally {
+    await host.close();
+    if (!guest.isClosed()) await guest.close();
+    await returned.close();
+    await server.stop();
+  }
+});

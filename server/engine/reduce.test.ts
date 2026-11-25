@@ -1,6 +1,10 @@
 import { buildQuotaMetric } from '../storage/quota.ts';
 import { expect, test } from 'bun:test';
-import { COUNTDOWN_MS, type HarnessCatalogEntry } from '../../shared/protocol.ts';
+import {
+  COUNTDOWN_MS,
+  DISCONNECTED_GUEST_GRACE_MS,
+  type HarnessCatalogEntry,
+} from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
 import { reduce } from './reduce.ts';
 import { createInitialRoomState, type RoomState, type RoundTarget } from './types.ts';
@@ -400,4 +404,113 @@ test('last human disconnecting in ROUND_LOADING holds countdown and mapsError re
   fin = reduce(fin, { type: 'end_match', playerId: 'h' }, 12_400).state;
   fin = reduce(fin, { type: 'play_again', playerId: 'h' }, 12_500).state;
   expect(fin.players.h?.mapsError).toBeUndefined();
+});
+
+test('a disconnected lobby guest expires once after the reconnect grace window', () => {
+  let state = makeRoom();
+  state = reduce(
+    state,
+    { type: 'player_join', playerId: 'h', secret: 'h', name: 'Хост', color: 'p-1', isHost: true },
+    10,
+  ).state;
+  state = reduce(
+    state,
+    { type: 'player_join', playerId: 'g', secret: 'g', name: 'Гость', color: 'p-2', isHost: false },
+    20,
+  ).state;
+  const disconnected = reduce(state, { type: 'player_disconnect', playerId: 'g' }, 100);
+  expect(disconnected.effects).toContainEqual({
+    type: 'schedule_guest_seat_expiry',
+    playerId: 'g',
+    atMs: 100 + DISCONNECTED_GUEST_GRACE_MS,
+  });
+  const early = reduce(
+    disconnected.state,
+    { type: 'expire_disconnected_guest', playerId: 'g' },
+    100 + DISCONNECTED_GUEST_GRACE_MS - 1,
+  );
+  expect(early.state.players.g).toBeDefined();
+  const expired = reduce(
+    early.state,
+    { type: 'expire_disconnected_guest', playerId: 'g' },
+    100 + DISCONNECTED_GUEST_GRACE_MS,
+  );
+  expect(expired.state.players.g).toBeUndefined();
+  expect(expired.state.playerOrder).toEqual(['h']);
+  expect(
+    reduce(expired.state, { type: 'expire_disconnected_guest', playerId: 'g' }, 999).state,
+  ).toBe(expired.state);
+});
+
+test('reconnect keeps a guest seat and cancels its pending lobby expiry', () => {
+  let state = makeRoom();
+  state = reduce(
+    state,
+    { type: 'player_join', playerId: 'g', secret: 'g', name: 'Гость', color: 'p-2', isHost: false },
+    10,
+  ).state;
+  state = reduce(state, { type: 'player_disconnect', playerId: 'g' }, 20).state;
+  const reconnected = reduce(state, { type: 'player_reconnect', playerId: 'g', isHost: false }, 30);
+  expect(reconnected.state.players.g?.connected).toBe(true);
+  expect(reconnected.effects).toContainEqual({ type: 'cancel_guest_seat_expiry', playerId: 'g' });
+  const lateExpiry = reduce(
+    reconnected.state,
+    { type: 'expire_disconnected_guest', playerId: 'g' },
+    20 + DISCONNECTED_GUEST_GRACE_MS,
+  );
+  expect(lateExpiry.state.players.g).toBeDefined();
+});
+
+test('only the host can free an offline guest seat in the lobby', () => {
+  let state = makeRoom();
+  state = reduce(
+    state,
+    { type: 'player_join', playerId: 'h', secret: 'h', name: 'Хост', color: 'p-1', isHost: true },
+    10,
+  ).state;
+  state = reduce(
+    state,
+    { type: 'player_join', playerId: 'g', secret: 'g', name: 'Гость', color: 'p-2', isHost: false },
+    20,
+  ).state;
+  state = reduce(state, { type: 'player_disconnect', playerId: 'g' }, 30).state;
+  expect(
+    reduce(state, { type: 'release_guest_seat', playerId: 'g', targetPlayerId: 'g' }, 40).ack,
+  ).toBe('forbidden');
+  const released = reduce(
+    state,
+    { type: 'release_guest_seat', playerId: 'h', targetPlayerId: 'g' },
+    40,
+  );
+  expect(released.ack).toBe('ok');
+  expect(released.state.players.g).toBeUndefined();
+  expect(released.effects).toContainEqual({ type: 'cancel_guest_seat_expiry', playerId: 'g' });
+});
+
+test('returning to the lobby preserves match seats only until their grace expires', () => {
+  let state = makeRoom({ phase: 'FINAL' });
+  state = reduce(
+    state,
+    { type: 'player_join', playerId: 'h', secret: 'h', name: 'Хост', color: 'p-1', isHost: true },
+    10,
+  ).state;
+  state = reduce(
+    state,
+    { type: 'player_join', playerId: 'g', secret: 'g', name: 'Гость', color: 'p-2', isHost: false },
+    20,
+  ).state;
+  state = reduce(state, { type: 'player_disconnect', playerId: 'g' }, 30).state;
+  const lobby = reduce(state, { type: 'play_again', playerId: 'h' }, 40);
+  expect(lobby.state.players.g?.totalScore).toBe(0);
+  expect(lobby.effects).toContainEqual({
+    type: 'schedule_guest_seat_expiry',
+    playerId: 'g',
+    atMs: 30 + DISCONNECTED_GUEST_GRACE_MS,
+  });
+  const expiredLobby = reduce(
+    lobby.state,
+    { type: 'expire_disconnected_guest', playerId: 'g' },
+    30 + DISCONNECTED_GUEST_GRACE_MS,
+  );
+  expect(expiredLobby.state.players.g).toBeUndefined();
 });

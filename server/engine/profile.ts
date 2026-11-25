@@ -9,9 +9,15 @@ export function handleProfileAction(
   const player = state.players[event.playerId];
   if (!player || (event.type === 'reset_bot_wins' && !player.isHost))
     return { state, effects: [], ack: 'forbidden' };
-  if (state.phase !== 'LOBBY' && state.phase !== 'FINAL')
+  if (
+    state.phase !== 'LOBBY' &&
+    state.phase !== 'FINAL' &&
+    !(event.type === 'update_profile' && event.persisted)
+  )
     return { state, effects: [], ack: 'invalid' };
   if (event.type === 'update_profile') {
+    if (event.profileId && player.profileId !== event.profileId)
+      return { state, effects: [], ack: 'forbidden' };
     const name = event.nick.trim();
     if (!name || name.length > 20 || !PARTICIPANT_COLOR_IDS.includes(event.color)) {
       return { state, effects: [], ack: 'invalid' };

@@ -38,6 +38,8 @@ export interface PlayerState {
   color: BotSlotConfig['color'];
   isHost: boolean;
   connected: boolean;
+  /** Epoch ms of the latest disconnect; only lobby guests are eligible for expiry. */
+  disconnectedAt?: number;
   isSpectator: boolean;
   mapsError?: string;
   panoLoaded: boolean;
@@ -195,12 +197,16 @@ export type EngineEvent =
       isHost?: boolean;
     }
   | { type: 'player_disconnect'; playerId: string }
+  | { type: 'expire_disconnected_guest'; playerId: string }
+  | { type: 'release_guest_seat'; playerId: string; targetPlayerId: string }
   | {
       type: 'update_profile';
       playerId: string;
       nick: string;
       color: BotSlotConfig['color'];
       avatar?: AvatarAppearance;
+      profileId?: string;
+      persisted?: boolean;
     }
   | { type: 'reset_bot_wins'; playerId: string; botId: string }
   | {
@@ -352,6 +358,8 @@ export type EngineEffect =
       withBots: boolean;
     }
   | { type: 'schedule_pano_timeout'; matchId: string; gen: number; atMs: number }
+  | { type: 'schedule_guest_seat_expiry'; playerId: string; atMs: number }
+  | { type: 'cancel_guest_seat_expiry'; playerId: string }
   | { type: 'schedule_countdown'; matchId: string; gen: number; atMs: number }
   | {
       type: 'start_bot_processes';

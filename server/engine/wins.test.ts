@@ -123,6 +123,27 @@ test('profile edits allow duplicate human and bot display values and preserve ph
       now,
     ).ack,
   ).toBe('invalid');
+  const guest = state.players.g;
+  if (!guest) throw new Error('missing guest');
+  const active = {
+    ...state,
+    phase: 'ROUND_ACTIVE' as const,
+    players: { ...state.players, g: { ...guest, profileId: 'profile-g' } },
+  };
+  expect(
+    handleProfileAction(
+      active,
+      {
+        type: 'update_profile',
+        playerId: 'g',
+        profileId: 'profile-g',
+        persisted: true,
+        nick: 'Saved before round',
+        color: 'p-4',
+      },
+      now,
+    ).state.players.g?.name,
+  ).toBe('Saved before round');
 });
 
 test('bot reset is host-only and persists a timestamp', () => {

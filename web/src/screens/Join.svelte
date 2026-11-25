@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { hasTerminalControlCharacters } from '$shared/display-name';
   import { untrack } from 'svelte';
   import { PARTICIPANT_COLORS, type ParticipantColorId } from '$shared/colors';
   import type { LobbySummary } from '$shared/protocol';
@@ -61,6 +62,7 @@
   const isMidMatch = $derived(lobbySummary !== null && lobbySummary.phase !== 'LOBBY');
   const disconnectedNames = $derived(lobbySummary?.disconnected ?? []);
   const trimNick = $derived(nick.trim());
+  const invalidName = $derived(hasTerminalControlCharacters(nick));
 
   $effect(() => {
     if (authState === 'ready') {
@@ -101,7 +103,7 @@
 
   function handleSubmit(event: Event): void {
     event.preventDefault();
-    if (!trimNick || joinPending) return;
+    if (!trimNick || invalidName || joinPending) return;
     onJoin(trimNick, selectedColor);
   }
 </script>
@@ -224,10 +226,14 @@
             class="field-input"
             maxlength={20}
             required
+            aria-invalid={invalidName}
+            aria-describedby="join-name-hint"
             placeholder="Например, Оля"
             bind:value={nick}
           />
-          <span class="hint">{RU.join.nameHint}</span>
+          <span id="join-name-hint" class="hint"
+            >{invalidName ? RU.join.invalidName : RU.join.nameHint}</span
+          >
         </label>
 
         <fieldset class="color-group">
@@ -257,7 +263,7 @@
         <button
           type="submit"
           class="btn btn-primary submit-btn"
-          disabled={!trimNick || joinPending}
+          disabled={!trimNick || invalidName || joinPending}
         >
           {#if joinPending}
             {RU.join.submitting}

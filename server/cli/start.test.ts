@@ -226,7 +226,7 @@ test('startGeoServer reads quota ceilings once at startup and reports percentage
 // seam=none; no_claim=isolated fake startup and native crash handler, not process-signal delivery.
 test('startGeoServer rejects concurrent second server on same dataDir and writes redacted crash logs', async () => {
   await withTempAppEnv(async ({ dataDir }) => {
-    const profile = new ProfileStore(path.join(dataDir, 'profiles.json')).create({
+    const profile = await new ProfileStore(path.join(dataDir, 'profiles.json')).create({
       nick: 'Private fixture',
       color: 'p-1',
       role: 'host',

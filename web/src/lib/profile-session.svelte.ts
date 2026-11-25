@@ -1,3 +1,4 @@
+import { hasTerminalControlCharacters } from '$shared/display-name';
 import type { ParticipantColorId } from '$shared/colors';
 import type { ClientViewState, ServerMessage } from '$shared/protocol';
 import { RU } from '../i18n/ru';
@@ -27,6 +28,10 @@ export class ProfileSession {
   private restoredProfileId: string | null = null;
 
   constructor(private readonly client: GeoWsClient) {}
+
+  get registrationDraft(): SavedUserProfile | null {
+    return this.saved && !hasTerminalControlCharacters(this.saved.nick) ? this.saved : null;
+  }
 
   registerNew(): void {
     this.client.registerNewProfile();
