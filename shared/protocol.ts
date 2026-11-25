@@ -63,7 +63,7 @@ export const MAX_WS_CONNECTIONS = 32;
 export const MAX_PENDING_AUTH_CONNECTIONS = 8;
 export const UNAUTH_TIMEOUT_MS = 5_000;
 /** Lobby seats held for a briefly disconnected guest are never retained indefinitely. */
-export const DISCONNECTED_GUEST_GRACE_MS = 2 * 60 * 1_000;
+export const DISCONNECTED_GUEST_GRACE_MS = 10 * 60 * 1_000;
 
 export type GamePhase = 'LOBBY' | 'ROUND_LOADING' | 'ROUND_ACTIVE' | 'ROUND_RESULTS' | 'FINAL';
 export type AckResult =

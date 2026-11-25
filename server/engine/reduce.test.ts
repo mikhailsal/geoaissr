@@ -406,7 +406,7 @@ test('last human disconnecting in ROUND_LOADING holds countdown and mapsError re
   expect(fin.players.h?.mapsError).toBeUndefined();
 });
 
-test('a disconnected lobby guest expires once after the reconnect grace window', () => {
+test('a disconnected lobby guest expires once after ten minutes', () => {
   let state = makeRoom();
   state = reduce(
     state,
@@ -418,22 +418,23 @@ test('a disconnected lobby guest expires once after the reconnect grace window',
     { type: 'player_join', playerId: 'g', secret: 'g', name: 'Гость', color: 'p-2', isHost: false },
     20,
   ).state;
+  const tenMinutesAfterDisconnect = 100 + 10 * 60_000;
   const disconnected = reduce(state, { type: 'player_disconnect', playerId: 'g' }, 100);
   expect(disconnected.effects).toContainEqual({
     type: 'schedule_guest_seat_expiry',
     playerId: 'g',
-    atMs: 100 + DISCONNECTED_GUEST_GRACE_MS,
+    atMs: tenMinutesAfterDisconnect,
   });
   const early = reduce(
     disconnected.state,
     { type: 'expire_disconnected_guest', playerId: 'g' },
-    100 + DISCONNECTED_GUEST_GRACE_MS - 1,
+    tenMinutesAfterDisconnect - 1,
   );
   expect(early.state.players.g).toBeDefined();
   const expired = reduce(
     early.state,
     { type: 'expire_disconnected_guest', playerId: 'g' },
-    100 + DISCONNECTED_GUEST_GRACE_MS,
+    tenMinutesAfterDisconnect,
   );
   expect(expired.state.players.g).toBeUndefined();
   expect(expired.state.playerOrder).toEqual(['h']);
