@@ -9,6 +9,7 @@ import {
 } from './maps-sample/args.ts';
 import {
   describeRound,
+  sampleExitCode,
   summarize,
   type SampleSummary,
   type SampledRound,
@@ -40,7 +41,13 @@ function formatSummary(summary: SampleSummary): string {
   ].join('\n');
 }
 
-async function run(args: SampleArgs, serverKey: string): Promise<SampleSummary> {
+/** The summary of a run, and whether a key, quota or network error cut it short. */
+interface SampleRun {
+  summary: SampleSummary;
+  cutShort: boolean;
+}
+
+async function run(args: SampleArgs, serverKey: string): Promise<SampleRun> {
   const metadata = createMetadataClient({ serverKey });
   const service = createLocationService({
     serverKey,
@@ -51,6 +58,7 @@ async function run(args: SampleArgs, serverKey: string): Promise<SampleSummary> 
   const failures: string[] = [];
   const failedSearches: SearchCost[] = [];
   let played: string[] = [];
+  let cutShort = false;
   for (let i = 1; i <= args.rounds; i += 1) {
     if ((i - 1) % args.matchRounds === 0) played = [];
     const lookupsBefore = metadata.lookupCount();
@@ -73,10 +81,13 @@ async function run(args: SampleArgs, serverKey: string): Promise<SampleSummary> 
         seconds: (performance.now() - startedAt) / 1000,
       });
       // A key, quota or network error will not go away on the next round.
-      if (err instanceof Error && 'code' in err) break;
+      if (err instanceof Error && 'code' in err) {
+        cutShort = true;
+        break;
+      }
     }
   }
-  return summarize({
+  const summary = summarize({
     map: args.map,
     region: args.region,
     roundsAsked: args.rounds,
@@ -84,6 +95,7 @@ async function run(args: SampleArgs, serverKey: string): Promise<SampleSummary> 
     failures,
     failedSearches,
   });
+  return { summary, cutShort };
 }
 
 if (import.meta.main) {
@@ -98,9 +110,9 @@ if (import.meta.main) {
       console.error('maps:sample: GOOGLE_MAPS_SERVER_KEY is not set; put it into .env');
       process.exit(2);
     }
-    const summary = await run(args, serverKey);
+    const { summary, cutShort } = await run(args, serverKey);
     console.log(args.json ? JSON.stringify(summary, null, 2) : `\n${formatSummary(summary)}`);
-    process.exit(summary.roundsFound === 0 ? 3 : 0);
+    process.exit(sampleExitCode(summary.roundsFound, cutShort));
   } catch (err) {
     if (!(err instanceof SampleArgsError)) throw err;
     console.error(`maps:sample: ${err.message}`);

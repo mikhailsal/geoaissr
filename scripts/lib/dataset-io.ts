@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -16,12 +17,21 @@ export async function loadDatasetBytes(opts: {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Writes through a temporary file, so a failed write never leaves half a dataset behind. */
+/**
+ * Writes through a temporary file, so a failed write never leaves half a dataset behind. The
+ * temporary file is created anew (`wx`): a file or a link someone left under its name in a shared
+ * folder is refused, not written through.
+ */
 export function writeDatasetFile(outPath: string, data: unknown): void {
   mkdirSync(path.dirname(outPath), { recursive: true });
-  const tmpPath = `${outPath}.tmp-${process.pid}`;
-  writeFileSync(tmpPath, `${JSON.stringify(data)}\n`);
-  renameSync(tmpPath, outPath);
+  const tmpPath = `${outPath}.tmp-${process.pid}-${randomUUID()}`;
+  writeFileSync(tmpPath, `${JSON.stringify(data)}\n`, { flag: 'wx' });
+  try {
+    renameSync(tmpPath, outPath);
+  } catch (err) {
+    rmSync(tmpPath, { force: true });
+    throw err;
+  }
 }
 
 /** `--name value` pairs of a builder's command line; an unknown flag is an error. */

@@ -2,6 +2,7 @@ import { MAP_LABELS_RU, type MapId } from '../../shared/maps.ts';
 import type { RegionId } from '../../shared/region-ids.ts';
 import { getRegionLabelRu, getWeightedCountriesForRegion } from '../../shared/regions.ts';
 import type { RoundTarget } from '../engine/types.ts';
+import { GeoError } from '../errors.ts';
 import { NORTH_MIN_LAT, getNorthCountries } from '../maps/north.ts';
 import { getRetroCountries, isRetroYear } from '../maps/retro.ts';
 import { getSourceGroups, isSourceMapId } from '../maps/sources.ts';
@@ -102,14 +103,21 @@ function panoramaRule(map: MapId): RollContext['accepts'] {
   return undefined;
 }
 
+/** A failure of the key or the quota: it stays, so the host has to see it. */
+function isLastingFailure(reason: unknown): boolean {
+  return reason instanceof GeoError && reason.code !== 'GEO_GOOGLE_UNREACHABLE';
+}
+
 /**
- * The earliest hit of a batch, so a seeded search gives the same round again. A lookup that
- * failed ends the search only when the batch found no place: the lookups go out together, and one
- * of them may fail in transit while another has already found the round.
+ * The earliest hit of a batch, so a seeded search gives the same round again. A refused key or a
+ * spent quota ahead of that hit ends the search, as it would in a search that sends one lookup
+ * at a time. A lookup lost in transit ends it only when the batch found no place: the lookups go
+ * out together, and one of them may fail while another has already found the round.
  */
 function firstHit(results: readonly PromiseSettledResult<RollHit | null>[]): RollHit | null {
   for (const result of results) {
     if (result.status === 'fulfilled' && result.value) return result.value;
+    if (result.status === 'rejected' && isLastingFailure(result.reason)) throw result.reason;
   }
   for (const result of results) {
     if (result.status === 'rejected') {

@@ -31,7 +31,10 @@ Usage: bun run maps:sample [--map <map>] [--region <region>] [--rounds <n>] [opt
   --help             show this text
 
 Needs GOOGLE_MAPS_SERVER_KEY in .env. It sends Street View metadata lookups only, which Google
-does not bill; no image is requested and nothing is written to disk.`;
+does not bill; no image is requested and nothing is written to disk.
+
+Exit status: 0 rounds were found; 3 no round was found; 4 a key, quota or network error cut the
+run short (the summary of what it found is still printed).`;
 
 function parseIntFlag(flag: string, raw: string | undefined, min: number, max: number): number {
   const n = Number(raw);

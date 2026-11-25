@@ -116,3 +116,13 @@ export function summarize(opts: {
       .sort((a, b) => b.rounds - a.rounds || a.nameRu.localeCompare(b.nameRu, 'ru')),
   };
 }
+
+/**
+ * The exit status of a sample. 0: rounds were found. 3: no round was found. 4: a key, quota or
+ * network error cut the run short, whatever it had found by then, so a script does not take a
+ * part of a sample for the whole.
+ */
+export function sampleExitCode(roundsFound: number, cutShort: boolean): number {
+  if (cutShort) return 4;
+  return roundsFound === 0 ? 3 : 0;
+}

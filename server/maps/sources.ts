@@ -5,7 +5,7 @@ import { haversineDistanceKm, type LatLng } from '../../shared/score.ts';
 import { AIRPORTS_BY_ISO, AIRPORT_SNAP_RADIUS_M, AIRPORT_ZONE_KM } from './airports.ts';
 import { URBAN_CENTRES, type UrbanCentre } from './cities.ts';
 import { isPlaceInRegion } from './countries.ts';
-import { randomPointAround } from './geo.ts';
+import { distanceToSegmentKm, randomPointAround } from './geo.ts';
 import { ALL_PLACES, settlementRadiusKm, type Place } from './places.ts';
 
 /** Maps whose rounds start around a known point: an airport, a city, a capital. */
@@ -91,10 +91,15 @@ function isInsideOutline(centre: UrbanCentre, pos: LatLng): boolean {
   return centre.rings.some((ring) => pointInRing(pos.lng, pos.lat, ring));
 }
 
+/** Inside the outline, or within the slack of one of its edges (an edge can run for kilometres). */
 function isNearOutline(centre: UrbanCentre, pos: LatLng): boolean {
   if (isInsideOutline(centre, pos)) return true;
   return centre.rings.some((ring) =>
-    ring.some(([lng, lat]) => haversineDistanceKm(pos, { lat, lng }) <= CITY_OUTLINE_SLACK_KM),
+    ring.some(([lng, lat], i) => {
+      const [nextLng, nextLat] = ring[(i + 1) % ring.length] ?? [lng, lat];
+      const km = distanceToSegmentKm(pos, { lat, lng }, { lat: nextLat, lng: nextLng });
+      return km <= CITY_OUTLINE_SLACK_KM;
+    }),
   );
 }
 

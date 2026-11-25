@@ -155,6 +155,19 @@ test('the guard blocks a territory name in the short spelling of the dataset', (
   }
 });
 
+// Value: protects=a short territory name is caught in its other cases; fails_when=a five-letter name is matched letter for letter, so «флаг Арубы» and «как на Тонге» pass while «Аруба» is blocked;
+// why_new=short names kept every letter, to spare «самолёт» next to «Самоа»; seam=none; no_claim=names of four letters or fewer («Саба») and every ordinary word (the listed ones)
+test('the guard blocks a short territory name in its other cases', () => {
+  expect(guard.findPlaceWord('флаг Арубы')).toBe('арубы');
+  expect(guard.findPlaceWord('пляж как на Тонге')).toBe('тонге');
+  expect(guard.findPlaceWord('порт Сент-Люсии')).toBe('люсии');
+  expect(guard.findPlaceWord('это Аруба')).toBe('аруба');
+  expect(guard.findPlaceWord('острова Самоа')).toBe('самоа');
+  for (const text of ['самолёт над полем', 'самовар на столе', 'тонкая линия', 'арка у дороги']) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
+});
+
 // Value: protects=ordinary words that start like a small territory's name still pass; fails_when=the territory stems get as short as the country stems and mask scene words;
 // why_new=the territory names are new to the guard; seam=none; no_claim=every word of the language (the listed ones)
 test('ordinary words that look like a small territory pass the guard', () => {

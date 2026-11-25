@@ -42,3 +42,20 @@ export function randomPointAround(
   const distanceKm = radiusKm * (evenDistance ? share : Math.sqrt(share));
   return offsetPoint(centre, distanceKm, rng() * 2 * Math.PI);
 }
+
+const KM_PER_DEGREE = (EARTH_RADIUS_KM * Math.PI) / 180;
+
+/**
+ * Distance from a point to the segment between two points, in km. Flat maths around the point:
+ * right for segments and distances of a few km, which is what an outline's edge is.
+ */
+export function distanceToSegmentKm(pos: LatLng, from: LatLng, to: LatLng): number {
+  const kmPerLng = KM_PER_DEGREE * Math.cos((pos.lat * Math.PI) / 180);
+  const ax = normalizeLongitude(from.lng - pos.lng) * kmPerLng;
+  const ay = (from.lat - pos.lat) * KM_PER_DEGREE;
+  const dx = normalizeLongitude(to.lng - from.lng) * kmPerLng;
+  const dy = (to.lat - from.lat) * KM_PER_DEGREE;
+  const lengthSq = dx * dx + dy * dy;
+  const along = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lengthSq));
+  return Math.hypot(ax + along * dx, ay + along * dy);
+}

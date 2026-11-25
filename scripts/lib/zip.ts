@@ -73,11 +73,11 @@ export function readZipEntry(bytes: Uint8Array, wanted: (name: string) => boolea
   if (packed.byteLength !== entry.compressedSize) {
     throw new Error(`ZIP archive is damaged: ${entry.name} is cut short`);
   }
-  if (entry.method === 0) return packed;
-  if (entry.method !== 8) {
+  if (entry.method !== 0 && entry.method !== 8) {
     throw new Error(`ZIP entry ${entry.name} uses unsupported compression method ${entry.method}`);
   }
-  const unpacked = inflateRawSync(packed, { maxOutputLength: MAX_ENTRY_BYTES });
+  const unpacked =
+    entry.method === 0 ? packed : inflateRawSync(packed, { maxOutputLength: MAX_ENTRY_BYTES });
   if (unpacked.byteLength !== entry.size) {
     throw new Error(
       `ZIP entry ${entry.name} unpacked to ${unpacked.byteLength} bytes, expected ${entry.size}`,

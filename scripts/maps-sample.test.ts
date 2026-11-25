@@ -1,7 +1,12 @@
 import { expect, test } from 'bun:test';
 import type { RoundTarget } from '../server/engine/types.ts';
 import { SAMPLE_HELP, SampleArgsError, parseSampleArgs } from './maps-sample/args.ts';
-import { describeRound, summarize, type SampledRound } from './maps-sample/stats.ts';
+import {
+  describeRound,
+  sampleExitCode,
+  summarize,
+  type SampledRound,
+} from './maps-sample/stats.ts';
 
 function target(lat: number, lng: number): RoundTarget {
   return {
@@ -207,4 +212,13 @@ test('summarize returns null statistics for an empty list', () => {
     slowestRoundSeconds: null,
     countries: [],
   });
+});
+
+// Value: protects=a sample cut short by a key, quota or network error ends with a failure status even when it found rounds; fails_when=the status follows the rounds found only, so a script takes an interrupted sample for a whole one;
+// why_new=the status was 0 as soon as one round was found; seam=none; no_claim=the CLI wiring around it (the status rule only)
+test('sampleExitCode fails a run that an error cut short', () => {
+  expect(sampleExitCode(5, false)).toBe(0);
+  expect(sampleExitCode(0, false)).toBe(3);
+  expect(sampleExitCode(5, true)).toBe(4);
+  expect(sampleExitCode(0, true)).toBe(4);
 });

@@ -111,6 +111,13 @@ test('readZipEntry throws when the unpacked size differs from the declared size'
   expect(() => readZipEntry(zip, () => true)).toThrow('expected 5');
 });
 
+// Value: protects=a stored entry whose bytes differ in number from its declared size is refused; fails_when=the stored branch returns the bytes unchecked and a damaged archive reaches a dataset builder;
+// why_new=only the deflated branch compared the sizes; seam=none; no_claim=real downloaded archives (in-memory fixture)
+test('readZipEntry throws when a stored entry differs from its declared size', () => {
+  const zip = buildZip([{ name: 'a.txt', data: text('twelve bytes'), method: 0, declaredSize: 5 }]);
+  expect(() => readZipEntry(zip, () => true)).toThrow('expected 5');
+});
+
 // Value: protects=a cut-short entry is reported; fails_when=the compressed-size check is removed;
 // why_new=there was no ZIP reader test at all; seam=none; no_claim=real downloaded archives (in-memory fixture)
 test('readZipEntry throws when the entry is cut short', () => {

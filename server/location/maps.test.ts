@@ -454,6 +454,24 @@ test('a retro batch keeps its place when three of its lookups fail in transit', 
   expect(requests.length).toBe(MAX_TRANSPORT_FAILURES * 2 + 9);
 });
 
+// Value: protects=a spent quota ahead of the place a batch found still stops the round with GEO_GOOGLE_QUOTA; fails_when=the batch takes the place and hides the quota error from the host, who learns of it a round later;
+// why_new=the lookups of a retro batch go out together and the earliest hit won over every failure; seam=none; no_claim=Google's real quota replies (the metadata double answers OVER_QUERY_LIMIT)
+test('a retro batch stops on a spent quota that comes before its place', async () => {
+  const { svc } = serviceWithDouble({
+    seed: 32,
+    answer: (probe, lookup) =>
+      lookup === 1 ? { status: 'OVER_QUERY_LIMIT' } : panoAt(probe, { date: '2009-08' }),
+  });
+  const err = await svc
+    .prepareRoundLocation({ map: 'retro', region: 'world', excludeCountryIds: [] })
+    .then(
+      () => null,
+      (e: unknown) => e,
+    );
+  expect(err).toBeInstanceOf(GeoError);
+  expect((err as GeoError).code).toBe('GEO_GOOGLE_QUOTA');
+});
+
 // Value: protects=three lookups in a row that never reach Google end the search with GEO_GOOGLE_UNREACHABLE; fails_when=a dead network spends the whole attempt budget;
 // why_new=transport failures used to cost one attempt each, 90 in a row; seam=none; no_claim=real network errors (fetch double throws)
 test('a dead network ends the search after three lookups', async () => {

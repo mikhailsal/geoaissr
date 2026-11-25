@@ -321,10 +321,13 @@ function stemOf(word: string): string {
  * Stem of a word from the name of a small territory. These names are short and sit close to
  * ordinary words («Самоа» and «самолёт», «Монако» and «монастырь», «Мальта» and «мальчик»), so
  * the stem keeps more of the word than `stemOf` does: all of a short word, all but the last
- * letter of a longer one.
+ * letter of a longer one or of a five-letter name that declines.
  */
 function territoryStemOf(word: string): string {
-  return word.length <= 5 ? word : word.slice(0, -1);
+  if (word.length > 5) return word.slice(0, -1);
+  // «Аруба», «Тонга» and «Люсия» change their last letter («на Арубе»); «Самоа» does not.
+  const declines = word.length === 5 && /[^аоуэыеёюя][ая]$/u.test(word);
+  return declines ? word.slice(0, 4) : word;
 }
 
 /** Words the names of the dataset shorten and the bots write in full («о-в Мэн», «остров Мэн»). */

@@ -219,3 +219,32 @@ test('the committed availability table matches the datasets', () => {
     rawAvailability as ReturnType<typeof computeMapAvailability>,
   );
 });
+
+// Value: protects=a city takes a panorama that lies just outside a long straight edge of its outline; fails_when=the slack is measured to the corners of the outline only, so a panorama 100 m off the middle of a two-kilometre edge is refused and the search spends more lookups;
+// why_new=the slack of the cities map was measured to the vertices; seam=none; no_claim=real Street View coverage (geometry only)
+test('a city takes a panorama just outside a long edge of its outline', () => {
+  const paris = URBAN_CENTRES.find(
+    (c) => c.iso === 'FR' && haversineDistanceKm(c.core, { lat: 48.8566, lng: 2.3522 }) < 5,
+  );
+  const source = getSourceGroups('cities', 'europe')
+    .flatMap((group) => group.sources)
+    .find((candidate) => candidate.centre === paris?.core);
+  const ring = paris?.rings[0] ?? [];
+  if (!paris || !source) throw new Error('the cities dataset has no Paris');
+  let checked = 0;
+  for (const [i, [lng, lat]] of ring.entries()) {
+    const [nextLng, nextLat] = ring[(i + 1) % ring.length] ?? [lng, lat];
+    if (haversineDistanceKm({ lat, lng }, { lat: nextLat, lng: nextLng }) < 2) continue;
+    const mid = { lat: (lat + nextLat) / 2, lng: (lng + nextLng) / 2 };
+    if (haversineDistanceKm(paris.core, mid) > 15) continue;
+    const along = Math.atan2((nextLng - lng) * Math.cos((lat * Math.PI) / 180), nextLat - lat);
+    // 100 m off the middle of the edge, on the side that is outside the outline.
+    const outside = [along + Math.PI / 2, along - Math.PI / 2]
+      .map((bearing) => offsetPoint(mid, 0.1, bearing))
+      .find((point) => !pointInRing(point.lng, point.lat, ring));
+    if (!outside) continue;
+    expect(source.accepts(outside)).toBe(true);
+    checked += 1;
+  }
+  expect(checked).toBeGreaterThan(0);
+});

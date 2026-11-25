@@ -1,5 +1,12 @@
 import { expect, test } from 'bun:test';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadDatasetBytes, parseBuilderArgs, writeDatasetFile } from './dataset-io.ts';
@@ -41,6 +48,23 @@ test('writeDatasetFile is byte-stable and loadDatasetBytes reads a local file ba
       label: 'x',
     });
     expect([...bytes]).toEqual([1, 2, 3]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Value: protects=a dataset write does not go through a link left under an old staging name; fails_when=the staging file has a name that can be guessed and is opened for truncation, so a link in a shared folder sends the bytes into another file;
+// why_new=the staging name was the output path plus the process id; seam=none; no_claim=a race against a live attacker (a planted link only)
+test('writeDatasetFile leaves a file linked under the old staging name alone', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-dataset-io-'));
+  try {
+    const out = path.join(dir, 'data.json');
+    const victim = path.join(dir, 'victim.txt');
+    writeFileSync(victim, 'keep me');
+    symlinkSync(victim, `${out}.tmp-${process.pid}`);
+    writeDatasetFile(out, { a: 1 });
+    expect(readFileSync(victim, 'utf8')).toBe('keep me');
+    expect(readFileSync(out, 'utf8')).toBe('{"a":1}\n');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
