@@ -126,6 +126,8 @@ The lobby opens on the shared stage once the visible characters have rendered. S
 
 Use **Участники** to manage the roster and **Настройки партии** to adjust the game. Close a window with its close button, Escape, or a click outside. Players send gestures as their own characters. The host can also select a robot and send a gesture as that robot. Emotions and turns on the stage reach everyone in the lobby. Repeated clicks add momentum to the ongoing turn. Turning a wardrobe preview stays local.
 
+In **Настройки партии**, the host can enable **Пуш: сократить время после ответа** and enter 1–60 seconds in **Оставить после пуша (с)**. The default is 15 seconds. A confirmed guess caps the remaining time for everyone. Placing a pin or confirming when less time remains keeps the existing deadline. Players still guessing hear the usual warning in the final 15 seconds. Clear **Разрешить ИИ пушить** to let only humans trigger the shorter clock. Push is off by default.
+
 After each round, open **Рейтинг за игру** to see the cumulative standings. The host can turn off **Показывать рейтинг между раундами** under **Настройки партии** to reveal the standings only at the end.
 
 The trophy beside each avatar counts wins from the last six hours. Only complete matches with exactly one first-place finisher count; ties and early finishes do not. Human wins follow the profile UUID, and AI wins follow the bot slot even after a rename. The host can reset an individual bot's count in the lobby or final results. Matches and reset timestamps persist on the server; a storage error is reported in the room.

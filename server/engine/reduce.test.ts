@@ -19,6 +19,9 @@ function makeSettings(overrides: Partial<SettingsFile> = {}): SettingsFile {
     moveEnabled: true,
     aiWaitWindowSec: 30,
     showMatchStandings: true,
+    pushEnabled: false,
+    pushSeconds: 15,
+    allowBotPush: true,
     bots: [],
     ...overrides,
   };
@@ -80,6 +83,30 @@ function makeTarget(round = 1): RoundTarget {
   };
 }
 
+function startActiveBotRound(settings: SettingsFile): RoomState {
+  let state = makeRoom({ settings });
+  state = reduce(
+    state,
+    { type: 'player_join', playerId: 'h', secret: 's1', name: 'Хост', color: 'p-1', isHost: true },
+    100,
+  ).state;
+  state = reduce(state, { type: 'add_bot', playerId: 'h' }, 110).state;
+  state = reduce(state, { type: 'start_match', playerId: 'h' }, 1000).state;
+  state = reduce(
+    state,
+    {
+      type: 'round_prepared',
+      matchId: 'm1',
+      gen: state.gen,
+      roundNumber: 1,
+      target: makeTarget(1),
+    },
+    1100,
+  ).state;
+  state = reduce(state, { type: 'pano_loaded', playerId: 'h', roundNumber: 1 }, 1200).state;
+  return reduce(state, { type: 'countdown_done', matchId: 'm1', gen: state.gen }, 10_000).state;
+}
+
 test('addBot enforces >= 60s duration and max 3 bots', () => {
   let s = makeRoom({ settings: makeSettings({ roundDurationSec: 30 }) });
   s = reduce(
@@ -125,11 +152,18 @@ test('non-host cannot mutate lobby or start match', () => {
   );
   const hostUpdate = reduce(
     s,
-    { type: 'update_lobby', playerId: 'h', patch: { showMatchStandings: false } },
+    {
+      type: 'update_lobby',
+      playerId: 'h',
+      patch: { showMatchStandings: false, pushEnabled: true, pushSeconds: 7, allowBotPush: false },
+    },
     103,
   );
   expect(hostUpdate.ack).toBe('ok');
   expect(hostUpdate.state.settings.showMatchStandings).toBe(false);
+  expect(hostUpdate.state.settings.pushEnabled).toBe(true);
+  expect(hostUpdate.state.settings.pushSeconds).toBe(7);
+  expect(hostUpdate.state.settings.allowBotPush).toBe(false);
   expect(hostUpdate.effects).toEqual([
     { type: 'save_settings', settings: hostUpdate.state.settings },
   ]);
@@ -252,21 +286,7 @@ test('stale gen timer ticks are dropped cleanly', () => {
 });
 
 test('all humans confirmed with thinking bot waits at least 60s from start or aiWaitWindowSec', () => {
-  let s = makeRoom({ settings: makeSettings({ roundDurationSec: 120, aiWaitWindowSec: 15 }) });
-  s = reduce(
-    s,
-    { type: 'player_join', playerId: 'h', secret: 's1', name: 'Хост', color: 'p-1', isHost: true },
-    100,
-  ).state;
-  s = reduce(s, { type: 'add_bot', playerId: 'h' }, 110).state;
-  s = reduce(s, { type: 'start_match', playerId: 'h' }, 1000).state;
-  s = reduce(
-    s,
-    { type: 'round_prepared', matchId: 'm1', gen: s.gen, roundNumber: 1, target: makeTarget(1) },
-    1100,
-  ).state;
-  s = reduce(s, { type: 'pano_loaded', playerId: 'h', roundNumber: 1 }, 1200).state;
-  s = reduce(s, { type: 'countdown_done', matchId: 'm1', gen: s.gen }, 10_000).state;
+  const s = startActiveBotRound(makeSettings({ roundDurationSec: 120, aiWaitWindowSec: 15 }));
 
   const guess = reduce(
     s,
@@ -312,6 +332,125 @@ test('all humans confirmed with thinking bot waits at least 60s from start or ai
   );
   expect(botDone.state.phase).toBe('ROUND_RESULTS');
   expect(botDone.state.results?.humanVsAi.visible).toBe(true);
+});
+
+test('a human confirmation uses the configured push window and never extends the deadline', () => {
+  const settings = makeSettings({ pushEnabled: true, pushSeconds: 7, allowBotPush: false });
+  let s = makeRoom({ settings });
+  s = reduce(
+    s,
+    { type: 'player_join', playerId: 'h', secret: 's1', name: 'Хост', color: 'p-1', isHost: true },
+    100,
+  ).state;
+  s = reduce(
+    s,
+    {
+      type: 'player_join',
+      playerId: 'g',
+      secret: 's2',
+      name: 'Гость',
+      color: 'p-2',
+      isHost: false,
+    },
+    101,
+  ).state;
+  s = reduce(s, { type: 'start_match', playerId: 'h' }, 1000).state;
+  s = reduce(
+    s,
+    { type: 'round_prepared', matchId: 'm1', gen: s.gen, roundNumber: 1, target: makeTarget(1) },
+    1100,
+  ).state;
+  s = reduce(s, { type: 'pano_loaded', playerId: 'h', roundNumber: 1 }, 1200).state;
+  s = reduce(s, { type: 'pano_loaded', playerId: 'g', roundNumber: 1 }, 1201).state;
+  s = reduce(s, { type: 'countdown_done', matchId: 'm1', gen: s.gen }, 10_000).state;
+
+  const confirm = {
+    type: 'submit_guess',
+    playerId: 'h',
+    roundNumber: 1,
+    lat: 55.7,
+    lng: 37.6,
+  } as const;
+  const late = reduce(s, confirm, 95_000);
+  expect(late.state.loadingOrActive?.endsAt).toBe(100_000);
+  expect(late.effects).toEqual([]);
+
+  const first = reduce(s, confirm, 15_000);
+  expect(first.state.loadingOrActive?.roundDeadlineAt).toBe(22_000);
+  expect(first.state.loadingOrActive?.endsAt).toBe(22_000);
+  expect(first.effects).toContainEqual({
+    type: 'schedule_deadline',
+    matchId: 'm1',
+    gen: first.state.gen,
+    kind: 'round',
+    atMs: 22_000,
+  });
+
+  const later = reduce(
+    first.state,
+    { type: 'submit_guess', playerId: 'g', roundNumber: 1, lat: 55.8, lng: 37.7 },
+    20_000,
+  );
+  expect(later.state.phase).toBe('ROUND_RESULTS');
+  expect(later.effects.some((effect) => effect.type === 'schedule_deadline')).toBe(false);
+});
+
+test('only a finalized bot guess pushes; bot completion keeps the normal early-end behavior', () => {
+  const settings = makeSettings({ pushEnabled: true, pushSeconds: 4, allowBotPush: true });
+  const s = startActiveBotRound(settings);
+  const botId = s.settings.bots[0]?.id ?? '';
+
+  const botGuess = {
+    type: 'bot_guess_recorded',
+    matchId: 'm1',
+    gen: s.gen,
+    roundNumber: 1,
+    botId,
+    guess: { lat: 55.8, lng: 37.5, explanation: 'Итог' },
+  } as const;
+  const disabled = reduce(
+    { ...s, settings: { ...s.settings, allowBotPush: false } },
+    botGuess,
+    15_000,
+  );
+  expect(disabled.state.loadingOrActive?.roundDeadlineAt).toBe(100_000);
+  expect(disabled.effects).toEqual([]);
+
+  const draft = reduce(s, { ...botGuess, finalized: false }, 15_000);
+  expect(draft.state.loadingOrActive?.roundDeadlineAt).toBe(100_000);
+  expect(draft.effects).toEqual([]);
+
+  const final = reduce(draft.state, botGuess, 16_000);
+  expect(final.state.phase).toBe('ROUND_ACTIVE');
+  expect(final.state.loadingOrActive?.roundDeadlineAt).toBe(20_000);
+  expect(final.effects).toContainEqual({
+    type: 'set_bot_round_deadline',
+    matchId: 'm1',
+    gen: final.state.gen,
+    roundNumber: 1,
+    atMs: 20_000,
+  });
+
+  const human = reduce(
+    final.state,
+    { type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 55.7, lng: 37.6 },
+    17_000,
+  );
+  expect(human.state.loadingOrActive?.endsAt).toBe(20_000);
+  const finished = reduce(
+    human.state,
+    {
+      type: 'bot_finished',
+      matchId: 'm1',
+      gen: human.state.gen,
+      roundNumber: 1,
+      botId,
+      aborted: false,
+      reason: 'done',
+    },
+    18_000,
+  );
+  expect(finished.state.phase).toBe('ROUND_RESULTS');
 });
 
 test('round results stay until the host presses next; no auto-advance timer', () => {

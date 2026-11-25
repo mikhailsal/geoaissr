@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { SettingsFile } from '../../shared/storage-schemas.ts';
+import { createDefaultSettings, type SettingsFile } from '../../shared/storage-schemas.ts';
 import { buildQuotaMetric } from '../storage/quota.ts';
 import { reduce } from './reduce.ts';
 import { createInitialRoomState, type RoomState, type RoundTarget } from './types.ts';
@@ -10,15 +10,10 @@ function makeRoom(settings: Partial<SettingsFile> = {}): RoomState {
     matchId: 'm-maps',
     fakeMode: true,
     settings: {
-      version: 2,
-      map: 'standard',
-      region: 'world',
+      ...createDefaultSettings(),
       rounds: 1,
       roundDurationSec: 90,
-      moveEnabled: true,
       aiWaitWindowSec: 30,
-      showMatchStandings: true,
-      bots: [],
       ...settings,
     },
     quotaSummary: {

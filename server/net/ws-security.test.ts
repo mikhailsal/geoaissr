@@ -5,6 +5,7 @@ import path from 'node:path';
 import { DEFAULT_AUDIO_PREFERENCES } from '../../shared/audio-preferences.ts';
 import type { ParticipantColorId } from '../../shared/colors.ts';
 import type { ClientViewState, ServerMessage } from '../../shared/protocol.ts';
+import { createDefaultSettings } from '../../shared/storage-schemas.ts';
 import type { BotRunner } from '../bots/runner.ts';
 import { reduce } from '../engine/reduce.ts';
 import { computeFinalRankings } from '../engine/results.ts';
@@ -92,6 +93,9 @@ function buildSecInitialState(fakeMode: boolean) {
       moveEnabled: true,
       aiWaitWindowSec: 30,
       showMatchStandings: true,
+      pushEnabled: false,
+      pushSeconds: 15,
+      allowBotPush: true,
       bots: [],
     },
     quotaSummary: {
@@ -330,15 +334,11 @@ test('spectators are excluded from final rankings and pre-join state is masked',
     matchId: 'sp1',
     fakeMode: true,
     settings: {
-      version: 2,
-      map: 'standard',
-      region: 'world',
+      ...createDefaultSettings(),
       rounds: 1,
       roundDurationSec: 60,
       moveEnabled: false,
       aiWaitWindowSec: 30,
-      showMatchStandings: true,
-      bots: [],
     },
     quotaSummary: {
       metrics: {
@@ -565,18 +565,6 @@ test('check_bot_vision emits vision_check_result on completion and on mid-check 
   }
 });
 
-const QUOTA_GATE_SETTINGS = {
-  version: 2,
-  map: 'standard',
-  region: 'world',
-  rounds: 2,
-  roundDurationSec: 60,
-  moveEnabled: true,
-  aiWaitWindowSec: 30,
-  showMatchStandings: true,
-  bots: [],
-} as const;
-
 test('RoomShell confirm_quota_reset keeps the gate closed when persisting fails', async () => {
   const baseSummary = {
     metrics: {
@@ -603,7 +591,12 @@ test('RoomShell confirm_quota_reset keeps the gate closed when persisting fails'
     createInitialRoomState({
       matchId: 'm-qerr',
       fakeMode: false,
-      settings: { ...QUOTA_GATE_SETTINGS, bots: [] },
+      settings: {
+        ...createDefaultSettings(),
+        rounds: 2,
+        roundDurationSec: 60,
+        aiWaitWindowSec: 30,
+      },
       quotaSummary: baseSummary,
       quotaWarning: 'corrupt',
       tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },

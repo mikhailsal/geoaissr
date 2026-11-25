@@ -35,7 +35,8 @@ test('spawnManaged stops entire detached process group including forked children
   try {
     const childrenFile = path.join(dir, 'children.json');
     const childPidFile = path.join(dir, 'grandchild.pid');
-    const script = ['sh', '-c', `sleep 30 & echo $! > ${JSON.stringify(childPidFile)}; wait`];
+    // Publish the PID only once the child has written it in this test's working directory.
+    const script = ['sh', '-c', 'sleep 30 & echo $! > pid.tmp && mv pid.tmp grandchild.pid; wait'];
     const handle = spawnManaged({
       cmd: script,
       cwd: dir,
