@@ -92,17 +92,33 @@ function ringBbox(rings: readonly LngLat[][]): [number, number, number, number] 
 /** A place this close to the outline still belongs to it: outlines follow 1 km grid cells. */
 const CORE_PLACE_MARGIN_KM = 3;
 
-function isNearRing(place: KnownPlace, rings: readonly LngLat[][]): boolean {
+/** Where a place stands to an outline: inside it, within the margin around it, or apart. */
+function standingToOutline(
+  place: KnownPlace,
+  rings: readonly LngLat[][],
+): 'inside' | 'near' | null {
+  let near = false;
   for (const ring of rings) {
-    if (pointInRing(place.lng, place.lat, ring)) return true;
-    for (const [lng, lat] of ring) {
-      if (haversineDistanceKm(place, { lat, lng }) <= CORE_PLACE_MARGIN_KM) return true;
-    }
+    if (pointInRing(place.lng, place.lat, ring)) return 'inside';
+    near ||= ring.some(
+      ([lng, lat]) => haversineDistanceKm(place, { lat, lng }) <= CORE_PLACE_MARGIN_KM,
+    );
   }
-  return false;
+  return near ? 'near' : null;
 }
 
-/** The core city of an outline: its most populous place, a city of its own before a borough. */
+/** A city of its own before a borough, then the more populous of the two. */
+function isBetterCore(best: KnownPlace | null, place: KnownPlace): boolean {
+  if (!best) return true;
+  if (best.district !== place.district) return best.district;
+  return place.population > best.population;
+}
+
+/**
+ * The core city of an outline: a city big enough that lies inside it, otherwise the best place
+ * inside it or within the margin. The margin alone would hand an outline to a bigger city just
+ * across its edge, which may be in another country (Johor Bahru for the north of Singapore).
+ */
 function findCorePlace(
   rings: readonly LngLat[][],
   places: readonly KnownPlace[],
@@ -111,18 +127,18 @@ function findCorePlace(
   // About 3 km in degrees of latitude; wider in longitude, where a degree is shorter.
   const padLat = CORE_PLACE_MARGIN_KM / 111;
   const padLng = padLat / Math.max(0.2, Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180));
+  let inside: KnownPlace | null = null;
   let best: KnownPlace | null = null;
   for (const place of places) {
     if (place.lng < minLng - padLng || place.lng > maxLng + padLng) continue;
     if (place.lat < minLat - padLat || place.lat > maxLat + padLat) continue;
-    if (!isNearRing(place, rings)) continue;
-    const better =
-      !best ||
-      (best.district && !place.district) ||
-      (best.district === place.district && place.population > best.population);
-    if (better) best = place;
+    const standing = standingToOutline(place, rings);
+    if (standing === null) continue;
+    if (isBetterCore(best, place)) best = place;
+    const bigEnough = place.population >= MIN_CORE_POPULATION;
+    if (standing === 'inside' && bigEnough && isBetterCore(inside, place)) inside = place;
   }
-  return best;
+  return inside ?? best;
 }
 
 /**

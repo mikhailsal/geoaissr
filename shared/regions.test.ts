@@ -61,6 +61,13 @@ test('findCountryAtPoint resolves Russian NAME_RU for major locations', () => {
   expect(findCountryAtPoint({ lat: -22.9068, lng: -43.1729 })?.nameRu).toBe('Бразилия');
 });
 
+// Value: protects=a point in an enclave resolves to the enclave; fails_when=Lesotho resolves to South Africa, whose outline has no hole, and a round there is labelled with the wrong country;
+// why_new=the first outline holding the point won; seam=none; no_claim=enclaves the dataset has no outline for (San Marino, Vatican)
+test('a point in Lesotho resolves to Lesotho, not to South Africa around it', () => {
+  expect(findCountryAtPoint({ lat: -29.31, lng: 27.48 })?.id).toBe('LSO');
+  expect(findCountryAtPoint({ lat: -26.2, lng: 28.04 })?.id).toBe('ZAF');
+});
+
 test('world countries exclude Antarctica and each country has valid polygons', () => {
   expect(REGION_COUNTRIES.length).toBeGreaterThanOrEqual(170);
   expect(REGION_COUNTRIES.some((c) => c.id === 'ATA')).toBe(false);

@@ -1,14 +1,20 @@
 import type { MapId } from '../../shared/maps.ts';
 import type { RegionId } from '../../shared/region-ids.ts';
-import { getCountryOfRegion, sampleWeightedItem } from '../../shared/regions.ts';
+import { getCountryOfRegion, polygonsInRegion, sampleWeightedItem } from '../../shared/regions.ts';
 import type { LatLng } from '../../shared/score.ts';
 import type { RoundTarget } from '../engine/types.ts';
 import { countryForIso, isPlaceInRegion, isoCodesOfCountryIds } from '../maps/countries.ts';
+import { labelCountryIso } from '../maps/country-label.ts';
 import { NORTH_MIN_LAT, getNorthCountries } from '../maps/north.ts';
 import { ALL_PLACES, placesOfIso } from '../maps/places.ts';
 import { getRetroCountries } from '../maps/retro.ts';
 import { seededRng } from '../maps/rng.ts';
-import { getSourceGroups, isSourceMapId, type SourceMapId } from '../maps/sources.ts';
+import {
+  getSourceGroups,
+  isSourceMapId,
+  type RoundSource,
+  type SourceMapId,
+} from '../maps/sources.ts';
 import { EmptyMapRegionError, type LocationService, type RoundLocationRequest } from './service.ts';
 
 interface FakeScene extends LatLng {
@@ -46,7 +52,7 @@ function scenesOfRegion(region: RegionId, round: number): FakeScene[] {
   if (!country) return [];
   const place = placesOfIso(country.iso)[0];
   if (place) return [sceneAt(country.iso, place, round)];
-  const bbox = country.polygons[0]?.bbox ?? [0, 0, 0, 0];
+  const bbox = polygonsInRegion(country, region)[0]?.bbox ?? [0, 0, 0, 0];
   return [
     sceneAt(country.iso, { lat: (bbox[1] + bbox[3]) / 2, lng: (bbox[0] + bbox[2]) / 2 }, round),
   ];
@@ -84,6 +90,21 @@ function pickUnplayed(scenes: readonly FakeScene[], played: ReadonlySet<string>,
   return scenes.find((scene) => !played.has(scene.iso)) ?? scenes[round % scenes.length];
 }
 
+/**
+ * Where a fake round of a source starts: its centre, or a probe of it when the centre lies
+ * outside the source's own zone (the core of a city can stand just off its dense outline). The
+ * probe is one the live map would label with the country of the source: the outline of Gisenyi
+ * runs on into Goma, across the border.
+ */
+function fakePosition(source: RoundSource, rng: () => number): LatLng {
+  if (source.accepts(source.centre)) return source.centre;
+  for (let i = 0; i < 20; i += 1) {
+    const probe = source.probe(rng);
+    if (source.accepts(probe) && labelCountryIso(source, probe) === source.iso) return probe;
+  }
+  return source.centre;
+}
+
 /** A real place of a point map, picked the way the live service picks one, with a fixed seed. */
 function sourceScene(
   map: SourceMapId,
@@ -97,7 +118,7 @@ function sourceScene(
   const open = groups.filter((group) => !played.has(group.iso));
   const group = sampleWeightedItem(open.length > 0 ? open : groups, rng);
   const source = sampleWeightedItem(group.sources, rng);
-  return sceneAt(source.iso, source.centre, round);
+  return sceneAt(source.iso, fakePosition(source, rng), round);
 }
 
 function pickScene(

@@ -1,9 +1,18 @@
-import type { RegionId } from '../../shared/region-ids.ts';
-import { getWeightedCountriesForRegion, type WeightedCountry } from '../../shared/regions.ts';
+import { countryRegionId, type RegionId } from '../../shared/region-ids.ts';
+import {
+  getWeightedCountriesForRegion,
+  polygonsInRegion,
+  type WeightedCountry,
+} from '../../shared/regions.ts';
 import rawRetro from './retro.data.json' with { type: 'json' };
 
 /** The retro map keeps panoramas shot before this year. */
 export const RETRO_BEFORE_YEAR = 2012;
+
+/** Whether a panorama shot in that year belongs to the retro map; an undated one does not. */
+export function isRetroYear(year: number | null): boolean {
+  return year !== null && year < RETRO_BEFORE_YEAR;
+}
 
 export interface RetroCountryStat {
   /** Lookups the measurement sent into the country. */
@@ -38,9 +47,14 @@ function retroCountries(region: RegionId): WeightedCountry[] {
   for (const entry of getWeightedCountriesForRegion(region)) {
     const stat = RETRO_DATASET.countries[entry.country.id];
     if (!stat || stat.old <= 0) continue;
+    // The measurement covers the land of the one-country region. A part overseas (French Guiana
+    // for France) was never measured, and a round sent there would spend its whole budget.
+    const measured = polygonsInRegion(entry.country, countryRegionId(entry.country.id));
+    const polygons = entry.polygons.filter((poly) => measured.includes(poly));
+    if (polygons.length === 0) continue;
     // A country where old panoramas are rare gets more of the lookups, so that every listed
     // country comes up about equally often.
-    result.push({ ...entry, weight: stat.lookups / stat.old });
+    result.push({ ...entry, polygons, weight: stat.lookups / stat.old });
   }
   cache.set(region, result);
   return result;

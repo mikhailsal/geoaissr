@@ -2,7 +2,9 @@ import { expect, test } from 'bun:test';
 import { isMapAvailable } from '../../shared/map-availability.ts';
 import { MAP_IDS } from '../../shared/maps.ts';
 import { AREA_REGION_IDS, type RegionId } from '../../shared/region-ids.ts';
+import { labelCountryIso } from '../maps/country-label.ts';
 import { NORTH_MIN_LAT } from '../maps/north.ts';
+import { getSourceGroups } from '../maps/sources.ts';
 import { createFakeLocationService } from './fake.ts';
 import { EmptyMapRegionError } from './service.ts';
 
@@ -85,5 +87,25 @@ test('a fake capitals match does not repeat a country', async () => {
     expect(played).not.toContain(target.countryId);
     played.push(target.countryId);
     expect(target.panoId.startsWith('fake-')).toBe(true);
+  }
+});
+
+// Value: protects=a fake cities round starts where the live map would take a panorama, also for a city whose core stands just off its dense outline; fails_when=the fake mode returns the core of such a city, a point the live map rejects;
+// why_new=the fake mode took the core of a city as its position; seam=none; no_claim=live sampling (fake service only)
+test('a fake cities round starts inside the zone of its city', async () => {
+  const sources = getSourceGroups('cities', 'country:RWA').flatMap((group) => group.sources);
+  // Rwanda has two cities, and the core of one of them is outside its own outline.
+  expect(sources.some((source) => !source.accepts(source.centre))).toBe(true);
+  const fake = createFakeLocationService();
+  for (let i = 0; i < 12; i += 1) {
+    const target = await fake.prepareRoundLocation({
+      map: 'cities',
+      region: 'country:RWA',
+      excludeCountryIds: [],
+    });
+    const source = sources.find((candidate) => candidate.accepts(target));
+    expect(source).toBeDefined();
+    // The outline of Gisenyi runs on into Goma: the fake round stays on the Rwandan side.
+    if (source) expect(labelCountryIso(source, target)).toBe('RW');
   }
 });

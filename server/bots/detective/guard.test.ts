@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { createPlaceGuard, maskPlaceWords } from './guard.ts';
+import { PLACE_MASK, createPlaceGuard, maskPlaceWords } from './guard.ts';
 
 const guard = createPlaceGuard();
 
@@ -122,6 +122,25 @@ test('the guard blocks the small states and territories of the point maps', () =
   expect(guard.findPlaceWord('андоррский флаг')).toBe('андоррский');
   expect(guard.findPlaceWord('флаг Самоа')).toBe('самоа');
   expect(guard.findPlaceWord('Каймановы острова')).toBe('каймановы');
+});
+
+// Value: protects=a territory whose every word is too ordinary to block alone is still blocked when written whole, and masked in what the eyes write; fails_when=the brain can name San Marino or Christmas Island to its partner word for word;
+// why_new=the territory names were matched word by word only, and these names have no word of their own; seam=none; no_claim=every spelling of a name (the dictionary form and its cases)
+test('the guard blocks a territory name made of ordinary words when it is written whole', () => {
+  expect(guard.findPlaceWord('флаг Сан-Марино')).toBe('марино');
+  expect(guard.findPlaceWord('похоже на Сен-Мартен')).toBe('мартен');
+  expect(guard.findPlaceWord('аэропорт Синт-Мартена')).toBe('мартена');
+  expect(guard.findPlaceWord('это остров Рождества')).toBe('рождества');
+  expect(guard.findPlaceWord('пляж на островах Кука')).toBe('кука');
+  expect(guard.findPlaceWord('остров Святой Елены')).toBe('елены');
+  expect(guard.findPlaceWord('номера как на острове Мэн')).toBe('мэн');
+  expect(guard.findPlaceWord('Кокосовые острова')).toBe('кокосовые');
+  expect(maskPlaceWords(guard, 'вывеска, как в Сан-Марино').text).toBe(
+    `вывеска, как в Сан-${PLACE_MASK}`,
+  );
+  for (const text of ['остров на реке', 'праздник Рождества', 'сан у священника', 'мэн в шляпе']) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
 });
 
 // Value: protects=ordinary words that start like a small territory's name still pass; fails_when=the territory stems get as short as the country stems and mask scene words;

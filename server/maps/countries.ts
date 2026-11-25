@@ -46,6 +46,9 @@ export function isoCodesOfCountryIds(countryIds: Iterable<string>): Set<string> 
   return codes;
 }
 
+/** Islands of Oceania whose nearest coast in the regions dataset is an Asian one. */
+const OCEANIA_ISO = new Set(['GU', 'PW']);
+
 const unlistedContinents = new Map<string, ContinentId>();
 
 function nearestPolygonContinent(countries: readonly RegionCountry[], pos: LatLng): ContinentId {
@@ -69,11 +72,12 @@ function nearestPolygonContinent(countries: readonly RegionCountry[], pos: LatLn
 /**
  * The continent of a place. A country that lies on one continent answers by its ISO code alone;
  * Russia and France span two, so the polygon decides. A country without polygons (an island
- * state, a city state) takes the continent of the nearest coast.
+ * state, a city state) takes the continent of the nearest coast, except Guam and Palau.
  */
 export function continentOfPlace(iso: string, pos: LatLng): ContinentId {
   const country = REGION_COUNTRY_BY_ISO.get(iso);
   if (!country) {
+    if (OCEANIA_ISO.has(iso)) return 'oceania';
     // Small enough to sit on one continent, so the first place answers for the whole country.
     const known = unlistedContinents.get(iso);
     if (known) return known;

@@ -88,7 +88,7 @@ The host picks two things in **Настройки партии**: the **Карт
 | «Аэропорты мира» | Within 5 km of an airport with scheduled flights                                         |
 | «Высокогорье»    | Cities of 100 thousand people or more above 2,000 m                                      |
 | «Север»          | North of 60° N                                                                           |
-| «Ретро»          | Panoramas shot before 2012, in the 30 countries where Google still serves enough of them |
+| «Ретро»          | Panoramas shot before 2012, in the 28 countries where Google still serves enough of them |
 
 Not every map has places everywhere: there are no cities above 2,000 m in Europe, and «Север» reaches eight countries. The lobby greys out a map that is empty in the chosen region and a region the chosen map does not reach. Scores are scaled to the region, so a guess 100 km off costs far more in a one-country match than in a world match.
 

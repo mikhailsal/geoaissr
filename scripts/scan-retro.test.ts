@@ -37,6 +37,21 @@ test('a country is measured with town and open-land lookups inside it', async ()
   expect(open.every((probe) => findCountryAtPoint(probe)?.id === 'EST')).toBe(true);
 });
 
+// Value: protects=the measurement counts only an old panorama a retro round would take; fails_when=an old panorama across the border or outside the settlement puts a country on the retro map where its rounds cannot be found;
+// why_new=the scan counted every old panorama a lookup returned; seam=none; no_claim=what Google answers (metadata double)
+test('an old panorama a round would reject is not counted', async () => {
+  const seen: number[] = [];
+  // Every lookup snaps to the same old panorama in Riga, across the border from Estonia.
+  const find: MetadataClient['find'] = (_pos, radiusM) => {
+    seen.push(radiusM);
+    return Promise.resolve({ panoId: 'riga', lat: 56.95, lng: 24.1, year: 2009 });
+  };
+  expect(findCountryAtPoint({ lat: 56.95, lng: 24.1 })?.id).toBe('LVA');
+  const stat = await measureCountry('EST', 24, find, seededRng(7));
+  expect(stat).toEqual({ lookups: 24, old: 0 });
+  expect(seen.length).toBe(24);
+});
+
 // Value: protects=the second pass goes only to countries where the first one found an old panorama, and the two passes add up; fails_when=every country gets the long pass or the first pass is thrown away;
 // why_new=the scan is new; seam=none; no_claim=what Google answers (metadata double)
 test('the scan looks closer only where the first pass found an old panorama', async () => {
@@ -77,4 +92,14 @@ test('a partial scan needs its own output file and known country ids', () => {
   expect(() => pickScanCountries('EST,XXX', '/tmp/part.json')).toThrow('no such country: XXX');
   expect(() => pickScanCountries('est', '/tmp/part.json')).toThrow('no such country: est');
   expect(() => pickScanCountries('EST', undefined)).toThrow('--only needs --out');
+  // Naming the tracked dataset as the output is the same as leaving --out away.
+  for (const tracked of [
+    'server/maps/retro.data.json',
+    './scripts/../server/maps/retro.data.json',
+  ]) {
+    expect(() => pickScanCountries('EST', tracked)).toThrow('--only needs --out');
+  }
+  // An empty list is a mistake (an unset shell variable), not a scan of the world.
+  expect(() => pickScanCountries('', undefined)).toThrow('no country given');
+  expect(() => pickScanCountries(',', '/tmp/part.json')).toThrow('no country given');
 });

@@ -178,15 +178,23 @@ function nearestCountryWithinKm(pos: LatLng, maxKm: number): RegionCountry | nul
   return bestCountry;
 }
 
+/**
+ * The country a point lies in. The outlines have no holes, so an enclave lies inside the outline
+ * of the country around it (Lesotho in South Africa): the smallest outline that holds the point
+ * is its country.
+ */
 export function findCountryAtPoint(pos: LatLng): RegionCountry | null {
+  let found: RegionCountry | null = null;
+  let foundArea = Infinity;
   for (const country of REGION_COUNTRIES) {
     for (const poly of country.polygons) {
-      if (pointInBbox(pos.lng, pos.lat, poly.bbox) && pointInRing(pos.lng, pos.lat, poly.ring)) {
-        return country;
-      }
+      if (poly.area >= foundArea || !pointInBbox(pos.lng, pos.lat, poly.bbox)) continue;
+      if (!pointInRing(pos.lng, pos.lat, poly.ring)) continue;
+      found = country;
+      foundArea = poly.area;
     }
   }
-  return nearestCountryWithinKm(pos, 120);
+  return found ?? nearestCountryWithinKm(pos, 120);
 }
 
 export interface WeightedCountry {

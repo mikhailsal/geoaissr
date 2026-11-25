@@ -142,7 +142,7 @@ test('summarize computes shares, medians, means and country counts', () => {
     roundsFound: 3,
     failures: ['no coverage'],
     inSettlementShare: 0.33,
-    medianNearestTownKm: 5,
+    medianNearestTownKm: 9,
     meanLookupsPerRound: 2.33,
     meanSecondsPerRound: 3,
     slowestRoundSeconds: 5,
@@ -158,6 +158,13 @@ test('summarize computes shares, medians, means and country counts', () => {
 test('summarize takes the middle value as the median for an odd count', () => {
   const rounds = [9, 1, 4].map((km) => sampled({ nearestTownKm: km }));
   expect(summarize({ ...empty, rounds }).medianNearestTownKm).toBe(4);
+});
+
+// Value: protects=a round with no town within the search bound stays in the median; fails_when=far rounds are dropped and a mostly remote sample reports a small median;
+// why_new=the median left out the rounds beyond the bound; seam=none; no_claim=the exact distance beyond 300 km (the bound stands for it)
+test('summarize counts a round far from any town at the search bound', () => {
+  const rounds = [1, null, null].map((km) => sampled({ nearestTownKm: km }));
+  expect(summarize({ ...empty, rounds }).medianNearestTownKm).toBe(300);
 });
 
 // Value: protects=an empty list gives null statistics and no countries; fails_when=an empty list yields NaN or throws;

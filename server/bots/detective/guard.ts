@@ -327,8 +327,52 @@ function territoryStemOf(word: string): string {
   return word.length <= 5 ? word : word.slice(0, -1);
 }
 
-function buildPlaceStems(): string[] {
+/** Words the names of the dataset shorten and the bots write in full («о-в Мэн», «остров Мэн»). */
+const NAME_SHORTHANDS: readonly (readonly [RegExp, string])[] = [
+  [/о-ва/giu, 'острова'],
+  [/о-в/giu, 'остров'],
+  [/св\./giu, 'святой'],
+];
+const SHORTHAND_WORDS = new Set(NAME_SHORTHANDS.map(([, full]) => full));
+
+/**
+ * A territory name in which no word can stand for the place alone («Сан-Марино», «о-в
+ * Рождества»): it is matched only when written whole, word after word.
+ */
+function wholeNamePhrase(name: string): string[] {
+  const full = NAME_SHORTHANDS.reduce((text, [short, word]) => text.replace(short, word), name);
+  return words(full);
+}
+
+function isNameWord(textWord: string | undefined, nameWord: string): boolean {
+  if (textWord === undefined) return false;
+  return nameWord.length <= 3
+    ? textWord === nameWord
+    : textWord.startsWith(territoryStemOf(nameWord));
+}
+
+/** The word to cut when a whole name starts at `at`: the longest word of the name itself. */
+function wholeNameAt(
+  phrases: readonly string[][],
+  ws: readonly string[],
+  at: number,
+): string | null {
+  for (const phrase of phrases) {
+    if (!phrase.every((nameWord, k) => isNameWord(ws[at + k], nameWord))) continue;
+    let key = 0;
+    for (const [k, nameWord] of phrase.entries()) {
+      const best = phrase[key] ?? '';
+      const longer = nameWord.length > best.length || SHORTHAND_WORDS.has(best);
+      if (!SHORTHAND_WORDS.has(nameWord) && longer) key = k;
+    }
+    return ws[at + key] ?? null;
+  }
+  return null;
+}
+
+function buildPlaceNames(): { stems: string[]; phrases: string[][] } {
   const stems = new Set<string>([...DEMONYM_STEMS, ...CITY_STEMS, ...LATIN_STEMS]);
+  const phrases: string[][] = [];
   for (const country of REGION_COUNTRIES) {
     for (const word of words(country.nameRu)) {
       if (word.length < 4 || GENERIC_NAME_WORDS.has(word)) continue;
@@ -337,13 +381,14 @@ function buildPlaceStems(): string[] {
   }
   // The point maps reach countries the regions dataset has no polygon for.
   for (const name of unlistedCountryNamesRu()) {
-    for (const word of words(name)) {
-      if (word.length < 4 || GENERIC_NAME_WORDS.has(word) || TERRITORY_NAME_SKIP.has(word))
-        continue;
-      stems.add(territoryStemOf(word));
-    }
+    const own = words(name).filter(
+      (word) => word.length >= 4 && !GENERIC_NAME_WORDS.has(word) && !TERRITORY_NAME_SKIP.has(word),
+    );
+    for (const word of own) stems.add(territoryStemOf(word));
+    const phrase = own.length === 0 ? wholeNamePhrase(name) : [];
+    if (phrase.length > 1) phrases.push(phrase);
   }
-  return [...stems];
+  return { stems: [...stems], phrases };
 }
 
 export interface PlaceGuard {
@@ -356,12 +401,14 @@ export interface PlaceGuard {
 }
 
 export function createPlaceGuard(): PlaceGuard {
-  const stems = buildPlaceStems();
+  const { stems, phrases } = buildPlaceNames();
   return {
     findPlaceWord(text, opts = {}) {
       const ws = words(text);
       for (const [i, word] of ws.entries()) {
         if (CITY_WORDS.has(word)) return word;
+        const named = wholeNameAt(phrases, ws, i);
+        if (named !== null) return named;
         if (word.length < 3 || isCommonWord(word)) continue;
         if (!stems.some((stem) => word.startsWith(stem))) continue;
         if (isScriptName(ws, i)) continue;

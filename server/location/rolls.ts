@@ -89,8 +89,10 @@ export function polygonRoll(
     const fix = await ctx.find(pos, radiusM);
     if (!fix || ctx.accepts?.(fix) === false) return null;
     const resolved = findCountryAtPoint(fix);
-    // The snapped pano can sit across a border: outside the region or in a country already played.
+    // The snapped pano can sit across a border: in a country already played, outside the region,
+    // or on the other continent of a country that spans two.
     if (resolved && !allowedIds.has(resolved.id)) return null;
+    if (resolved && !isPlaceInRegion(resolved.iso, fix, ctx.region)) return null;
     return { target: makeTarget(ctx, fix, resolved ?? picked.country) };
   };
 }

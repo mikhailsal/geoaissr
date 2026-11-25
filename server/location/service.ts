@@ -3,7 +3,7 @@ import type { RegionId } from '../../shared/region-ids.ts';
 import { getRegionLabelRu, getWeightedCountriesForRegion } from '../../shared/regions.ts';
 import type { RoundTarget } from '../engine/types.ts';
 import { NORTH_MIN_LAT, getNorthCountries } from '../maps/north.ts';
-import { RETRO_BEFORE_YEAR, getRetroCountries } from '../maps/retro.ts';
+import { getRetroCountries, isRetroYear } from '../maps/retro.ts';
 import { getSourceGroups, isSourceMapId } from '../maps/sources.ts';
 import {
   createMetadataClient,
@@ -16,8 +16,10 @@ import {
   polygonRoll,
   sourceRoll,
   townRoll,
+  type RecentPlaces,
   type Roll,
   type RollContext,
+  type RollHit,
 } from './rolls.ts';
 
 export interface RoundLocationRequest {
@@ -45,6 +47,15 @@ const DEFAULT_ATTEMPT_BUDGET = 90;
  * the retro map asks for several at once; the other maps find a place in two or three.
  */
 const LOOKUPS_AT_ONCE: Readonly<Partial<Record<MapId, number>>> = { retro: 12 };
+/**
+ * Share of its lookups a round spends on countries the match has not played and places not played
+ * lately. A country or a place nobody has played may have no panorama at all, so after that share
+ * the round takes any place of the map and region: it repeats one rather than fail.
+ */
+export const FRESH_ONLY_SHARE = 1 / 3;
+
+/** A memory with nothing in it: every place counts as not played. */
+const NOTHING_PLAYED: RecentPlaces = { has: () => false, add: () => undefined };
 
 export class EmptyMapRegionError extends Error {
   constructor(map: MapId, region: RegionId) {
@@ -53,7 +64,7 @@ export class EmptyMapRegionError extends Error {
   }
 }
 
-/** The way one round looks for its place; decided once, then repeated until a place is found. */
+/** The way a round looks for its place: decided once for a phase of its search, then repeated. */
 function chooseRoll(ctx: RollContext): Roll {
   const { map, region, exclude } = ctx;
   if (isSourceMapId(map)) {
@@ -74,14 +85,35 @@ function chooseRoll(ctx: RollContext): Roll {
       : getWeightedCountriesForRegion(region, exclude);
   if (countries.length === 0) throw new EmptyMapRegionError(map, region);
   const open = polygonRoll(ctx, countries, OPEN_LAND_RADIUS_M);
-  if (map === 'wild' || !inTown) return open;
-  return townRoll(ctx, countries, { fallback: open });
+  if (map === 'wild') return open;
+  const town = townRoll(ctx, countries, { fallback: open });
+  // An old panorama may survive only in the towns of a country, or only outside them, so every
+  // lookup of a retro round picks its kind anew, the way the scan measured the country.
+  if (map === 'retro') return () => (ctx.rng() < TOWN_ROUND_SHARE ? town() : open());
+  return inTown ? town : open;
 }
 
 function panoramaRule(map: MapId): RollContext['accepts'] {
   if (map === 'north') return (fix) => fix.lat >= NORTH_MIN_LAT;
-  if (map === 'retro') return (fix) => fix.year !== null && fix.year < RETRO_BEFORE_YEAR;
+  if (map === 'retro') return (fix) => isRetroYear(fix.year);
   return undefined;
+}
+
+/**
+ * The earliest hit of a batch, so a seeded search gives the same round again. A lookup that
+ * failed ends the search only when the batch found no place: the lookups go out together, and one
+ * of them may fail in transit while another has already found the round.
+ */
+function firstHit(results: readonly PromiseSettledResult<RollHit | null>[]): RollHit | null {
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value) return result.value;
+  }
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      throw result.reason instanceof Error ? result.reason : new Error(String(result.reason));
+    }
+  }
+  return null;
 }
 
 export function createLocationService(opts: {
@@ -97,7 +129,7 @@ export function createLocationService(opts: {
 
   async function prepareRoundLocation(input: RoundLocationRequest): Promise<RoundTarget> {
     const { map, region } = input;
-    const roll = chooseRoll({
+    const ctx: RollContext = {
       map,
       region,
       rng,
@@ -105,14 +137,19 @@ export function createLocationService(opts: {
       exclude: new Set(input.excludeCountryIds),
       recent,
       accepts: panoramaRule(map),
-    });
+    };
     const budget = ATTEMPT_BUDGET[map] ?? DEFAULT_ATTEMPT_BUDGET;
+    const freshOnly = Math.ceil(budget * FRESH_ONLY_SHARE);
     const atOnce = LOOKUPS_AT_ONCE[map] ?? 1;
+    let roll = chooseRoll(ctx);
+    let anyPlace = false;
     for (let spent = 0; spent < budget; spent += atOnce) {
+      if (!anyPlace && spent >= freshOnly) {
+        roll = chooseRoll({ ...ctx, exclude: new Set(), recent: NOTHING_PLAYED });
+        anyPlace = true;
+      }
       const size = Math.min(atOnce, budget - spent);
-      const hits = await Promise.all(Array.from({ length: size }, () => roll()));
-      // The earliest attempt of the batch wins, so a seeded search gives the same round again.
-      const hit = hits.find((entry) => entry !== null);
+      const hit = firstHit(await Promise.allSettled(Array.from({ length: size }, () => roll())));
       if (!hit) continue;
       if (hit.placeKey !== undefined) recent.add(hit.placeKey);
       return hit.target;

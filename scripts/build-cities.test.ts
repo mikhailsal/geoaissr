@@ -130,6 +130,22 @@ test('buildCities counts a place just outside the ring but not a far one', () =>
   expect(far.stats).toMatchObject({ kept: 0, droppedNoCity: 1 });
 });
 
+// Value: protects=an outline takes a big enough city inside it as its core, and its country, before a bigger city just across its edge; fails_when=the margin gives the north of Singapore to Johor Bahru and a Malaysia round lands in Singapore;
+// why_new=a place within the margin stood equal to one inside the outline; seam=none; no_claim=real GHSL data (inline fixture)
+test('buildCities takes a city inside the outline before a bigger one across its edge', () => {
+  const { dataset: out } = run([centre('North', 900_000)], {
+    SG: place(50.05, 10.05, 250_000, PLACE_FLAG_DISTRICT),
+    MY: place(50.11, 10.11, 900_000),
+  });
+  expect(out.centres[0]).toMatchObject({ iso: 'SG', core: [50.05, 10.05] });
+  // With no big enough city inside, the one across the edge is still the core.
+  const { dataset: small } = run([centre('North', 900_000)], {
+    SG: place(50.05, 10.05, MIN_CORE_POPULATION - 1),
+    MY: place(50.11, 10.11, 900_000),
+  });
+  expect(small.centres[0]).toMatchObject({ iso: 'MY', core: [50.11, 10.11] });
+});
+
 // Value: protects=output is sorted by population, largest first; fails_when=the sort is removed or reversed;
 // why_new=there was no cities builder test at all; seam=none; no_claim=real GHSL data (inline fixture)
 test('buildCities sorts centres by population descending', () => {

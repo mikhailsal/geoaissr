@@ -87,6 +87,36 @@ test('a patch with an unknown country keeps the old region and tells the host', 
   );
   expect(known.state.settings.region).toBe('country:JPN');
   expect(known.state.settingsNotice).toBeUndefined();
+  // One patch corrected twice: the host reads about the duration and about the region.
+  const withBot = makeRoom({
+    region: 'asia',
+    bots: [
+      {
+        id: 'b1',
+        name: 'Бот',
+        color: 'p-1',
+        enabled: true,
+        harness: 'claude',
+        model: 'sonnet',
+        effort: 'low',
+        moveLimit: 0,
+        imageSize: 400,
+        budgetSec: 90,
+        difficultyPreset: 'amateur',
+        personalityPreset: 'neutral',
+        personalityText: '',
+      },
+    ],
+  });
+  const both = reduce(
+    withBot,
+    { type: 'update_lobby', playerId: 'h', patch: { roundDurationSec: 30, region: 'country:ZZZ' } },
+    200,
+  );
+  expect(both.state.settings.roundDurationSec).toBe(60);
+  expect(both.state.settings.region).toBe('asia');
+  expect(both.state.settingsNotice).toContain('не может быть меньше 60 с');
+  expect(both.state.settingsNotice).toContain('Такого региона нет');
 });
 
 // Value: protects=a match cannot start on a map that has no places in the chosen region, and the host reads why; fails_when=the start goes through and the round search fails after the countdown;

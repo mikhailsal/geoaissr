@@ -27,6 +27,7 @@ export interface SampleSummary {
   roundsFound: number;
   failures: string[];
   inSettlementShare: number | null;
+  /** Over every round found; a round with no town within 300 km counts as 300. */
   medianNearestTownKm: number | null;
   meanLookupsPerRound: number | null;
   meanSecondsPerRound: number | null;
@@ -92,7 +93,7 @@ export function summarize(opts: {
     failures: [...opts.failures],
     inSettlementShare: round2(mean(rounds.map((r) => (r.inSettlement ? 1 : 0)))),
     medianNearestTownKm: round2(
-      median(rounds.flatMap((r) => (r.nearestTownKm === null ? [] : [r.nearestTownKm]))),
+      median(rounds.map((r) => r.nearestTownKm ?? NEAREST_TOWN_SEARCH_KM)),
     ),
     meanLookupsPerRound: round2(mean(rounds.map((r) => r.lookups))),
     meanSecondsPerRound: round2(mean(seconds)),

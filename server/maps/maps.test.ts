@@ -63,6 +63,13 @@ test('a place knows its continent and its region', () => {
   expect(continentOfPlace('SG', { lat: 1.35, lng: 103.8 })).toBe('asia');
   expect(continentOfPlace('MT', { lat: 35.9, lng: 14.5 })).toBe('europe');
   expect(continentOfPlace('MU', { lat: -20.2, lng: 57.5 })).toBe('africa');
+  // Guam and Palau lie nearer to an Asian coast of the regions dataset, yet belong to Oceania.
+  expect(continentOfPlace('GU', { lat: 13.5, lng: 144.8 })).toBe('oceania');
+  expect(continentOfPlace('PW', { lat: 7.4, lng: 134.5 })).toBe('oceania');
+  const asianAirports = getSourceGroups('airports', 'asia').map((group) => group.iso);
+  expect(asianAirports).not.toContain('GU');
+  expect(asianAirports).not.toContain('PW');
+  expect(getSourceGroups('airports', 'oceania').map((group) => group.iso)).toContain('GU');
   expect(isPlaceInRegion('FR', { lat: 48.85, lng: 2.35 }, 'world')).toBe(true);
   expect(isPlaceInRegion('FR', { lat: 48.85, lng: 2.35 }, 'country:FRA')).toBe(true);
   expect(isPlaceInRegion('FR', { lat: 48.85, lng: 2.35 }, 'country:DEU')).toBe(false);
@@ -150,7 +157,13 @@ test('the north map keeps only land north of the sixtieth parallel', () => {
   for (const entry of world) {
     expect(entry.polygons.every((poly) => poly.bbox[1] >= NORTH_MIN_LAT)).toBe(true);
     expect(entry.polygons.every((poly) => poly.ring.every(([, lat]) => lat >= 59.999))).toBe(true);
+    // The box follows the land: an island wholly north of the line does not start at the line.
+    for (const poly of entry.polygons) {
+      expect(poly.bbox[1]).toBeCloseTo(Math.min(...poly.ring.map(([, lat]) => lat)), 9);
+    }
   }
+  const boxes = world.flatMap((entry) => entry.polygons.map((poly) => poly.bbox[1]));
+  expect(boxes.some((minLat) => minLat > 70)).toBe(true);
   expect(getNorthCountries('africa')).toEqual([]);
   expect(getNorthCountries('country:FIN').map((entry) => entry.country.id)).toEqual(['FIN']);
   // Played countries are skipped until none is left.

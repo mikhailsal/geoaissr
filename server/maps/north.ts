@@ -39,6 +39,7 @@ function clipPolygon(poly: RegionPolygon): RegionPolygon | null {
   let doubled = 0;
   let minLng = Infinity;
   let maxLng = -Infinity;
+  let minLat = Infinity;
   let maxLat = -Infinity;
   for (let i = 0; i + 1 < ring.length; i += 1) {
     const a = ring[i];
@@ -47,13 +48,15 @@ function clipPolygon(poly: RegionPolygon): RegionPolygon | null {
     doubled += a[0] * b[1] - b[0] * a[1];
     minLng = Math.min(minLng, a[0]);
     maxLng = Math.max(maxLng, a[0]);
+    // An island wholly north of the line starts above it: the box follows the land, not the line.
+    minLat = Math.min(minLat, a[1]);
     maxLat = Math.max(maxLat, a[1]);
   }
   // The same flat-map area the regions dataset stores: square degrees shrunk by cos(latitude).
-  const midLat = (NORTH_MIN_LAT + maxLat) / 2;
+  const midLat = (minLat + maxLat) / 2;
   const area = (Math.abs(doubled) / 2) * Math.max(0.15, Math.cos((midLat * Math.PI) / 180));
   if (area <= 0) return null;
-  return { region: poly.region, bbox: [minLng, NORTH_MIN_LAT, maxLng, maxLat], area, ring };
+  return { region: poly.region, bbox: [minLng, minLat, maxLng, maxLat], area, ring };
 }
 
 const cache = new Map<RegionId, WeightedCountry[]>();

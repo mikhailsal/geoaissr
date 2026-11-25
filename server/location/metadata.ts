@@ -103,7 +103,7 @@ export interface MetadataClient {
    * end the search with `GEO_GOOGLE_UNREACHABLE`.
    */
   find: (pos: LatLng, radiusM: number) => Promise<PanoFix | null>;
-  /** Lookups sent so far, for the sampling tool. */
+  /** Requests sent so far, the second try of a lookup included; for the sampling tool. */
   lookupCount: () => number;
 }
 
@@ -111,8 +111,13 @@ export function createMetadataClient(opts: {
   serverKey: string;
   fetchImpl?: FetchLike;
 }): MetadataClient {
-  const fetchImpl: FetchLike = opts.fetchImpl ?? ((u, init) => fetch(u, init));
-  let lookups = 0;
+  const send: FetchLike = opts.fetchImpl ?? ((u, init) => fetch(u, init));
+  let requests = 0;
+  // Counted where a request leaves: a lookup that is tried twice is two requests.
+  const fetchImpl: FetchLike = (u, init) => {
+    requests += 1;
+    return send(u, init);
+  };
   let failuresInRow = 0;
 
   async function query(lat: number, lng: number, radius = 5000): Promise<SvMetadataResponse> {
@@ -122,7 +127,6 @@ export function createMetadataClient(opts: {
       source: 'outdoor',
       key: opts.serverKey,
     });
-    lookups += 1;
     const url = `https://maps.googleapis.com/maps/api/streetview/metadata?${params.toString()}`;
     return fetchMetadataWithRetry(url, fetchImpl);
   }
@@ -147,5 +151,5 @@ export function createMetadataClient(opts: {
     return validateMetadataPayload(raw);
   }
 
-  return { query, find, lookupCount: () => lookups };
+  return { query, find, lookupCount: () => requests };
 }
