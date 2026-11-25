@@ -30,7 +30,7 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 
 ### Maps: follow-ups after the maps and regions release
 
-**What:** Items left open when the maps and the «Карта» and «Регион» split shipped in 0.3.9.
+**What:** Items left open when the maps and the «Карта» and «Регион» split shipped in 0.4.0.
 
 - The «Ретро» map plays the 28 countries of `server/maps/retro.data.json`, measured in November 2026. Google keeps replacing old panoramas, so the list shrinks with time: rerun `bun run scan:retro` (about half an hour of free metadata lookups) when retro rounds get slow, then `bun run build:map-availability`.
 - A country near the bar of the retro measurement (5 old panoramas in 480 lookups) comes and goes between scans. Mexico and South Africa found 7 to 9 in two runs and fell under the bar in the third, so they are off the map, and with South Africa the retro map has no country in Africa. More lookups for the countries near the bar would make the list steadier (`scripts/scan-retro.ts`).
@@ -51,6 +51,11 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 - The core of three urban centres stands just off their own outline (Goma, and one centre each in Pakistan and South Africa), because no city of 150 thousand people or more is inside it. A round still starts inside the outline, within reach of that core.
 - The place-word guard of the Detective style (`server/bots/detective/guard.ts`) matches a country name by its words. A few names are too short or too ordinary for that and pass: «США», «Чад», «ЮАР», «Того», «Гвинея», «ЦАР». A territory name made of ordinary words («Сан-Марино», «остров Рождества») is caught only when written whole.
 - `scripts/build-cities.ts` keeps the outer ring of a city outline and drops its holes, so a probe can fall on a lake or a park inside the outline. The 750 m search then finds the nearest street or misses.
+- `bun run scan:retro` counts a lookup that never reached Google, or that Google answered with `UNKNOWN_ERROR`, as a place without an old panorama. A scan on a bad network can so drop a country near the bar and still look complete. Count such lookups apart and do not rewrite the dataset when they are more than a few.
+- The search counts lookups that failed to reach Google in the order they finish (`server/location/metadata.ts`). In a «Ретро» batch of 12, three lookups that each fail twice finish last and end the round with `GEO_GOOGLE_UNREACHABLE`, although the other nine reached Google. Count per batch in lookup order.
+- The regions dataset names South Sudan `SDS`, Palestine `PSX` and Western Sahara `SAH`, so `--region country:SSD` is refused. Accept the ISO codes as other names for the same regions.
+- A panorama that lies within reach of a bigger country's place and closer to a settlement of a small neighbour takes the neighbour's label (`server/maps/country-label.ts`): a round in central Rome can be labelled as the Vatican.
+- The ZIP reader of the dataset builders (`scripts/lib/zip.ts`) checks the unpacked length of an entry and not its CRC-32.
 
 **Why:** Recorded so they are not lost. None of them blocks play.
 
