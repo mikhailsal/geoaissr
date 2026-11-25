@@ -64,20 +64,23 @@ export class EmptyMapRegionError extends Error {
   }
 }
 
-/** The way a round looks for its place: decided once for a phase of its search, then repeated. */
-function chooseRoll(ctx: RollContext): Roll {
+/**
+ * The way a round looks for its place. `inTown` is the round's own choice between a settlement
+ * and open land: it is made once, and both phases of the search keep it.
+ */
+function chooseRoll(ctx: RollContext, inTown: boolean): Roll {
   const { map, region, exclude } = ctx;
   if (isSourceMapId(map)) {
     const groups = getSourceGroups(map, region);
     if (groups.length === 0) throw new EmptyMapRegionError(map, region);
     return sourceRoll(ctx, groups);
   }
-  const inTown = ctx.rng() < TOWN_ROUND_SHARE;
   if (map === 'north') {
     const countries = getNorthCountries(region, exclude);
     if (countries.length === 0) throw new EmptyMapRegionError(map, region);
-    const open = polygonRoll(ctx, countries, NORTH_LAND_RADIUS_M);
-    return inTown ? townRoll(ctx, countries, { fallback: open, minLat: NORTH_MIN_LAT }) : open;
+    return inTown
+      ? townRoll(ctx, countries, { landRadiusM: NORTH_LAND_RADIUS_M, minLat: NORTH_MIN_LAT })
+      : polygonRoll(ctx, countries, NORTH_LAND_RADIUS_M);
   }
   const countries =
     map === 'retro'
@@ -86,7 +89,7 @@ function chooseRoll(ctx: RollContext): Roll {
   if (countries.length === 0) throw new EmptyMapRegionError(map, region);
   const open = polygonRoll(ctx, countries, OPEN_LAND_RADIUS_M);
   if (map === 'wild') return open;
-  const town = townRoll(ctx, countries, { fallback: open });
+  const town = townRoll(ctx, countries, { landRadiusM: OPEN_LAND_RADIUS_M });
   // An old panorama may survive only in the towns of a country, or only outside them, so every
   // lookup of a retro round picks its kind anew, the way the scan measured the country.
   if (map === 'retro') return () => (ctx.rng() < TOWN_ROUND_SHARE ? town() : open());
@@ -141,11 +144,12 @@ export function createLocationService(opts: {
     const budget = ATTEMPT_BUDGET[map] ?? DEFAULT_ATTEMPT_BUDGET;
     const freshOnly = Math.ceil(budget * FRESH_ONLY_SHARE);
     const atOnce = LOOKUPS_AT_ONCE[map] ?? 1;
-    let roll = chooseRoll(ctx);
+    const inTown = !isSourceMapId(map) && rng() < TOWN_ROUND_SHARE;
+    let roll = chooseRoll(ctx, inTown);
     let anyPlace = false;
     for (let spent = 0; spent < budget; spent += atOnce) {
       if (!anyPlace && spent >= freshOnly) {
-        roll = chooseRoll({ ...ctx, exclude: new Set(), recent: NOTHING_PLAYED });
+        roll = chooseRoll({ ...ctx, exclude: new Set(), recent: NOTHING_PLAYED }, inTown);
         anyPlace = true;
       }
       const size = Math.min(atOnce, budget - spent);

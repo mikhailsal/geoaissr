@@ -143,6 +143,18 @@ test('the guard blocks a territory name made of ordinary words when it is writte
   }
 });
 
+// Value: protects=a territory name is caught in the short spelling the dataset itself uses; fails_when=only the full words are matched, so «о-в Мэн» reaches the eyes and comes back unmasked;
+// why_new=the whole-name match expanded the dictionary side only; seam=none; no_claim=other ways to shorten a name (the dataset's own spelling)
+test('the guard blocks a territory name in the short spelling of the dataset', () => {
+  expect(guard.findPlaceWord('номера как на о-в Мэн')).toBe('мэн');
+  expect(guard.findPlaceWord('Кокосовые о-ва')).toBe('кокосовые');
+  expect(guard.findPlaceWord('флаг о-ва Кука')).toBe('кука');
+  expect(maskPlaceWords(guard, 'паром на о-в Мэн').text).toBe(`паром на о-в ${PLACE_MASK}`);
+  for (const text of ['о-в на реке', 'вид на о-ва', 'мэн в шляпе']) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
+});
+
 // Value: protects=ordinary words that start like a small territory's name still pass; fails_when=the territory stems get as short as the country stems and mask scene words;
 // why_new=the territory names are new to the guard; seam=none; no_claim=every word of the language (the listed ones)
 test('ordinary words that look like a small territory pass the guard', () => {

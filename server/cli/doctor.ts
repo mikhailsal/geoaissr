@@ -368,14 +368,15 @@ function checkStorageAndDevTools(
   });
 
   const sOutcome = loadSettings(paths.settingsFile);
+  // A file of an older version is read in full; the game rewrites it at the next save.
+  const settingsOk = ['ok', 'missing', 'migrated'].includes(sOutcome.status);
   items.push({
     code: 'SETTINGS_STATUS',
     level: 'warning',
-    ok: sOutcome.status === 'ok' || sOutcome.status === 'missing',
-    what:
-      sOutcome.status === 'ok' || sOutcome.status === 'missing'
-        ? `Настройки: OK (${paths.settingsFile})`
-        : `Настройки (${sOutcome.status}): будут использованы значения по умолчанию`,
+    ok: settingsOk,
+    what: settingsOk
+      ? `Настройки: OK (${paths.settingsFile})`
+      : `Настройки (${sOutcome.status}): будут использованы значения по умолчанию`,
     fix: sOutcome.status === 'newer_version' ? 'Обновите geoaissr (`git pull && bun install`)' : '',
     context: `status=${sOutcome.status}`,
   });

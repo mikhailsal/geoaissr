@@ -31,7 +31,13 @@ function sampled(over: Partial<SampledRound>): SampledRound {
   };
 }
 
-const empty = { map: 'standard', region: 'world', roundsAsked: 3, failures: [] };
+const empty = {
+  map: 'standard',
+  region: 'world',
+  roundsAsked: 3,
+  failures: [],
+  failedSearches: [],
+};
 
 // Value: protects=defaults of the sample tool; fails_when=a default value changes;
 // why_new=there was no maps-sample test at all; seam=none; no_claim=the CLI wiring (parser only)
@@ -165,6 +171,23 @@ test('summarize takes the middle value as the median for an odd count', () => {
 test('summarize counts a round far from any town at the search bound', () => {
   const rounds = [1, null, null].map((km) => sampled({ nearestTownKm: km }));
   expect(summarize({ ...empty, rounds }).medianNearestTownKm).toBe(300);
+});
+
+// Value: protects=a search that found no round counts in the cost of a sample; fails_when=the failed search is dropped and a region where every second search spends its 90 lookups reports one lookup a round;
+// why_new=the cost was taken over the rounds found only; seam=none; no_claim=the live lookup counter (inline costs)
+test('summarize counts the lookups and the time of a search that found no round', () => {
+  const summary = summarize({
+    ...empty,
+    rounds: [sampled({ lookups: 1, seconds: 0.5 })],
+    failures: ['no panorama in 90 lookups'],
+    failedSearches: [{ lookups: 90, seconds: 20 }],
+  });
+  expect(summary).toMatchObject({
+    roundsFound: 1,
+    meanLookupsPerRound: 45.5,
+    meanSecondsPerRound: 10.25,
+    slowestRoundSeconds: 20,
+  });
 });
 
 // Value: protects=an empty list gives null statistics and no countries; fails_when=an empty list yields NaN or throws;

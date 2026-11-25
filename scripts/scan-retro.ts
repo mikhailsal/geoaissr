@@ -73,7 +73,7 @@ export async function measureCountry(
   };
   const countries = getWeightedCountriesForRegion(region);
   const open = polygonRoll(ctx, countries, OPEN_LAND_RADIUS_M);
-  const town = townRoll(ctx, countries, { fallback: open });
+  const town = townRoll(ctx, countries, { landRadiusM: OPEN_LAND_RADIUS_M });
   const attempt = async (roll: Roll): Promise<void> => {
     if (await roll()) stat.old += 1;
   };

@@ -20,6 +20,12 @@ export interface SampledRound {
   seconds: number;
 }
 
+/** What a search cost, whether it found a round or not. */
+export interface SearchCost {
+  lookups: number;
+  seconds: number;
+}
+
 export interface SampleSummary {
   map: string;
   region: string;
@@ -29,6 +35,10 @@ export interface SampleSummary {
   inSettlementShare: number | null;
   /** Over every round found; a round with no town within 300 km counts as 300. */
   medianNearestTownKm: number | null;
+  /**
+   * The three below are over every search that ran: one that found no round counts with the
+   * lookups and the time it spent, the way a match would have waited for it.
+   */
   meanLookupsPerRound: number | null;
   meanSecondsPerRound: number | null;
   slowestRoundSeconds: number | null;
@@ -78,13 +88,16 @@ export function summarize(opts: {
   roundsAsked: number;
   rounds: readonly SampledRound[];
   failures: readonly string[];
+  /** The cost of each search that found no round. */
+  failedSearches: readonly SearchCost[];
 }): SampleSummary {
   const { rounds } = opts;
+  const searches: readonly SearchCost[] = [...rounds, ...opts.failedSearches];
   const byCountry = new Map<string, number>();
   for (const round of rounds) {
     byCountry.set(round.countryNameRu, (byCountry.get(round.countryNameRu) ?? 0) + 1);
   }
-  const seconds = rounds.map((r) => r.seconds);
+  const seconds = searches.map((search) => search.seconds);
   return {
     map: opts.map,
     region: opts.region,
@@ -95,7 +108,7 @@ export function summarize(opts: {
     medianNearestTownKm: round2(
       median(rounds.map((r) => r.nearestTownKm ?? NEAREST_TOWN_SEARCH_KM)),
     ),
-    meanLookupsPerRound: round2(mean(rounds.map((r) => r.lookups))),
+    meanLookupsPerRound: round2(mean(searches.map((search) => search.lookups))),
     meanSecondsPerRound: round2(mean(seconds)),
     slowestRoundSeconds: round2(seconds.length > 0 ? Math.max(...seconds) : null),
     countries: [...byCountry.entries()]

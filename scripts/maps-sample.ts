@@ -12,6 +12,7 @@ import {
   summarize,
   type SampleSummary,
   type SampledRound,
+  type SearchCost,
 } from './maps-sample/stats.ts';
 
 function formatRound(index: number, round: SampledRound, links: boolean): string {
@@ -33,7 +34,7 @@ function formatSummary(summary: SampleSummary): string {
   return [
     `map ${summary.map}, region ${summary.region}: ${summary.roundsFound} of ${summary.roundsAsked} rounds found`,
     `in a settlement: ${share}; median distance to the nearest town: ${summary.medianNearestTownKm ?? 'n/a'} km`,
-    `lookups per round: ${summary.meanLookupsPerRound ?? 'n/a'}; seconds per round: ${summary.meanSecondsPerRound ?? 'n/a'} (slowest ${summary.slowestRoundSeconds ?? 'n/a'})`,
+    `lookups per round: ${summary.meanLookupsPerRound ?? 'n/a'}; seconds per round: ${summary.meanSecondsPerRound ?? 'n/a'} (slowest ${summary.slowestRoundSeconds ?? 'n/a'})${summary.failures.length > 0 ? ', the failed searches included' : ''}`,
     `countries (${summary.countries.length}): ${top}`,
     ...summary.failures.map((failure) => `failed: ${failure}`),
   ].join('\n');
@@ -48,6 +49,7 @@ async function run(args: SampleArgs, serverKey: string): Promise<SampleSummary> 
   });
   const rounds: SampledRound[] = [];
   const failures: string[] = [];
+  const failedSearches: SearchCost[] = [];
   let played: string[] = [];
   for (let i = 1; i <= args.rounds; i += 1) {
     if ((i - 1) % args.matchRounds === 0) played = [];
@@ -66,6 +68,10 @@ async function run(args: SampleArgs, serverKey: string): Promise<SampleSummary> 
       if (!args.json) console.log(formatRound(i, round, args.links));
     } catch (err) {
       failures.push(err instanceof Error ? err.message : String(err));
+      failedSearches.push({
+        lookups: metadata.lookupCount() - lookupsBefore,
+        seconds: (performance.now() - startedAt) / 1000,
+      });
       // A key, quota or network error will not go away on the next round.
       if (err instanceof Error && 'code' in err) break;
     }
@@ -76,6 +82,7 @@ async function run(args: SampleArgs, serverKey: string): Promise<SampleSummary> 
     roundsAsked: args.rounds,
     rounds,
     failures,
+    failedSearches,
   });
 }
 

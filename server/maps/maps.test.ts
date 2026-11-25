@@ -13,6 +13,17 @@ import { ALL_PLACES, placesNear, placesOfIso, settlementRadiusKm } from './place
 import { seededRng } from './rng.ts';
 import { getSourceGroups } from './sources.ts';
 
+// Value: protects=a country without an outline has one continent whichever of its places is asked first; fails_when=the first place asked decides, so the Northern Mariana Islands are in Asia after the airports map was opened and in Oceania after the availability table was built;
+// why_new=the answer was remembered from the first place asked; seam=none; no_claim=which continent is right for an island group (only that it is one, and that of its biggest settlement). Stays the first test of the file: it asks before any other test has.
+test('a country without an outline has one continent whichever place is asked first', () => {
+  // The airport of Rota is nearer to an Asian coast than to any of Oceania.
+  expect(continentOfPlace('MP', { lat: 14.17, lng: 145.24 })).toBe('oceania');
+  expect(continentOfPlace('MP', { lat: 15.12, lng: 145.73 })).toBe('oceania');
+  // Kiritimati lies nearer to Hawaii than to any coast of Oceania.
+  expect(continentOfPlace('KI', { lat: 1.99, lng: -157.35 })).toBe('oceania');
+  expect(continentOfPlace('KI', { lat: 1.38, lng: 173.15 })).toBe('oceania');
+});
+
 // Value: protects=a probe near the antimeridian or the pole is still a valid coordinate; fails_when=the offset adds degrees without wrapping the longitude or clamping the latitude;
 // why_new=the airports probe added flat degrees and could leave -180..180; seam=none; no_claim=Google's handling of the coordinate (math only)
 test('offsetPoint wraps the longitude and keeps the latitude off the pole', () => {

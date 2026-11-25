@@ -146,6 +146,40 @@ test('doctor displays configured quota ceilings and rounded percentages', async 
   }
 });
 
+// Value: protects=the doctor reports a settings file of the previous version as healthy; fails_when=an owner who upgrades is told the defaults will be used, though the game keeps every setting;
+// why_new=settings had no migration before version 2; seam=none; no_claim=the migration itself (maps-migration.test.ts)
+test('doctor reports a settings file of the previous version as healthy', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-doc-migrated-'));
+  try {
+    const configDir = path.join(dir, 'c');
+    mkdirSync(configDir);
+    writeFileSync(
+      path.join(configDir, 'settings.json'),
+      JSON.stringify({
+        version: 1,
+        region: 'europe',
+        rounds: 7,
+        roundDurationSec: 90,
+        moveEnabled: false,
+        aiWaitWindowSec: 15,
+        bots: [],
+      }),
+    );
+    const result = await runDoctorChecks(parseDoctorArgs(['--no-tunnel']), {
+      env: { GEOAISSR_CONFIG_DIR: configDir, GEOAISSR_DATA_DIR: path.join(dir, 'd') },
+      fetchImpl: () => Promise.resolve(Response.json({ status: 'OK' })),
+      probe: makeOkProbe(),
+      which: (bin) => `/usr/bin/${bin}`,
+    });
+    const settings = result.checks.find((item) => item.code === 'SETTINGS_STATUS');
+    expect(settings?.context).toBe('status=migrated');
+    expect(settings?.ok).toBe(true);
+    expect(settings?.what).toStartWith('Настройки: OK');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('pickDoctorExitCode returns 2 for env/config missing and 3 for external dependency denial', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'geo-doc-exit-'));
   try {

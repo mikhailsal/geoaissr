@@ -2,6 +2,8 @@ import type { ContinentId, RegionId } from '../../shared/region-ids.ts';
 import { countryIdOfRegion, isAreaRegionId } from '../../shared/region-ids.ts';
 import { REGION_COUNTRIES, pointInRing, type RegionCountry } from '../../shared/regions.ts';
 import { haversineDistanceKm, type LatLng } from '../../shared/score.ts';
+import { AIRPORTS_BY_ISO } from './airports.ts';
+import { placesOfIso } from './places.ts';
 
 /** Prefix of a country id for a country that has no polygon in the regions dataset. */
 export const ISO_ID_PREFIX = 'iso:';
@@ -70,21 +72,41 @@ function nearestPolygonContinent(countries: readonly RegionCountry[], pos: LatLn
 }
 
 /**
+ * The point that answers for a country without an outline: its biggest settlement, or its first
+ * airport when the places dataset has none. The same point whichever place is asked about, so
+ * the continent of the country does not depend on which map was opened first.
+ */
+function anchorOfUnlisted(iso: string): LatLng | null {
+  let biggest: (LatLng & { population: number }) | null = null;
+  for (const place of placesOfIso(iso)) {
+    if (!biggest || place.population > biggest.population) biggest = place;
+  }
+  if (biggest) return biggest;
+  const airport = AIRPORTS_BY_ISO[iso]?.[0];
+  return airport ? { lat: airport[0], lng: airport[1] } : null;
+}
+
+function continentOfUnlisted(iso: string, pos: LatLng): ContinentId {
+  if (OCEANIA_ISO.has(iso)) return 'oceania';
+  const known = unlistedContinents.get(iso);
+  if (known) return known;
+  const anchor = anchorOfUnlisted(iso);
+  // A country no dataset has a place for answers by the point itself, and is not remembered.
+  if (!anchor) return nearestPolygonContinent(REGION_COUNTRIES, pos);
+  const found = nearestPolygonContinent(REGION_COUNTRIES, anchor);
+  unlistedContinents.set(iso, found);
+  return found;
+}
+
+/**
  * The continent of a place. A country that lies on one continent answers by its ISO code alone;
  * Russia and France span two, so the polygon decides. A country without polygons (an island
- * state, a city state) takes the continent of the nearest coast, except Guam and Palau.
+ * state, a city state) is small enough to sit on one continent: that of the coast nearest to its
+ * biggest settlement, except Guam and Palau.
  */
 export function continentOfPlace(iso: string, pos: LatLng): ContinentId {
   const country = REGION_COUNTRY_BY_ISO.get(iso);
-  if (!country) {
-    if (OCEANIA_ISO.has(iso)) return 'oceania';
-    // Small enough to sit on one continent, so the first place answers for the whole country.
-    const known = unlistedContinents.get(iso);
-    if (known) return known;
-    const found = nearestPolygonContinent(REGION_COUNTRIES, pos);
-    unlistedContinents.set(iso, found);
-    return found;
-  }
+  if (!country) return continentOfUnlisted(iso, pos);
   const first = country.polygons[0]?.region ?? 'europe';
   if (country.polygons.every((poly) => poly.region === first)) return first;
   return nearestPolygonContinent([country], pos);

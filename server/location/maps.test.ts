@@ -1,6 +1,10 @@
 import { expect, test } from 'bun:test';
 import { countryRegionId } from '../../shared/region-ids.ts';
-import { pointInRing, polygonsInRegion } from '../../shared/regions.ts';
+import {
+  getWeightedCountriesForRegion,
+  pointInRing,
+  polygonsInRegion,
+} from '../../shared/regions.ts';
 import { haversineDistanceKm, type LatLng } from '../../shared/score.ts';
 import { GeoError } from '../errors.ts';
 import { URBAN_CENTRES } from '../maps/cities.ts';
@@ -12,8 +16,10 @@ import {
   HIGHLAND_MIN_POPULATION,
   MEGACITY_MIN_POPULATION,
 } from '../maps/sources.ts';
+import { seededRng } from '../maps/rng.ts';
 import { MAX_TRANSPORT_FAILURES } from './metadata.ts';
-import { EmptyMapRegionError, FRESH_ONLY_SHARE } from './service.ts';
+import { createRecentPlaces, townRoll } from './rolls.ts';
+import { EmptyMapRegionError, FRESH_ONLY_SHARE, OPEN_LAND_RADIUS_M } from './service.ts';
 import { panoAt, serviceWithDouble } from './test-helpers.ts';
 
 function centreAround(pos: LatLng): (typeof URBAN_CENTRES)[number] | undefined {
@@ -238,6 +244,61 @@ test('a wild match in Lesotho finds its rounds in Lesotho', async () => {
     });
     expect(target.countryId).toBe('LSO');
     expect(requests.length).toBe(round);
+  }
+});
+
+// Value: protects=a round keeps its choice between a settlement and open land when the search reopens the played countries; fails_when=the second phase of the search flips the coin again, so a round that drew open land turns into a town round after its first third and the half-and-half mix of «Стандарт» leans to whichever kind is found sooner;
+// why_new=the two-phase search is new; seam=none; no_claim=which of the two a seed draws (only that it holds for the round)
+test('a round keeps its choice of town or open land through the whole search', async () => {
+  const kinds = new Set<boolean>();
+  for (let seed = 1; seed <= 8; seed += 1) {
+    const { svc, requests } = serviceWithDouble({
+      seed,
+      answer: () => ({ status: 'ZERO_RESULTS' }),
+    });
+    const failure = await svc
+      .prepareRoundLocation({ map: 'standard', region: 'country:JPN', excludeCountryIds: [] })
+      .then(
+        () => null,
+        (err: unknown) => err,
+      );
+    expect(String(failure)).toContain('90 попыток');
+    expect(requests.length).toBe(90);
+    const openLand = requests.map((request) => request.radius === OPEN_LAND_RADIUS_M);
+    expect(new Set(openLand).size).toBe(1);
+    kinds.add(openLand[0] === true);
+  }
+  // Both kinds of round were drawn, so the check above did not pass on one kind alone.
+  expect(kinds.size).toBe(2);
+});
+
+// Value: protects=a town lookup of a country that has no settlement in the region stays on the land of that country; fails_when=the fallback picks a country anew, so French Guiana's share of the South America rounds goes to Brazil;
+// why_new=the fallback ran the land roll over every country of the region; seam=none; no_claim=real Street View coverage (the double finds nothing)
+test('a town lookup of a country without settlements stays on its own land', async () => {
+  const countries = getWeightedCountriesForRegion('south_america');
+  const guiana = countries.find((entry) => entry.country.id === 'FRA')?.polygons ?? [];
+  expect(guiana.length).toBeGreaterThan(0);
+  const probes: { pos: LatLng; radiusM: number }[] = [];
+  const roll = townRoll(
+    {
+      map: 'standard',
+      region: 'south_america',
+      rng: seededRng(9),
+      find: (pos, radiusM) => {
+        probes.push({ pos, radiusM });
+        return Promise.resolve(null);
+      },
+      exclude: new Set(),
+      recent: createRecentPlaces(),
+    },
+    countries,
+    { landRadiusM: OPEN_LAND_RADIUS_M },
+  );
+  for (let i = 0; i < 1500; i += 1) await roll();
+  const onLand = probes.filter((probe) => probe.radiusM === OPEN_LAND_RADIUS_M);
+  expect(onLand.length).toBeGreaterThan(3);
+  for (const { pos } of onLand) {
+    expect(guiana.some((poly) => pointInRing(pos.lng, pos.lat, poly.ring))).toBe(true);
   }
 });
 

@@ -385,8 +385,10 @@ function buildPlaceNames(): { stems: string[]; phrases: string[][] } {
       (word) => word.length >= 4 && !GENERIC_NAME_WORDS.has(word) && !TERRITORY_NAME_SKIP.has(word),
     );
     for (const word of own) stems.add(territoryStemOf(word));
-    const phrase = own.length === 0 ? wholeNamePhrase(name) : [];
-    if (phrase.length > 1) phrases.push(phrase);
+    if (own.length > 0) continue;
+    // Both spellings are the name: the full one and the short one of the dataset («о-в Мэн»).
+    const spellings = new Map([wholeNamePhrase(name), words(name)].map((p) => [p.join(' '), p]));
+    for (const phrase of spellings.values()) if (phrase.length > 1) phrases.push(phrase);
   }
   return { stems: [...stems], phrases };
 }

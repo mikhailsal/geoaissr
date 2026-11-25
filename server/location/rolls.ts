@@ -76,6 +76,24 @@ function pickWeightedPolygon(entry: WeightedCountry, rng: () => number): RegionP
   ).poly;
 }
 
+/** One lookup at a random point of the land of a country that was already picked. */
+async function rollLand(
+  ctx: RollContext,
+  picked: WeightedCountry,
+  allowedIds: ReadonlySet<string>,
+  radiusM: number,
+): Promise<RollHit | null> {
+  const pos = samplePointInPolygon(pickWeightedPolygon(picked, ctx.rng), ctx.rng);
+  const fix = await ctx.find(pos, radiusM);
+  if (!fix || ctx.accepts?.(fix) === false) return null;
+  const resolved = findCountryAtPoint(fix);
+  // The snapped pano can sit across a border: in a country already played, outside the region,
+  // or on the other continent of a country that spans two.
+  if (resolved && !allowedIds.has(resolved.id)) return null;
+  if (resolved && !isPlaceInRegion(resolved.iso, fix, ctx.region)) return null;
+  return { target: makeTarget(ctx, fix, resolved ?? picked.country) };
+}
+
 /** A random point of a country's land: mostly far from any town. */
 export function polygonRoll(
   ctx: RollContext,
@@ -83,18 +101,7 @@ export function polygonRoll(
   radiusM: number,
 ): Roll {
   const allowedIds = new Set(countries.map((entry) => entry.country.id));
-  return async () => {
-    const picked = sampleWeightedItem(countries, ctx.rng);
-    const pos = samplePointInPolygon(pickWeightedPolygon(picked, ctx.rng), ctx.rng);
-    const fix = await ctx.find(pos, radiusM);
-    if (!fix || ctx.accepts?.(fix) === false) return null;
-    const resolved = findCountryAtPoint(fix);
-    // The snapped pano can sit across a border: in a country already played, outside the region,
-    // or on the other continent of a country that spans two.
-    if (resolved && !allowedIds.has(resolved.id)) return null;
-    if (resolved && !isPlaceInRegion(resolved.iso, fix, ctx.region)) return null;
-    return { target: makeTarget(ctx, fix, resolved ?? picked.country) };
-  };
+  return () => rollLand(ctx, sampleWeightedItem(countries, ctx.rng), allowedIds, radiusM);
 }
 
 async function rollSource(
@@ -154,18 +161,19 @@ function townSources(iso: string, region: RegionId, minLat: number | null): Roun
 
 /**
  * A settlement of a country picked the same way the polygon roll picks one, so the mix of
- * countries does not change. A country without known settlements falls back to its land.
+ * countries does not change. A country without known settlements in the region is looked for on
+ * its own land: the lookup stays in the country that was picked.
  */
 export function townRoll(
   ctx: RollContext,
   countries: readonly WeightedCountry[],
-  opts: { fallback: Roll; minLat?: number },
+  opts: { landRadiusM: number; minLat?: number },
 ): Roll {
   const allowedIds = new Set(countries.map((entry) => entry.country.id));
   return async () => {
     const picked = sampleWeightedItem(countries, ctx.rng);
     const towns = townSources(picked.country.iso, ctx.region, opts.minLat ?? null);
-    if (towns.length === 0) return opts.fallback();
+    if (towns.length === 0) return rollLand(ctx, picked, allowedIds, opts.landRadiusM);
     return rollSource(ctx, pickSource(towns, ctx), (country) => allowedIds.has(country.id));
   };
 }
