@@ -139,7 +139,9 @@ async function login(page: Page, baseUrl: string, code: string): Promise<void> {
 }
 
 async function codeOf(page: Page): Promise<string> {
-  await expect.poll(async () => (await savedProfile(page)).profileToken).toMatch(/^[0-9a-f]{32}$/);
+  await expect
+    .poll(() => savedProfile(page))
+    .toMatchObject({ profileToken: expect.stringMatching(/^[0-9a-f]{32}$/) });
   const code = (await savedProfile(page)).profileToken;
   if (!code) throw new Error('Registration did not cache a profile code');
   return code;
