@@ -2,7 +2,7 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
-## [Unreleased]
+## [0.3.8] - 2026-11-25
 
 ### Added
 
