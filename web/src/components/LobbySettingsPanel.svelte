@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { ClientViewState, LobbySettingsPatch } from '$shared/protocol';
-  import { REGION_IDS, type RegionId } from '$shared/storage-schemas';
+  import {
+    PUSH_SECONDS_MAX,
+    PUSH_SECONDS_MIN,
+    REGION_IDS,
+    type RegionId,
+  } from '$shared/storage-schemas';
   import { formatRoundsRu, formatSecondsOnly } from '../i18n/format';
   import { REGION_LABELS, RU } from '../i18n/ru';
   import QuotaMetric from './QuotaMetric.svelte';
@@ -17,7 +22,7 @@
 
   function commitNumber(
     input: HTMLInputElement,
-    setting: 'rounds' | 'roundDurationSec' | 'aiWaitWindowSec',
+    setting: 'rounds' | 'roundDurationSec' | 'aiWaitWindowSec' | 'pushSeconds',
     current: number,
   ): void {
     const value = input.valueAsNumber;
@@ -107,6 +112,48 @@
       <span>{RU.lobby.showMatchStandings}</span>
     </label>
 
+    <label class="standings-option full-span">
+      <input
+        type="checkbox"
+        checked={view.pushEnabled}
+        disabled={!view.viewerIsHost}
+        onchange={(e) => {
+          onUpdateLobby({ pushEnabled: e.currentTarget.checked });
+        }}
+      />
+      <span>{RU.lobby.pushEnabled}</span>
+    </label>
+
+    {#if view.pushEnabled}
+      <label class="field full-span">
+        <span class="lbl">{RU.lobby.pushSecondsLabel}</span>
+        <input
+          type="number"
+          class="field-input"
+          min={PUSH_SECONDS_MIN}
+          max={PUSH_SECONDS_MAX}
+          disabled={!view.viewerIsHost}
+          value={view.pushSeconds}
+          onchange={(e) => {
+            commitNumber(e.currentTarget, 'pushSeconds', view.pushSeconds);
+          }}
+        />
+        <span class="hint">{RU.lobby.pushSecondsHint}</span>
+      </label>
+
+      <label class="standings-option full-span">
+        <input
+          type="checkbox"
+          checked={view.allowBotPush}
+          disabled={!view.viewerIsHost}
+          onchange={(e) => {
+            onUpdateLobby({ allowBotPush: e.currentTarget.checked });
+          }}
+        />
+        <span>{RU.lobby.allowBotPush}</span>
+      </label>
+    {/if}
+
     {#if view.bots.some((b) => b.enabled)}
       <label class="field full-span">
         <span class="lbl">{RU.lobby.waitWindowLabel}</span>
@@ -121,7 +168,11 @@
             commitNumber(e.currentTarget, 'aiWaitWindowSec', view.aiWaitWindowSec);
           }}
         />
-        <span class="hint">{RU.lobby.waitWindowHint}</span>
+        <span class="hint"
+          >{view.pushEnabled
+            ? RU.lobby.pushedWaitWindowHint(view.pushSeconds)
+            : RU.lobby.waitWindowHint}</span
+        >
       </label>
     {/if}
   </div>

@@ -15,6 +15,9 @@ function makeBaseRoom(): RoomState {
     moveEnabled: true,
     aiWaitWindowSec: 30,
     showMatchStandings: true,
+    pushEnabled: false,
+    pushSeconds: 15,
+    allowBotPush: true,
     bots: [],
   };
   const harnesses: HarnessCatalogEntry[] = [
@@ -163,6 +166,7 @@ test('startBlockedReasons blocks quota exceeded and host mapsError in real mode'
   ).state;
 
   const view = projectView(s, 'h');
+  expect(view.pushSeconds).toBe(15);
   expect(view.startBlockedReasons.length).toBe(2);
   expect(reduce(s, { type: 'start_match', playerId: 'h' }, 301).ack).toBe('invalid');
 });

@@ -66,7 +66,9 @@ can overlap the first moments of the active round.
 
 The warning is omitted for spectators and players who have already answered. If
 the server shortens the deadline, for example while waiting for the remaining
-AIs, its playback seeks to the corresponding remaining second. Repeated room
+AIs, its playback seeks to the corresponding remaining second. A push that
+leaves more than 15 seconds schedules the warning for the final 15. A shorter
+push starts the warning partway through the recording. Repeated room
 snapshots do not announce the same answer twice. Multiple opponent answers in
 one snapshot produce one cue. Round results carry the server's finish time and
 the IDs of confirmed humans and successfully finished bots. This lets the client

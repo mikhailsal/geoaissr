@@ -72,6 +72,9 @@ test('lobby bot IDs avoid collisions and unavailable harness keeps enabled false
       moveEnabled: true,
       aiWaitWindowSec: 30,
       showMatchStandings: true,
+      pushEnabled: false,
+      pushSeconds: 15,
+      allowBotPush: true,
       bots: [],
     },
     quotaSummary: {
@@ -147,6 +150,9 @@ function makeEarlyFailState(matchId = 'm-early') {
       moveEnabled: false,
       aiWaitWindowSec: 30,
       showMatchStandings: true,
+      pushEnabled: false,
+      pushSeconds: 15,
+      allowBotPush: true,
       bots: [
         {
           id: 'b1',
@@ -345,6 +351,9 @@ function makeLobbyWithModels(): RoomState {
       moveEnabled: true,
       aiWaitWindowSec: 30,
       showMatchStandings: true,
+      pushEnabled: false,
+      pushSeconds: 15,
+      allowBotPush: true,
       bots: [],
     },
     quotaSummary: {

@@ -119,6 +119,9 @@ test('migration function transforms v0 schema to v1', () => {
     });
     expect(resOk.status).toBe('ok');
     expect(resOk.value.showMatchStandings).toBe(true);
+    expect(resOk.value.pushEnabled).toBe(false);
+    expect(resOk.value.pushSeconds).toBe(15);
+    expect(resOk.value.allowBotPush).toBe(true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
