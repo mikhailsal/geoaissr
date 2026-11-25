@@ -1,8 +1,14 @@
 import { expect, test } from 'bun:test';
 import type { MetadataClient } from '../server/location/metadata.ts';
 import { seededRng } from '../server/maps/rng.ts';
-import { findCountryAtPoint } from '../shared/regions.ts';
-import { MIN_OLD_FOUND, measureCountry, scanRetro, selectRetroCountries } from './scan-retro.ts';
+import { REGION_COUNTRIES, findCountryAtPoint } from '../shared/regions.ts';
+import {
+  MIN_OLD_FOUND,
+  measureCountry,
+  pickScanCountries,
+  scanRetro,
+  selectRetroCountries,
+} from './scan-retro.ts';
 
 /** A metadata double: every lookup finds a panorama at the probe, old ones only north of 50°. */
 function northIsOld(seen: { lat: number; lng: number; radiusM: number }[] = []) {
@@ -59,4 +65,16 @@ test('a country needs enough old panoramas to stay on the retro map', () => {
   };
   expect(Object.keys(selectRetroCountries(stats))).toEqual(['EST', 'NOR']);
   expect(Object.keys(selectRetroCountries(stats, 100))).toEqual(['EST']);
+});
+
+// Value: protects=a scan of some countries cannot replace the tracked retro dataset, and a mistyped country id stops the scan instead of writing a dataset with no countries; fails_when=--only without --out is accepted, or an unknown id is dropped without a word;
+// why_new=the scan is new; seam=none; no_claim=the file write itself (dataset-io test)
+test('a partial scan needs its own output file and known country ids', () => {
+  expect(pickScanCountries(undefined, undefined).length).toBe(REGION_COUNTRIES.length);
+  expect(pickScanCountries('IRL,EST', '/tmp/part.json')).toEqual(
+    REGION_COUNTRIES.map((country) => country.id).filter((id) => id === 'EST' || id === 'IRL'),
+  );
+  expect(() => pickScanCountries('EST,XXX', '/tmp/part.json')).toThrow('no such country: XXX');
+  expect(() => pickScanCountries('est', '/tmp/part.json')).toThrow('no such country: est');
+  expect(() => pickScanCountries('EST', undefined)).toThrow('--only needs --out');
 });

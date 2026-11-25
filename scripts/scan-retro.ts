@@ -104,19 +104,34 @@ export function selectRetroCountries(stats: RetroStats, minOld = MIN_OLD_FOUND):
 }
 
 /**
+ * The countries one run measures: all of them, or the ids `--only` lists. A part of the world
+ * never replaces the tracked dataset, so `--only` needs its own `--out` path.
+ */
+export function pickScanCountries(only: string | undefined, out: string | undefined): string[] {
+  const all = REGION_COUNTRIES.map((country) => country.id);
+  const asked = (only ?? '').split(',').filter(Boolean);
+  if (asked.length === 0) return all;
+  const unknown = asked.filter((id) => !all.includes(id));
+  if (unknown.length > 0) {
+    throw new Error(`--only: no such country: ${unknown.join(', ')} (ids look like EST)`);
+  }
+  if (out === undefined) {
+    throw new Error('--only needs --out <path>: only a full scan rewrites retro.data.json');
+  }
+  return all.filter((id) => asked.includes(id));
+}
+
+/**
  * Measures where the search still finds panoramas shot before the retro limit and rewrites
  * `server/maps/retro.data.json`. Needs `GOOGLE_MAPS_SERVER_KEY`; metadata lookups are free of
  * charge, a full run sends about 35 thousand of them and takes about half an hour.
- * `--only EST,IRL` measures some countries; `--out <path>` writes elsewhere.
+ * `--out <path>` writes elsewhere; `--only EST,IRL --out <path>` measures some countries.
  */
 if (import.meta.main) {
   const args = parseBuilderArgs(process.argv.slice(2), ['only', 'out']);
+  const countryIds = pickScanCountries(args.only, args.out);
   const serverKey = process.env.GOOGLE_MAPS_SERVER_KEY?.trim() ?? '';
   if (!serverKey) throw new Error('GOOGLE_MAPS_SERVER_KEY is not set (see .env.example)');
-  const only = (args.only ?? '').split(',').filter(Boolean);
-  const countryIds = REGION_COUNTRIES.map((country) => country.id).filter(
-    (id) => only.length === 0 || only.includes(id),
-  );
   const stats = await scanRetro({
     countryIds,
     find: createMetadataClient({ serverKey }).find,

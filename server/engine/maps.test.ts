@@ -68,9 +68,9 @@ test('the lobby saves the map and a one-country region and shows them', () => {
   expect(view.startBlockedReasons).toEqual([]);
 });
 
-// Value: protects=a region with the right form but an unknown country keeps the old region; fails_when=a forged or stale country id reaches the sampler and the round search throws;
+// Value: protects=a region with the right form but an unknown country keeps the old region, and the host reads why; fails_when=a forged or stale country id reaches the sampler and the round search throws, or the select snaps back without a word;
 // why_new=regions were a closed list the schema checked; seam=none; no_claim=the websocket schema (engine only)
-test('a patch with an unknown country keeps the old region', () => {
+test('a patch with an unknown country keeps the old region and tells the host', () => {
   const s = makeRoom({ region: 'asia' });
   const out = reduce(
     s,
@@ -79,6 +79,14 @@ test('a patch with an unknown country keeps the old region', () => {
   );
   expect(out.state.settings.region).toBe('asia');
   expect(out.state.settings.map).toBe('cities');
+  expect(out.state.settingsNotice).toContain('Такого региона нет');
+  const known = reduce(
+    s,
+    { type: 'update_lobby', playerId: 'h', patch: { region: 'country:JPN' } },
+    200,
+  );
+  expect(known.state.settings.region).toBe('country:JPN');
+  expect(known.state.settingsNotice).toBeUndefined();
 });
 
 // Value: protects=a match cannot start on a map that has no places in the chosen region, and the host reads why; fails_when=the start goes through and the round search fails after the countdown;

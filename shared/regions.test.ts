@@ -19,6 +19,7 @@ import {
   isKnownRegion,
   listCountryRegions,
   pointInRing,
+  polygonsInRegion,
   samplePointInPolygon,
   sampleWeightedItem,
 } from './regions.ts';
@@ -137,6 +138,27 @@ test('a one-country region knows its country, its name and its scale', () => {
   expect(getRegionDiagonalKm('country:RUS')).toBeLessThan(REGION_DIAGONALS_KM.world);
   const only = getWeightedCountriesForRegion('country:FRA', new Set(['FRA']));
   expect(only.map((entry) => entry.country.id)).toEqual(['FRA']);
+});
+
+// Value: protects=a France match is scored on the scale of mainland France and its rounds stay in Europe, while a world or South America match still reaches French Guiana; fails_when=the overseas polygon stretches the scale of country:FRA across the Atlantic, or another country loses a polygon;
+// why_new=one-country regions are new and the outlines draw French Guiana inside France; seam=none; no_claim=where Google has panoramas
+test('a one-country region leaves out an overseas part on another continent', () => {
+  const france = getCountryOfRegion('country:FRA');
+  if (!france) throw new Error('France is missing from the regions dataset');
+  expect(france.polygons.some((poly) => poly.region === 'south_america')).toBe(true);
+  const home = polygonsInRegion(france, 'country:FRA');
+  expect(home.length).toBe(france.polygons.length - 1);
+  expect(home.every((poly) => poly.region === 'europe')).toBe(true);
+  expect(getRegionDiagonalKm('country:FRA')).toBeGreaterThan(900);
+  expect(getRegionDiagonalKm('country:FRA')).toBeLessThan(2000);
+  expect(polygonsInRegion(france, 'world').length).toBe(france.polygons.length);
+  expect(polygonsInRegion(france, 'south_america').length).toBe(1);
+  // Every other country plays on all of its land: Kaliningrad, Alaska and Hawaii stay.
+  const trimmed = REGION_COUNTRIES.filter(
+    (country) =>
+      polygonsInRegion(country, countryRegionId(country.id)).length !== country.polygons.length,
+  );
+  expect(trimmed.map((country) => country.id)).toEqual(['FRA']);
 });
 
 // Value: protects=the lobby's country list holds every country once, sorted by its Russian name; fails_when=a country is missing, repeated or the list is in dataset order;

@@ -78,10 +78,29 @@ test('a map without places in the region is greyed out, and so is a region the m
     await map.selectOption({ label: 'Север' });
     await expect(settings.getByTestId('map-description')).toContainText('60°');
     await expect(region.locator('option[value="africa"]')).toBeDisabled();
+    await expect(region.locator('option[value="africa"]')).toHaveText(
+      'Африка (нет на выбранной карте)',
+    );
     await expect(region.locator('option[value="country:BRA"]')).toBeDisabled();
     await expect(region.locator('option[value="country:FIN"]')).toBeEnabled();
     await expect(region.locator('option[value="europe"]')).toBeEnabled();
+    // The countries the map reaches come first; the rest sit in a group that says why.
+    const open = region.locator('optgroup[label="Страны"] option');
+    const closed = region.locator('optgroup[label="Нет на выбранной карте"] option');
+    await expect(open).toHaveCount(8);
+    await expect(open.first()).toBeEnabled();
+    await expect(closed.filter({ hasText: 'Бразилия' })).toHaveCount(1);
+    await expect(
+      region.locator('optgroup[label="Нет на выбранной карте"] option:enabled'),
+    ).toHaveCount(0);
     await expect(settings.getByRole('list', { name: 'Почему нельзя начать' })).toHaveCount(0);
+
+    // The chosen country stays chosen when another map moves the other countries between groups.
+    await region.selectOption({ label: 'Финляндия' });
+    await map.selectOption({ label: 'Стандартная' });
+    await expect(region).toHaveValue('country:FIN');
+    await expect(region.locator('optgroup[label="Нет на выбранной карте"]')).toHaveCount(0);
+    await expect(region.locator('option:disabled')).toHaveCount(0);
   } finally {
     await server.stop();
   }

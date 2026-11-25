@@ -80,6 +80,8 @@ export const RU = {
     mapEmptyInRegion: 'нет в выбранном регионе',
     regionLabel: 'Регион',
     regionCountriesGroup: 'Страны',
+    regionCountriesEmptyGroup: 'Нет на выбранной карте',
+    regionEmptyOnMap: 'нет на выбранной карте',
     waitWindowLabel: 'Ожидание ИИ (с)',
     waitWindowHint: 'но не раньше 60-й секунды',
     minDurationBumpNotice: 'Длительность поднята до 60 с для партии с ИИ',

@@ -30,7 +30,7 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 
 ### Maps: follow-ups after the maps and regions release
 
-**What:** Items left open when the maps and the «Карта» and «Регион» split shipped in 0.3.7.
+**What:** Items left open when the maps and the «Карта» and «Регион» split shipped in 0.3.9.
 
 - The «Ретро» map plays the 30 countries of `server/maps/retro.data.json`, measured in November 2026. Google keeps replacing old panoramas, so the list shrinks with time: rerun `bun run scan:retro` (about half an hour of free metadata lookups) when retro rounds get slow, then `bun run build:map-availability`.
 - The cities builder keeps an urban centre only when a known place of 150 thousand people or more sits in its outline. That drops the dense countryside of India, Bangladesh and the Nile valley as intended, and with it some real cities whose city proper is small (Mendoza, Chiang Mai). A list of exceptions by name would bring them back (`scripts/build-cities.ts`).

@@ -2,6 +2,28 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [Unreleased]
+
+### Added
+
+- Choose the map and the region separately in «Настройки партии». «Карта» is the pool of places a round starts in. «Регион» narrows any map to the whole world, a continent or one of 175 countries. A line under the map says what it holds, and the AI opponents are told the same.
+- Play seven new maps: «Глушь» (random points by country area, mostly roads far from any town), «Города» (the dense built-up area of cities of 500 thousand people or more), «Мегаполисы» (cities of 5 million or more), «Столицы» (national capitals, every country equally likely), «Высокогорье» (cities of 100 thousand people or more above 2,000 m), «Север» (north of 60° N) and «Ретро» (panoramas shot before 2012, in the 30 countries where Google still serves enough of them).
+- Play a whole match inside one country. The score is scaled to that country, so a guess 100 km off costs far more than in a world match.
+- The lobby greys out a map that has no places in the chosen region and a region the chosen map does not reach, and says why. The countries a map reaches come first in the list. A match does not start on a combination with no places.
+- Set the map and the region at start: `bun run start -- --map capitals --region europe`, or `--region country:FRA` for one country.
+- See what a map gives before you play it. `bun run maps:sample -- --map cities --region europe` rolls live rounds and prints the share that start in a settlement, the lookups and the seconds per round. The lookups are free and need `GOOGLE_MAPS_SERVER_KEY`.
+- Rebuild the place lists from open data with `bun run build:places` and `bun run build:cities`, and measure again where old panoramas are still found with `bun run scan:retro`. Run `bun run build:map-availability` after any of them.
+
+### Changed
+
+- «Стандартная» starts half of its rounds in a town or village and half at a random point of a country. Before, every round started at a random point, so most rounds were roads through empty land. That mix is now the «Глушь» map.
+- «Аэропорты мира» moved from the «Регион» list to «Карта», so airports can be played inside a continent or a country.
+- **Upgrade note:** `settings.json` and the lines of `matches.jsonl` are now version 2 and carry the map next to the region. Older files are upgraded when they are read, and a saved airports region becomes the airports map of the whole world. A build older than this one does not read a version 2 `settings.json`: it starts with the default settings and leaves the file as it is.
+
+### Fixed
+
+- The search for a round stops at once with `GEO_GOOGLE_UNREACHABLE` when three lookups in a row cannot reach Google. Before, it spent its whole attempt budget on a dead connection.
+
 ## [0.3.8] - 2026-11-25
 
 ### Added

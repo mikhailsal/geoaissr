@@ -91,17 +91,50 @@ export function getRegionDiagonalKm(region: RegionId): number {
   if (known !== undefined) return known;
   const diagonal = Math.max(
     MIN_COUNTRY_DIAGONAL_KM,
-    computeRingsDiagonalKm(country.polygons.map((poly) => poly.ring)),
+    computeRingsDiagonalKm(homePolygons(country).map((poly) => poly.ring)),
   );
   countryDiagonals.set(country.id, diagonal);
   return diagonal;
+}
+
+/** A polygon on another continent belongs to the country's home up to this gap between boxes. */
+const OVERSEAS_GAP_DEG = 20;
+
+function boxGapDeg(a: RegionPolygon['bbox'], b: RegionPolygon['bbox']): number {
+  const lngGap = Math.max(0, a[0] - b[2], b[0] - a[2]);
+  const latGap = Math.max(0, a[1] - b[3], b[1] - a[3]);
+  return Math.max(lngGap, latGap);
+}
+
+/**
+ * The polygons a one-country region plays on. The outlines draw French Guiana as a part of
+ * France. An overseas part on another continent would stretch the country's scoring scale across
+ * an ocean, and the maps that go by country code never start a round there. So the region keeps
+ * the continent of the largest polygon and every part near what it already keeps: European
+ * Russia borders the Asian part, and Kaliningrad lies near European Russia.
+ */
+function homePolygons(country: RegionCountry): RegionPolygon[] {
+  const [first, ...rest] = country.polygons;
+  if (!first) return [];
+  const main = rest.reduce((best, poly) => (poly.area > best.area ? poly : best), first);
+  const home = country.polygons.filter((poly) => poly.region === main.region);
+  let away = country.polygons.filter((poly) => poly.region !== main.region);
+  while (away.length > 0) {
+    const near = away.filter((poly) =>
+      home.some((kept) => boxGapDeg(poly.bbox, kept.bbox) <= OVERSEAS_GAP_DEG),
+    );
+    if (near.length === 0) break;
+    home.push(...near);
+    away = away.filter((poly) => !near.includes(poly));
+  }
+  return away.length === 0 ? country.polygons : country.polygons.filter((p) => !away.includes(p));
 }
 
 /** The polygons of a country that lie inside the region. */
 export function polygonsInRegion(country: RegionCountry, region: RegionId): RegionPolygon[] {
   if (region === 'world') return country.polygons;
   if (isAreaRegionId(region)) return country.polygons.filter((p) => p.region === region);
-  return countryIdOfRegion(region) === country.id ? country.polygons : [];
+  return countryIdOfRegion(region) === country.id ? homePolygons(country) : [];
 }
 
 export function pointInRing(lng: number, lat: number, ring: readonly LngLat[]): boolean {

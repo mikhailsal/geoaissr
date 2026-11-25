@@ -19,6 +19,12 @@
   let { view, minDurationSec, hostName, onUpdateLobby, onConfirmQuotaReset }: Props = $props();
 
   const countryRegions = listCountryRegions();
+  const openCountries = $derived(
+    countryRegions.filter((country) => isMapAvailable(view.map, country.region)),
+  );
+  const closedCountries = $derived(
+    countryRegions.filter((country) => !isMapAvailable(view.map, country.region)),
+  );
 
   function commitNumber(
     input: HTMLInputElement,
@@ -90,7 +96,7 @@
       <span class="hint" data-testid="map-description">{MAP_DESCRIPTIONS_RU[view.map]}</span>
     </label>
 
-    <label class="field">
+    <label class="field region-field">
       <span class="lbl">{RU.lobby.regionLabel}</span>
       <select
         class="field-select"
@@ -102,20 +108,25 @@
         }}
       >
         {#each AREA_REGION_IDS as id (id)}
-          <option value={id} disabled={!isMapAvailable(view.map, id) && id !== view.region}>
-            {AREA_REGION_LABELS_RU[id]}
+          {@const available = isMapAvailable(view.map, id)}
+          <option value={id} disabled={!available && id !== view.region}>
+            {AREA_REGION_LABELS_RU[id]}{available ? '' : ` (${RU.lobby.regionEmptyOnMap})`}
           </option>
         {/each}
         <optgroup label={RU.lobby.regionCountriesGroup}>
-          {#each countryRegions as country (country.region)}
-            <option
-              value={country.region}
-              disabled={!isMapAvailable(view.map, country.region) && country.region !== view.region}
-            >
-              {country.nameRu}
-            </option>
+          {#each openCountries as country (country.region)}
+            <option value={country.region}>{country.nameRu}</option>
           {/each}
         </optgroup>
+        {#if closedCountries.length > 0}
+          <optgroup label={RU.lobby.regionCountriesEmptyGroup}>
+            {#each closedCountries as country (country.region)}
+              <option value={country.region} disabled={country.region !== view.region}>
+                {country.nameRu}
+              </option>
+            {/each}
+          </optgroup>
+        {/if}
       </select>
     </label>
 
@@ -247,6 +258,13 @@
 
   .full-span {
     grid-column: 1 / -1;
+  }
+
+  /* A long country name needs the whole row on a phone. */
+  @media (max-width: 600px) and (orientation: portrait) {
+    .region-field {
+      grid-column: 1 / -1;
+    }
   }
 
   .lbl,
