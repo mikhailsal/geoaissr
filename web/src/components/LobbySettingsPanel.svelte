@@ -147,7 +147,9 @@
             commitNumber(e.currentTarget, 'aiWaitWindowSec', view.aiWaitWindowSec);
           }}
         />
-        <span class="hint">{RU.lobby.waitWindowHint}</span>
+        <span class="hint"
+          >{view.pushEnabled ? RU.lobby.pushedWaitWindowHint : RU.lobby.waitWindowHint}</span
+        >
       </label>
     {/if}
   </div>

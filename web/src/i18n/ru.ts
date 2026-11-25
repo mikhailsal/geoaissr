@@ -92,6 +92,7 @@ export const RU = {
     regionLabel: 'Регион',
     waitWindowLabel: 'Ожидание ИИ (с)',
     waitWindowHint: 'но не раньше 60-й секунды',
+    pushedWaitWindowHint: 'После пуша у ИИ останется не больше 15 секунд.',
     minDurationBumpNotice: 'Длительность поднята до 60 с для партии с ИИ',
     startBtn: 'Начать',
     preparingFirstRound: 'Готовим первый раунд…',
