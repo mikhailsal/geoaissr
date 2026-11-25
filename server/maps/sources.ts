@@ -25,7 +25,7 @@ export function isSourceMapId(map: MapId): map is SourceMapId {
 /** One place a round can start around. */
 export interface RoundSource {
   /** Stable identity, used to avoid the same place twice in a row. */
-  key: string;
+  placeKey: string;
   /** ISO 3166-1 alpha-2 code of the country the place belongs to. */
   iso: string;
   centre: LatLng;
@@ -62,7 +62,7 @@ const CITY_OUTLINE_SLACK_KM = 0.5;
 function airportSource(iso: string, lat: number, lng: number): RoundSource {
   const centre = { lat, lng };
   return {
-    key: `airport:${lat},${lng}`,
+    placeKey: `airport:${lat},${lng}`,
     iso,
     centre,
     weight: 1,
@@ -77,7 +77,7 @@ function airportSource(iso: string, lat: number, lng: number): RoundSource {
 export function settlementSource(place: Place, prefix: string): RoundSource {
   const radiusKm = settlementRadiusKm(place.population);
   return {
-    key: `${prefix}:${place.lat},${place.lng}`,
+    placeKey: `${prefix}:${place.lat},${place.lng}`,
     iso: place.iso,
     centre: place,
     weight: Math.sqrt(Math.max(1, place.population)),
@@ -103,7 +103,7 @@ function citySource(centre: UrbanCentre): RoundSource {
   const reachKm = CITY_CORE_REACH * settlementRadiusKm(centre.population);
   const [minLng, minLat, maxLng, maxLat] = centre.bbox;
   return {
-    key: `city:${centre.core.lat},${centre.core.lng}`,
+    placeKey: `city:${centre.core.lat},${centre.core.lng}`,
     iso: centre.iso,
     centre: centre.core,
     weight: Math.sqrt(centre.population),

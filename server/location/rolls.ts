@@ -106,11 +106,11 @@ async function rollSource(
   if (!isPlaceInRegion(iso, fix, ctx.region)) return null;
   const country = countryForIso(iso);
   if (!allows(country)) return null;
-  return { target: makeTarget(ctx, fix, country), placeKey: source.key };
+  return { target: makeTarget(ctx, fix, country), placeKey: source.placeKey };
 }
 
 function pickSource(sources: readonly RoundSource[], ctx: RollContext): RoundSource {
-  const fresh = sources.filter((source) => !ctx.recent.has(source.key));
+  const fresh = sources.filter((source) => !ctx.recent.has(source.placeKey));
   return sampleWeightedItem(fresh.length > 0 ? fresh : sources, ctx.rng);
 }
 
@@ -123,7 +123,9 @@ export function sourceRoll(ctx: RollContext, groups: readonly SourceGroup[]): Ro
   const usable = exclusionsHold ? open : groups;
   return async () => {
     // A country whose every place was played lately waits while others have fresh ones.
-    const fresh = usable.filter((entry) => entry.sources.some((src) => !ctx.recent.has(src.key)));
+    const fresh = usable.filter((entry) =>
+      entry.sources.some((src) => !ctx.recent.has(src.placeKey)),
+    );
     const group = sampleWeightedItem(fresh.length > 0 ? fresh : usable, ctx.rng);
     return rollSource(
       ctx,
