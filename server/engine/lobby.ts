@@ -237,6 +237,7 @@ function reclaimExistingPlayer(
     id: opts.playerId,
     secret: opts.newSecret,
     connected: true,
+    disconnectedAt: undefined,
     isHost: old.isHost || Boolean(opts.isHost),
   };
   const nextOrder = state.playerOrder.map((id) => (id === opts.oldPlayerId ? opts.playerId : id));
@@ -296,11 +297,12 @@ export function handlePlayerJoinOrReclaim(
       profileId: existing.profileId ?? opts.profileId,
       avatar: opts.avatar ?? existing.avatar,
       connected: true,
+      disconnectedAt: undefined,
       isHost: existing.isHost || opts.isHost,
     };
     return {
       state: { ...state, players: { ...state.players, [opts.playerId]: updated } },
-      effects: [],
+      effects: [{ type: 'cancel_guest_seat_expiry', playerId: opts.playerId }],
     };
   }
   if (opts.kind === 'reclaim') {

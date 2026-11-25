@@ -23,6 +23,10 @@ export abstract class GameCommands {
     this.client.sendSequenced('remove_bot', { botId });
   }
 
+  releaseGuestSeat(playerId: string): void {
+    this.client.sendSequenced('release_guest_seat', { playerId });
+  }
+
   updateBot(
     botId: string,
     patch: {

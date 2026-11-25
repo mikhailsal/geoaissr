@@ -101,9 +101,10 @@ export class GameStore extends GameCommands {
     this.resendPinOnNextState = true;
     this.authError = null;
     this.authState = 'ready';
-    if (!msg.restoredPlayerId && this.profile.saved && !this.wsClient.registeringNew) {
+    const draft = this.profile.registrationDraft;
+    if (!msg.restoredPlayerId && draft && !this.wsClient.registeringNew) {
       this.authState = 'checking';
-      this.join(this.profile.saved.nick, this.profile.saved.color);
+      this.join(draft.nick, draft.color);
     }
   }
 

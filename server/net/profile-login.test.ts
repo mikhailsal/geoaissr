@@ -349,7 +349,7 @@ test('full room resumes existing profile but rejects a ninth seat', async () => 
       });
     const returned = await login(f, owner.profile);
     expect(returned.ok.resumedSeat).toBe(true);
-    const extra = f.profiles.create({ nick: 'Same', color: 'p-1', role: 'guest' });
+    const extra = await f.profiles.create({ nick: 'Same', color: 'p-1', role: 'guest' });
     const rejected = await connect(f.url);
     rejected.send({ type: 'profile_login', profileToken: extra.profileToken });
     expect((await rejected.next('profile_login_error')).code).toBe('room_full');
@@ -416,7 +416,7 @@ test('legacy host enrollment rejects guest authority before persistence and acce
   const dir = temporary();
   const f = fixture(dir);
   try {
-    const unrelated = f.profiles.create({ nick: 'Other', color: 'p-2', role: 'guest' });
+    const unrelated = await f.profiles.create({ nick: 'Other', color: 'p-2', role: 'guest' });
     const file = path.join(dir, 'profiles.json');
     const registryBefore = readFileSync(file, 'utf8');
     for (const bound of [false, true]) {

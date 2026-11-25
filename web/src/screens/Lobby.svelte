@@ -28,6 +28,7 @@
     onUpdateLobby: (patch: LobbySettingsPatch) => void;
     onAddBot: () => void;
     onRemoveBot: (botId: string) => void;
+    onReleaseGuestSeat: (playerId: string) => void;
     onUpdateBot: (botId: string, patch: Record<string, unknown>) => void;
     onApplyBotPreset: (botId: string, preset: Exclude<DifficultyPreset, 'custom'>) => void;
     onCheckBotVision: (botId: string) => void;
@@ -49,6 +50,7 @@
     onUpdateLobby,
     onAddBot,
     onRemoveBot,
+    onReleaseGuestSeat,
     onUpdateBot,
     onApplyBotPreset,
     onCheckBotVision,
@@ -178,6 +180,7 @@
     <LobbyParticipants
       {view}
       {onAddBot}
+      {onReleaseGuestSeat}
       onCharacter={(event: MouseEvent, id: string, bot: boolean) => {
         openWardrobe(event, id, bot, bot ? 'bot' : 'appearance');
       }}

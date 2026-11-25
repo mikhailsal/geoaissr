@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { hasTerminalControlCharacters } from '$shared/display-name';
+  import { RU } from '../i18n/ru';
   import { formatProfileToken } from '../lib/profile';
   import { untrack } from 'svelte';
   import type { ParticipantColorId } from '$shared/colors';
@@ -30,6 +32,7 @@
     onClose,
   }: Props = $props();
   let nick = $state(untrack(() => name));
+  const invalidName = $derived(!publicOnly && hasTerminalControlCharacters(nick));
   let selected = $state(untrack(() => color));
   let copyMessage = $state('');
   let nameInput = $state<HTMLInputElement>();
@@ -41,7 +44,8 @@
 <form
   onsubmit={(e) => {
     e.preventDefault();
-    if (!publicOnly && editable && !pending && nick.trim()) onSave?.(nick.trim(), selected);
+    if (!publicOnly && editable && !pending && !invalidName && nick.trim())
+      onSave?.(nick.trim(), selected);
   }}
 >
   {#if !publicOnly && profileToken}
@@ -73,6 +77,8 @@
     <label
       >Имя<input
         class="field-input"
+        aria-invalid={invalidName}
+        aria-describedby={invalidName ? 'profile-name-error' : undefined}
         value={publicOnly ? name : nick}
         disabled={publicOnly}
         oninput={(event) => (nick = event.currentTarget.value)}
@@ -81,6 +87,7 @@
         required
       /></label
     >
+    {#if invalidName}<p id="profile-name-error" role="status">{RU.join.invalidName}</p>{/if}
     <ParticipantColorPicker
       legend="Цвет"
       selected={publicOnly ? color : selected}
@@ -91,8 +98,9 @@
   {#if error}<p role="alert">{error}</p>{/if}
   <div class="actions">
     {#if onClose}<button type="button" class="btn" onclick={onClose}>Закрыть</button>{/if}
-    {#if editable}<button class="btn btn-primary" disabled={publicOnly || pending || !nick.trim()}
-        >Сохранить</button
+    {#if editable}<button
+        class="btn btn-primary"
+        disabled={publicOnly || pending || invalidName || !nick.trim()}>Сохранить</button
       >{/if}
     {#if !publicOnly}<button type="button" class="btn" onclick={onLogout}>Выйти</button>{/if}
   </div>

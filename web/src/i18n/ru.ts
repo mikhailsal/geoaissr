@@ -41,6 +41,7 @@ export const RU = {
     serverUnreachable: 'Сервер не отвечает. Возможно, хост закрыл игру',
     retry: 'Повторить',
     nameLabel: 'Ваше имя',
+    invalidName: 'Удалите из имени управляющие символы.',
     nameHint: 'От 1 до 20 символов',
     colorLabel: 'Цвет фишки',
     submitEnter: 'Войти',

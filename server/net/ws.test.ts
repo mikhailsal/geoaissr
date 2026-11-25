@@ -187,3 +187,34 @@ test('WS auth rejects bad tokens, supports host join and healthz', async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('long synchronous sessions do not consume the asynchronous write queue', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'geo-ws-queue-'));
+  const { shell, srv } = setupTestServer(dir);
+  try {
+    const client = await connectWsAndCollect(srv.baseUrl.replace('http://', 'ws://') + '/ws');
+    client.ws.send(JSON.stringify({ type: 'hello', token: 'host-secret-tok' }));
+    await client.nextMsg();
+    await client.nextMsg();
+    client.ws.send(JSON.stringify({ type: 'join', seq: 1, nick: 'Host', color: 'p-1' }));
+    await client.nextMsg();
+    await client.nextMsg();
+    for (let seq = 2; seq < 30; seq += 1) {
+      client.ws.send(
+        JSON.stringify({ type: 'update_lobby', seq, patch: { rounds: seq % 2 === 0 ? 2 : 3 } }),
+      );
+      for (;;) {
+        const message = await client.nextMsg();
+        if (message.type === 'ack') {
+          expect(message).toMatchObject({ seq, result: 'ok' });
+          break;
+        }
+      }
+    }
+    client.ws.close();
+  } finally {
+    srv.stop();
+    shell.dispose();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

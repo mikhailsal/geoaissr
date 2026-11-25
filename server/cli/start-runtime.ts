@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { sanitizeTerminalName } from '../../shared/display-name.ts';
 import { harnessProblem } from '../../shared/play-style.ts';
 import type { HarnessCatalogEntry, TunnelStatusView } from '../../shared/protocol.ts';
 import type { BotSlotConfig, SettingsFile } from '../../shared/storage-schemas.ts';
@@ -79,6 +80,22 @@ export function buildInitialSettings(opts: {
   }
   settings = { ...settings, bots: sanitizedBots };
   return { settings, settingsOutcomeStatus: outcome.status, settingsNotice };
+}
+
+export function formatRoundEndForTerminal(info: {
+  roundNumber: number;
+  totalRounds: number;
+  target: { countryNameRu: string };
+  answeredNames: string[];
+  abortedBots: Array<{ name: string; reason: string }>;
+}): string {
+  const answeredNames = info.answeredNames.map(sanitizeTerminalName);
+  const answered = answeredNames.length > 0 ? answeredNames.join(', ') : 'никто';
+  const aborted = info.abortedBots.map(
+    ({ name, reason }) => `${sanitizeTerminalName(name)} (${reason})`,
+  );
+  const abortStr = aborted.length > 0 ? ` | оборваны: ${aborted.join(', ')}` : '';
+  return `Раунд ${info.roundNumber}/${info.totalRounds} (${info.target.countryNameRu}): ответили ${answered}${abortStr}`;
 }
 
 export function collectHarnessVersionWarnings(
@@ -281,14 +298,7 @@ export function buildConfiguredShell(opts: {
       }),
     logRoundEnd: (info) => {
       opts.logger.log('round_end', info);
-      const ans = info.answeredNames.length > 0 ? info.answeredNames.join(', ') : 'никто';
-      const abortStr =
-        info.abortedBots.length > 0
-          ? ` | оборваны: ${info.abortedBots.map((b) => `${b.name} (${b.reason})`).join(', ')}`
-          : '';
-      console.log(
-        `Раунд ${info.roundNumber}/${info.totalRounds} (${info.target.countryNameRu}): ответили ${ans}${abortStr}`,
-      );
+      console.log(formatRoundEndForTerminal(info));
     },
   });
   shellRef = shell;
@@ -414,12 +424,18 @@ async function ignoreFailure(fn: () => unknown): Promise<void> {
  * SIGKILLed by the process exit hook in proc/spawn.ts.
  */
 export async function runShutdownSequence(opts: {
-  pipeline: { httpServer: { stop: () => void }; shell: RoomShell; botRunner: BotRunner } | null;
+  pipeline: {
+    httpServer: { stop: () => void };
+    shell: RoomShell;
+    botRunner: BotRunner;
+    profiles?: { flush: () => Promise<void> };
+  } | null;
   tunnel: TunnelManager | null;
   releaseLock: () => void;
 }): Promise<void> {
   try {
     await ignoreFailure(() => opts.pipeline?.httpServer.stop());
+    await ignoreFailure(() => opts.pipeline?.profiles?.flush());
     await ignoreFailure(() => opts.pipeline?.shell.dispose());
     await ignoreFailure(() => opts.pipeline?.botRunner.close());
     await ignoreFailure(() => opts.tunnel?.stop());
