@@ -75,6 +75,26 @@ function sendState(ctx: CoordCtx, ws: ServerWebSocket<WsClientData>): void {
       sendJson(ws, { type: 'avatar_turn', serverNow: Date.now(), participantId, yaw });
   }
 }
+function sendHelloOk(
+  ctx: CoordCtx,
+  ws: ServerWebSocket<WsClientData>,
+  role: StoredProfile['role'],
+  profile: StoredProfile | undefined,
+  restoredId: string | undefined,
+): void {
+  sendJson(ws, {
+    type: 'hello_ok',
+    serverNow: Date.now(),
+    role,
+    profile,
+    browserMapsKey: ctx.browserMapsKey,
+    fakeMode: ctx.fakeMode,
+    restoredPlayerId: restoredId,
+    restoredProfileId: profile?.profileId,
+    lobbySummary: computeLobbySummary(ctx.shell.getState()),
+  });
+  sendState(ctx, ws);
+}
 export function profileError(
   ws: ServerWebSocket<WsClientData>,
   code: Extract<ServerMessage, { type: 'profile_login_error' }>['code'],
@@ -102,16 +122,25 @@ function rejectRoleMismatch(
   profileError(ws, 'host_required');
   return true;
 }
-function checkNewJoinEligibility(state: RoomState, role: 'host' | 'guest' | null): boolean {
-  const hasHost = state.playerOrder.some((id) => state.players[id]?.isHost);
-  return state.playerOrder.length < (role !== 'host' && !hasHost ? MAX_HUMANS - 1 : MAX_HUMANS);
+function checkNewJoinEligibility(
+  state: RoomState,
+  role: 'host' | 'guest' | null,
+  pendingRoles: Iterable<'host' | 'guest' | null> = [],
+): boolean {
+  const reservations = [...pendingRoles];
+  const hasHost =
+    state.playerOrder.some((id) => state.players[id]?.isHost) || reservations.includes('host');
+  return (
+    state.playerOrder.length + reservations.length <
+    (role !== 'host' && !hasHost ? MAX_HUMANS - 1 : MAX_HUMANS)
+  );
 }
 export function handleProfileLogin(
   ctx: CoordCtx,
   ws: ServerWebSocket<WsClientData>,
   msg: Extract<ClientMessage, { type: 'profile_login' }>,
 ): void {
-  if (ws.data.authenticated) {
+  if (ws.data.authenticated || ws.data.pendingProfileEnrollment) {
     ws.close(4004, 'already_authenticated');
     return;
   }
@@ -137,7 +166,7 @@ export function handleProfileLogin(
     return;
   }
   const seat = seats[0];
-  if (!seat && !checkNewJoinEligibility(state, profile.role)) {
+  if (!seat && !checkNewJoinEligibility(state, profile.role, ctx.pendingJoinRoles.values())) {
     profileError(ws, 'room_full');
     return;
   }
@@ -194,12 +223,12 @@ function validInvitation(ctx: CoordCtx, ws: ServerWebSocket<WsClientData>, token
   ws.close(4003, 'invalid_token');
   return false;
 }
-export function handleHelloMsg(
+export async function handleHelloMsg(
   ctx: CoordCtx,
   ws: ServerWebSocket<WsClientData>,
   msg: Extract<ClientMessage, { type: 'hello' }>,
-): void {
-  if (ws.data.authenticated) {
+): Promise<void> {
+  if (ws.data.authenticated || ws.data.pendingProfileEnrollment) {
     ws.close(4004, 'already_authenticated');
     return;
   }
@@ -234,8 +263,9 @@ export function handleHelloMsg(
       return;
     }
     if (!profile) {
+      ws.data.pendingProfileEnrollment = true;
       try {
-        profile = ctx.profiles.create({
+        profile = await ctx.profiles.create({
           profileId: authoritativeId,
           nick: existing.name,
           color: existing.color,
@@ -245,7 +275,15 @@ export function handleHelloMsg(
       } catch {
         profileError(ws, 'profile_store_unavailable');
         return;
+      } finally {
+        delete ws.data.pendingProfileEnrollment;
       }
+    }
+    if (!ctx.sockets.has(ws)) return;
+    const currentSeat = ctx.shell.getState().players[existing.id];
+    if (!currentSeat || !safeTokenMatch(currentSeat.secret, existing.secret)) {
+      profileError(ws, 'profile_store_unavailable');
+      return;
     }
     restoredId = existing.id;
     ws.data.playerId = existing.id;
@@ -260,25 +298,46 @@ export function handleHelloMsg(
     });
   } else if (rejectRoleMismatch(ws, msg.expectedRole, ws.data.role)) return;
   finishAuthentication(ctx, ws, profile);
-  sendJson(ws, {
-    type: 'hello_ok',
-    serverNow: Date.now(),
-    role: ws.data.role,
-    profile,
-    browserMapsKey: ctx.browserMapsKey,
-    fakeMode: ctx.fakeMode,
-    restoredPlayerId: restoredId,
-    restoredProfileId: profile?.profileId,
-    lobbySummary: computeLobbySummary(ctx.shell.getState()),
+  sendHelloOk(ctx, ws, ws.data.role, profile, restoredId);
+}
+function finishGuestEnrollment(
+  ctx: CoordCtx,
+  ws: ServerWebSocket<WsClientData>,
+  profile: StoredProfile,
+): void {
+  const playerId = randomBytes(8).toString('hex');
+  const secret = randomBytes(16).toString('hex');
+  const canJoin = ctx.sockets.has(ws) && ws.data.authenticated && !ws.data.playerId;
+  if (canJoin) {
+    ws.data.playerId = playerId;
+    ws.data.profileId = profile.profileId;
+    ws.data.authenticated = false;
+  }
+  ctx.shell.dispatch({
+    type: 'player_join',
+    playerId,
+    secret,
+    name: profile.nick,
+    profileId: profile.profileId,
+    color: profile.color,
+    avatar: profile.avatar,
+    isHost: profile.role === 'host',
   });
+  if (!canJoin) {
+    ctx.shell.dispatch({ type: 'player_disconnect', playerId });
+    return;
+  }
+  ws.data.authenticated = true;
+  sendJson(ws, { type: 'join_ok', serverNow: Date.now(), playerId, playerSecret: secret, profile });
   sendState(ctx, ws);
 }
-export function handleJoinMsg(
+
+export async function handleJoinMsg(
   ctx: CoordCtx,
   ws: ServerWebSocket<WsClientData>,
   msg: Extract<ClientMessage, { type: 'join' }>,
-): void {
-  if (ws.data.playerId) return;
+): Promise<void> {
+  if (ws.data.playerId || ws.data.pendingProfileEnrollment) return;
   const state = ctx.shell.getState();
   const sendJoinErr = (
     code: Extract<ServerMessage, { type: 'join_error' }>['code'],
@@ -309,69 +368,65 @@ export function handleJoinMsg(
     sendJoinErr('bad_nick', 'Имя должно быть от 1 до 20 символов.');
     return;
   }
-  if (!checkNewJoinEligibility(state, ws.data.role)) {
+  if (!checkNewJoinEligibility(state, ws.data.role, ctx.pendingJoinRoles.values())) {
     sendJoinErr('room_full', 'Комната заполнена (максимум 8 игроков).');
     return;
   }
   let profile: StoredProfile;
+  ws.data.pendingProfileEnrollment = true;
+  ctx.pendingJoinRoles.set(ws, ws.data.role);
   try {
-    profile = ctx.profiles.create({
-      profileId: msg.profileId,
-      nick,
-      color: msg.color,
-      avatar: msg.avatar,
-      role: ws.data.role ?? 'guest',
-    });
+    profile = await ctx.profiles.create(
+      {
+        profileId: msg.profileId,
+        nick,
+        color: msg.color,
+        avatar: msg.avatar,
+        role: ws.data.role ?? 'guest',
+      },
+      () =>
+        ctx.sockets.has(ws) && ws.data.authenticated && ws.data.pendingProfileEnrollment === true,
+    );
   } catch {
     sendJoinErr('profile_store_unavailable', STORE_UNAVAILABLE);
     return;
+  } finally {
+    ctx.pendingJoinRoles.delete(ws);
+    delete ws.data.pendingProfileEnrollment;
   }
-  const playerId = randomBytes(8).toString('hex');
-  const playerSecret = randomBytes(16).toString('hex');
-  ws.data.playerId = playerId;
-  ws.data.profileId = profile.profileId;
-  ws.data.authenticated = false;
-  ctx.shell.dispatch({
-    type: 'player_join',
-    playerId,
-    secret: playerSecret,
-    name: nick,
-    profileId: profile.profileId,
-    color: profile.color,
-    avatar: profile.avatar,
-    isHost: profile.role === 'host',
-  });
-  ws.data.authenticated = true;
-  sendJson(ws, { type: 'join_ok', serverNow: Date.now(), playerId, playerSecret, profile });
-  sendState(ctx, ws);
+  finishGuestEnrollment(ctx, ws, profile);
 }
 
-export function handleProfileEdit(
+export async function handleProfileEdit(
   ctx: CoordCtx,
   ws: ServerWebSocket<WsClientData>,
   msg: Extract<ClientMessage, { type: 'update_profile' }>,
   playerId: string,
-): void {
+): Promise<void> {
+  const profileId = ws.data.profileId ?? undefined;
   const event = {
     type: 'update_profile' as const,
     playerId,
     nick: msg.nick,
     color: msg.color,
     avatar: msg.avatar,
+    profileId,
   };
   let result = handleProfileAction(ctx.shell.getState(), event, Date.now()).ack ?? 'ok';
   let message: string | undefined;
   if (result === 'ok') {
     try {
-      if (!ws.data.profileId) throw new Error('Unavailable');
-      ctx.profiles.edit(ws.data.profileId, msg.nick.trim(), msg.color, msg.avatar);
-      result = ctx.shell.dispatch(event) ?? 'ok';
+      if (!profileId) throw new Error('Unavailable');
+      await ctx.profiles.edit(profileId, msg.nick.trim(), msg.color, msg.avatar, true);
+      ctx.shell.dispatch({ ...event, persisted: true });
+      result = 'ok';
     } catch {
       result = 'invalid';
       message = STORE_UNAVAILABLE;
     }
   }
-  ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result });
+  const previous = ws.data.lastSeqByPlayer.get(playerId);
+  if (!previous || msg.seq >= previous.seq)
+    ws.data.lastSeqByPlayer.set(playerId, { seq: msg.seq, result, commandType: msg.type });
   sendJson(ws, { type: 'ack', serverNow: Date.now(), seq: msg.seq, result, message });
-  return;
 }

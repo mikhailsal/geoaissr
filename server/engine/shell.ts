@@ -74,6 +74,7 @@ interface TimerRegistry {
   countdown: ReturnType<typeof setTimeout> | null;
   deadline: ReturnType<typeof setTimeout> | null;
   botBudgets: Map<string, ReturnType<typeof setTimeout>>;
+  guestSeatExpiries: Map<string, ReturnType<typeof setTimeout>>;
 }
 
 interface EffectContext {
@@ -86,7 +87,13 @@ interface EffectContext {
 }
 
 function createTimerRegistry(): TimerRegistry {
-  return { panoTimeout: null, countdown: null, deadline: null, botBudgets: new Map() };
+  return {
+    panoTimeout: null,
+    countdown: null,
+    deadline: null,
+    botBudgets: new Map(),
+    guestSeatExpiries: new Map(),
+  };
 }
 
 function clearTimer(t: ReturnType<typeof setTimeout> | null): null {
@@ -100,6 +107,8 @@ function clearAllTimers(timers: TimerRegistry): void {
   timers.deadline = clearTimer(timers.deadline);
   for (const t of timers.botBudgets.values()) clearTimeout(t);
   timers.botBudgets.clear();
+  for (const t of timers.guestSeatExpiries.values()) clearTimeout(t);
+  timers.guestSeatExpiries.clear();
 }
 
 function scheduleDelay(
@@ -194,12 +203,33 @@ function runAsyncEffect(ctx: EffectContext, effect: EngineEffect, state: RoomSta
 type ScheduleEffect = Extract<
   EngineEffect,
   {
-    type: 'schedule_pano_timeout' | 'schedule_countdown' | 'schedule_deadline';
+    type:
+      | 'schedule_pano_timeout'
+      | 'schedule_countdown'
+      | 'schedule_deadline'
+      | 'schedule_guest_seat_expiry';
   }
 >;
 
+function cancelGuestSeatExpiry(timers: TimerRegistry, playerId: string): void {
+  const existing = timers.guestSeatExpiries.get(playerId);
+  if (existing) clearTimeout(existing);
+  timers.guestSeatExpiries.delete(playerId);
+}
+
 function runScheduleEffect(ctx: EffectContext, effect: ScheduleEffect): void {
   const { timers } = ctx;
+  if (effect.type === 'schedule_guest_seat_expiry') {
+    cancelGuestSeatExpiry(timers, effect.playerId);
+    timers.guestSeatExpiries.set(
+      effect.playerId,
+      scheduleDelay(ctx, effect.atMs, () => {
+        timers.guestSeatExpiries.delete(effect.playerId);
+        ctx.dispatch({ type: 'expire_disconnected_guest', playerId: effect.playerId });
+      }),
+    );
+    return;
+  }
   if (effect.type === 'schedule_pano_timeout') {
     timers.panoTimeout = clearTimer(timers.panoTimeout);
     timers.panoTimeout = scheduleDelay(ctx, effect.atMs, () => {
@@ -247,6 +277,10 @@ function runScheduleEffect(ctx: EffectContext, effect: ScheduleEffect): void {
 
 function runSyncEffect(ctx: EffectContext, effect: EngineEffect, currentState: RoomState): void {
   switch (effect.type) {
+    case 'cancel_guest_seat_expiry':
+      cancelGuestSeatExpiry(ctx.timers, effect.playerId);
+      return;
+    case 'schedule_guest_seat_expiry':
     case 'schedule_pano_timeout':
     case 'schedule_countdown':
     case 'schedule_deadline':

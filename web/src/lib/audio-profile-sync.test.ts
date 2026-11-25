@@ -237,3 +237,20 @@ test('idle slider writes send the latest value after the debounce interval', asy
   expect(h.sends[0]?.preferences.musicVolume).toBe(0.7);
   h.controller.clear();
 });
+
+test('a busy profile retries only the latest slider value after the server delay', async () => {
+  const h = harness();
+  h.controller.bind({ profileId: 'A', audioPreferences: defaults }, h.sender);
+  h.controller.edit({ ...defaults, musicVolume: 0.3 });
+  h.controller.flush();
+  h.controller.ack({ seq: 1, result: 'rate_limited', retryAfterMs: 20 });
+  h.controller.edit({ ...defaults, musicVolume: 0.7 });
+  h.controller.flush();
+  expect(h.sends).toHaveLength(1);
+  await Bun.sleep(50);
+  expect(h.sends).toHaveLength(2);
+  expect(h.sends[1]?.preferences.musicVolume).toBe(0.7);
+  h.controller.ack({ seq: 2, result: 'ok' });
+  expect(h.state().pending).toBe(false);
+  h.controller.clear();
+});

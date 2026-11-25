@@ -217,6 +217,11 @@ export function dispatchEngineClientMessage(
       return shell.dispatch({ type: 'add_bot', playerId }) ?? 'ok';
     case 'remove_bot':
       return shell.dispatch({ type: 'remove_bot', playerId, botId: msg.botId }) ?? 'ok';
+    case 'release_guest_seat':
+      return (
+        shell.dispatch({ type: 'release_guest_seat', playerId, targetPlayerId: msg.playerId }) ??
+        'ok'
+      );
     case 'update_bot':
       return (
         shell.dispatch({ type: 'update_bot', playerId, botId: msg.botId, patch: msg.patch }) ?? 'ok'

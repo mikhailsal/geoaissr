@@ -30,7 +30,14 @@ import {
   scheduleUnauthClose,
 } from './ws-actions.ts';
 
-type DurableAction = 'update_audio_preferences' | 'bot_appearance';
+type DurableAction = 'update_profile' | 'update_audio_preferences' | 'bot_appearance';
+type AckRecord = {
+  seq: number;
+  result: AckResult;
+  commandType?: DurableAction;
+  message?: string;
+  retryAfterMs?: number;
+};
 type AuthenticatedAction = Exclude<
   ClientMessage,
   { type: 'ping' | 'join' | 'hello' | 'profile_login' }
@@ -50,7 +57,9 @@ export interface WsClientData {
   /** When hello succeeded; used to evict sockets that authenticate but never join. */
   authenticatedAt: number | null;
   pendingAction?: Promise<void>;
-  lastSeqByPlayer: Map<string, { seq: number; result: AckResult; commandType?: DurableAction }>;
+  pendingActionCount?: number;
+  pendingProfileEnrollment?: boolean;
+  lastSeqByPlayer: Map<string, AckRecord>;
   countedPanoRounds: Set<number>;
 }
 
@@ -79,6 +88,7 @@ export interface CoordCtx {
   countedPanoKeys: Set<string>;
   countedMapKindsByConnId: Map<string, Set<string>>;
   countedMapCountsByMatchPlayer: Map<string, number>;
+  pendingJoinRoles: Map<ServerWebSocket<WsClientData>, 'host' | 'guest' | null>;
   versionRef: { value: number };
   broadcastState: () => void;
 }
@@ -89,12 +99,14 @@ function acknowledgeAction(
   playerId: string,
   seq: number,
   result: AckResult,
-  commandType?: 'bot_appearance',
+  commandType?: DurableAction,
+  message?: string,
+  retryAfterMs?: number,
 ): void {
   const previous = ws.data.lastSeqByPlayer.get(playerId);
   if (!previous || seq >= previous.seq)
-    ws.data.lastSeqByPlayer.set(playerId, { seq, result, commandType });
-  sendJson(ws, { type: 'ack', serverNow: Date.now(), seq, result });
+    ws.data.lastSeqByPlayer.set(playerId, { seq, result, commandType, message, retryAfterMs });
+  sendJson(ws, { type: 'ack', serverNow: Date.now(), seq, result, message, retryAfterMs });
 }
 
 function replayAction(
@@ -107,8 +119,20 @@ function replayAction(
   if (!prev || seq > prev.seq) return false;
   const result =
     durableType && (prev.seq !== seq || prev.commandType !== durableType) ? 'invalid' : prev.result;
-  sendJson(ws, { type: 'ack', serverNow: Date.now(), seq, result });
+  sendJson(ws, {
+    type: 'ack',
+    serverNow: Date.now(),
+    seq,
+    result,
+    message: result === prev.result ? prev.message : undefined,
+    retryAfterMs: result === prev.result ? prev.retryAfterMs : undefined,
+  });
   return true;
+}
+
+function durableActionType(msg: AuthenticatedAction): DurableAction | undefined {
+  if (msg.type === 'update_profile' || msg.type === 'update_audio_preferences') return msg.type;
+  return msg.type === 'update_bot' && msg.patch.avatar !== undefined ? 'bot_appearance' : undefined;
 }
 
 function handleAuthenticatedAction(
@@ -118,12 +142,6 @@ function handleAuthenticatedAction(
   playerId: string,
 ): void | Promise<void> {
   const botAppearance = msg.type === 'update_bot' && msg.patch.avatar !== undefined;
-  const durableType = botAppearance
-    ? 'bot_appearance'
-    : msg.type === 'update_audio_preferences'
-      ? msg.type
-      : undefined;
-  if (replayAction(ws, playerId, msg.seq, durableType)) return;
 
   if (botAppearance) {
     return ctx.shell.saveBotAppearance({ ...msg, playerId }).then((result) => {
@@ -179,9 +197,9 @@ function handleAuthenticatedAction(
   }
 
   if (msg.type === 'update_profile' || msg.type === 'update_audio_preferences') {
-    if (msg.type === 'update_profile') handleProfileEdit(ctx, ws, msg, playerId);
-    else handleAudioPreferences(ctx, ws, msg, playerId);
-    return;
+    return msg.type === 'update_profile'
+      ? handleProfileEdit(ctx, ws, msg, playerId)
+      : handleAudioPreferences(ctx, ws, msg, playerId);
   }
 
   const mappedResult =
@@ -191,22 +209,48 @@ function handleAuthenticatedAction(
   acknowledgeAction(ws, playerId, msg.seq, mappedResult);
 }
 
-// Preserve socket order while a wardrobe save waits for earlier writes, including duplicate requests.
+// Keep durable acknowledgements and later gameplay actions in receive order on each socket.
 function dispatchOrderedAction(
   ctx: CoordCtx,
   ws: ServerWebSocket<WsClientData>,
   msg: AuthenticatedAction,
   playerId: string,
 ): void {
+  const durableType = durableActionType(msg);
+  if (replayAction(ws, playerId, msg.seq, durableType)) return;
+  if ((ws.data.pendingActionCount ?? 0) >= 16) {
+    ws.close(1008, 'too_many_pending_actions');
+    return;
+  }
+  const profileId = ws.data.profileId;
+  const profileWrite = msg.type === 'update_profile' || msg.type === 'update_audio_preferences';
+  const limited = profileWrite && profileId && !ctx.profiles.admitWrite(profileId);
+  const retryAfterMs = limited ? ctx.profiles.writeRetryAfterMs(profileId) : undefined;
   const run = () => {
-    if (ws.data.playerId === playerId && ctx.sockets.has(ws))
-      return handleAuthenticatedAction(ctx, ws, msg, playerId);
+    if (ws.data.playerId !== playerId || !ctx.sockets.has(ws)) return;
+    if (replayAction(ws, playerId, msg.seq, durableType)) return;
+    if (limited) {
+      acknowledgeAction(
+        ws,
+        playerId,
+        msg.seq,
+        'rate_limited',
+        durableType,
+        'Слишком много изменений. Повторите через пару секунд.',
+        retryAfterMs,
+      );
+      return;
+    }
+    return handleAuthenticatedAction(ctx, ws, msg, playerId);
   };
-  const pending = ws.data.pendingAction ? ws.data.pendingAction.then(run) : run();
+  const prior = ws.data.pendingAction;
+  const pending = prior ? prior.then(run) : run();
   if (!pending) return;
   ws.data.pendingAction = pending;
+  ws.data.pendingActionCount = (ws.data.pendingActionCount ?? 0) + 1;
   const clear = () => {
     if (ws.data.pendingAction === pending) delete ws.data.pendingAction;
+    ws.data.pendingActionCount = (ws.data.pendingActionCount ?? 1) - 1;
   };
   void pending.then(clear, clear);
 }
@@ -251,7 +295,7 @@ function routeRawWsMessage(
     return;
   }
   if (msg.type === 'hello') {
-    handleHelloMsg(ctx, ws, msg);
+    void handleHelloMsg(ctx, ws, msg);
     return;
   }
   if (!ws.data.authenticated) {
@@ -263,7 +307,7 @@ function routeRawWsMessage(
     return;
   }
   if (msg.type === 'join') {
-    handleJoinMsg(ctx, ws, msg);
+    void handleJoinMsg(ctx, ws, msg);
     return;
   }
   if (ws.data.playerId) dispatchOrderedAction(ctx, ws, msg, ws.data.playerId);
@@ -286,6 +330,7 @@ export function createWsRoomCoordinator(opts: {
   const countedPanoKeys = new Set<string>();
   const countedMapKindsByConnId = new Map<string, Set<string>>();
   const countedMapCountsByMatchPlayer = new Map<string, number>();
+  const pendingJoinRoles = new Map<ServerWebSocket<WsClientData>, 'host' | 'guest' | null>();
   const versionRef = { value: 1 };
   const avatarTurns = new Map<string, number>();
 
@@ -294,7 +339,7 @@ export function createWsRoomCoordinator(opts: {
     versionRef.value += 1;
     const now = Date.now();
     for (const s of sockets) {
-      if (!s.data.authenticated) continue;
+      if (!s.data.authenticated || s.data.pendingProfileEnrollment) continue;
       sendJson(s, {
         type: 'state',
         serverNow: now,
@@ -313,6 +358,7 @@ export function createWsRoomCoordinator(opts: {
     countedPanoKeys,
     countedMapKindsByConnId,
     countedMapCountsByMatchPlayer,
+    pendingJoinRoles,
     versionRef,
     broadcastState,
   };

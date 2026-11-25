@@ -186,14 +186,42 @@ test('rapid avatar clicks boost both renderers and stop arriving when the guest 
 async function observeBotTurns(pages: Page[]) {
   let delayTurns = false;
   const delayed: Array<() => void> = [];
-  let deliveredTurns = 0;
+  const turns: Array<{ seq: number; yaw: number; broadcasts: number; acknowledged: boolean }> = [];
   for (const page of pages) {
     await page.routeWebSocket('**/ws', (client) => {
       const room = client.connectToServer();
+      const pageTurns: typeof turns = [];
+      client.onMessage((message) => {
+        const turn = JSON.parse(message.toString()) as { seq?: number; type: string; yaw?: number };
+        if (
+          delayTurns &&
+          turn.type === 'avatar_turn' &&
+          turn.seq !== undefined &&
+          turn.yaw !== undefined
+        ) {
+          const sent = { seq: turn.seq, yaw: turn.yaw, broadcasts: 0, acknowledged: false };
+          turns.push(sent);
+          pageTurns.push(sent);
+        }
+        room.send(message);
+      });
       room.onMessage((message) => {
-        const { type } = JSON.parse(message.toString()) as { type: string };
-        if (delayTurns && (type === 'avatar_turn' || type === 'ack')) {
-          if (type === 'avatar_turn') deliveredTurns++;
+        const response = JSON.parse(message.toString()) as {
+          type: string;
+          seq?: number;
+          yaw?: number;
+        };
+        const turn =
+          response.type === 'avatar_turn'
+            ? turns.find(({ yaw }) => yaw === response.yaw)
+            : response.seq === undefined
+              ? undefined
+              : pageTurns.find(({ seq }) => seq === response.seq);
+        if (delayTurns && (response.type === 'avatar_turn' || response.type === 'ack')) {
+          if (turn) {
+            if (response.type === 'avatar_turn') turn.broadcasts++;
+            else turn.acknowledged = true;
+          }
           delayed.push(() => {
             client.send(message);
           });
@@ -218,7 +246,12 @@ async function observeBotTurns(pages: Page[]) {
       delayTurns = true;
     },
     async releaseAfterBothTurns() {
-      await expect.poll(() => deliveredTurns).toBe(4);
+      await expect
+        .poll(
+          () =>
+            turns.length === 2 && turns.every((turn) => turn.broadcasts === 2 && turn.acknowledged),
+        )
+        .toBe(true);
       delayTurns = false;
       for (const send of delayed) send();
     },
