@@ -5,6 +5,7 @@ import path from 'node:path';
 import { DEFAULT_AUDIO_PREFERENCES } from '../../shared/audio-preferences.ts';
 import type { ParticipantColorId } from '../../shared/colors.ts';
 import type { ClientViewState, ServerMessage } from '../../shared/protocol.ts';
+import { createDefaultSettings } from '../../shared/storage-schemas.ts';
 import type { BotRunner } from '../bots/runner.ts';
 import { reduce } from '../engine/reduce.ts';
 import { computeFinalRankings } from '../engine/results.ts';
@@ -91,6 +92,8 @@ function buildSecInitialState(fakeMode: boolean) {
       moveEnabled: true,
       aiWaitWindowSec: 30,
       showMatchStandings: true,
+      pushEnabled: false,
+      allowBotPush: true,
       bots: [],
     },
     quotaSummary: {
@@ -335,6 +338,8 @@ test('spectators are excluded from final rankings and pre-join state is masked',
       moveEnabled: false,
       aiWaitWindowSec: 30,
       showMatchStandings: true,
+      pushEnabled: false,
+      allowBotPush: true,
       bots: [],
     },
     quotaSummary: {
@@ -588,14 +593,10 @@ test('RoomShell confirm_quota_reset keeps the gate closed when persisting fails'
       matchId: 'm-qerr',
       fakeMode: false,
       settings: {
-        version: 1,
-        region: 'world',
+        ...createDefaultSettings(),
         rounds: 2,
         roundDurationSec: 60,
-        moveEnabled: true,
         aiWaitWindowSec: 30,
-        showMatchStandings: true,
-        bots: [],
       },
       quotaSummary: baseSummary,
       quotaWarning: 'corrupt',

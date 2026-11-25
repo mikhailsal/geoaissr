@@ -107,6 +107,32 @@
       <span>{RU.lobby.showMatchStandings}</span>
     </label>
 
+    <label class="standings-option full-span">
+      <input
+        type="checkbox"
+        checked={view.pushEnabled}
+        disabled={!view.viewerIsHost}
+        onchange={(e) => {
+          onUpdateLobby({ pushEnabled: e.currentTarget.checked });
+        }}
+      />
+      <span>{RU.lobby.pushEnabled}</span>
+    </label>
+
+    {#if view.pushEnabled}
+      <label class="standings-option full-span">
+        <input
+          type="checkbox"
+          checked={view.allowBotPush}
+          disabled={!view.viewerIsHost}
+          onchange={(e) => {
+            onUpdateLobby({ allowBotPush: e.currentTarget.checked });
+          }}
+        />
+        <span>{RU.lobby.allowBotPush}</span>
+      </label>
+    {/if}
+
     {#if view.bots.some((b) => b.enabled)}
       <label class="field full-span">
         <span class="lbl">{RU.lobby.waitWindowLabel}</span>

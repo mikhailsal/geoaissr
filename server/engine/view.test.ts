@@ -15,6 +15,8 @@ function makeBaseRoom(): RoomState {
     moveEnabled: true,
     aiWaitWindowSec: 30,
     showMatchStandings: true,
+    pushEnabled: false,
+    allowBotPush: true,
     bots: [],
   };
   const harnesses: HarnessCatalogEntry[] = [

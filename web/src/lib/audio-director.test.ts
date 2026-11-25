@@ -246,6 +246,19 @@ test('warning seeks into final 15 seconds and restarts for a shortened deadline'
   expect(output.tracks.get('warning')).toMatchObject({ offset: 9, key: 'match:1:55000' });
 });
 
+test('warning starts for a shortened final countdown without replaying on later guesses', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(activeWith({ endsAt: 120_000 }), 100_000, true);
+  expect(output.tracks.has('warning')).toBe(false);
+  director.update(activeWith({ endsAt: 115_000 }), 100_000, true);
+  expect(output.tracks.get('warning')).toMatchObject({ offset: 0, key: 'match:1:115000' });
+  const laterGuess = activeWith({ endsAt: 115_000 });
+  laterGuess.players = [player('other', true)];
+  director.update(laterGuess, 101_000, true);
+  expect(output.starts.filter((track) => track.id === 'warning')).toHaveLength(1);
+});
+
 test('confirmation and spectating suppress personal warnings', () => {
   const output = new FakeOutput();
   const director = new AudioDirector(output);

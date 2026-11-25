@@ -57,6 +57,8 @@ function setupTestServer(dir: string, staticDir = path.join(dir, 'missing-dist')
       moveEnabled: true,
       aiWaitWindowSec: 30,
       showMatchStandings: true,
+      pushEnabled: false,
+      allowBotPush: true,
       bots: [],
     },
     quotaSummary: buildQuotaSummaryForRoom(quota, { rounds: 2 }),

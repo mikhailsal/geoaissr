@@ -179,6 +179,9 @@ function handleBotEvent(state: RoomState, event: EngineEvent, now: number): Redu
   if (event.type === 'bot_finished') {
     return checkAllHumansConfirmedAndBotsState(nextState, now);
   }
+  if (event.type === 'bot_guess_recorded' && event.finalized !== false) {
+    return checkAllHumansConfirmedAndBotsState(nextState, now, 'bot');
+  }
   return { state: nextState, effects: [] };
 }
 

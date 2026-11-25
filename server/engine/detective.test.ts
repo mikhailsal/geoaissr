@@ -42,6 +42,8 @@ function makeRoom(
     moveEnabled: true,
     aiWaitWindowSec: 30,
     showMatchStandings: true,
+    pushEnabled: false,
+    allowBotPush: true,
     bots: [],
   };
   const quota = { used: 0, ceiling: 8000, worst: 2 };

@@ -86,6 +86,10 @@ export const settingsFileSchema = z.object({
   aiWaitWindowSec: z.number().int().min(0).max(120),
   /** Absent in older settings files: show standings after each completed round. */
   showMatchStandings: z.boolean().default(true),
+  /** Absent in older settings files: round pushes are disabled. */
+  pushEnabled: z.boolean().default(false),
+  /** Absent in older settings files: bots may use pushes when the host enables them. */
+  allowBotPush: z.boolean().default(true),
   bots: z.array(botSlotConfigSchema).max(3),
   quotaCeilings: z
     .object({
@@ -107,6 +111,8 @@ export function createDefaultSettings(): SettingsFile {
     region: 'world',
     aiWaitWindowSec: 20,
     showMatchStandings: true,
+    pushEnabled: false,
+    allowBotPush: true,
     bots: [],
   };
 }

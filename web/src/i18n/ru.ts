@@ -85,6 +85,8 @@ export const RU = {
     durationLabel: 'Время раунда (с)',
     moveLabel: 'Движение по панораме',
     showMatchStandings: 'Показывать рейтинг между раундами',
+    pushEnabled: 'Пуш: оставить 15 секунд после ответа',
+    allowBotPush: 'Разрешить ИИ пушить',
     moveOn: 'вкл',
     moveOff: 'выкл',
     regionLabel: 'Регион',

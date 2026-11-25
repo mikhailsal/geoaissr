@@ -13,6 +13,8 @@ import type {
 
 export { COUNTDOWN_MS };
 
+const ROUND_PUSH_MS = 15_000;
+
 function buildInitialBotsForRound(state: RoomState): {
   bots: Record<string, BotRoundState>;
   enabledCount: number;
@@ -318,7 +320,11 @@ export function handleCountdownDone(
   };
 }
 
-export function checkAllHumansConfirmedAndBotsState(state: RoomState, now: number): ReduceOutput {
+export function checkAllHumansConfirmedAndBotsState(
+  state: RoomState,
+  now: number,
+  confirmation?: 'human' | 'bot',
+): ReduceOutput {
   const active = state.loadingOrActive;
   if (
     state.phase !== 'ROUND_ACTIVE' ||
@@ -338,34 +344,36 @@ export function checkAllHumansConfirmedAndBotsState(state: RoomState, now: numbe
     playingHumans.length > 0 &&
     playingHumans.every((p) => active.humanGuesses[p.id]?.confirmed === true);
 
-  if (!allConfirmed) {
-    return { state, effects: [] };
-  }
-
-  const anyBotThinking = Object.values(active.bots).some((b) => b.status === 'thinking');
-  if (!anyBotThinking) {
+  if (allConfirmed && !Object.values(active.bots).some((bot) => bot.status === 'thinking')) {
     return finishActiveRoundToResults(state, now, 'все завершили');
   }
 
-  if (active.allHumansConfirmedAt !== null) {
-    return { state, effects: [] };
-  }
+  const currentEnd = active.endsAt ?? active.roundDeadlineAt;
+  const canPush =
+    state.settings.pushEnabled &&
+    (confirmation === 'human' || (confirmation === 'bot' && state.settings.allowBotPush));
+  const pushedEnd = canPush ? Math.min(currentEnd, now + ROUND_PUSH_MS) : currentEnd;
+  const startBotWait = allConfirmed && active.allHumansConfirmedAt === null;
+  if (!startBotWait && pushedEnd === currentEnd) return { state, effects: [] };
 
-  const waitEnd = Math.min(
-    active.roundDeadlineAt,
-    Math.max(now + state.settings.aiWaitWindowSec * 1000, active.roundStartedAt + 60_000),
-  );
-  if (waitEnd <= now) {
+  // A push and the normal bot wait can start on the same answer. The earlier deadline wins.
+  const endsAt = startBotWait
+    ? Math.min(
+        pushedEnd,
+        Math.max(now + state.settings.aiWaitWindowSec * 1000, active.roundStartedAt + 60_000),
+      )
+    : pushedEnd;
+  if (endsAt <= now) {
     return finishActiveRoundToResults(state, now, 'истекло окно ожидания ИИ');
   }
-
   return {
     state: {
       ...state,
       loadingOrActive: {
         ...active,
-        allHumansConfirmedAt: now,
-        endsAt: waitEnd,
+        allHumansConfirmedAt: startBotWait ? now : active.allHumansConfirmedAt,
+        roundDeadlineAt: pushedEnd < currentEnd ? pushedEnd : active.roundDeadlineAt,
+        endsAt,
       },
     },
     effects: [
@@ -373,15 +381,15 @@ export function checkAllHumansConfirmedAndBotsState(state: RoomState, now: numbe
         type: 'schedule_deadline',
         matchId: state.matchId,
         gen: state.gen,
-        kind: 'wait',
-        atMs: waitEnd,
+        kind: allConfirmed ? 'wait' : 'round',
+        atMs: endsAt,
       },
       {
         type: 'set_bot_round_deadline',
         matchId: state.matchId,
         gen: state.gen,
         roundNumber: state.roundNumber,
-        atMs: waitEnd,
+        atMs: endsAt,
       },
     ],
   };
@@ -428,8 +436,7 @@ export function handleActivePinOrGuess(
   if (event.type === 'set_pin') {
     return { state: updatedState, effects: [], ack: 'ok' };
   }
-  const res = checkAllHumansConfirmedAndBotsState(updatedState, now);
-  return { ...res, ack: 'ok' };
+  return { ...checkAllHumansConfirmedAndBotsState(updatedState, now, 'human'), ack: 'ok' };
 }
 
 export { maybeStartCountdown };

@@ -87,6 +87,8 @@ export const lobbySettingsPatchSchema = z.object({
   region: z.enum(REGION_IDS).optional(),
   aiWaitWindowSec: z.number().int().min(0).max(120).optional(),
   showMatchStandings: z.boolean().optional(),
+  pushEnabled: z.boolean().optional(),
+  allowBotPush: z.boolean().optional(),
 });
 
 export type LobbySettingsPatch = z.infer<typeof lobbySettingsPatchSchema>;
@@ -328,6 +330,8 @@ export interface ClientViewState {
   region: RegionId;
   aiWaitWindowSec: number;
   showMatchStandings: boolean;
+  pushEnabled: boolean;
+  allowBotPush: boolean;
   startBlockedReasons: string[];
   settingsNotice?: string;
   quotaWarning?: string;
