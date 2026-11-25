@@ -212,6 +212,7 @@ export function projectView(state: RoomState, viewerId: string): ClientViewState
     aiWaitWindowSec: state.settings.aiWaitWindowSec,
     showMatchStandings: state.settings.showMatchStandings,
     pushEnabled: state.settings.pushEnabled,
+    pushSeconds: state.settings.pushSeconds,
     allowBotPush: state.settings.allowBotPush,
     startBlockedReasons: computeStartBlockedReasons(state),
     settingsNotice: state.settingsNotice,

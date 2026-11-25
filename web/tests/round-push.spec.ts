@@ -10,7 +10,7 @@ async function join(page: Page, url: string, name: string): Promise<void> {
   await page.getByRole('button', { name: 'Понятно', exact: true }).click();
 }
 
-test('a confirmed human push shortens both clocks, cues the other player, and expires on the server', async ({
+test('a confirmed human push uses the configured cap on both clocks, cues the other player, and expires on the server', async ({
   page: host,
   browser,
 }) => {
@@ -21,12 +21,18 @@ test('a confirmed human push shortens both clocks, cues the other player, and ex
     await Promise.all([join(host, server.hostUrl, 'Оля'), join(guest, server.guestUrl, 'Дима')]);
     const hostSettings = await openLobbyDialog(host, 'Настройки партии');
     const guestSettings = await openLobbyDialog(guest, 'Настройки партии');
-    const push = { name: 'Пуш: оставить 15 секунд после ответа' };
+    const push = { name: 'Пуш: сократить время после ответа' };
     const bots = { name: 'Разрешить ИИ пушить' };
     await expect(hostSettings.getByRole('checkbox', push)).not.toBeChecked();
     await hostSettings.getByRole('checkbox', push).check();
     await expect(guestSettings.getByRole('checkbox', push)).toBeChecked();
     await expect(guestSettings.getByRole('checkbox', push)).toBeDisabled();
+    const pushSeconds = { name: 'Оставить после пуша (с)' };
+    await expect(hostSettings.getByRole('spinbutton', pushSeconds)).toHaveValue('15');
+    await hostSettings.getByRole('spinbutton', pushSeconds).fill('11');
+    await hostSettings.getByRole('spinbutton', pushSeconds).press('Tab');
+    await expect(guestSettings.getByRole('spinbutton', pushSeconds)).toHaveValue('11');
+    await expect(guestSettings.getByRole('spinbutton', pushSeconds)).toBeDisabled();
     await expect(hostSettings.getByRole('checkbox', bots)).toBeChecked();
     await hostSettings.getByRole('checkbox', bots).uncheck();
     await expect(guestSettings.getByRole('checkbox', bots)).not.toBeChecked();
@@ -40,7 +46,7 @@ test('a confirmed human push shortens both clocks, cues the other player, and ex
     await expect(guestClock).toHaveText(/^[12]:/);
     await host.getByRole('button', { name: 'Угадать', exact: true }).click();
     for (const player of [host, guest]) {
-      await expect(player.locator('.timer-pill .digits')).toHaveText(/^0:(?:1[0-5]|0[1-9])$/);
+      await expect(player.locator('.timer-pill .digits')).toHaveText(/^0:(?:1[01]|0[1-9])$/);
     }
     await expect
       .poll(

@@ -13,8 +13,6 @@ import type {
 
 export { COUNTDOWN_MS };
 
-const ROUND_PUSH_MS = 15_000;
-
 function buildInitialBotsForRound(state: RoomState): {
   bots: Record<string, BotRoundState>;
   enabledCount: number;
@@ -352,7 +350,9 @@ export function checkAllHumansConfirmedAndBotsState(
   const canPush =
     state.settings.pushEnabled &&
     (confirmation === 'human' || (confirmation === 'bot' && state.settings.allowBotPush));
-  const pushedEnd = canPush ? Math.min(currentEnd, now + ROUND_PUSH_MS) : currentEnd;
+  const pushedEnd = canPush
+    ? Math.min(currentEnd, now + state.settings.pushSeconds * 1000)
+    : currentEnd;
   const startBotWait = allConfirmed && active.allHumansConfirmedAt === null;
   if (!startBotWait && pushedEnd === currentEnd) return { state, effects: [] };
 

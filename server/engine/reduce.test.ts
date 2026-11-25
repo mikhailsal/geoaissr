@@ -19,6 +19,7 @@ function makeSettings(overrides: Partial<SettingsFile> = {}): SettingsFile {
     aiWaitWindowSec: 30,
     showMatchStandings: true,
     pushEnabled: false,
+    pushSeconds: 15,
     allowBotPush: true,
     bots: [],
     ...overrides,
@@ -152,13 +153,14 @@ test('non-host cannot mutate lobby or start match', () => {
     {
       type: 'update_lobby',
       playerId: 'h',
-      patch: { showMatchStandings: false, pushEnabled: true, allowBotPush: false },
+      patch: { showMatchStandings: false, pushEnabled: true, pushSeconds: 7, allowBotPush: false },
     },
     103,
   );
   expect(hostUpdate.ack).toBe('ok');
   expect(hostUpdate.state.settings.showMatchStandings).toBe(false);
   expect(hostUpdate.state.settings.pushEnabled).toBe(true);
+  expect(hostUpdate.state.settings.pushSeconds).toBe(7);
   expect(hostUpdate.state.settings.allowBotPush).toBe(false);
   expect(hostUpdate.effects).toEqual([
     { type: 'save_settings', settings: hostUpdate.state.settings },
@@ -330,8 +332,8 @@ test('all humans confirmed with thinking bot waits at least 60s from start or ai
   expect(botDone.state.results?.humanVsAi.visible).toBe(true);
 });
 
-test('a human confirmation caps the authoritative round deadline and never extends it', () => {
-  const settings = makeSettings({ pushEnabled: true, allowBotPush: false });
+test('a human confirmation uses the configured push window and never extends the deadline', () => {
+  const settings = makeSettings({ pushEnabled: true, pushSeconds: 7, allowBotPush: false });
   let s = makeRoom({ settings });
   s = reduce(
     s,
@@ -372,14 +374,14 @@ test('a human confirmation caps the authoritative round deadline and never exten
   expect(late.effects).toEqual([]);
 
   const first = reduce(s, confirm, 15_000);
-  expect(first.state.loadingOrActive?.roundDeadlineAt).toBe(30_000);
-  expect(first.state.loadingOrActive?.endsAt).toBe(30_000);
+  expect(first.state.loadingOrActive?.roundDeadlineAt).toBe(22_000);
+  expect(first.state.loadingOrActive?.endsAt).toBe(22_000);
   expect(first.effects).toContainEqual({
     type: 'schedule_deadline',
     matchId: 'm1',
     gen: first.state.gen,
     kind: 'round',
-    atMs: 30_000,
+    atMs: 22_000,
   });
 
   const later = reduce(
@@ -392,7 +394,7 @@ test('a human confirmation caps the authoritative round deadline and never exten
 });
 
 test('only a finalized bot guess pushes; bot completion keeps the normal early-end behavior', () => {
-  const settings = makeSettings({ pushEnabled: true, allowBotPush: true });
+  const settings = makeSettings({ pushEnabled: true, pushSeconds: 4, allowBotPush: true });
   const s = startActiveBotRound(settings);
   const botId = s.settings.bots[0]?.id ?? '';
 
@@ -418,13 +420,13 @@ test('only a finalized bot guess pushes; bot completion keeps the normal early-e
 
   const final = reduce(draft.state, botGuess, 16_000);
   expect(final.state.phase).toBe('ROUND_ACTIVE');
-  expect(final.state.loadingOrActive?.roundDeadlineAt).toBe(31_000);
+  expect(final.state.loadingOrActive?.roundDeadlineAt).toBe(20_000);
   expect(final.effects).toContainEqual({
     type: 'set_bot_round_deadline',
     matchId: 'm1',
     gen: final.state.gen,
     roundNumber: 1,
-    atMs: 31_000,
+    atMs: 20_000,
   });
 
   const human = reduce(
@@ -432,7 +434,7 @@ test('only a finalized bot guess pushes; bot completion keeps the normal early-e
     { type: 'submit_guess', playerId: 'h', roundNumber: 1, lat: 55.7, lng: 37.6 },
     17_000,
   );
-  expect(human.state.loadingOrActive?.endsAt).toBe(31_000);
+  expect(human.state.loadingOrActive?.endsAt).toBe(20_000);
   const finished = reduce(
     human.state,
     {

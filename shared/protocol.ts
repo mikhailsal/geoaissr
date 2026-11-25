@@ -28,6 +28,7 @@ export type { BotTurnThumbView } from './bot-results.ts';
 import {
   type StoredProfile,
   HARNESS_IDS,
+  pushSecondsSchema,
   REGION_IDS,
   botSlotConfigSchema,
   type BotSlotConfig,
@@ -88,6 +89,7 @@ export const lobbySettingsPatchSchema = z.object({
   aiWaitWindowSec: z.number().int().min(0).max(120).optional(),
   showMatchStandings: z.boolean().optional(),
   pushEnabled: z.boolean().optional(),
+  pushSeconds: pushSecondsSchema.optional(),
   allowBotPush: z.boolean().optional(),
 });
 
@@ -331,6 +333,7 @@ export interface ClientViewState {
   aiWaitWindowSec: number;
   showMatchStandings: boolean;
   pushEnabled: boolean;
+  pushSeconds: number;
   allowBotPush: boolean;
   startBlockedReasons: string[];
   settingsNotice?: string;

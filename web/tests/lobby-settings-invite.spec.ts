@@ -25,11 +25,13 @@ test('host numeric settings show the accepted value after invalid or empty edits
     for (const viewer of [page, guest]) {
       await viewer.getByRole('button', { name: 'Настройки партии', exact: true }).click();
     }
+    await page.getByRole('checkbox', { name: 'Пуш: сократить время после ответа' }).check();
     await expect(guest.getByRole('spinbutton', { name: 'Раунды' })).toBeDisabled();
     for (const [label, bound, outside] of [
       ['Раунды', '20', '21'],
       ['Время раунда (с)', '60', '59'],
       ['Ожидание ИИ (с)', '0', '-1'],
+      ['Оставить после пуша (с)', '1', '0'],
     ] as const) {
       const field = page.getByRole('spinbutton', { name: label });
       const guestField = guest.getByRole('spinbutton', { name: label });

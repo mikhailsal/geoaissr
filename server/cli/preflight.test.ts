@@ -105,6 +105,7 @@ function makePortTestShell() {
         aiWaitWindowSec: 30,
         showMatchStandings: true,
         pushEnabled: false,
+        pushSeconds: 15,
         allowBotPush: true,
         bots: [],
       },

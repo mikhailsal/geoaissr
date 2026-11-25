@@ -12,6 +12,11 @@ import {
 import { PARTICIPANT_COLOR_IDS } from './colors.ts';
 import { PLAY_STYLES } from './play-style.ts';
 
+export const PUSH_SECONDS_MIN = 1;
+export const PUSH_SECONDS_MAX = 60;
+const DEFAULT_PUSH_SECONDS = 15;
+export const pushSecondsSchema = z.number().int().min(PUSH_SECONDS_MIN).max(PUSH_SECONDS_MAX);
+
 export const HARNESS_IDS = ['codex', 'claude', 'agy'] as const;
 export type HarnessId = (typeof HARNESS_IDS)[number];
 
@@ -88,6 +93,8 @@ export const settingsFileSchema = z.object({
   showMatchStandings: z.boolean().default(true),
   /** Absent in older settings files: round pushes are disabled. */
   pushEnabled: z.boolean().default(false),
+  /** Absent in older settings files: a push keeps the historical 15-second window. */
+  pushSeconds: pushSecondsSchema.default(DEFAULT_PUSH_SECONDS),
   /** Absent in older settings files: bots may use pushes when the host enables them. */
   allowBotPush: z.boolean().default(true),
   bots: z.array(botSlotConfigSchema).max(3),
@@ -112,6 +119,7 @@ export function createDefaultSettings(): SettingsFile {
     aiWaitWindowSec: 20,
     showMatchStandings: true,
     pushEnabled: false,
+    pushSeconds: DEFAULT_PUSH_SECONDS,
     allowBotPush: true,
     bots: [],
   };

@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { ClientViewState, LobbySettingsPatch } from '$shared/protocol';
-  import { REGION_IDS, type RegionId } from '$shared/storage-schemas';
+  import {
+    PUSH_SECONDS_MAX,
+    PUSH_SECONDS_MIN,
+    REGION_IDS,
+    type RegionId,
+  } from '$shared/storage-schemas';
   import { formatRoundsRu, formatSecondsOnly } from '../i18n/format';
   import { REGION_LABELS, RU } from '../i18n/ru';
   import QuotaMetric from './QuotaMetric.svelte';
@@ -17,7 +22,7 @@
 
   function commitNumber(
     input: HTMLInputElement,
-    setting: 'rounds' | 'roundDurationSec' | 'aiWaitWindowSec',
+    setting: 'rounds' | 'roundDurationSec' | 'aiWaitWindowSec' | 'pushSeconds',
     current: number,
   ): void {
     const value = input.valueAsNumber;
@@ -120,6 +125,22 @@
     </label>
 
     {#if view.pushEnabled}
+      <label class="field full-span">
+        <span class="lbl">{RU.lobby.pushSecondsLabel}</span>
+        <input
+          type="number"
+          class="field-input"
+          min={PUSH_SECONDS_MIN}
+          max={PUSH_SECONDS_MAX}
+          disabled={!view.viewerIsHost}
+          value={view.pushSeconds}
+          onchange={(e) => {
+            commitNumber(e.currentTarget, 'pushSeconds', view.pushSeconds);
+          }}
+        />
+        <span class="hint">{RU.lobby.pushSecondsHint}</span>
+      </label>
+
       <label class="standings-option full-span">
         <input
           type="checkbox"
@@ -148,7 +169,9 @@
           }}
         />
         <span class="hint"
-          >{view.pushEnabled ? RU.lobby.pushedWaitWindowHint : RU.lobby.waitWindowHint}</span
+          >{view.pushEnabled
+            ? RU.lobby.pushedWaitWindowHint(view.pushSeconds)
+            : RU.lobby.waitWindowHint}</span
         >
       </label>
     {/if}
