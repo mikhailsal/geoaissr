@@ -9,13 +9,14 @@
 
 A single root `package.json` (no workspaces):
 
-- `shared/` — protocol, zod schemas, regions, colors, scoring, bot tool schemas. Imports nothing from other folders.
-- `server/` — game server on Bun (`engine/`, `net/`, `proc/`, `storage/`, `bots/`, `images/`, `tunnel/`, `cli/`, `dev/`, `http/`, `maps/`). Does not import `web/` or `bot-tools/`.
+- `shared/` — protocol, zod schemas, regions, maps (`maps.ts`, `map-availability.ts`), colors, scoring, bot tool schemas. Imports nothing from other folders.
+- `server/` — game server on Bun (`engine/`, `net/`, `proc/`, `storage/`, `bots/`, `images/`, `tunnel/`, `cli/`, `dev/`, `http/`, `maps/`, `location/`). Does not import `web/` or `bot-tools/`.
+  - `server/maps/` — the places of each map: datasets (`*.data.json`, generated, not edited by hand) and the code that turns them into round sources. `server/location/` — the round search over the Street View metadata service (`service.ts`, the per-map rolls in `rolls.ts`) and the `--fake` location service.
   - `server/bots/prompts/` — the bots' start prompts as plain text files (`intuit.txt`, `detective-brain.txt`, `detective-eyes.txt`), read at every bot launch. Change prompt wording there, not in code; the tag syntax is in that folder's `README.md`. `bun run test` renders every file for every setting.
   - `server/bots/detective/` — the Detective play style: two processes per bot (brain and eyes) and the session between them. Rules and tools: [docs/bot-tools.md](./docs/bot-tools.md).
 - `web/` — frontend on Svelte 5 + Vite. Imports only from `shared/` and packages.
 - `bot-tools/` — MCP stdio bridge to `127.0.0.1:BOT_PORT`. Imports only from `shared/` and packages.
-- `scripts/` — check, region and airport build, hook and eval scripts.
+- `scripts/` — check, dataset build (`build-*.ts`, shared readers in `scripts/lib/`), map measurement (`maps-sample.ts`, `scan-retro.ts`), hook and eval scripts.
 - `spikes/` — throwaway M0 spike code (subject to the same limits and checks; deleted after M1).
 - `test/` — integration tests and the fake MCP harness.
 
@@ -45,6 +46,9 @@ A single root `package.json` (no workspaces):
 - `bun run doctor` / `bun run doctor --json` — check keys, `cloudflared`, harnesses.
 - `bun run start` — build the client, start the server and tunnel (`--no-tunnel`, `--public-url`, `--port`, `--no-open`).
 - `bun run test:harness` / `bun run test:tunnel` — on-demand live checks (with network/CLI). `bun run test:harness --detective` plays one live Detective round per available harness (`--only <brain harness> --eyes <eyes harness>` for a mixed pair).
+- `bun run maps:sample -- --map <map> --region <region> --rounds <n>` — roll live rounds of a map and region and print the mix (share in settlements, lookups and seconds per round); free metadata lookups, needs `GOOGLE_MAPS_SERVER_KEY`. `--help` lists the flags.
+- `bun run build:regions`, `build:airports`, `build:places`, `build:cities` — rebuild a dataset from its open source (the source and licence are named at the top of each script). After any of them run `bun run build:map-availability`; `bun run test` fails while the availability table is out of date.
+- `bun run scan:retro` — measure where panoramas older than 2012 are still found and rewrite `server/maps/retro.data.json` (about half an hour of free lookups, needs the server key).
 - `bun run eval:bots` — measure one bot configuration (finish rate, time, error, pin movement) on the licensed panorama dataset; flags and metrics in [docs/evals/README.md](./docs/evals/README.md).
 
 ## Data storage and errors
