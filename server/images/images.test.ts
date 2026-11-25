@@ -37,6 +37,7 @@ test('bot image service uses in-round cache and reserves static quota before fet
       lng: 10,
       countryId: '276',
       countryNameRu: 'Германия',
+      map: 'standard' as const,
       region: 'europe' as const,
       fakeSceneIndex: 0,
     };

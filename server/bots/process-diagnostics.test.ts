@@ -40,6 +40,7 @@ const TARGET: RoundTarget = {
   lng: 2.3522,
   countryId: '250',
   countryNameRu: 'Франция',
+  map: 'standard',
   region: 'world',
   fakeSceneIndex: 0,
 };

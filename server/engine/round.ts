@@ -102,6 +102,7 @@ export function createLoadingStateForRound(
         matchId: nextState.matchId,
         gen: nextGen,
         roundNumber,
+        map: nextState.settings.map,
         region: nextState.settings.region,
         excludeCountryIds: [...nextState.usedCountryIds],
         withBots: enabledCount > 0,

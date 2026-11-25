@@ -23,6 +23,7 @@ export const ERROR_CODES = [
   'GEO_TUNNEL_NOT_READY',
   'GEO_GOOGLE_KEY_DENIED',
   'GEO_GOOGLE_QUOTA',
+  'GEO_GOOGLE_UNREACHABLE',
   'GEO_HARNESS_NOT_LOGGED_IN',
   'GEO_HARNESS_HIDDEN',
   'GEO_QUOTA_CEILING',
@@ -140,6 +141,15 @@ export const ERROR_REGISTRY: Record<ErrorCode, ErrorRegistryEntry> = {
     fixTemplate:
       'проверьте дневные квоты в Cloud Console и текущий расход в quota.json; повторять после сброса квоты',
     docAnchor: 'docs/errors.md#GEO_GOOGLE_QUOTA',
+  },
+  GEO_GOOGLE_UNREACHABLE: {
+    code: 'GEO_GOOGLE_UNREACHABLE',
+    errorClass: 'dependency',
+    exitCode: 3,
+    whatTemplate: 'Google Street View не отвечает: три запроса подряд не дошли до сервиса',
+    fixTemplate:
+      'проверьте подключение к интернету и начните раунд снова; повторять можно, квота на такие запросы не тратится',
+    docAnchor: 'docs/errors.md#GEO_GOOGLE_UNREACHABLE',
   },
   GEO_HARNESS_NOT_LOGGED_IN: {
     code: 'GEO_HARNESS_NOT_LOGGED_IN',

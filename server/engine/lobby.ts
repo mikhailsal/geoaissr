@@ -6,6 +6,7 @@ import {
   type HarnessCatalogEntry,
   type LobbySettingsPatch,
 } from '../../shared/protocol.ts';
+import { isKnownRegion } from '../../shared/regions.ts';
 import type { BotSlotConfig, HarnessId, SettingsFile } from '../../shared/storage-schemas.ts';
 import { eyesPatchInvalid, keepVisionCheck, mergeBotSlotPatch } from './bot-slot-patch.ts';
 import type { PlayerState, ReduceOutput, RoomState } from './types.ts';
@@ -80,9 +81,15 @@ export function handleUpdateLobby(
     notice = 'Длительность раунда не может быть меньше 60 с при включённых ИИ';
   }
 
+  // A country this build does not know (a stale client, a forged message) keeps the old region.
+  const region =
+    patch.region !== undefined && isKnownRegion(patch.region)
+      ? patch.region
+      : state.settings.region;
   const nextSettings: SettingsFile = {
     ...state.settings,
     ...patch,
+    region,
     roundDurationSec: requestedDuration,
   };
   return {

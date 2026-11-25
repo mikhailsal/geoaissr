@@ -62,6 +62,7 @@ async function handlersOnEastRoad(onLookup: (n: number) => void = () => {}) {
     dispatch: (event: EngineEvent) => events.push(event),
   } as unknown as RunnerCtx;
   const target = await createFakeLocationService().prepareRoundLocation({
+    map: 'standard',
     region: 'world',
     excludeCountryIds: [],
   });

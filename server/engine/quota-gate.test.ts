@@ -32,7 +32,8 @@ function makeLobby(quotaSummary: QuotaSummaryView): RoomState {
     matchId: 'm-quota',
     fakeMode: true,
     settings: {
-      version: 1,
+      version: 2,
+      map: 'standard',
       region: 'world',
       rounds: 2,
       roundDurationSec: 60,

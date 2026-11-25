@@ -92,10 +92,11 @@ function bot(id: string, name: string, color: ParticipantColorId): BotSlotConfig
 function win(id: string, winnerId: string, isAi: boolean): MatchRecord {
   const endedAt = new Date(Date.now() - 60_000).toISOString();
   return {
-    version: 1,
+    version: 2,
     matchId: id,
     startedAt: endedAt,
     endedAt,
+    map: 'standard',
     region: 'world',
     plannedRounds: 1,
     playedRounds: 1,

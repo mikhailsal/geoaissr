@@ -11,7 +11,12 @@ import { startAppHttpServer } from '../net/http.ts';
 import { createAuthRateLimiter } from '../net/rate-limit.ts';
 import { createWsRoomCoordinator } from '../net/ws.ts';
 import { buildQuotaMetric, createQuotaManager } from '../storage/quota.ts';
-import { assertPortAvailable, parseStartArgs, resolveGoogleEnvKeys } from './preflight.ts';
+import {
+  assertPortAvailable,
+  parseRegion,
+  parseStartArgs,
+  resolveGoogleEnvKeys,
+} from './preflight.ts';
 
 test('parseStartArgs parses defaults, PORT env, flags, and rejects conflicts', () => {
   expect(parseStartArgs([], {}).port).toBe(5174);
@@ -46,6 +51,32 @@ test('parseStartArgs parses defaults, PORT env, flags, and rejects conflicts', (
 
   expect(() => parseStartArgs(['--public-url', 'https://a.example', '--no-tunnel'])).toThrow();
   expect(() => parseStartArgs(['--bogus'])).toThrow();
+});
+
+// Value: protects=the start command takes a map and a one-country region and refuses unknown ones with the list of what exists; fails_when=--map is not parsed, or a wrong map or country starts the server with broken settings;
+// why_new=the --map flag and country regions are new; seam=none; no_claim=that the override reaches the room (start-runtime)
+test('parseStartArgs takes a map and a one-country region and rejects unknown ones', () => {
+  const custom = parseStartArgs(['--map', 'capitals', '--region', 'country:FRA']);
+  expect(custom.mapOverride).toBe('capitals');
+  expect(custom.regionOverride).toBe('country:FRA');
+  expect(parseStartArgs([]).mapOverride).toBeUndefined();
+  expect(parseRegion('oceania')).toBe('oceania');
+
+  const failure = (argv: string[]): string => {
+    try {
+      parseStartArgs(argv);
+    } catch (err) {
+      return err instanceof GeoError ? `${err.code}: ${err.causeDetail}` : String(err);
+    }
+    return 'no error';
+  };
+  expect(failure(['--map', 'atlantis'])).toContain(
+    'GEO_INVALID_ARGS: Неизвестная карта «atlantis»',
+  );
+  expect(failure(['--map', 'atlantis'])).toContain('standard, wild, cities');
+  expect(failure(['--region', 'country:ZZZ'])).toContain('Неизвестный регион «country:ZZZ»');
+  expect(failure(['--region', 'airports'])).toContain('страна вида country:FRA');
+  expect(failure(['--map'])).not.toBe('no error');
 });
 
 test('resolveGoogleEnvKeys allows empty keys in fake mode and rejects missing keys in live mode', () => {
@@ -97,7 +128,8 @@ function makePortTestShell() {
       matchId: 'm-port',
       fakeMode: true,
       settings: {
-        version: 1,
+        version: 2,
+        map: 'standard',
         region: 'world',
         rounds: 3,
         roundDurationSec: 60,

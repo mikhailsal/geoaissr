@@ -1,4 +1,6 @@
-import { REGION_IDS, type RegionId } from '../../shared/storage-schemas.ts';
+import { MAP_IDS, isMapId, type MapId } from '../../shared/maps.ts';
+import { AREA_REGION_IDS, isRegionIdShape, type RegionId } from '../../shared/region-ids.ts';
+import { isKnownRegion } from '../../shared/regions.ts';
 import { GeoError } from '../errors.ts';
 
 export interface StartCliOptions {
@@ -8,12 +10,20 @@ export interface StartCliOptions {
   port: number;
   publicUrl: string | null;
   roundsOverride?: number;
+  mapOverride?: MapId;
   regionOverride?: RegionId;
   durationOverride?: number;
   noMoveOverride?: boolean;
 }
 
-const VALUE_FLAGS = new Set(['--port', '--public-url', '--rounds', '--region', '--duration']);
+const VALUE_FLAGS = new Set([
+  '--port',
+  '--public-url',
+  '--rounds',
+  '--map',
+  '--region',
+  '--duration',
+]);
 
 function parsePositiveInt(val: string, flag: string, min: number, max: number): number {
   const n = Number(val);
@@ -24,6 +34,23 @@ function parsePositiveInt(val: string, flag: string, min: number, max: number): 
     });
   }
   return n;
+}
+
+function parseMap(val: string): MapId {
+  if (isMapId(val)) return val;
+  throw new GeoError({
+    code: 'GEO_INVALID_ARGS',
+    causeDetail: `Неизвестная карта «${val}». Доступно: ${MAP_IDS.join(', ')}`,
+  });
+}
+
+/** An area (`world`, `europe`) or one country by its three-letter code: `country:FRA`. */
+export function parseRegion(val: string): RegionId {
+  if (isRegionIdShape(val) && isKnownRegion(val)) return val;
+  throw new GeoError({
+    code: 'GEO_INVALID_ARGS',
+    causeDetail: `Неизвестный регион «${val}». Доступно: ${AREA_REGION_IDS.join(', ')} или страна вида country:FRA`,
+  });
 }
 
 function parseDefaultPort(env: Record<string, string | undefined>): number {
@@ -45,14 +72,12 @@ function applyValueFlag(opts: StartCliOptions, arg: string, val: string): void {
     opts.durationOverride = parsePositiveInt(val, '--duration', 30, 600);
     return;
   }
+  if (arg === '--map') {
+    opts.mapOverride = parseMap(val);
+    return;
+  }
   if (arg === '--region') {
-    if (!(REGION_IDS as readonly string[]).includes(val)) {
-      throw new GeoError({
-        code: 'GEO_INVALID_ARGS',
-        causeDetail: `Неизвестный регион «${val}». Доступно: ${REGION_IDS.join(', ')}`,
-      });
-    }
-    opts.regionOverride = val as RegionId;
+    opts.regionOverride = parseRegion(val);
     return;
   }
   if (arg === '--public-url') {

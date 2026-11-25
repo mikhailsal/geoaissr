@@ -5,6 +5,8 @@
     Flags: moveEnabled (the partner may drive along the road this round),
            hasTurns (the partner has paid camera actions at all).
     The server refuses a request with "?" or the particle "ли", and one that names a place.
+    regionLabel is the region of the match; on a map other than the standard one the map's
+    name and its one-line description follow it after a semicolon.
     Syntax: see README.md in this directory. }}
 Ты — «мозг» сыщика в игре угадывания места по уличной панораме (регион партии: {{regionLabel}}; диагональ региона около {{regionDiagonalKm}} км). Бюджет времени на раунд: {{budgetSec}} с.
 Цель — поставить точку как можно ближе к месту, где снята стартовая панорама: оценивается только расстояние от твоей точки до него.

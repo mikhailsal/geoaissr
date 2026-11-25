@@ -8,7 +8,11 @@ import {
   rankStandings,
 } from '../../shared/score.ts';
 import { getRegionDiagonalKm } from '../../shared/regions.ts';
-import type { BotRoundTelemetry, MatchRecord } from '../../shared/storage-schemas.ts';
+import {
+  MATCH_RECORD_VERSION,
+  type BotRoundTelemetry,
+  type MatchRecord,
+} from '../../shared/storage-schemas.ts';
 import { createLoadingStateForRound } from './round.ts';
 import type {
   ActiveRoundState,
@@ -370,10 +374,11 @@ export function buildMatchRecord(state: RoomState, now: number): MatchRecord {
   const hasAi = participants.some((p) => p.isAi);
 
   return {
-    version: 1,
+    version: MATCH_RECORD_VERSION,
     matchId: state.matchId,
     startedAt: state.matchStartedAt ?? new Date(now).toISOString(),
     endedAt: new Date(now).toISOString(),
+    map: state.settings.map,
     region: state.settings.region,
     plannedRounds: state.settings.rounds,
     playedRounds: state.playedRounds.length,

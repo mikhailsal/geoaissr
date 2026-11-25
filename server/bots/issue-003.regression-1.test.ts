@@ -112,6 +112,7 @@ test('runner receives the effective round deadline budget without mutating setti
         lng: 0,
         countryId: 'x',
         countryNameRu: 'x',
+        map: 'standard',
         region: 'world',
         fakeSceneIndex: 0,
       },

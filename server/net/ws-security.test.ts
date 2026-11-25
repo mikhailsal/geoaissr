@@ -83,7 +83,8 @@ function buildSecInitialState(fakeMode: boolean) {
     matchId: 'sec-m1',
     fakeMode,
     settings: {
-      version: 1,
+      version: 2,
+      map: 'standard',
       region: 'world',
       rounds: 2,
       roundDurationSec: 60,
@@ -138,6 +139,7 @@ function createSecServer(
         lng: 37,
         countryId: '643-eu',
         countryNameRu: 'Россия',
+        map: 'standard',
         region: 'world',
         fakeSceneIndex: 0,
       }),
@@ -327,7 +329,8 @@ test('spectators are excluded from final rankings and pre-join state is masked',
     matchId: 'sp1',
     fakeMode: true,
     settings: {
-      version: 1,
+      version: 2,
+      map: 'standard',
       region: 'world',
       rounds: 1,
       roundDurationSec: 60,
@@ -376,6 +379,7 @@ test('spectators are excluded from final rankings and pre-join state is masked',
         lng: 20,
         countryId: 'X',
         countryNameRu: 'Х',
+        map: 'standard',
         region: 'world',
         fakeSceneIndex: 0,
       },
@@ -560,6 +564,18 @@ test('check_bot_vision emits vision_check_result on completion and on mid-check 
   }
 });
 
+const QUOTA_GATE_SETTINGS = {
+  version: 2,
+  map: 'standard',
+  region: 'world',
+  rounds: 2,
+  roundDurationSec: 60,
+  moveEnabled: true,
+  aiWaitWindowSec: 30,
+  showMatchStandings: true,
+  bots: [],
+} as const;
+
 test('RoomShell confirm_quota_reset keeps the gate closed when persisting fails', async () => {
   const baseSummary = {
     metrics: {
@@ -586,16 +602,7 @@ test('RoomShell confirm_quota_reset keeps the gate closed when persisting fails'
     createInitialRoomState({
       matchId: 'm-qerr',
       fakeMode: false,
-      settings: {
-        version: 1,
-        region: 'world',
-        rounds: 2,
-        roundDurationSec: 60,
-        moveEnabled: true,
-        aiWaitWindowSec: 30,
-        showMatchStandings: true,
-        bots: [],
-      },
+      settings: { ...QUOTA_GATE_SETTINGS, bots: [] },
       quotaSummary: baseSummary,
       quotaWarning: 'corrupt',
       tunnel: { mode: 'local', status: 'local', inviteUrl: null, changedSinceStart: false },

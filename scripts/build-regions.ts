@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { WORLD_DIAGONAL_KM, haversineDistanceKm } from '../shared/score.ts';
-import type { PolygonRegionId } from '../shared/storage-schemas.ts';
+import { computeRingsDiagonalKm } from '../shared/region-geometry.ts';
+import type { AreaRegionId, ContinentId } from '../shared/region-ids.ts';
+import { WORLD_DIAGONAL_KM } from '../shared/score.ts';
 
 type LngLat = [number, number];
 type Ring = LngLat[];
-type PolyContinent = Exclude<PolygonRegionId, 'world'>;
+type PolyContinent = ContinentId;
 
 interface RawFeature {
   properties: {
@@ -38,7 +39,7 @@ export interface CompactCountry {
 
 export interface RegionsDataset {
   version: 1;
-  diagonalsKm: Record<PolygonRegionId, number>;
+  diagonalsKm: Record<AreaRegionId, number>;
   countries: CompactCountry[];
 }
 
@@ -145,44 +146,6 @@ function classifyPolygonRegion(
   return [{ region: baseRegion, ring }];
 }
 
-function computeMinimalLngSpan(lngs: number[]): [number, number] {
-  const sorted = [...lngs].sort((a, b) => a - b);
-  const first = sorted.at(0);
-  const last = sorted.at(-1);
-  if (first === undefined || last === undefined) return [-180, 180];
-  let maxGap = 360 - (last - first);
-  let west = first;
-  let east = last;
-  for (let i = 0; i < sorted.length - 1; i += 1) {
-    const cur = sorted.at(i);
-    const next = sorted.at(i + 1);
-    if (cur === undefined || next === undefined) continue;
-    const gap = next - cur;
-    if (gap > maxGap) {
-      maxGap = gap;
-      west = next;
-      east = cur;
-    }
-  }
-  return [west, east];
-}
-
-function computeRegionDiagonal(polygons: CompactPolygon[]): number {
-  let minLat = 90;
-  let maxLat = -90;
-  const lngs: number[] = [];
-  for (const poly of polygons) {
-    for (const [lng, lat] of poly.ring) {
-      if (lat < minLat) minLat = lat;
-      if (lat > maxLat) maxLat = lat;
-      lngs.push(lng);
-    }
-  }
-  const [west, east] = computeMinimalLngSpan(lngs);
-  const d = haversineDistanceKm({ lat: minLat, lng: west }, { lat: maxLat, lng: east });
-  return Math.round(d * 1000) / 1000;
-}
-
 function convertFeature(f: RawFeature): CompactCountry | null {
   const baseRegion = CONTINENT_TO_REGION[f.properties.CONTINENT ?? ''];
   if (!baseRegion) return null;
@@ -250,14 +213,14 @@ export async function buildRegions(): Promise<RegionsDataset> {
     }
   }
 
-  const diagonalsKm: Record<PolygonRegionId, number> = {
+  const diagonalsKm: Record<AreaRegionId, number> = {
     world: WORLD_DIAGONAL_KM,
-    europe: computeRegionDiagonal(regionBuckets.europe),
-    asia: computeRegionDiagonal(regionBuckets.asia),
-    north_america: computeRegionDiagonal(regionBuckets.north_america),
-    south_america: computeRegionDiagonal(regionBuckets.south_america),
-    africa: computeRegionDiagonal(regionBuckets.africa),
-    oceania: computeRegionDiagonal(regionBuckets.oceania),
+    europe: computeRingsDiagonalKm(regionBuckets.europe.map((p) => p.ring)),
+    asia: computeRingsDiagonalKm(regionBuckets.asia.map((p) => p.ring)),
+    north_america: computeRingsDiagonalKm(regionBuckets.north_america.map((p) => p.ring)),
+    south_america: computeRingsDiagonalKm(regionBuckets.south_america.map((p) => p.ring)),
+    africa: computeRingsDiagonalKm(regionBuckets.africa.map((p) => p.ring)),
+    oceania: computeRingsDiagonalKm(regionBuckets.oceania.map((p) => p.ring)),
   };
 
   return { version: 1, diagonalsKm, countries };

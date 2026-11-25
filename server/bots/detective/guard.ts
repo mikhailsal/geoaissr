@@ -1,10 +1,12 @@
 import { REGION_COUNTRIES } from '../../../shared/regions.ts';
+import { unlistedCountryNamesRu } from '../../maps/country-names.ts';
 
 /**
  * Place-name and demonym guard of the Detective play style. It checks the brain's requests before
  * they reach the eyes (a request that names a place is refused) and masks place words in what the
  * eyes write outside quoted text. It is a heuristic: country names and their stems from
- * shared/regions, irregular demonyms, large cities and English demonyms. A demonym right next to
+ * shared/regions, the names of the small territories the point maps reach, irregular demonyms,
+ * large cities and English demonyms. A demonym right next to
  * a script noun names a script the eyes can see («грузинское письмо», «арабская вязь») and passes.
  */
 
@@ -28,6 +30,33 @@ const GENERIC_NAME_WORDS = new Set([
   'федерация',
   'штаты',
   'гвинея',
+]);
+
+/**
+ * Words inside the names of small territories that are ordinary words, first names, or too
+ * close to an ordinary word even as a whole («Сен-Мартен» and «в марте», «Сан-Марино» and
+ * «марина», «Кокосовые о-ва» and «кокосовые пальмы»).
+ */
+const TERRITORY_NAME_SKIP = new Set([
+  'внешние',
+  'малые',
+  'южные',
+  'северные',
+  'территории',
+  'федеративные',
+  'сент',
+  'синт',
+  'рождества',
+  'елены',
+  'пьер',
+  'томе',
+  'кабо',
+  'кука',
+  'саба',
+  'мартен',
+  'марино',
+  'майен',
+  'кокосовые',
 ]);
 
 /** Irregular demonym stems that a country-name stem does not catch. */
@@ -214,6 +243,11 @@ const COMMON_WORDS = new Set([
   'судам',
   'судами',
   'судах',
+  // «кайма» is an edging (of a road sign, say), not the Cayman Islands.
+  'кайма',
+  'каймам',
+  'каймами',
+  'каймах',
 ]);
 const COMMON_PREFIXES = [
   'грузов',
@@ -283,12 +317,30 @@ function stemOf(word: string): string {
   return word.length <= 5 ? word.slice(0, 4) : word.slice(0, word.length - 2);
 }
 
+/**
+ * Stem of a word from the name of a small territory. These names are short and sit close to
+ * ordinary words («Самоа» and «самолёт», «Монако» and «монастырь», «Мальта» and «мальчик»), so
+ * the stem keeps more of the word than `stemOf` does: all of a short word, all but the last
+ * letter of a longer one.
+ */
+function territoryStemOf(word: string): string {
+  return word.length <= 5 ? word : word.slice(0, -1);
+}
+
 function buildPlaceStems(): string[] {
   const stems = new Set<string>([...DEMONYM_STEMS, ...CITY_STEMS, ...LATIN_STEMS]);
   for (const country of REGION_COUNTRIES) {
     for (const word of words(country.nameRu)) {
       if (word.length < 4 || GENERIC_NAME_WORDS.has(word)) continue;
       stems.add(stemOf(word));
+    }
+  }
+  // The point maps reach countries the regions dataset has no polygon for.
+  for (const name of unlistedCountryNamesRu()) {
+    for (const word of words(name)) {
+      if (word.length < 4 || GENERIC_NAME_WORDS.has(word) || TERRITORY_NAME_SKIP.has(word))
+        continue;
+      stems.add(territoryStemOf(word));
     }
   }
   return [...stems];

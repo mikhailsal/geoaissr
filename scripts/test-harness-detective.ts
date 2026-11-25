@@ -114,7 +114,11 @@ export async function verifyDetective(pair: DetectivePair, root: string): Promis
   );
   const t0 = Date.now();
   try {
-    const target = await loc.prepareRoundLocation({ region: 'europe', excludeCountryIds: [] });
+    const target = await loc.prepareRoundLocation({
+      map: 'standard',
+      region: 'europe',
+      excludeCountryIds: [],
+    });
     await images.prepareStartViews(target);
     const ids = { matchId: `detective-${label}`, gen: 1, roundNumber: 1 };
     runner.startRoundBots({ ...ids, target, bots: [slot], moveEnabled: true });

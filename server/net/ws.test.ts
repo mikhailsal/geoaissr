@@ -50,7 +50,8 @@ function setupTestServer(dir: string, staticDir = path.join(dir, 'missing-dist')
     matchId: 'ws-m1',
     fakeMode: true,
     settings: {
-      version: 1,
+      version: 2,
+      map: 'standard',
       region: 'world',
       rounds: 2,
       roundDurationSec: 60,
@@ -77,6 +78,7 @@ function setupTestServer(dir: string, staticDir = path.join(dir, 'missing-dist')
         lng: 37,
         countryId: '643-eu',
         countryNameRu: 'Россия',
+        map: 'standard',
         region: 'world',
         fakeSceneIndex: 0,
       }),

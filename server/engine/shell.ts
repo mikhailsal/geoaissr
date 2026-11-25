@@ -3,6 +3,7 @@ import {
   styleFallbacks,
   type PlayStyleFallback,
 } from '../../shared/play-style.ts';
+import type { MapId } from '../../shared/maps.ts';
 import type { AckResult, ClientViewState, QuotaSummaryView } from '../../shared/protocol.ts';
 import type {
   BotSlotConfig,
@@ -29,6 +30,7 @@ export interface ShellDeps {
     matchId: string;
     gen: number;
     roundNumber: number;
+    map: MapId;
     region: RegionId;
     excludeCountryIds: string[];
     withBots: boolean;
@@ -146,6 +148,7 @@ function runAsyncEffect(ctx: EffectContext, effect: EngineEffect, state: RoomSta
         matchId: effect.matchId,
         gen: effect.gen,
         roundNumber: effect.roundNumber,
+        map: effect.map,
         region: effect.region,
         excludeCountryIds: effect.excludeCountryIds,
         withBots: effect.withBots,

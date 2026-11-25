@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import {
+  SETTINGS_FILE_VERSION,
   createDefaultSettings,
   quotaFileSchema,
   settingsFileSchema,
@@ -34,17 +35,18 @@ test('migrateObject upgrades older version step-by-step and preserves newer_vers
       bots: [],
     });
     writeFileSync(filePath, v0);
+    // The settings schema is at version 2 now, so the step under test goes from 2 to 3.
     const migrated = migrateObject({
-      rawText: JSON.stringify({ version: 1, rounds: 7 }),
+      rawText: JSON.stringify({ version: 2, rounds: 7 }),
       filePath,
       schema: settingsFileSchema,
       defaultValue: createDefaultSettings,
-      currentVersion: 2,
+      currentVersion: 3,
       migrations: {
-        1: (d) => ({
+        2: (d) => ({
           ...createDefaultSettings(),
           ...d,
-          version: 2,
+          version: 3,
         }),
       },
     });
@@ -102,12 +104,14 @@ test('migration function transforms v0 schema to v1', () => {
     });
     expect(res.status).toBe('unreadable');
 
+    // A complete file of the current settings version (2 since the map got its own field).
     const resOk = migrateObject({
       rawText: JSON.stringify({
-        version: 1,
+        version: SETTINGS_FILE_VERSION,
         rounds: 8,
         roundDurationSec: 90,
         moveEnabled: false,
+        map: 'standard',
         region: 'europe',
         aiWaitWindowSec: 15,
         bots: [],
@@ -115,6 +119,7 @@ test('migration function transforms v0 schema to v1', () => {
       filePath: f,
       schema: settingsFileSchema,
       defaultValue: createDefaultSettings,
+      currentVersion: SETTINGS_FILE_VERSION,
       migrations: {},
     });
     expect(resOk.status).toBe('ok');
@@ -248,10 +253,11 @@ test('matches.jsonl appends v1 records and skips newer-version rows cleanly', ()
     const mFile = path.join(dir, 'matches.jsonl');
     writeFileSync(mFile, `${JSON.stringify({ version: 9, future: true })}\n`);
     appendMatchRecord(mFile, {
-      version: 1,
+      version: 2,
       matchId: 'm-1',
       startedAt: '2026-11-13T10:00:00.000Z',
       endedAt: '2026-11-13T10:05:00.000Z',
+      map: 'standard',
       region: 'world',
       plannedRounds: 5,
       playedRounds: 5,

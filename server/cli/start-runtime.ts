@@ -29,6 +29,7 @@ import {
   type TunnelManager,
 } from '../tunnel/cloudflared.ts';
 import { type StartCliOptions } from './preflight.ts';
+import { createPrepareRound } from './prepare-round.ts';
 import { formatCliError } from './report-error.ts';
 import { printRemoteOwnerInvite } from './start-banner.ts';
 
@@ -54,6 +55,7 @@ export function buildInitialSettings(opts: {
   }
 
   if (opts.cli.roundsOverride !== undefined) settings.rounds = opts.cli.roundsOverride;
+  if (opts.cli.mapOverride !== undefined) settings.map = opts.cli.mapOverride;
   if (opts.cli.regionOverride !== undefined) settings.region = opts.cli.regionOverride;
   if (opts.cli.durationOverride !== undefined)
     settings.roundDurationSec = opts.cli.durationOverride;
@@ -247,14 +249,11 @@ export function buildConfiguredShell(opts: {
       return Promise.resolve(buildQuotaSummaryForState(opts.quotaManager, shellRef?.getState()));
     },
     recalculateQuotaSummary: (s) => buildQuotaSummaryForState(opts.quotaManager, s),
-    prepareRound: async ({ region, excludeCountryIds, withBots }) => {
-      const target = await opts.locationService.prepareRoundLocation({
-        region,
-        excludeCountryIds,
-      });
-      if (withBots) await opts.imageService.prepareStartViews(target);
-      return target;
-    },
+    prepareRound: createPrepareRound({
+      locationService: opts.locationService,
+      prepareStartViews: (target) => opts.imageService.prepareStartViews(target),
+      getState: () => shellRef?.getState(),
+    }),
     startBotProcesses: (arg) => {
       opts.getBotRunner()?.startRoundBots(arg);
     },

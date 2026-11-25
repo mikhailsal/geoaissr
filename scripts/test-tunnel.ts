@@ -84,6 +84,7 @@ function createTunnelSmokeServer(dir: string, hostToken: string, guestToken: str
       confirmQuotaReset: () => Promise.resolve(shell.getView('host').quota),
       prepareRound: (opts) =>
         loc.prepareRoundLocation({
+          map: opts.map,
           region: opts.region,
           excludeCountryIds: opts.excludeCountryIds,
         }),

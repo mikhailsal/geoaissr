@@ -1,14 +1,26 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { isKnownRegion } from '../../shared/regions.ts';
 import {
+  SETTINGS_FILE_VERSION,
   createDefaultSettings,
   settingsFileSchema,
+  splitLegacyRegion,
   type SettingsFile,
 } from '../../shared/storage-schemas.ts';
 import { GeoError } from '../errors.ts';
 import { migrateObject, type LoadOutcome, type MigrationFn } from './migrate.ts';
 
-export const SETTINGS_MIGRATIONS: Record<number, MigrationFn> = {};
+export const SETTINGS_MIGRATIONS: Record<number, MigrationFn> = {
+  // Version 2 split the map from the region; version 1 kept the airports map among the regions.
+  1: (raw) => ({ ...raw, ...splitLegacyRegion(raw.region) }),
+};
+
+/** A region naming a country this build does not know (a hand-edited file) becomes the world. */
+function withKnownRegion(outcome: LoadOutcome<SettingsFile>): LoadOutcome<SettingsFile> {
+  if (isKnownRegion(outcome.value.region)) return outcome;
+  return { ...outcome, value: { ...outcome.value, region: 'world' } };
+}
 
 export function atomicWriteFile(filePath: string, content: string): void {
   const dir = path.dirname(filePath);
@@ -32,13 +44,16 @@ export function loadSettings(settingsFile: string): LoadOutcome<SettingsFile> {
       errorDetail: err instanceof Error ? err.message : String(err),
     };
   }
-  return migrateObject({
-    rawText,
-    filePath: settingsFile,
-    schema: settingsFileSchema,
-    defaultValue: createDefaultSettings,
-    migrations: SETTINGS_MIGRATIONS,
-  });
+  return withKnownRegion(
+    migrateObject({
+      rawText,
+      filePath: settingsFile,
+      schema: settingsFileSchema,
+      defaultValue: createDefaultSettings,
+      migrations: SETTINGS_MIGRATIONS,
+      currentVersion: SETTINGS_FILE_VERSION,
+    }),
+  );
 }
 
 export function saveSettings(

@@ -13,6 +13,7 @@ const TARGET = {
   lng: 2.35,
   countryId: '250',
   countryNameRu: 'Франция',
+  map: 'standard' as const,
   region: 'world' as const,
   fakeSceneIndex: 0,
 };

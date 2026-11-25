@@ -1,6 +1,8 @@
 import type { BotCostEstimate, BotTokenUsage } from '../../shared/bot-results.ts';
 import type { PlayStyleFallback } from '../../shared/play-style.ts';
-import type { BotSlotConfig, RegionId } from '../../shared/storage-schemas.ts';
+import { getMapPromptNoteRu } from '../../shared/maps.ts';
+import { getRegionLabelRu } from '../../shared/regions.ts';
+import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
 import type { EngineEvent, RoundTarget } from '../engine/types.ts';
 import type { BotImageService } from '../images/bot-image-service.ts';
 import type { LocationService } from '../location.ts';
@@ -8,16 +10,13 @@ import type { ServerLogger } from '../log.ts';
 import type { BotToolApiServer } from './api.ts';
 import type { ActiveBotHandle, CustomBotLaunchBuilder } from './process.ts';
 
-export const REGION_LABELS_RU: Record<RegionId, string> = {
-  world: 'Весь мир',
-  europe: 'Европа',
-  asia: 'Азия',
-  north_america: 'Северная Америка',
-  south_america: 'Южная Америка',
-  africa: 'Африка',
-  oceania: 'Океания',
-  airports: 'Аэропорты мира (до 5 км)',
-};
+/**
+ * What a bot is told about where the match plays: the region, plus the map when it is not the
+ * standard one. The same facts a player reads in the lobby.
+ */
+export function describePlayAreaRu(target: Pick<RoundTarget, 'map' | 'region'>): string {
+  return `${getRegionLabelRu(target.region)}${getMapPromptNoteRu(target.map)}`;
+}
 
 export interface BotRunner {
   startRoundBots: (opts: {

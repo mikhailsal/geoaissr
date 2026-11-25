@@ -19,6 +19,7 @@ const TARGET: RoundTarget = {
   lng: 37.61,
   countryId: '643-eu',
   countryNameRu: 'Россия',
+  map: 'standard',
   region: 'world',
   fakeSceneIndex: 0,
 };
@@ -35,7 +36,8 @@ function makeRoom(
   availableHarnesses: HarnessCatalogEntry[] = [CLAUDE],
 ): RoomState {
   const settings: SettingsFile = {
-    version: 1,
+    version: 2,
+    map: 'standard',
     region: 'world',
     rounds: 1,
     roundDurationSec,

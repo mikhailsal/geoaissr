@@ -27,12 +27,13 @@ export type { BotTurnThumbView } from './bot-results.ts';
 import {
   type StoredProfile,
   HARNESS_IDS,
-  REGION_IDS,
   botSlotConfigSchema,
   type BotSlotConfig,
   type HarnessId,
   type RegionId,
 } from './storage-schemas.ts';
+import { MAP_IDS, type MapId } from './maps.ts';
+import { regionIdSchema } from './region-ids.ts';
 import type { RoundCompletion } from './round-timing.ts';
 
 export { DIFFICULTY_PRESETS, HARNESS_IDS, botSlotConfigSchema };
@@ -74,7 +75,8 @@ export const lobbySettingsPatchSchema = z.object({
   rounds: z.number().int().min(1).max(20).optional(),
   roundDurationSec: z.number().int().min(30).max(600).optional(),
   moveEnabled: z.boolean().optional(),
-  region: z.enum(REGION_IDS).optional(),
+  map: z.enum(MAP_IDS).optional(),
+  region: regionIdSchema.optional(),
   aiWaitWindowSec: z.number().int().min(0).max(120).optional(),
   showMatchStandings: z.boolean().optional(),
 });
@@ -314,6 +316,7 @@ export interface ClientViewState {
   totalRounds: number;
   roundDurationSec: number;
   moveEnabled: boolean;
+  map: MapId;
   region: RegionId;
   aiWaitWindowSec: number;
   showMatchStandings: boolean;

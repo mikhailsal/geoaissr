@@ -159,7 +159,11 @@ async function verifySingleMcpScenario(root: string, sc: FakeHarnessScenario): P
       };
     },
   });
-  const target = await loc.prepareRoundLocation({ region: 'europe', excludeCountryIds: [] });
+  const target = await loc.prepareRoundLocation({
+    map: 'standard',
+    region: 'europe',
+    excludeCountryIds: [],
+  });
   await img.prepareStartViews(target);
   runner.startRoundBots({
     matchId: 'm1',
@@ -362,7 +366,11 @@ test('hanging fake-harness process is terminated cleanly by runner stopAll / cra
         cwd: workDir,
       }),
     });
-    const target = await loc.prepareRoundLocation({ region: 'europe', excludeCountryIds: [] });
+    const target = await loc.prepareRoundLocation({
+      map: 'standard',
+      region: 'europe',
+      excludeCountryIds: [],
+    });
     await img.prepareStartViews(target);
     runner.startRoundBots({
       matchId: 'm-hang',

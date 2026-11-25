@@ -27,10 +27,11 @@ function writeTestSettings(
   roundDurationSec = 60,
 ): void {
   const settings = {
-    version: 1,
+    version: 2,
     rounds,
     roundDurationSec,
     moveEnabled: true,
+    map: 'standard',
     region: 'world',
     aiWaitWindowSec: 5,
     ...(quotaCeilings ? { quotaCeilings } : {}),

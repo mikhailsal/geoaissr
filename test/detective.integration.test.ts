@@ -141,7 +141,11 @@ async function withDetective(
       : {}),
   });
   try {
-    const target = await loc.prepareRoundLocation({ region: 'europe', excludeCountryIds: [] });
+    const target = await loc.prepareRoundLocation({
+      map: 'standard',
+      region: 'europe',
+      excludeCountryIds: [],
+    });
     await images.prepareStartViews(target);
     runner.startRoundBots({
       matchId: 'm-d',

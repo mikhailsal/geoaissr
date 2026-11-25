@@ -50,6 +50,10 @@ Google returned `REQUEST_DENIED` when checking the server key. Check that Street
 
 Google returned `OVER_QUERY_LIMIT`, 403 or 429. Check the daily quotas and billing in Cloud Console.
 
+## GEO_GOOGLE_UNREACHABLE
+
+Three lookups in a row never reached the Street View Metadata API (a timeout, a network error or HTTP 5xx) while the server was looking for a place to start a round. The search stops at once instead of spending its whole attempt budget on a dead connection. Check the internet connection and start the round again; such lookups cost no quota.
+
 ## GEO_HARNESS_NOT_LOGGED_IN
 
 No allowed AI harness (`codex`, `claude`, `agy`) is installed or signed in. Sign in to the CLI you need and run `bun run doctor`.

@@ -108,3 +108,38 @@ test('invisible characters and fullwidth letters do not hide a place name', () =
   );
   expect(guard.findPlaceWord('как в Китае')).toBe('китае');
 });
+
+// Value: protects=the guard catches the island and city states the point maps reach, in the cases a sentence uses; fails_when=the names of countries without a polygon stop feeding the guard;
+// why_new=the guard only knew the countries of the regions dataset, and the airports and capitals maps go beyond it; seam=none; no_claim=names of cities and airports themselves
+test('the guard blocks the small states and territories of the point maps', () => {
+  expect(guard.findPlaceWord('похоже на Сингапур')).toBe('сингапур');
+  expect(guard.findPlaceWord('вывеска как на Мальте')).toBe('мальте');
+  expect(guard.findPlaceWord('такси как в Гонконге')).toBe('гонконге');
+  expect(guard.findPlaceWord('пляж как на Мальдивах')).toBe('мальдивах');
+  expect(guard.findPlaceWord('это Монако')).toBe('монако');
+  expect(guard.findPlaceWord('остров Маврикий')).toBe('маврикий');
+  expect(guard.findPlaceWord('номера как в Бахрейне')).toBe('бахрейне');
+  expect(guard.findPlaceWord('андоррский флаг')).toBe('андоррский');
+  expect(guard.findPlaceWord('флаг Самоа')).toBe('самоа');
+  expect(guard.findPlaceWord('Каймановы острова')).toBe('каймановы');
+});
+
+// Value: protects=ordinary words that start like a small territory's name still pass; fails_when=the territory stems get as short as the country stems and mask scene words;
+// why_new=the territory names are new to the guard; seam=none; no_claim=every word of the language (the listed ones)
+test('ordinary words that look like a small territory pass the guard', () => {
+  for (const text of [
+    'самолёт над полем',
+    'монастырь на холме',
+    'мальчик у дороги',
+    'в сентябре и в марте',
+    'кокосовые пальмы',
+    'красная кайма на знаке',
+    'знаки с белыми каймами',
+    'пристань и марина',
+    'комод, тумба и стул',
+    'внешние стены и малые окна',
+    'южные и северные склоны',
+  ]) {
+    expect(guard.findPlaceWord(text)).toBeNull();
+  }
+});
