@@ -2,6 +2,12 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.3.9] - 2026-11-25
+
+### Added
+
+- Hosts can enable round pushes and choose whether AI opponents can trigger them. A confirmed guess leaves everyone at most 15 seconds, including bots still thinking. Players who have yet to answer hear the usual countdown.
+
 ## [0.3.7] - 2026-11-25
 
 ### Fixed
