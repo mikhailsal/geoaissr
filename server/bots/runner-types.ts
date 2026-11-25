@@ -16,6 +16,7 @@ export const REGION_LABELS_RU: Record<RegionId, string> = {
   south_america: 'Южная Америка',
   africa: 'Африка',
   oceania: 'Океания',
+  airports: 'Аэропорты мира (до 5 км)',
 };
 
 export interface BotRunner {

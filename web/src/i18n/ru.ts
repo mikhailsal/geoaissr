@@ -9,6 +9,7 @@ export const REGION_LABELS: Record<RegionId, string> = {
   south_america: 'Южная Америка',
   africa: 'Африка',
   oceania: 'Океания',
+  airports: 'Аэропорты мира (до 5 км)',
 };
 
 export const PRESET_LABELS: Record<DifficultyPreset, string> = {

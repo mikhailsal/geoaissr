@@ -8,6 +8,17 @@ Notable changes to this locally run application are recorded here. Releases are 
 
 - Hosts can enable round pushes, set how many seconds remain after a confirmed guess (1–60, default 15), and choose whether AI opponents can trigger them. The same deadline applies to bots still thinking. Players who have yet to answer hear the usual countdown.
 
+## [0.3.8] - 2026-11-25
+
+### Added
+
+- Play on a new map, «Аэропорты мира (до 5 км)». Pick it in the lobby's «Регион» list, and every round starts within 5 km of an airport with scheduled flights: 3,270 large and medium airports in 233 countries and territories. A match does not repeat a country. The round is named after the airport's country, and the score uses the world scale.
+- Rebuild the airport list with `bun run build:airports`. It downloads the OurAirports data, which is in the public domain, and writes `server/maps/airports.data.json`.
+
+### Fixed
+
+- `bun run check` no longer runs out of memory when the checkout holds agent worktrees in `.claude/worktrees`. ESLint, Prettier and git skip that folder.
+
 ## [0.3.7] - 2026-11-25
 
 ### Fixed
