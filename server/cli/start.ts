@@ -96,17 +96,18 @@ function createNetTransport(opts: {
   const rateLimiter = createAuthRateLimiter(
     opts.cli.noTunnel ? 'local' : opts.cli.publicUrl ? 'public_url' : 'tunnel',
   );
+  const profiles = new ProfileStore(
+    opts.optsInput.paths.profilesFile,
+    (tokens) => {
+      opts.optsInput.logger.registerSecrets([], tokens);
+    },
+    (message) => {
+      opts.optsInput.logger.log('profiles_unavailable', { message });
+    },
+  );
   const wsCoordinator = createWsRoomCoordinator({
     shell: opts.shell,
-    profiles: new ProfileStore(
-      opts.optsInput.paths.profilesFile,
-      (tokens) => {
-        opts.optsInput.logger.registerSecrets([], tokens);
-      },
-      (message) => {
-        opts.optsInput.logger.log('profiles_unavailable', { message });
-      },
-    ),
+    profiles,
     hostToken: opts.optsInput.hostToken,
     guestToken: opts.optsInput.guestToken,
     browserMapsKey: opts.optsInput.browserKey,
@@ -123,11 +124,17 @@ function createNetTransport(opts: {
     wsCoordinator,
     rateLimiter,
   });
-  return { wsCoordinator, httpServer };
+  return { wsCoordinator, httpServer, profiles };
 }
 
 function resolveEstimateBotCost(deps: StartGeoServerDeps, paths: AppPaths) {
   return deps.estimateBotCost ?? createPricingService({ dataDir: paths.dataDir }).estimateCost;
+}
+
+function initialQuotaWarning(quotaManager: ReturnType<typeof createConfiguredQuotaManager>) {
+  return quotaManager.needsResetConfirm()
+    ? 'Расход за месяц неизвестен: файл квоты повреждён. Сверьте расход в Cloud Console'
+    : undefined;
 }
 
 function createServerPipeline(opts: PipelineBuildOpts) {
@@ -143,8 +150,8 @@ function createServerPipeline(opts: PipelineBuildOpts) {
     availableHarnesses,
     fakeMode: cli.fake,
   });
-  const quotaManager = createConfiguredQuotaManager(paths, settings);
-  const thumbStore = createThumbStore();
+  const quotaManager = createConfiguredQuotaManager(paths, settings),
+    thumbStore = createThumbStore();
   const locationService = cli.fake
     ? createFakeLocationService()
     : createLocationService({ serverKey: serverKey ?? '' });
@@ -160,9 +167,7 @@ function createServerPipeline(opts: PipelineBuildOpts) {
     fakeMode: cli.fake,
     settings,
     settingsNotice,
-    quotaWarning: quotaManager.needsResetConfirm()
-      ? 'Расход за месяц неизвестен: файл квоты повреждён. Сверьте расход в Cloud Console'
-      : undefined,
+    quotaWarning: initialQuotaWarning(quotaManager),
     quotaSummary: buildQuotaSummaryForState(quotaManager),
     tunnel: computeInitialTunnelView(cli, guestToken, cli.port),
     availableHarnesses,
@@ -208,6 +213,7 @@ function createServerPipeline(opts: PipelineBuildOpts) {
     shell,
     botRunner: botRunnerRef,
     httpServer: net.httpServer,
+    profiles: net.profiles,
   };
 }
 

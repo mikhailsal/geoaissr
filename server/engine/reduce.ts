@@ -22,18 +22,71 @@ import {
 import { addFindingToJournal, addThumbToJournal, patchJournalStep } from './journal.ts';
 import type { EngineEvent, ReduceOutput, RoomState } from './types.ts';
 import { computeStartBlockedReasons } from './view.ts';
+import { DISCONNECTED_GUEST_GRACE_MS } from '../../shared/protocol.ts';
+
+function removePlayer(state: RoomState, playerId: string): RoomState {
+  const { [playerId]: _removed, ...players } = state.players;
+  return { ...state, players, playerOrder: state.playerOrder.filter((id) => id !== playerId) };
+}
 
 function handlePlayerDisconnect(state: RoomState, playerId: string, now: number): ReduceOutput {
   const existing = state.players[playerId];
-  if (!existing) return { state, effects: [] };
+  if (!existing || !existing.connected) return { state, effects: [] };
   const nextState: RoomState = {
     ...state,
-    players: { ...state.players, [playerId]: { ...existing, connected: false } },
+    players: {
+      ...state.players,
+      [playerId]: { ...existing, connected: false, disconnectedAt: now },
+    },
   };
+  if (nextState.phase === 'LOBBY' && !existing.isHost) {
+    return {
+      state: nextState,
+      effects: [
+        {
+          type: 'schedule_guest_seat_expiry',
+          playerId,
+          atMs: now + DISCONNECTED_GUEST_GRACE_MS,
+        },
+      ],
+    };
+  }
   if (nextState.phase === 'ROUND_LOADING') {
     return maybeStartCountdown(nextState, now, false);
   }
   return { state: nextState, effects: [] };
+}
+
+function handleGuestSeatExpiry(state: RoomState, playerId: string, now: number): ReduceOutput {
+  const player = state.players[playerId];
+  if (
+    state.phase !== 'LOBBY' ||
+    !player ||
+    player.isHost ||
+    player.connected ||
+    player.disconnectedAt === undefined ||
+    now < player.disconnectedAt + DISCONNECTED_GUEST_GRACE_MS
+  ) {
+    return { state, effects: [] };
+  }
+  return { state: removePlayer(state, playerId), effects: [] };
+}
+
+function handleReleaseGuestSeat(
+  state: RoomState,
+  playerId: string,
+  targetPlayerId: string,
+): ReduceOutput {
+  const target = state.players[targetPlayerId];
+  if (state.phase !== 'LOBBY' || !state.players[playerId]?.isHost) {
+    return { state, effects: [], ack: 'forbidden' };
+  }
+  if (!target || target.isHost || target.connected) return { state, effects: [], ack: 'invalid' };
+  return {
+    state: removePlayer(state, targetPlayerId),
+    effects: [{ type: 'cancel_guest_seat_expiry', playerId: targetPlayerId }],
+    ack: 'ok',
+  };
 }
 
 function handleStartMatch(state: RoomState, playerId: string, now: number): ReduceOutput {
@@ -333,6 +386,10 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
       return handlePlayerJoinOrReclaim(state, { kind: 'reclaim', ...event });
     case 'player_disconnect':
       return handlePlayerDisconnect(state, event.playerId, now);
+    case 'expire_disconnected_guest':
+      return handleGuestSeatExpiry(state, event.playerId, now);
+    case 'release_guest_seat':
+      return handleReleaseGuestSeat(state, event.playerId, event.targetPlayerId);
     case 'update_lobby':
       return handleUpdateLobby(state, event.playerId, event.patch);
     case 'add_bot':
@@ -365,7 +422,7 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
     case 'end_match':
       return handleEndMatch(state, event.playerId, now);
     case 'play_again':
-      return handlePlayAgain(state, event.playerId);
+      return handlePlayAgain(state, event.playerId, now);
     default:
       return { state, effects: [] };
   }

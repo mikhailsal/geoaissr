@@ -2,6 +2,14 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.3.7] - 2026-11-25
+
+### Fixed
+
+- Hosts can release a disconnected guest’s seat from the lobby participant list. Offline guest seats expire after a ten-minute reconnect window in the lobby. Match results and permanent profile codes are preserved.
+- Profile and audio preference changes use bounded, asynchronous saves. Acknowledged changes persist across reconnects.
+- Player and bot name inputs reject terminal control characters. The host’s round summary also escapes unsafe characters in previously saved names.
+
 ## [0.3.5] - 2026-11-24
 
 ### Changed

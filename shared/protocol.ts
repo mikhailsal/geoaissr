@@ -6,6 +6,7 @@ import {
   joinMessageSchema,
   profileLoginMessageSchema,
   updateProfileMessageSchema,
+  releaseGuestSeatMessageSchema,
   avatarGestureMessageSchema,
   avatarSpinMessageSchema,
   avatarTurnMessageSchema,
@@ -41,6 +42,7 @@ export {
   joinMessageSchema,
   profileLoginMessageSchema,
   updateProfileMessageSchema,
+  releaseGuestSeatMessageSchema,
 };
 export { MAX_NICK_LEN } from './profile-messages.ts';
 export {
@@ -60,10 +62,18 @@ export const MAX_BOTS = 3;
 export const MAX_WS_CONNECTIONS = 32;
 export const MAX_PENDING_AUTH_CONNECTIONS = 8;
 export const UNAUTH_TIMEOUT_MS = 5_000;
+/** Lobby seats held for a briefly disconnected guest are never retained indefinitely. */
+export const DISCONNECTED_GUEST_GRACE_MS = 10 * 60 * 1_000;
 
 export type GamePhase = 'LOBBY' | 'ROUND_LOADING' | 'ROUND_ACTIVE' | 'ROUND_RESULTS' | 'FINAL';
 export type AckResult =
-  'ok' | 'round_over' | 'already_confirmed' | 'not_in_round' | 'invalid' | 'forbidden';
+  | 'ok'
+  | 'round_over'
+  | 'already_confirmed'
+  | 'not_in_round'
+  | 'invalid'
+  | 'forbidden'
+  | 'rate_limited';
 
 export const pingMessageSchema = z.object({
   type: z.literal('ping'),
@@ -149,6 +159,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   avatarGestureMessageSchema,
   avatarSpinMessageSchema,
   avatarTurnMessageSchema,
+  releaseGuestSeatMessageSchema,
   updateAudioPreferencesMessageSchema,
   resetBotWinsMessageSchema,
   pingMessageSchema,
@@ -448,6 +459,7 @@ export type ServerMessage =
       seq: number;
       result: AckResult;
       message?: string;
+      retryAfterMs?: number;
     }
   | {
       type: 'vision_check_result';

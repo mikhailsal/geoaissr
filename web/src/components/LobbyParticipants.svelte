@@ -8,10 +8,12 @@
   let {
     view,
     onAddBot,
+    onReleaseGuestSeat,
     onCharacter,
   }: {
     view: ClientViewState;
     onAddBot: () => void;
+    onReleaseGuestSeat: (playerId: string) => void;
     onCharacter: (event: MouseEvent, id: string, bot: boolean) => void;
   } = $props();
 </script>
@@ -47,6 +49,16 @@
           >
           <ChevronRight aria-hidden="true" size={18} />
         </button>
+        {#if view.viewerIsHost && !player.isHost && !player.connected}
+          <button
+            class="release btn"
+            type="button"
+            aria-label={'Освободить место: ' + player.name}
+            onclick={() => {
+              onReleaseGuestSeat(player.id);
+            }}>Освободить место</button
+          >
+        {/if}
       </li>
     {/each}
   </ul>
@@ -158,5 +170,8 @@
   }
   .warning {
     color: var(--signal);
+  }
+  .release {
+    margin-inline-start: var(--sp-2);
   }
 </style>

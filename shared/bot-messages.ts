@@ -7,6 +7,7 @@ import {
   personalityTextSchema,
 } from './bot-tools.ts';
 import { PARTICIPANT_COLOR_IDS } from './colors.ts';
+import { hasTerminalControlCharacters } from './display-name.ts';
 import { PLAY_STYLES } from './play-style.ts';
 import { botModelSchema, HARNESS_IDS } from './storage-schemas.ts';
 
@@ -19,7 +20,10 @@ export const botSlotPatchSchema = z.object({
     .string()
     .trim()
     .max(BOT_NAME_MAX_LEN)
-    .refine((v) => !/[\r\n]/.test(v), 'Имя должно быть в одну строку')
+    .refine(
+      (value) => !hasTerminalControlCharacters(value),
+      'Имя не должно содержать управляющие символы',
+    )
     .optional(),
   color: z.enum(PARTICIPANT_COLOR_IDS).optional(),
   enabled: z.boolean().optional(),
