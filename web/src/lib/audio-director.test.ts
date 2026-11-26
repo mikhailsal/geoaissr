@@ -96,6 +96,22 @@ function resultsAt(finishedAt: number, confirmedIds: string[] = []): ClientViewS
   return view({ phase: 'ROUND_RESULTS', gen: 2, active: undefined, results });
 }
 
+// Value: protects=the opponent sound plays when a bot's final answer arrives, not seconds later
+// when its process exits, and only once; fails_when=the sound waits for the «done» status again;
+// why_new=the old tests moved bots straight to «done»; seam=none; no_claim=actual audio output.
+test('a bot that answered while its process still runs is announced at once and only once', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  director.update(view(), 3_000, true);
+  director.update(activeWith({ botProgress: [bot('bot1', 'thinking')] }), 3_500, true);
+  expect(output.cues).toEqual([]);
+  const answered = { ...bot('bot1', 'thinking'), answered: true as const };
+  director.update(activeWith({ botProgress: [answered] }), 4_000, true);
+  expect(output.cues).toEqual(['opponent']);
+  director.update(activeWith({ botProgress: [bot('bot1', 'done')] }), 9_000, true);
+  expect(output.cues).toEqual(['opponent']);
+});
+
 test('announces live transitions and coalesces new opponents without duplicates', () => {
   const output = new FakeOutput();
   const director = new AudioDirector(output);

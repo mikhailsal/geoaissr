@@ -137,7 +137,9 @@ with sample-exact OGG loops as the fallback. `audio-director.ts`
 selects live transitions and timed effects using the same synchronized server
 clock as the visible timer; background progression follows its own audio clock.
 Outstanding loads lose permission to start when their source is stopped or
-their channel is muted. `GameAudio.svelte` owns browser visibility and cleanup.
+their channel is muted. `GameAudio.svelte` owns activation and cleanup. A hidden tab keeps
+playing, so a player who switched tabs still hears an opponent's answer and the next round;
+only a lost connection stops the sound.
 
 The 19 OGG files comprise 12 event sounds and seven music loops. Archived drafts,
 duplicate MP3 exports and reference recordings are not included.

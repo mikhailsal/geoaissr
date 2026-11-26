@@ -108,6 +108,7 @@ function projectActive(state: RoomState, viewerId: string): ClientViewState['act
       turnsUsed: b.turnsUsed,
       moveLimit: b.moveLimit,
       status: b.status,
+      ...(b.status === 'thinking' && b.guessFinalized === true ? { answered: true as const } : {}),
       abortReason: b.abortReason,
       ...(b.playStyle ? { playStyle: b.playStyle } : {}),
     })),

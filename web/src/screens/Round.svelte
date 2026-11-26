@@ -207,7 +207,7 @@
           roundNumber={view.roundNumber}
           playerColor={myColor}
           pin={currentPin}
-          locked={view.viewerIsSpectator || view.active.myConfirmed}
+          locked={view.viewerIsSpectator || view.active.myConfirmed || remainingMs <= 0}
           expanded={desktopExpanded || mobileMapOpen}
           onPick={(lat: number, lng: number) => {
             onSetPin(view.roundNumber, lat, lng);

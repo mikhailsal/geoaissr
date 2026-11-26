@@ -233,6 +233,11 @@ export interface BotRoundProgressView {
   turnsUsed: number;
   moveLimit: number;
   status: 'thinking' | 'done' | 'aborted';
+  /**
+   * The bot's final answer is in while its process is still closing. The answer is what starts a
+   * round push, so the sound and the «ответил» tag follow it and not the process exit.
+   */
+  answered?: true;
   abortReason?: string;
   /** The style the bot really plays this round; absent means Intuit. */
   playStyle?: PlayStyle;

@@ -1,6 +1,12 @@
 import { expect, test, mock, spyOn } from 'bun:test';
 import { Loader } from '@googlemaps/js-api-loader';
-import { buildPinElement, buildStreetViewUrl, loadGoogleMapsLibraries } from './maps-loader';
+import {
+  buildGuessMapOptions,
+  buildLightMapOptions,
+  buildPinElement,
+  buildStreetViewUrl,
+  loadGoogleMapsLibraries,
+} from './maps-loader';
 
 // Value: protects=exact pano URL and coordinates; fails_when=query keys or values change;
 // why_new=no existing URL contract test; seam=none; no_claim=external coverage or page availability.
@@ -70,4 +76,17 @@ test('configures compact pins and English maps', async () => {
     loader.mockRestore();
     Object.assign(globalThis, { document: originalDocument, window: originalWindow });
   }
+});
+
+// Value: protects=crosshair pointer over the guess map, grabbing hand while dragging, and Google's
+// place icons left on; fails_when=the cursors are dropped or a style hides places again;
+// why_new=no test covered the map options; seam=buildGuessMapOptions (non-test caller:
+// mountReusableGuessMap); no_claim=does not render a Google map.
+test('gives the guess map a crosshair pointer and keeps places of interest', () => {
+  const guess = buildGuessMapOptions();
+  expect(guess.draggableCursor).toBe('crosshair');
+  expect(guess.draggingCursor).toBe('grabbing');
+  expect(guess.clickableIcons).toBe(false);
+  expect(guess.styles).toBeUndefined();
+  expect(buildLightMapOptions().draggableCursor).toBeUndefined();
 });
