@@ -42,20 +42,20 @@ The files in `web/public/audio/` are copied unchanged from the owner's
 `sound-llm` project. Event names below are exact OGG basenames. The table lists
 each recording's base gain, multiplied by the selected effects volume.
 
-| File                              | Event                                                                   | Duration | Gain |
-| --------------------------------- | ----------------------------------------------------------------------- | -------- | ---- |
-| `loading-round.ogg`               | A new round starts loading; the complete drum phrase precedes counting  | 6.77 s   | 0.28 |
-| `soft-countdown.ogg`              | Three one-second counts, the go tone at +3 s, then its natural tail     | 6.50 s   | 0.60 |
-| `effect-new-round.ogg`            | A live round becomes active                                             | 1.18 s   | 0.35 |
-| `place-guess-land.ogg`            | You place or move your marker                                           | 0.24 s   | 0.70 |
-| `effect-guess-locked.ogg`         | The server accepts your submitted answer                                | 0.55 s   | 0.40 |
-| `new-effect-opponent-guessed.ogg` | Another human confirms or an AI finishes its answer                     | 2.87 s   | 0.25 |
-| `effect-timer-countdown.ogg`      | Your final 15 seconds, the hit/whistle at zero, then its natural tail   | 18.00 s  | 0.40 |
-| `round-end.ogg`                   | Round results arrive; its drum/rumble may finish during the next screen | 6.93 s   | 0.32 |
-| `game_end.ogg`                    | Match results arrive after at least one completed round                 | 0.40 s   | 0.40 |
-| `swoosh.ogg`                      | A live transition between lobby, round, round results and match results | 0.91 s   | 0.50 |
-| `swoosh-short.ogg`                | Host menu, map toggle, profile and AI explanation panels                | 0.07 s   | 0.70 |
-| `effect-count-down-tick.ogg`      | The host changes the round duration                                     | 1.04 s   | 0.50 |
+| File                              | Event                                                                                  | Duration | Gain |
+| --------------------------------- | -------------------------------------------------------------------------------------- | -------- | ---- |
+| `loading-round.ogg`               | A new round starts loading; the complete drum phrase precedes counting                 | 6.77 s   | 0.28 |
+| `soft-countdown.ogg`              | Three one-second counts, the go tone at +3 s, then its natural tail                    | 6.50 s   | 0.60 |
+| `effect-new-round.ogg`            | A live round becomes active                                                            | 1.18 s   | 0.35 |
+| `place-guess-land.ogg`            | You place or move your marker                                                          | 0.24 s   | 0.70 |
+| `effect-guess-locked.ogg`         | The server accepts your answer, or your «Готов» click is registered                    | 0.55 s   | 0.40 |
+| `new-effect-opponent-guessed.ogg` | Another human confirms or an AI finishes its answer, or another player presses «Готов» | 2.87 s   | 0.25 |
+| `effect-timer-countdown.ogg`      | Your final 15 seconds, the hit/whistle at zero, then its natural tail                  | 18.00 s  | 0.40 |
+| `round-end.ogg`                   | Round results arrive; its drum/rumble may finish during the next screen                | 6.93 s   | 0.32 |
+| `game_end.ogg`                    | Match results arrive after at least one completed round                                | 0.40 s   | 0.40 |
+| `swoosh.ogg`                      | A live transition between lobby, round, round results and match results                | 0.91 s   | 0.50 |
+| `swoosh-short.ogg`                | Host menu, map toggle, profile and AI explanation panels                               | 0.07 s   | 0.70 |
+| `effect-count-down-tick.ogg`      | The host changes the round duration                                                    | 1.04 s   | 0.50 |
 
 The server starts the three-second countdown when the connected round participants'
 panoramas are ready or the panorama wait times out, with a minimum of 6.8 seconds
@@ -74,6 +74,11 @@ one snapshot produce one cue. Round results carry the server's finish time and
 the IDs of confirmed humans and successfully finished bots. This lets the client
 play a final opponent cue if that answer arrives with the results and stop the
 warning if the round ended before the deadline.
+
+On the results and final screens, a «Готов» press plays the same cues. A newly
+ready player other than the viewer produces one opponent cue per snapshot; the
+viewer's own press plays the locked cue. Phase changes, initial snapshots and
+reconnect restoration stay silent.
 
 The timer recording is longer than its 15 counted seconds: the final hit is at
 +15.048 seconds, followed by its decay. Reaching zero and entering results let

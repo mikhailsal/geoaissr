@@ -30,7 +30,7 @@ The fonts are bundled in the repository (`@fontsource-variable/unbounded`, `@fon
 | `--paper-dim`   | `#B9B4A8` | Secondary text and captions                                    |
 | `--paint`       | `#FFD23F` | Primary accent, focus, main button, timer                      |
 | `--signal`      | `#FF6369` | Errors, the last-10-seconds countdown                          |
-| `--ok`          | `#3DBB7A` | Success, confirmed answer, connection healthy                  |
+| `--ok`          | `#3DBB7A` | Success, confirmed answer, connection healthy, «✓ готов» mark  |
 
 ### Participant palette (`--p-1` … `--p-12`)
 
