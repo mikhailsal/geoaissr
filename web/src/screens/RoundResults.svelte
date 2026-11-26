@@ -6,6 +6,7 @@
   import HostMenu from '../components/HostMenu.svelte';
   import ResultsTabs from '../components/ResultsTabs.svelte';
   import MatchStandings from '../components/MatchStandings.svelte';
+  import NextRoundFooter from '../components/NextRoundFooter.svelte';
   import ResultsMap from '../components/ResultsMap.svelte';
   import { formatDistanceRu, formatNumberRu } from '../i18n/format';
   import { attachGlobalKeys, prefersReducedMotion } from '../lib/keys';
@@ -18,7 +19,8 @@
     activeBotCard: { roundNumber: number; entry: RoundResultEntryView } | null;
     onSelectBotCard: (roundNumber: number, entry: RoundResultEntryView) => void;
     onCloseBotCard: () => void;
-    onNextRound: (roundNumber: number) => void;
+    onNextRound: (roundNumber: number, force: boolean) => void;
+    onReady: (roundNumber: number, matchId: string) => void;
     onEndMatch: () => void;
     onMapLoaded: () => void;
     onClientError: (source: 'maps_js' | 'map', code: string, message: string) => void;
@@ -32,6 +34,7 @@
     onSelectBotCard,
     onCloseBotCard,
     onNextRound,
+    onReady,
     onEndMatch,
     onMapLoaded,
     onClientError,
@@ -269,24 +272,7 @@
         </div>
       {/if}
 
-      <footer class="next-footer">
-        {#if !view.viewerIsHost}
-          <span class="muted" role="status">
-            {isFinalRound ? RU.results.waitHostFinal : RU.results.waitHostNext}
-          </span>
-        {/if}
-        {#if view.viewerIsHost}
-          <button
-            type="button"
-            class="btn btn-primary"
-            onclick={() => {
-              onNextRound(view.roundNumber);
-            }}
-          >
-            {isFinalRound ? 'К итогам' : RU.results.nextBtn}
-          </button>
-        {/if}
-      </footer>
+      <NextRoundFooter {view} {isFinalRound} {onNextRound} {onReady} />
     </section>
   </main>
 {/if}
@@ -460,15 +446,6 @@
   .bot-card-row td {
     max-width: 0;
     padding: var(--sp-2) 0;
-  }
-
-  .next-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    padding-top: var(--sp-2);
-    border-top: 1px solid var(--line);
   }
 
   @media (max-width: 899px) {

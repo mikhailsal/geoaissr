@@ -239,14 +239,31 @@ function handleDeadlineTick(
 /** Results stay on screen until the host moves on; there is no auto-advance timer. */
 function handleNextRound(
   state: RoomState,
-  event: Extract<EngineEvent, { type: 'next_round' }>,
+  event: Extract<EngineEvent, { type: 'next_round' | 'ready_next' }>,
   now: number,
 ): ReduceOutput {
   if (state.phase !== 'ROUND_RESULTS' || !state.results) {
     return { state, effects: [], ack: 'round_over' };
   }
-  if (!state.players[event.playerId]?.isHost) return { state, effects: [], ack: 'forbidden' };
   if (event.roundNumber !== state.roundNumber) return { state, effects: [], ack: 'round_over' };
+  const player = state.players[event.playerId];
+  const { readyIds } = state.results;
+  if (event.type === 'ready_next') {
+    // «Готов» only tells the host who has finished reading; it never moves the match on.
+    if (!player || player.isHost) return { state, effects: [], ack: 'forbidden' };
+    // «Ещё раз» keeps the players and starts the rounds from 1 again.
+    if (event.matchId !== state.matchId) return { state, effects: [], ack: 'round_over' };
+    if (readyIds.includes(player.id)) return { state, effects: [], ack: 'ok' };
+    const results = { ...state.results, readyIds: [...readyIds, player.id] };
+    return { state: { ...state, results }, effects: [], ack: 'ok' };
+  }
+  if (!player?.isHost) return { state, effects: [], ack: 'forbidden' };
+  // The host's screen can be behind: a guest may come back between its last view and the click.
+  // Without `force` the click is refused, and the next one meets the question about that guest.
+  const waiting = Object.values(state.players).some(
+    (p) => !p.isHost && p.connected && !readyIds.includes(p.id),
+  );
+  if (waiting && !event.force) return { state, effects: [], ack: 'forbidden' };
   return { ...advanceFromResults(state, now), ack: 'ok' };
 }
 
@@ -421,6 +438,7 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
     case 'deadline_tick':
       return handleDeadlineTick(state, event, now);
     case 'next_round':
+    case 'ready_next':
       return handleNextRound(state, event, now);
     case 'end_match':
       return handleEndMatch(state, event.playerId, now);

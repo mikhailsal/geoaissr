@@ -226,6 +226,7 @@ function buildResultsState(
   const aiTotal = state.humanVsAiTotal.ai + aiMean;
 
   const results: RoundResultsState = {
+    readyIds: [],
     completion: {
       finishedAt: now,
       confirmedIds: [

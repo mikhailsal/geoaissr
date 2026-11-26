@@ -181,7 +181,9 @@ async function playRoundTwoAndFinal(hostPage: Page, guestPage: Page): Promise<vo
   await guestPage.getByRole('button', { name: 'Угадать' }).click();
 
   await expect(hostPage.getByText(/Правильный ответ:/)).toBeVisible({ timeout: 12_000 });
+  // The guest has not pressed «Готов»: the host is asked first and may go on anyway.
   await hostPage.getByRole('button', { name: 'К итогам' }).click();
+  await hostPage.getByRole('dialog').getByRole('button', { name: 'Запускать' }).click();
 
   await expect(hostPage.getByRole('button', { name: 'Ещё раз' })).toBeVisible({
     timeout: 10_000,
@@ -245,6 +247,7 @@ test('full 2-round match satisfies T53 map telemetry, axe WCAG AA, and BotCard/S
     await playRoundOne(hostPage, guestPage);
 
     await hostPage.getByRole('button', { name: 'Дальше' }).click();
+    await hostPage.getByRole('dialog').getByRole('button', { name: 'Запускать' }).click();
     await playRoundTwoAndFinal(hostPage, guestPage);
 
     expect(hostMaps.getCount()).toBeLessThanOrEqual(2);

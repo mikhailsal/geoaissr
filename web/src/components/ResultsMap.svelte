@@ -133,8 +133,21 @@
     };
   });
 
+  let drawn: { on: GoogleResultsMapController; key: string } | null = null;
+
   $effect(() => {
     if (fakeMode || !controller) return;
+    // A redraw fits the map to the pins again. A new view of the same results (a player pressed
+    // «Готов») must not move the map under someone who is looking at a guess.
+    const key = JSON.stringify([
+      targetLat,
+      targetLng,
+      countryNameRu,
+      selectedEntryId,
+      visibleEntries.map((e) => [e.id, e.lat, e.lng, e.color, e.name]),
+    ]);
+    if (drawn?.on === controller && drawn.key === key) return;
+    drawn = { on: controller, key };
     const pins: PinOverlaySpec[] = visibleEntries.map((entry) => {
       const color = getParticipantColor(entry.color);
       return {
@@ -147,7 +160,8 @@
         isAi: entry.isAi,
         selected: selectedEntryId === entry.id,
         onClick: () => {
-          onSelectEntry(entry);
+          // The pin may outlive the view it was drawn from: open the entry as it is now.
+          onSelectEntry(entries.find((e) => e.id === entry.id) ?? entry);
         },
       };
     });

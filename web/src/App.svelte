@@ -143,8 +143,11 @@
     audioPlayer.cue('click');
     store.closeBotCard();
   };
-  const handleNextRound = (rn: number): void => {
-    store.nextRound(rn);
+  const handleNextRound = (rn: number, force: boolean): void => {
+    store.nextRound(rn, force);
+  };
+  const handleReadyNext = (rn: number, matchId: string): void => {
+    store.readyNext(rn, matchId);
   };
   const handlePlayAgain = (): void => {
     store.playAgain();
@@ -301,6 +304,7 @@
       onSelectBotCard={handleSelectBotCard}
       onCloseBotCard={handleCloseBotCard}
       onNextRound={handleNextRound}
+      onReady={handleReadyNext}
       onEndMatch={handleEndMatch}
       onMapLoaded={handleResultsMapLoaded}
       onClientError={handleClientError}
