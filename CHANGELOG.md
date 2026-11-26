@@ -2,6 +2,17 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.4.2] - 2026-11-26
+
+### Added
+
+- Tell the host you are ready for the next round. On the results screen every player except the host has a «Готов» button where the host has «Дальше», and a line shows how many are ready («Готовы: 1 из 3»).
+- The host is asked before starting without someone. If «Дальше» is pressed while a connected player has not pressed «Готов», a question names them («Вася, Петя ещё не нажали «Готов». Точно запускаем?») with «Запускать» and «Отмена». The question closes by itself when the last player becomes ready. A player who has dropped off is not waited for.
+
+### Fixed
+
+- Escape closes an open dialog. Before, during a round and on the results and final screens the key went to the screen behind the dialog.
+
 ## [0.4.1] - 2026-11-26
 
 ### Added
