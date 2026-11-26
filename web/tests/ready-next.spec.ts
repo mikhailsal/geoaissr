@@ -96,6 +96,13 @@ test('the host is asked before starting without a guest who is still reading', a
     await expect(host.getByRole('row').filter({ hasText: 'Оля' }).getByText('✓ готов')).toHaveCount(
       0,
     );
+    // The match standings tab marks them too.
+    await host.getByRole('tab', { name: 'Рейтинг за игру' }).click();
+    const standingsRow = host
+      .getByTestId('match-standings-table')
+      .getByRole('row')
+      .filter({ hasText: 'Дима' });
+    await expect(standingsRow.getByText('✓ готов')).toBeVisible();
     await host.getByRole('button', { name: 'Дальше' }).click();
     await expect(host.getByRole('dialog')).toHaveCount(0);
     await expect(host.locator('header').getByText('раунд 2 из 2')).toBeVisible({ timeout: 12_000 });

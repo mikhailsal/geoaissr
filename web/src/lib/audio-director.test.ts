@@ -503,4 +503,6 @@ test('ready clicks on the results and final screens are announced once each', ()
   director.update(null, 2_200, false);
   director.update(finalReady(['g', 'h2']), 2_300, true);
   expect(output.cues).toEqual(['opponent']);
+  director.update(finalReady(['g', 'h2', 'me']), 2_400, true);
+  expect(output.cues).toEqual(['opponent', 'locked']);
 });

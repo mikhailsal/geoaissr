@@ -615,6 +615,9 @@ test('a guest marks themselves ready on the final screen and the host is held fo
   expect(ready.effects).toEqual([]);
   expect(ready.state.phase).toBe('FINAL');
   expect(projectView(ready.state, 'h').final?.readyIds).toEqual(['g']);
+  const again = reduce(ready.state, { type: 'ready_lobby', playerId: 'g', gen: fin.gen }, 7350);
+  expect(again.ack).toBe('ok');
+  expect(again.state).toBe(ready.state);
 
   const lobby = reduce(ready.state, { type: 'play_again', playerId: 'h' }, 7400);
   expect(lobby.ack).toBe('ok');
@@ -627,6 +630,25 @@ test('a guest marks themselves ready on the final screen and the host is held fo
   const forced = reduce(fin, { type: 'play_again', playerId: 'h', force: true }, 7600);
   expect(forced.ack).toBe('ok');
   expect(forced.state.phase).toBe('LOBBY');
+
+  // Nobody waits for a guest who has dropped off.
+  const gone = reduce(fin, { type: 'player_disconnect', playerId: 'g' }, 7700).state;
+  expect(reduce(gone, { type: 'play_again', playerId: 'h' }, 7800).ack).toBe('ok');
+});
+
+// Value: protects=marks from an earlier final screen are gone when the last round's results lead
+// to a new one; fails_when=advanceFromResults stops resetting finalReadyIds; why_new=the test above
+// enters FINAL through end_match only; seam=none; no_claim=none beyond protects.
+test('the final screen reached from the last round starts with nobody ready', () => {
+  const room = resultsRoomWithGuest();
+  const last = { ...room, settings: { ...room.settings, rounds: 1 }, finalReadyIds: ['g'] };
+  const fin = reduce(
+    last,
+    { type: 'next_round', playerId: 'h', roundNumber: 1, force: true },
+    7000,
+  ).state;
+  expect(fin.phase).toBe('FINAL');
+  expect(projectView(fin, 'h').final?.readyIds).toEqual([]);
 });
 
 test('last human disconnecting in ROUND_LOADING holds countdown and mapsError resets cleanly', () => {
