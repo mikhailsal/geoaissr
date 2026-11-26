@@ -30,9 +30,9 @@ logout from another tab discards its in-memory pending edit for that profile.
 When browser storage is unavailable, controls and server saving still work.
 
 Audio activates after a pointer or keyboard interaction. A restored game can
-therefore remain silent until the first interaction. Hidden tabs, disconnected
-sessions and logged-out players are silent. After reconnecting, audio waits for
-a fresh room snapshot. Returning to the game restores the paused music and
+therefore remain silent until the first interaction. Disconnected
+sessions and logged-out players are silent; a hidden tab keeps playing. After reconnecting, audio waits for
+a fresh room snapshot. Reconnecting restores the paused music and
 current timed warnings without replaying earlier results or answers.
 Sound failures never block joining, placing a marker or submitting an answer.
 

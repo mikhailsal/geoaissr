@@ -76,7 +76,7 @@ The [bot tool and accounting reference](docs/bot-tools.md) describes the step jo
 
 ## Maps and regions
 
-The host picks two things in **Настройки партии**: the **Карта** (map), which is the pool of places a round can start in, and the **Регион** (region), which narrows any map to the whole world, a continent or one country. A line under the map select says what the map holds; the AI opponents are told the same.
+The host picks two things in **Настройки партии**: the **Карта** (map), which is the pool of places a round can start in, and the **Регион** (region), which narrows any map to the whole world, a continent or one country. The region list has a search field: type a few letters of a country or continent, then pick with the arrow keys and Enter. The lobby lists only countries where a measured scan found Street View panoramas (103 for «Стандартная», 101 for «Глушь»), and the point maps leave out places in countries with next to no panoramas. A line under the map select says what the map holds; the AI opponents are told the same.
 
 | Map              | Where a round starts                                                                     |
 | ---------------- | ---------------------------------------------------------------------------------------- |
@@ -115,6 +115,7 @@ The place lists are built from open data and committed to the repository; no Str
 | `bun run test:tunnel -- --hold-sec 5`                    | Live check of the `cloudflared` Quick Tunnel and DNS readiness                                           |
 | `bun run eval:bots -- --dry --repeats 1`                 | Offline dry run of the bot evaluation ([details](docs/evals/README.md))                                  |
 | `bun run maps:sample -- --map cities --region europe`    | Rolls live rounds of a map and region and prints the mix (free metadata lookups; `--help` for flags)     |
+| `bun run scan:coverage`                                  | Measures which countries have Street View coverage and rewrites `server/maps/coverage.data.json`         |
 
 ---
 
