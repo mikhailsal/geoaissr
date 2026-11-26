@@ -36,6 +36,13 @@
   const firstCountryIndex = $derived(shown.findIndex((option) => option.kind === 'country'));
   const activeOption = $derived(shown[activeIndex]);
 
+  // The list can change under an open picker (another tab changes the map, the host role moves).
+  $effect(() => {
+    if (!open) return;
+    if (disabled) closeList(false);
+    else if (activeIndex >= shown.length) activeIndex = Math.max(0, firstPickable(0, 1));
+  });
+
   function optionId(option: RegionOption): string {
     return `${id}-${option.region}`;
   }

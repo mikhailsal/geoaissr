@@ -47,7 +47,14 @@ async function fetchMetadataWithRetry(
         lastError = new Error(`HTTP ${res.status}`);
         continue;
       }
-      return (await res.json()) as SvMetadataResponse;
+      const data = (await res.json()) as SvMetadataResponse;
+      // Google's server error: the same request may succeed when sent again. It is not "no
+      // panorama here", so it never counts as a miss of a round or of a coverage scan.
+      if (data.status === 'UNKNOWN_ERROR') {
+        lastError = new Error('Street View Metadata UNKNOWN_ERROR');
+        continue;
+      }
+      return data;
     } catch (err) {
       if (err instanceof GeoError) throw err;
       lastError = err;

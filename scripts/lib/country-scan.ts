@@ -75,7 +75,7 @@ export async function measureCountryHits(opts: {
 }
 
 /** A file path with the links of its folder followed, so a link to `server/maps` hides nothing. */
-function canonicalPath(file: string): string {
+export function canonicalPath(file: string): string {
   const resolved = path.resolve(file);
   try {
     return path.join(realpathSync(path.dirname(resolved)), path.basename(resolved));

@@ -5,7 +5,7 @@ import type {
   CoverageDataset,
   CoverageKindStat,
 } from '../server/maps/coverage.ts';
-import { measureCountryHits, pickCountryIds } from './lib/country-scan.ts';
+import { canonicalPath, measureCountryHits, pickCountryIds } from './lib/country-scan.ts';
 import { parseBuilderArgs, writeDatasetFile } from './lib/dataset-io.ts';
 
 /**
@@ -91,6 +91,8 @@ export function pickScanCountries(only: string | undefined, out: string | undefi
 if (import.meta.main) {
   const args = parseBuilderArgs(process.argv.slice(2), ['only', 'out']);
   const countryIds = pickScanCountries(args.only, args.out);
+  // Fixed before the scan: the file that was checked is the file that gets written.
+  const outPath = args.out === undefined ? TRACKED_DATASET : canonicalPath(args.out);
   const serverKey = process.env.GOOGLE_MAPS_SERVER_KEY?.trim() ?? '';
   if (!serverKey) throw new Error('GOOGLE_MAPS_SERVER_KEY is not set (see .env.example)');
   const stats = await scanCoverage({
@@ -109,7 +111,6 @@ if (import.meta.main) {
     measured: new Date().toISOString().slice(0, 7),
     countries: stats,
   };
-  const outPath = args.out ?? TRACKED_DATASET;
   writeDatasetFile(outPath, dataset);
   console.log('Generated', outPath, 'countries:', Object.keys(stats).length);
 }

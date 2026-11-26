@@ -103,8 +103,12 @@ function chooseRoll(ctx: RollContext, inTown: boolean): Roll {
   }
   const towns = getCoveredCountries(region, 'town', exclude);
   const town = towns.length > 0 ? townRoll(ctx, towns, { landRadiusM: OPEN_LAND_RADIUS_M }) : null;
-  // A country covered only in its towns (or only outside them) plays the kind it has.
-  const roll = inTown ? (town ?? open) : (open ?? town);
+  // A country covered only in its towns (or only outside them) plays the kind it has, and a kind
+  // whose countries were all played gives way to the other while that one has a fresh country.
+  const hasFresh = (list: typeof land): boolean => list.some((e) => !exclude.has(e.country.id));
+  const [first, second] = inTown ? [town, open] : [open, town];
+  const firstIsStale = !hasFresh(inTown ? towns : land) && hasFresh(inTown ? land : towns);
+  const roll = firstIsStale ? second : (first ?? second);
   if (!roll) throw new EmptyMapRegionError(map, region);
   return roll;
 }

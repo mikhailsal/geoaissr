@@ -6,6 +6,7 @@ import type { LatLng } from '../../shared/score.ts';
 import type { RoundTarget } from '../engine/types.ts';
 import { countryForIso, isPlaceInRegion, isoCodesOfCountryIds } from '../maps/countries.ts';
 import { labelCountryIso } from '../maps/country-label.ts';
+import { getCoveredCountries, isCountryCovered } from '../maps/coverage.ts';
 import { NORTH_MIN_LAT, getNorthCountries } from '../maps/north.ts';
 import { ALL_PLACES, placesOfIso } from '../maps/places.ts';
 import { getRetroCountries } from '../maps/retro.ts';
@@ -133,7 +134,29 @@ function pickScene(
   if (input.map === 'retro') return pickUnplayed(retroScenes(input.region, round), played, round);
   // The standard and wild maps keep to countries with Street View coverage, as the live maps do.
   if (!isMapAvailable(input.map, input.region)) return undefined;
-  return pickUnplayed(scenesOfRegion(input.region, round), played, round);
+  return coveredScene(input, played, round);
+}
+
+/** A scene of the standard or wild map: in a country with coverage, as on the live maps. */
+function coveredScene(
+  input: RoundLocationRequest,
+  played: ReadonlySet<string>,
+  round: number,
+): FakeScene | undefined {
+  const kinds = input.map === 'wild' ? (['open'] as const) : (['town', 'open'] as const);
+  const isCovered = (id: string): boolean => kinds.some((kind) => isCountryCovered(id, kind));
+  const drawn = scenesOfRegion(input.region, round).filter((scene) =>
+    isCovered(countryForIso(scene.iso).id),
+  );
+  if (drawn.length > 0) return pickUnplayed(drawn, played, round);
+  // No drawn scene in a covered country of the region: play at a settlement of one.
+  for (const kind of kinds) {
+    for (const { country } of getCoveredCountries(input.region, kind)) {
+      const place = placesOfIso(country.iso)[0];
+      if (place) return sceneAt(country.iso, place, round);
+    }
+  }
+  return undefined;
 }
 
 function toTarget(scene: FakeScene, map: MapId, region: RegionId): RoundTarget {

@@ -5,9 +5,12 @@ import {
   COVERAGE_DATASET,
   getCoveredCountries,
   isCountryBare,
+  isCoveredStat,
   isCountryCovered,
   isCountryPlayable,
 } from '../maps/coverage.ts';
+import { getSourceGroups } from '../maps/sources.ts';
+import { createFakeLocationService } from './fake.ts';
 import { EmptyMapRegionError } from './service.ts';
 import { serviceWithDouble } from './test-helpers.ts';
 
@@ -75,6 +78,90 @@ test('the availability table offers the standard and wild maps where a round can
   expect(table.standard?.['country:FRA']).toBe(1);
   expect(table.standard?.world).toBe(getPlayableCount());
   expect(table.wild?.world).toBe(getCoveredCountries('world', 'open').length);
+});
+
+// Value: protects=a country covered only in its towns (Greenland) or only outside them (Brunei)
+// plays the kind it has, and the wild map takes it only with open land; fails_when=a round there
+// aims at the kind without panoramas and spends its lookups, or the wild map offers Greenland;
+// why_new=only fully covered and bare countries were tested; seam=none; no_claim=that the two
+// countries stay one-sided in a later scan (the first two lines check it).
+test('a country covered in one kind plays that kind', async () => {
+  expect([isCountryCovered('GRL', 'town'), isCountryCovered('GRL', 'open')]).toEqual([true, false]);
+  expect([isCountryCovered('BRN', 'town'), isCountryCovered('BRN', 'open')]).toEqual([false, true]);
+  const { svc, requests } = serviceWithDouble({ seed: 7 });
+  const prepare = (map: 'standard' | 'wild', region: 'country:GRL' | 'country:BRN') =>
+    svc.prepareRoundLocation({ map, region, excludeCountryIds: [] }).then(
+      (target) => target.countryId,
+      (e: unknown) => e,
+    );
+  for (let i = 0; i < 8; i += 1) {
+    expect(await prepare('standard', 'country:GRL')).toBe('GRL');
+  }
+  // Every Greenland lookup aimed at a settlement: none used the open-land radius.
+  expect(requests.some((request) => request.radius === 5000)).toBe(false);
+  expect(await prepare('wild', 'country:GRL')).toBeInstanceOf(EmptyMapRegionError);
+  for (let i = 0; i < 8; i += 1) {
+    expect(await prepare('standard', 'country:BRN')).toBe('BRN');
+  }
+  expect(await prepare('wild', 'country:BRN')).toBe('BRN');
+});
+
+// Value: protects=a standard round goes to a country not yet played while one is left, whichever
+// kind covers it; fails_when=with every open-land country of North America played, an open round
+// repeats Canada although Greenland (towns only) is fresh; why_new=each kind fell back to all its
+// countries on its own; seam=none; no_claim=the order of countries inside a kind.
+test('a standard round prefers the kind that still has a fresh country', async () => {
+  const playedLand = getCoveredCountries('north_america', 'open').map((e) => e.country.id);
+  expect(playedLand).not.toContain('GRL');
+  const { svc } = serviceWithDouble({ seed: 11 });
+  for (let i = 0; i < 12; i += 1) {
+    const target = await svc.prepareRoundLocation({
+      map: 'standard',
+      region: 'north_america',
+      excludeCountryIds: playedLand,
+    });
+    expect(target.countryId).toBe('GRL');
+  }
+});
+
+// Value: protects=the fake location service keeps the standard and wild maps to covered countries
+// like the live one; fails_when=a fake round of Africa lands in Cairo, a country the lobby does
+// not offer; why_new=the fake service checked the region only; seam=none; no_claim=live lookups.
+test('fake rounds of the standard and wild maps keep to covered countries', async () => {
+  const fake = createFakeLocationService();
+  for (const map of ['standard', 'wild'] as const) {
+    for (let i = 0; i < 6; i += 1) {
+      const target = await fake.prepareRoundLocation({
+        map,
+        region: 'africa',
+        excludeCountryIds: [],
+      });
+      expect(isCountryCovered(target.countryId, map === 'wild' ? 'open' : 'town')).toBe(true);
+    }
+  }
+});
+
+// Value: protects=the point maps aim at no place in a country the scan found bare, and keep the
+// places of covered ones; fails_when=the filter is dropped and Beijing is a capital round again,
+// or it drops a covered country; why_new=only the rule was tested, not the filtered sources;
+// seam=none; no_claim=that a single place inside a thinly covered country has no panorama.
+test('the point maps leave out the places of bare countries', () => {
+  for (const map of ['capitals', 'airports', 'megacities'] as const) {
+    const isos = getSourceGroups(map, 'asia').map((group) => group.iso);
+    expect(isos).toContain('JP');
+    for (const bare of ['CN', 'KP', 'IR', 'PK']) expect(isos).not.toContain(bare);
+  }
+});
+
+// Value: protects=the bar of one find in forty lookups, in the direction the round budget needs;
+// fails_when=the comparison flips and thin countries pass, or a country with no finds passes;
+// why_new=the dataset test names countries far from the bar; seam=none; no_claim=none beyond
+// protects.
+test('a country is covered from one find in forty lookups', () => {
+  expect(isCoveredStat({ lookups: 40, found: 1 })).toBe(true);
+  expect(isCoveredStat({ lookups: 41, found: 1 })).toBe(false);
+  expect(isCoveredStat({ lookups: 120, found: 0 })).toBe(false);
+  expect(isCoveredStat(undefined)).toBe(false);
 });
 
 function getPlayableCount(): number {

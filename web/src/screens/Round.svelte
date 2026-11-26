@@ -80,6 +80,7 @@
   function submitCurrentPin(): void {
     if (view.phase !== 'ROUND_ACTIVE' || !view.active) return;
     if (view.viewerIsSpectator || view.active.myConfirmed || !currentPin || submittingGuess) return;
+    if (remainingMs <= 0) return; // the round is closing: a late guess would stay a pin
     onSubmitGuess(view.roundNumber, currentPin.lat, currentPin.lng);
   }
 
@@ -239,7 +240,7 @@
           <button
             type="button"
             class="btn btn-primary guess-btn"
-            disabled={!currentPin || submittingGuess}
+            disabled={!currentPin || submittingGuess || remainingMs <= 0}
             onclick={submitCurrentPin}
           >
             {submittingGuess ? RU.round.submittingBtn : RU.round.guessBtn}
