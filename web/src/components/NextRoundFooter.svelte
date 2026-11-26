@@ -6,8 +6,8 @@
   interface Props {
     view: ClientViewState;
     isFinalRound: boolean;
-    onNextRound: (roundNumber: number) => void;
-    onReady: (roundNumber: number) => void;
+    onNextRound: (roundNumber: number, force: boolean) => void;
+    onReady: (roundNumber: number, matchId: string) => void;
   }
 
   let { view, isFinalRound, onNextRound, onReady }: Props = $props();
@@ -25,9 +25,10 @@
     if (notReady.length === 0) confirmOpen = false;
   });
 
-  function next(): void {
+  /** `force`: the host has seen the question. The server refuses an unforced start while it waits. */
+  function next(force: boolean): void {
     confirmOpen = false;
-    onNextRound(view.roundNumber);
+    onNextRound(view.roundNumber, force);
   }
 </script>
 
@@ -48,7 +49,7 @@
       class="btn btn-primary"
       onclick={() => {
         if (notReady.length > 0) confirmOpen = true;
-        else next();
+        else next(false);
       }}
     >
       {isFinalRound ? RU.results.finalBtn : RU.results.nextBtn}
@@ -59,7 +60,7 @@
       class="btn btn-primary"
       disabled={iAmReady}
       onclick={() => {
-        onReady(view.roundNumber);
+        onReady(view.roundNumber, view.matchId);
       }}
     >
       {iAmReady ? RU.results.readyDone : RU.results.readyBtn}
@@ -85,7 +86,13 @@
       >
         {RU.results.notReadyCancel}
       </button>
-      <button type="button" class="btn btn-primary" onclick={next}>
+      <button
+        type="button"
+        class="btn btn-primary"
+        onclick={() => {
+          next(true);
+        }}
+      >
         {RU.results.notReadyGo}
       </button>
     </div>

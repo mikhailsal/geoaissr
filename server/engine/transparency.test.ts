@@ -277,7 +277,7 @@ test('late accounting updates its archived round across results and the next rou
   );
   const next = reduce(
     priced,
-    { type: 'next_round', playerId: 'host', roundNumber: 1 },
+    { type: 'next_round', playerId: 'host', roundNumber: 1, force: true },
     151_000,
   ).state;
   const late = accounting(next, { costUsd: 0.006 }, active.gen, 1);

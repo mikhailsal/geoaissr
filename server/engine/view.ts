@@ -137,7 +137,7 @@ function projectResults(state: RoomState, viewerIsHost: boolean): ClientViewStat
     : undefined;
   return {
     completion: res.completion,
-    readyIds: res.readyIds ?? [],
+    readyIds: res.readyIds,
     targetLat: res.target.lat,
     targetLng: res.target.lng,
     countryNameRu: res.target.countryNameRu,

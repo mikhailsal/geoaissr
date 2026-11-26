@@ -423,7 +423,11 @@ test('round results show raw bot diagnostics to the host only; guests keep the a
 
 test('final screen bot cards show raw bot diagnostics to the host only', () => {
   const resultsRoom = makeResultsRoomWithFailedBot();
-  const s = reduce(resultsRoom, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 6000).state;
+  const s = reduce(
+    resultsRoom,
+    { type: 'next_round', playerId: 'h', roundNumber: 1, force: true },
+    6000,
+  ).state;
   expect(s.phase).toBe('FINAL');
 
   const cardFor = (viewerId: string) =>

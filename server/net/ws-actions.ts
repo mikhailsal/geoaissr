@@ -11,6 +11,7 @@ import { visionSubject } from '../../shared/play-style.ts';
 import type { BotSlotConfig } from '../../shared/storage-schemas.ts';
 import type { BotRunner } from '../bots/runner.ts';
 import type { RoomShell } from '../engine/shell.ts';
+import type { EngineEvent } from '../engine/types.ts';
 import { buildQuotaSummaryForRoom, type QuotaManager } from '../storage/quota.ts';
 import type { RateLimiter } from './rate-limit.ts';
 import type { WsClientData } from './ws.ts';
@@ -202,6 +203,14 @@ export function handleVisionCheckMsg(deps: VisionCheckActionDeps): void {
   });
 }
 
+function leaveResultsEvent(
+  msg: Extract<ClientMessage, { type: 'next_round' | 'ready_next' }>,
+  playerId: string,
+): Extract<EngineEvent, { type: 'next_round' | 'ready_next' }> {
+  const { type, roundNumber, force, matchId } = msg;
+  return { type, playerId, roundNumber, force, matchId };
+}
+
 /** Map authenticated gameplay/lobby client messages onto RoomShell events. */
 export function dispatchEngineClientMessage(
   shell: RoomShell,
@@ -273,7 +282,7 @@ export function dispatchEngineClientMessage(
       );
     case 'next_round':
     case 'ready_next':
-      return shell.dispatch({ type: msg.type, playerId, roundNumber: msg.roundNumber }) ?? 'ok';
+      return shell.dispatch(leaveResultsEvent(msg, playerId)) ?? 'ok';
     case 'end_match':
       return shell.dispatch({ type: 'end_match', playerId }) ?? 'ok';
     case 'play_again':

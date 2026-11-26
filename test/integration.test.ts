@@ -305,7 +305,9 @@ async function driveMatchRound(
     const fullRes = await fetch(`${baseUrl}${fullUrl}`);
     expect(fullRes.status).toBe(200);
   }
-  host.ws.send(JSON.stringify({ type: 'next_round', seq: baseSeq + 50, roundNumber: round }));
+  host.ws.send(
+    JSON.stringify({ type: 'next_round', seq: baseSeq + 50, roundNumber: round, force: true }),
+  );
   return thumbUrl;
 }
 

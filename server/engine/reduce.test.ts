@@ -499,7 +499,16 @@ test('round results stay until the host presses next; no auto-advance timer', ()
   expect(byGuest.ack).toBe('forbidden');
   expect(byGuest.state.phase).toBe('ROUND_RESULTS');
 
-  const byHost = reduce(guest, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 10 * 60_000);
+  // The guest has not pressed «Готов»: the host's plain click is refused until the host confirms.
+  const plain = reduce(guest, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 8000);
+  expect(plain.ack).toBe('forbidden');
+  expect(plain.state).toBe(guest);
+
+  const byHost = reduce(
+    guest,
+    { type: 'next_round', playerId: 'h', roundNumber: 1, force: true },
+    10 * 60_000,
+  );
   expect(byHost.ack).toBe('ok');
   expect(byHost.state.phase).toBe('ROUND_LOADING');
 });
@@ -508,31 +517,76 @@ test('round results stay until the host presses next; no auto-advance timer', ()
 // never moves the match on, the host cannot mark themselves, and a click for another round is
 // dropped; fails_when=a guest's click starts the next round, or a stale click from the previous
 // results screen marks the guest ready on the new one; why_new=the message is new; seam=none;
-// no_claim=the host's confirmation dialog (browser test in game-flow.spec.ts).
+// no_claim=the host's confirmation dialog (browser test in web/tests/ready-next.spec.ts).
 test('a guest marks themselves ready on the results screen without moving the match on', () => {
   let s = resultsRoomWithGuest();
   expect(projectView(s, 'g').results?.readyIds).toEqual([]);
 
-  const ready = reduce(s, { type: 'ready_next', playerId: 'g', roundNumber: 1 }, 7000);
+  const ready = reduce(
+    s,
+    { type: 'ready_next', playerId: 'g', roundNumber: 1, matchId: 'm1' },
+    7000,
+  );
   expect(ready.ack).toBe('ok');
   expect(ready.effects).toEqual([]);
   s = ready.state;
   expect(s.phase).toBe('ROUND_RESULTS');
   expect(projectView(s, 'h').results?.readyIds).toEqual(['g']);
 
-  const again = reduce(s, { type: 'ready_next', playerId: 'g', roundNumber: 1 }, 7100);
+  const again = reduce(
+    s,
+    { type: 'ready_next', playerId: 'g', roundNumber: 1, matchId: 'm1' },
+    7100,
+  );
   expect(again.ack).toBe('ok');
   expect(again.state.results?.readyIds).toEqual(['g']);
 
-  expect(reduce(s, { type: 'ready_next', playerId: 'h', roundNumber: 1 }, 7200).ack).toBe(
-    'forbidden',
+  expect(
+    reduce(s, { type: 'ready_next', playerId: 'h', roundNumber: 1, matchId: 'm1' }, 7200).ack,
+  ).toBe('forbidden');
+  expect(
+    reduce(s, { type: 'ready_next', playerId: 'x', roundNumber: 1, matchId: 'm1' }, 7200).ack,
+  ).toBe('forbidden');
+  const stale = reduce(
+    s,
+    { type: 'ready_next', playerId: 'g', roundNumber: 2, matchId: 'm1' },
+    7300,
   );
-  expect(reduce(s, { type: 'ready_next', playerId: 'x', roundNumber: 1 }, 7200).ack).toBe(
-    'forbidden',
-  );
-  const stale = reduce(s, { type: 'ready_next', playerId: 'g', roundNumber: 2 }, 7300);
   expect(stale.ack).toBe('round_over');
   expect(stale.state.results?.readyIds).toEqual(['g']);
+
+  // Everyone connected is ready: the host's plain click starts the next round.
+  const go = reduce(s, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 7400);
+  expect(go.ack).toBe('ok');
+  expect(go.state.phase).toBe('ROUND_LOADING');
+});
+
+// Value: protects=a ready click that arrives after the host has left the results screen is
+// dropped; fails_when=a late click throws or changes the state of the next round; why_new=the test
+// above stays on the live results screen; seam=none; no_claim=none beyond protects.
+test('a «Готов» that arrives after the host moved on is dropped', () => {
+  const room = resultsRoomWithGuest();
+  // A click from the previous match («Ещё раз» starts the rounds from 1 again) is dropped too.
+  const old = reduce(
+    room,
+    { type: 'ready_next', playerId: 'g', roundNumber: 1, matchId: 'm0' },
+    6900,
+  );
+  expect(old.ack).toBe('round_over');
+  expect(old.state).toBe(room);
+
+  const moved = reduce(
+    room,
+    { type: 'next_round', playerId: 'h', roundNumber: 1, force: true },
+    7000,
+  ).state;
+  const late = reduce(
+    moved,
+    { type: 'ready_next', playerId: 'g', roundNumber: 1, matchId: 'm1' },
+    7100,
+  );
+  expect(late.ack).toBe('round_over');
+  expect(late.state).toBe(moved);
 });
 
 test('last human disconnecting in ROUND_LOADING holds countdown and mapsError resets cleanly', () => {

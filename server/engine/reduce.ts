@@ -247,15 +247,23 @@ function handleNextRound(
   }
   if (event.roundNumber !== state.roundNumber) return { state, effects: [], ack: 'round_over' };
   const player = state.players[event.playerId];
+  const { readyIds } = state.results;
   if (event.type === 'ready_next') {
     // «Готов» only tells the host who has finished reading; it never moves the match on.
-    const readyIds = state.results.readyIds ?? [];
     if (!player || player.isHost) return { state, effects: [], ack: 'forbidden' };
+    // «Ещё раз» keeps the players and starts the rounds from 1 again.
+    if (event.matchId !== state.matchId) return { state, effects: [], ack: 'round_over' };
     if (readyIds.includes(player.id)) return { state, effects: [], ack: 'ok' };
     const results = { ...state.results, readyIds: [...readyIds, player.id] };
     return { state: { ...state, results }, effects: [], ack: 'ok' };
   }
   if (!player?.isHost) return { state, effects: [], ack: 'forbidden' };
+  // The host's screen can be behind: a guest may come back between its last view and the click.
+  // Without `force` the click is refused, and the next one meets the question about that guest.
+  const waiting = Object.values(state.players).some(
+    (p) => !p.isHost && p.connected && !readyIds.includes(p.id),
+  );
+  if (waiting && !event.force) return { state, effects: [], ack: 'forbidden' };
   return { ...advanceFromResults(state, now), ack: 'ok' };
 }
 

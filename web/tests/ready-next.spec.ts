@@ -1,9 +1,10 @@
 // Value: protects=the host is asked before leaving a guest who has not pressed «Готов», «Отмена»
-// keeps the results on screen, and once the guest is ready «Дальше» starts the round with no
-// question; fails_when=the host's click starts the round over a guest still reading, the guest
-// has no way to say they are ready, or the question stays after everyone is ready; why_new=the
-// button is new; seam=none; no_claim=a guest who has dropped off is not waited for (rule in
-// NextRoundFooter.svelte, no browser check), and «Запускать» (pressed in game-flow.spec.ts).
+// keeps the results on screen, the question goes away by itself when the guest becomes ready, a
+// ready guest and a guest who has dropped off are not asked about; fails_when=the host's click
+// starts the round over a guest still reading, the guest has no way to say they are ready, the
+// question stays after everyone is ready, or the host is asked to wait for a closed tab;
+// why_new=the button is new; seam=none; no_claim=«Запускать» (pressed in game-flow.spec.ts) and a
+// guest who comes back after dropping off.
 import { expect, test, type Page } from '@playwright/test';
 import { startIsolatedFakeServer, type StartedFakeApp } from './helpers';
 
@@ -44,7 +45,7 @@ async function guess(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Угадать' }).click();
 }
 
-test('a guest presses «Готов» and the host is asked before starting without them', async ({
+test('the host is asked before starting without a guest who is still reading', async ({
   browser,
 }) => {
   if (!server) throw new Error('E2E server was not initialized');
@@ -74,12 +75,33 @@ test('a guest presses «Готов» and the host is asked before starting witho
     await expect(host.getByText(/Правильный ответ:/)).toBeVisible();
     await expect(guest.getByText(/Правильный ответ:/)).toBeVisible();
 
+    // Escape answers the question like «Отмена».
+    await host.getByRole('button', { name: 'Дальше' }).click();
+    await expect(question).toBeVisible();
+    await host.keyboard.press('Escape');
+    await expect(question).toHaveCount(0);
+    await expect(host.getByText(/Правильный ответ:/)).toBeVisible();
+
+    // The guest becomes ready while the host is looking at the question: it closes by itself.
+    await host.getByRole('button', { name: 'Дальше' }).click();
+    await expect(question).toBeVisible();
     await guest.getByRole('button', { name: 'Готов', exact: true }).click();
     await expect(guest.getByRole('button', { name: 'Вы готовы' })).toBeDisabled();
+    await expect(question).toHaveCount(0);
     await expect(host.getByText('Готовы: 1 из 1')).toBeVisible();
     await host.getByRole('button', { name: 'Дальше' }).click();
     await expect(host.getByRole('dialog')).toHaveCount(0);
     await expect(host.locator('header').getByText('раунд 2 из 2')).toBeVisible({ timeout: 12_000 });
+
+    // Round 2: the guest closes the tab on the results screen. Nobody is left to wait for.
+    await guess(host);
+    await guess(guest);
+    await expect(host.getByText('Готовы: 0 из 1')).toBeVisible({ timeout: 12_000 });
+    await guestCtx.close();
+    await expect(host.getByText(/Готовы:/)).toHaveCount(0);
+    await host.getByRole('button', { name: 'К итогам' }).click();
+    await expect(host.getByRole('dialog')).toHaveCount(0);
+    await expect(host.getByRole('button', { name: 'Ещё раз' })).toBeVisible({ timeout: 10_000 });
   } finally {
     await hostCtx.close();
     await guestCtx.close();

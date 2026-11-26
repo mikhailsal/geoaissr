@@ -19,8 +19,8 @@
     activeBotCard: { roundNumber: number; entry: RoundResultEntryView } | null;
     onSelectBotCard: (roundNumber: number, entry: RoundResultEntryView) => void;
     onCloseBotCard: () => void;
-    onNextRound: (roundNumber: number) => void;
-    onReady: (roundNumber: number) => void;
+    onNextRound: (roundNumber: number, force: boolean) => void;
+    onReady: (roundNumber: number, matchId: string) => void;
     onEndMatch: () => void;
     onMapLoaded: () => void;
     onClientError: (source: 'maps_js' | 'map', code: string, message: string) => void;

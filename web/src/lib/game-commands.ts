@@ -62,12 +62,13 @@ export abstract class GameCommands {
     this.client.sendSequenced('retry_round', { gen });
   }
 
-  nextRound(roundNumber: number): void {
-    this.client.sendSequenced('next_round', { roundNumber });
+  /** `force`: the host has been asked about the players who are not ready. */
+  nextRound(roundNumber: number, force: boolean): void {
+    this.client.sendSequenced('next_round', { roundNumber, force });
   }
 
-  readyNext(roundNumber: number): void {
-    this.client.sendSequenced('ready_next', { roundNumber });
+  readyNext(roundNumber: number, matchId: string): void {
+    this.client.sendSequenced('ready_next', { roundNumber, matchId });
   }
 
   playAgain(): void {

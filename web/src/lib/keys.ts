@@ -39,6 +39,9 @@ export function attachGlobalKeys(getHandlers: () => GlobalKeyHandlers): () => vo
     if (event.defaultPrevented || event.repeat || event.metaKey || event.ctrlKey || event.altKey) {
       return;
     }
+    // An open modal dialog owns the keyboard: a screen shortcut that took Escape here would
+    // also cancel the browser's own closing of the dialog.
+    if (event.target instanceof Element && event.target.closest('dialog[open]')) return;
     const handlers = getHandlers();
     if (event.code === 'Escape' && handlers.onEscape) {
       event.preventDefault();
