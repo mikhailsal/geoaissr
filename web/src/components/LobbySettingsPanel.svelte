@@ -1,13 +1,20 @@
 <script lang="ts">
   import type { ClientViewState, LobbySettingsPatch } from '$shared/protocol';
   import { isMapAvailable } from '$shared/map-availability';
-  import { MAP_DESCRIPTIONS_RU, MAP_IDS, MAP_LABELS_RU, type MapId } from '$shared/maps';
-  import { AREA_REGION_IDS, type RegionId } from '$shared/region-ids';
-  import { AREA_REGION_LABELS_RU, getRegionLabelRu, listCountryRegions } from '$shared/regions';
+  import {
+    MAP_DESCRIPTIONS_RU,
+    MAP_IDS,
+    MAP_LABELS_RU,
+    MAP_OPTION_NOTES_RU,
+    type MapId,
+  } from '$shared/maps';
+  import type { RegionId } from '$shared/region-ids';
+  import { getRegionLabelRu } from '$shared/regions';
   import { PUSH_SECONDS_MAX, PUSH_SECONDS_MIN } from '$shared/storage-schemas';
   import { formatRoundsRu, formatSecondsOnly } from '../i18n/format';
   import { RU } from '../i18n/ru';
   import QuotaMetric from './QuotaMetric.svelte';
+  import RegionPicker from './RegionPicker.svelte';
 
   interface Props {
     view: ClientViewState;
@@ -19,13 +26,7 @@
 
   let { view, minDurationSec, hostName, onUpdateLobby, onConfirmQuotaReset }: Props = $props();
 
-  const countryRegions = listCountryRegions();
-  const openCountries = $derived(
-    countryRegions.filter((country) => isMapAvailable(view.map, country.region)),
-  );
-  const closedCountries = $derived(
-    countryRegions.filter((country) => !isMapAvailable(view.map, country.region)),
-  );
+  const uid = $props.id();
 
   function commitNumber(
     input: HTMLInputElement,
@@ -90,46 +91,25 @@
         {#each MAP_IDS as id (id)}
           {@const available = isMapAvailable(id, view.region)}
           <option value={id} disabled={!available && id !== view.map}>
-            {MAP_LABELS_RU[id]}{available ? '' : ` (${RU.lobby.mapEmptyInRegion})`}
+            {MAP_LABELS_RU[id]}: {available ? MAP_OPTION_NOTES_RU[id] : RU.lobby.mapEmptyInRegion}
           </option>
         {/each}
       </select>
       <span class="hint" data-testid="map-description">{MAP_DESCRIPTIONS_RU[view.map]}</span>
     </label>
 
-    <label class="field region-field">
-      <span class="lbl">{RU.lobby.regionLabel}</span>
-      <select
-        class="field-select"
-        data-testid="region-select"
+    <div class="field full-span">
+      <span class="lbl" id={`${uid}-region`}>{RU.lobby.regionLabel}</span>
+      <RegionPicker
+        map={view.map}
+        region={view.region}
         disabled={!view.viewerIsHost}
-        value={view.region}
-        onchange={(e) => {
-          onUpdateLobby({ region: e.currentTarget.value as RegionId });
+        labelledBy={`${uid}-region`}
+        onPick={(region: RegionId) => {
+          onUpdateLobby({ region });
         }}
-      >
-        {#each AREA_REGION_IDS as id (id)}
-          {@const available = isMapAvailable(view.map, id)}
-          <option value={id} disabled={!available && id !== view.region}>
-            {AREA_REGION_LABELS_RU[id]}{available ? '' : ` (${RU.lobby.regionEmptyOnMap})`}
-          </option>
-        {/each}
-        <optgroup label={RU.lobby.regionCountriesGroup}>
-          {#each openCountries as country (country.region)}
-            <option value={country.region}>{country.nameRu}</option>
-          {/each}
-        </optgroup>
-        {#if closedCountries.length > 0}
-          <optgroup label={RU.lobby.regionCountriesEmptyGroup}>
-            {#each closedCountries as country (country.region)}
-              <option value={country.region} disabled={country.region !== view.region}>
-                {country.nameRu}
-              </option>
-            {/each}
-          </optgroup>
-        {/if}
-      </select>
-    </label>
+      />
+    </div>
 
     <div class="field">
       <span class="lbl">{RU.lobby.moveLabel}</span>
@@ -305,13 +285,6 @@
 
   .full-span {
     grid-column: 1 / -1;
-  }
-
-  /* A long country name needs the whole row on a phone. */
-  @media (max-width: 600px) and (orientation: portrait) {
-    .region-field {
-      grid-column: 1 / -1;
-    }
   }
 
   .lbl,

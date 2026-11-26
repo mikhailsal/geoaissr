@@ -4,7 +4,8 @@ import { pointInRing } from '../../shared/regions.ts';
 import { haversineDistanceKm, type LatLng } from '../../shared/score.ts';
 import { AIRPORTS_BY_ISO, AIRPORT_SNAP_RADIUS_M, AIRPORT_ZONE_KM } from './airports.ts';
 import { URBAN_CENTRES, type UrbanCentre } from './cities.ts';
-import { isPlaceInRegion } from './countries.ts';
+import { countryForIso, isPlaceInRegion } from './countries.ts';
+import { isCountryBare } from './coverage.ts';
 import { distanceToSegmentKm, randomPointAround } from './geo.ts';
 import { ALL_PLACES, settlementRadiusKm, type Place } from './places.ts';
 
@@ -48,8 +49,6 @@ export interface SourceGroup {
 export const MEGACITY_MIN_POPULATION = 5_000_000;
 export const HIGHLAND_MIN_POPULATION = 100_000;
 export const HIGHLAND_MIN_ELEVATION_M = 2000;
-/** Google has no street-level coverage in mainland China. */
-const NO_COVERAGE_ISO = new Set(['CN']);
 /** Search radius around a probe inside a settlement, in metres. */
 export const SETTLEMENT_SNAP_RADIUS_M = 750;
 /** A panorama this far outside a settlement's built-up radius still counts as the settlement. */
@@ -130,7 +129,7 @@ function citySource(centre: UrbanCentre): RoundSource {
   };
 }
 
-function buildSources(map: SourceMapId): RoundSource[] {
+function rawSources(map: SourceMapId): RoundSource[] {
   if (map === 'airports') {
     return Object.entries(AIRPORTS_BY_ISO).flatMap(([iso, list]) =>
       list.map(([lat, lng]) => airportSource(iso, lat, lng)),
@@ -140,18 +139,23 @@ function buildSources(map: SourceMapId): RoundSource[] {
   if (map === 'megacities') {
     return URBAN_CENTRES.filter((c) => c.population >= MEGACITY_MIN_POPULATION).map(citySource);
   }
-  const places = ALL_PLACES.filter((place) => !NO_COVERAGE_ISO.has(place.iso));
   if (map === 'capitals') {
-    return places.filter((place) => place.capital).map((p) => settlementSource(p, 'capital'));
+    return ALL_PLACES.filter((place) => place.capital).map((p) => settlementSource(p, 'capital'));
   }
-  return places
-    .filter(
-      (place) =>
-        !place.district &&
-        place.population >= HIGHLAND_MIN_POPULATION &&
-        place.elevation >= HIGHLAND_MIN_ELEVATION_M,
-    )
-    .map((p) => settlementSource(p, 'highland'));
+  return ALL_PLACES.filter(
+    (place) =>
+      !place.district &&
+      place.population >= HIGHLAND_MIN_POPULATION &&
+      place.elevation >= HIGHLAND_MIN_ELEVATION_M,
+  ).map((p) => settlementSource(p, 'highland'));
+}
+
+/**
+ * The places of a map, minus those of a country where the coverage scan found next to nothing:
+ * mainland China, Iran, North Korea. A round sent there would spend its whole budget.
+ */
+function buildSources(map: SourceMapId): RoundSource[] {
+  return rawSources(map).filter((source) => !isCountryBare(countryForIso(source.iso).id));
 }
 
 const sourcesCache = new Map<SourceMapId, RoundSource[]>();

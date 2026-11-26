@@ -5,6 +5,7 @@ import {
 } from '../../shared/play-style.ts';
 import type { MapId } from '../../shared/maps.ts';
 import type { AckResult, ClientViewState, QuotaSummaryView } from '../../shared/protocol.ts';
+import { LATE_PIN_GRACE_MS } from '../../shared/round-timing.ts';
 import type {
   BotSlotConfig,
   MatchRecord,
@@ -268,7 +269,10 @@ function runScheduleEffect(ctx: EffectContext, effect: ScheduleEffect): void {
     return;
   }
   timers.deadline = clearTimer(timers.deadline);
-  timers.deadline = scheduleDelay(ctx, effect.atMs, () => {
+  // Players see the round end at `atMs`; the round closes a moment later so that a pin sent in
+  // its last second still counts. A wait for bots has no human pin left to arrive.
+  const fireAt = effect.kind === 'round' ? effect.atMs + LATE_PIN_GRACE_MS : effect.atMs;
+  timers.deadline = scheduleDelay(ctx, fireAt, () => {
     ctx.dispatch({
       type: 'deadline_tick',
       matchId: effect.matchId,

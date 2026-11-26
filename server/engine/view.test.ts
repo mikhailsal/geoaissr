@@ -138,6 +138,9 @@ test('active view leaks neither target coordinates nor other players pins or bot
   expect(serialized).not.toContain('Секретная мысль');
   expect(guestView.active?.myPin).toBeNull();
   expect(guestView.players.find((p) => p.id === 'h')?.confirmed).toBe(true);
+  // The bot's process is still closing, but its final answer is in: the view says so, since the
+  // answer is what starts a push and what the players' sound follows.
+  expect(guestView.active?.botProgress[0]).toMatchObject({ status: 'thinking', answered: true });
 });
 
 test('startBlockedReasons blocks quota exceeded and host mapsError in real mode', () => {

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { haversineDistanceKm } from '../../shared/score.ts';
 import { createLocationService } from '../location.ts';
-import { AIRPORT_SNAP_RADIUS_M, AIRPORT_ZONE_KM } from './airports.ts';
+import { AIRPORTS_BY_ISO, AIRPORT_SNAP_RADIUS_M, AIRPORT_ZONE_KM } from './airports.ts';
 import { countryForIso, isoCodesOfCountryIds } from './countries.ts';
 import { seededRng as mulberry32 } from './rng.ts';
 import { getSourceGroups } from './sources.ts';
@@ -24,7 +24,11 @@ function nearestAirportKm(pos: { lat: number; lng: number }): number {
 test('airports dataset holds valid coordinates for more than 3000 airports', () => {
   const groups = airportGroups();
   const all = groups.flatMap((group) => group.sources.map((airport) => airport.centre));
-  expect(all.length).toBeGreaterThan(3000);
+  expect(Object.values(AIRPORTS_BY_ISO).flat().length).toBeGreaterThan(3000);
+  // The map leaves out the airports of countries without any Street View coverage.
+  expect(all.length).toBeGreaterThan(2500);
+  expect(groups.some((group) => group.iso === 'CN')).toBe(false);
+  expect(groups.some((group) => group.iso === 'HK')).toBe(true);
   expect(groups.every((group) => /^[A-Z]{2}$/.test(group.iso))).toBe(true);
   expect(all.every(({ lat, lng }) => Math.abs(lat) <= 90 && Math.abs(lng) <= 180)).toBe(true);
 });

@@ -20,23 +20,6 @@ export interface PinOverlaySpec {
   onClick?: () => void;
 }
 
-const LIGHT_MAP_STYLES: google.maps.MapTypeStyle[] = [
-  {
-    featureType: 'poi',
-    elementType: 'labels',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'poi.business',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'transit.station',
-    elementType: 'labels.icon',
-    stylers: [{ visibility: 'off' }],
-  },
-];
-
 let cachedPromise: Promise<LoadedGoogleMaps> | null = null;
 let cachedKey = '';
 const authFailureListeners = new Set<(message: string) => void>();
@@ -83,6 +66,7 @@ export function loadGoogleMapsLibraries(apiKey: string): Promise<LoadedGoogleMap
   return cachedPromise;
 }
 
+/** Options shared by the guess and results maps; icons stay unclickable so a click reaches the map. */
 export function buildLightMapOptions(
   center = { lat: 20, lng: 10 },
   zoom = 2,
@@ -97,7 +81,19 @@ export function buildLightMapOptions(
     streetViewControl: false,
     fullscreenControl: false,
     gestureHandling: 'greedy',
-    styles: LIGHT_MAP_STYLES,
+  };
+}
+
+/**
+ * The map a player marks the guess on. Places of interest and landmarks keep Google's icons and
+ * names: they are what a player matches against the panorama. The pointer is a crosshair, since
+ * a click puts the pin, and turns into the grabbing hand only while the map is dragged.
+ */
+export function buildGuessMapOptions(): google.maps.MapOptions {
+  return {
+    ...buildLightMapOptions(),
+    draggableCursor: 'crosshair',
+    draggingCursor: 'grabbing',
   };
 }
 
@@ -202,7 +198,7 @@ export async function mountReusableGuessMap(
     const host = document.createElement('div');
     host.style.width = '100%';
     host.style.height = '100%';
-    const map = new libs.mapsLib.Map(host, buildLightMapOptions());
+    const map = new libs.mapsLib.Map(host, buildGuessMapOptions());
     entry = { host, map, overlays: [] };
     cachedMaps.set('guess', entry);
   }

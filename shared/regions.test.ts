@@ -198,7 +198,14 @@ test('every map has a name, a description and a prompt note', () => {
 test('map availability tells an empty combination from a full one', () => {
   expect(isMapAvailable('standard', 'country:LUX')).toBe(true);
   expect(isMapAvailable('wild', 'oceania')).toBe(true);
-  expect(countMapPlaces('standard', 'world')).toBe(Infinity);
+  // The standard and wild maps count the countries a coverage scan found playable.
+  expect(countMapPlaces('standard', 'world')).toBeGreaterThan(80);
+  expect(countMapPlaces('standard', 'world')).toBeLessThan(176);
+  expect(countMapPlaces('wild', 'world')).toBeLessThanOrEqual(countMapPlaces('standard', 'world'));
+  expect(isMapAvailable('standard', 'country:CHN')).toBe(false);
+  expect(isMapAvailable('standard', 'country:PRK')).toBe(false);
+  expect(isMapAvailable('wild', 'country:PRK')).toBe(false);
+  expect(isMapAvailable('standard', 'country:FRA')).toBe(true);
   expect(isMapAvailable('highlands', 'europe')).toBe(false);
   expect(isMapAvailable('highlands', 'south_america')).toBe(true);
   expect(isMapAvailable('megacities', 'oceania')).toBe(false);

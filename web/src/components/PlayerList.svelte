@@ -42,10 +42,10 @@
           <span class="name">{bot.name}</span>
           <span
             class="status"
-            class:done={bot.status === 'done'}
+            class:done={bot.status === 'done' || bot.answered}
             class:aborted={bot.status === 'aborted'}
           >
-            {#if bot.status === 'done'}
+            {#if bot.status === 'done' || bot.answered}
               {RU.round.answeredTag}
             {:else if bot.status === 'aborted'}
               {RU.round.abortedTag}

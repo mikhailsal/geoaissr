@@ -732,7 +732,9 @@ async function setVisibility(page: Page, state: 'visible' | 'hidden'): Promise<v
   }, state);
 }
 
-test('hidden and reconnecting games stop audio and resume only current music', async ({ page }) => {
+test('a hidden tab keeps its audio; a reconnect stops it and resumes only current music', async ({
+  page,
+}) => {
   const server = await startIsolatedFakeServer({ rounds: 1 });
   let disconnect: (() => Promise<void>) | undefined;
   try {
@@ -747,21 +749,13 @@ test('hidden and reconnecting games stop audio and resume only current music', a
     const lobby = await started(page, 'round-loop-suspense');
     await startRound(page);
     const music = await matchSuspense(page, lobby);
+    // A hidden tab keeps playing: the same music source stays live through hide and show.
     await setVisibility(page, 'hidden');
-    await expect.poll(async () => Object.keys((await trace(page)).live).length).toBe(0);
-    const halted = await trace(page);
-    const pause = halted.stops.filter(({ id }) => id === music.id).at(-1);
-    if (!pause) throw new Error('Missing music stop on hidden page');
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 300)));
+    expect((await trace(page)).live[music.id]).toBe(music.url);
     await setVisibility(page, 'visible');
-    await expect
-      .poll(async () =>
-        Object.values((await trace(page)).live).some((u) => u.includes('round-loop')),
-      )
-      .toBe(true);
-    const visible = await trace(page);
-    const resumed = matchMusic(audibleStarts(visible), lobby).find((s) => s.id in visible.live);
-    expect(resumed?.url).toBe(music.url);
-    expect(resumed?.offset).toBeCloseTo(music.offset + pause.at - music.at, 1);
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 300)));
+    expect((await trace(page)).live[music.id]).toBe(music.url);
     if (!disconnect) throw new Error('Missing fixture socket');
     await disconnect();
     await expect.poll(async () => Object.keys((await trace(page)).live).length).toBe(0);

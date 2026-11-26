@@ -260,6 +260,26 @@ test('the round end counts a bot with its final guess as done and one with a che
   expect(late.effects.flatMap((e) => ('abortedBots' in e ? e.abortedBots : []))).toHaveLength(1);
 });
 
+// Value: protects=a guess sent in the grace second after the shown end keeps its coordinates but
+// does not confirm, so it cannot cut the bots off or count as an answer given in time;
+// fails_when=the late guess confirms and ends the round with "the wait for the bots expired";
+// why_new=answers could not arrive after the round end before the grace second; seam=none;
+// no_claim=the shell timer that keeps the round open for that second.
+test('a guess in the grace second is kept as a pin and does not end the round', () => {
+  const { room, ids } = roundWithGuess(false);
+  const afterEnd = (room.loadingOrActive?.roundDeadlineAt ?? 0) + 500;
+  const guess = { type: 'submit_guess', playerId: 'h', roundNumber: ids.roundNumber } as const;
+  const out = reduce(room, { ...guess, lat: 1, lng: 2 }, afterEnd);
+  expect(out.ack).toBe('ok');
+  expect(out.state.phase).toBe('ROUND_ACTIVE');
+  expect(out.state.loadingOrActive?.humanGuesses.h).toMatchObject({
+    pin: { lat: 1, lng: 2 },
+    confirmed: false,
+  });
+  const inTime = reduce(room, { ...guess, lat: 1, lng: 2 }, afterEnd - 1000);
+  expect(inTime.state.loadingOrActive?.humanGuesses.h?.confirmed ?? true).toBe(true);
+});
+
 test('the bot budget ending stops the processes of an answered bot without calling it a timeout', () => {
   const { room, botId, ids } = roundWithGuess(true);
   const out = reduce(

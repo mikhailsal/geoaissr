@@ -15,7 +15,9 @@ function confirmedOpponentIds(view: ClientViewState): string[] {
       ? (view.results?.completion?.confirmedIds ?? [])
       : [
           ...view.players.filter((p) => p.confirmed).map((p) => p.id),
-          ...(view.active?.botProgress.filter((b) => b.status === 'done').map((b) => b.id) ?? []),
+          ...(view.active?.botProgress
+            .filter((b) => b.status === 'done' || b.answered)
+            .map((b) => b.id) ?? []),
         ];
   return confirmedIds.filter((id) => id !== view.viewerId);
 }

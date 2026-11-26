@@ -422,10 +422,14 @@ export function handleActivePinOrGuess(
     return { state, effects: [], ack: 'invalid' };
   }
   const cleanCoords = { lat: event.lat, lng: normalizeLongitude(event.lng) };
-  const nextGuess =
-    event.type === 'set_pin'
-      ? { ...guess, pin: cleanCoords }
-      : { pin: cleanCoords, confirmed: true, confirmedAt: now };
+  // The grace second after the shown end exists for answers already on their way: a guess sent
+  // then keeps its coordinates like a pin, and neither confirms nor ends the round early.
+  const shownEnd = active.endsAt ?? active.roundDeadlineAt;
+  const afterShownEnd = shownEnd !== null && now >= shownEnd;
+  const asPin = event.type === 'set_pin' || afterShownEnd;
+  const nextGuess = asPin
+    ? { ...guess, pin: cleanCoords }
+    : { pin: cleanCoords, confirmed: true, confirmedAt: now };
 
   const updatedState: RoomState = {
     ...state,
@@ -434,7 +438,7 @@ export function handleActivePinOrGuess(
       humanGuesses: { ...active.humanGuesses, [event.playerId]: nextGuess },
     },
   };
-  if (event.type === 'set_pin') {
+  if (asPin) {
     return { state: updatedState, effects: [], ack: 'ok' };
   }
   return { ...checkAllHumansConfirmedAndBotsState(updatedState, now, 'human'), ack: 'ok' };

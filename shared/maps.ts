@@ -32,6 +32,22 @@ export const MAP_LABELS_RU: Readonly<Record<MapId, string>> = {
   retro: 'Ретро',
 };
 
+/**
+ * A few words after the map's name in the list of maps, so that «Глушь» or «Север» says what it
+ * is before it is picked. The full line under the select follows in `MAP_DESCRIPTIONS_RU`.
+ */
+export const MAP_OPTION_NOTES_RU: Readonly<Record<MapId, string>> = {
+  standard: 'города и случайные точки',
+  wild: 'случайные точки, чаще вдали от городов',
+  cities: 'от 500 тысяч жителей',
+  megacities: 'от 5 миллионов жителей',
+  capitals: 'только столицы стран',
+  airports: 'до 5 км от аэропорта',
+  highlands: 'города выше 2000 м',
+  north: 'севернее 60° с. ш.',
+  retro: 'панорамы до 2012 года',
+};
+
 /** One line under the map select: what kind of places the map holds. */
 export const MAP_DESCRIPTIONS_RU: Readonly<Record<MapId, string>> = {
   standard: 'Половина раундов в городах и посёлках, половина в случайных точках страны',

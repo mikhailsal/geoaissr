@@ -1,6 +1,7 @@
 import type { MapAvailabilityDataset } from '../../shared/map-availability.ts';
 import { AREA_REGION_IDS, countryRegionId, type RegionId } from '../../shared/region-ids.ts';
 import { REGION_COUNTRIES } from '../../shared/regions.ts';
+import { countPlayableCountries } from './coverage.ts';
 import { getNorthCountries } from './north.ts';
 import { getRetroCountries } from './retro.ts';
 import { SOURCE_MAP_IDS, getSourceGroups } from './sources.ts';
@@ -21,7 +22,8 @@ function tableOf(count: (region: RegionId) => number): Record<string, number> {
 /**
  * Counts the places of every limited map in every region: the table behind
  * `shared/map-availability.data.json`. Point maps count their places, the north and retro maps
- * their countries. The standard and wild maps cover every region and are left out.
+ * their countries, and so do the standard and wild maps: the countries where the coverage scan
+ * found panoramas (`coverage.data.json`).
  */
 export function computeMapAvailability(): MapAvailabilityDataset {
   const maps: MapAvailabilityDataset['maps'] = {};
@@ -30,6 +32,8 @@ export function computeMapAvailability(): MapAvailabilityDataset {
       getSourceGroups(map, region).reduce((sum, group) => sum + group.sources.length, 0),
     );
   }
+  maps.standard = tableOf((region) => countPlayableCountries(region, 'any'));
+  maps.wild = tableOf((region) => countPlayableCountries(region, 'open'));
   maps.north = tableOf((region) => getNorthCountries(region).length);
   maps.retro = tableOf((region) => getRetroCountries(region).length);
   return { version: 1, maps };
