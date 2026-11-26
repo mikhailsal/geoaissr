@@ -1,3 +1,4 @@
+import { isMapAvailable } from '../../shared/map-availability.ts';
 import type { MapId } from '../../shared/maps.ts';
 import type { RegionId } from '../../shared/region-ids.ts';
 import { getCountryOfRegion, polygonsInRegion, sampleWeightedItem } from '../../shared/regions.ts';
@@ -130,6 +131,8 @@ function pickScene(
   if (isSourceMapId(input.map)) return sourceScene(input.map, input.region, played, rng, round);
   if (input.map === 'north') return pickUnplayed(northScenes(input.region, round), played, round);
   if (input.map === 'retro') return pickUnplayed(retroScenes(input.region, round), played, round);
+  // The standard and wild maps keep to countries with Street View coverage, as the live maps do.
+  if (!isMapAvailable(input.map, input.region)) return undefined;
   return pickUnplayed(scenesOfRegion(input.region, round), played, round);
 }
 

@@ -1,8 +1,9 @@
 import { MAP_LABELS_RU, type MapId } from '../../shared/maps.ts';
 import type { RegionId } from '../../shared/region-ids.ts';
-import { getRegionLabelRu, getWeightedCountriesForRegion } from '../../shared/regions.ts';
+import { getRegionLabelRu } from '../../shared/regions.ts';
 import type { RoundTarget } from '../engine/types.ts';
 import { GeoError } from '../errors.ts';
+import { getCoveredCountries } from '../maps/coverage.ts';
 import { NORTH_MIN_LAT, getNorthCountries } from '../maps/north.ts';
 import { getRetroCountries, isRetroYear } from '../maps/retro.ts';
 import { getSourceGroups, isSourceMapId } from '../maps/sources.ts';
@@ -83,18 +84,29 @@ function chooseRoll(ctx: RollContext, inTown: boolean): Roll {
       ? townRoll(ctx, countries, { landRadiusM: NORTH_LAND_RADIUS_M, minLat: NORTH_MIN_LAT })
       : polygonRoll(ctx, countries, NORTH_LAND_RADIUS_M);
   }
-  const countries =
-    map === 'retro'
-      ? getRetroCountries(region, exclude)
-      : getWeightedCountriesForRegion(region, exclude);
-  if (countries.length === 0) throw new EmptyMapRegionError(map, region);
-  const open = polygonRoll(ctx, countries, OPEN_LAND_RADIUS_M);
-  if (map === 'wild') return open;
-  const town = townRoll(ctx, countries, { landRadiusM: OPEN_LAND_RADIUS_M });
-  // An old panorama may survive only in the towns of a country, or only outside them, so every
-  // lookup of a retro round picks its kind anew, the way the scan measured the country.
-  if (map === 'retro') return () => (ctx.rng() < TOWN_ROUND_SHARE ? town() : open());
-  return inTown ? town : open;
+  if (map === 'retro') {
+    const countries = getRetroCountries(region, exclude);
+    if (countries.length === 0) throw new EmptyMapRegionError(map, region);
+    const open = polygonRoll(ctx, countries, OPEN_LAND_RADIUS_M);
+    const town = townRoll(ctx, countries, { landRadiusM: OPEN_LAND_RADIUS_M });
+    // An old panorama may survive only in the towns of a country, or only outside them, so every
+    // lookup of a retro round picks its kind anew, the way the scan measured the country.
+    return () => (ctx.rng() < TOWN_ROUND_SHARE ? town() : open());
+  }
+  // The standard and wild maps keep to the countries where the coverage scan found panoramas of
+  // the kind the round looks for: a country without them would spend the whole lookup budget.
+  const land = getCoveredCountries(region, 'open', exclude);
+  const open = land.length > 0 ? polygonRoll(ctx, land, OPEN_LAND_RADIUS_M) : null;
+  if (map === 'wild') {
+    if (!open) throw new EmptyMapRegionError(map, region);
+    return open;
+  }
+  const towns = getCoveredCountries(region, 'town', exclude);
+  const town = towns.length > 0 ? townRoll(ctx, towns, { landRadiusM: OPEN_LAND_RADIUS_M }) : null;
+  // A country covered only in its towns (or only outside them) plays the kind it has.
+  const roll = inTown ? (town ?? open) : (open ?? town);
+  if (!roll) throw new EmptyMapRegionError(map, region);
+  return roll;
 }
 
 function panoramaRule(map: MapId): RollContext['accepts'] {

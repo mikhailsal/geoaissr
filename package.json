@@ -25,6 +25,7 @@
     "build:cities": "bun run scripts/build-cities.ts",
     "build:map-availability": "bun run scripts/build-map-availability.ts",
     "scan:retro": "bun run scripts/scan-retro.ts",
+    "scan:coverage": "bun run scripts/scan-coverage.ts",
     "maps:sample": "bun run scripts/maps-sample.ts"
   },
   "dependencies": {
