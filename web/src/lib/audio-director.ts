@@ -22,6 +22,13 @@ function confirmedOpponentIds(view: ClientViewState): string[] {
   return confirmedIds.filter((id) => id !== view.viewerId);
 }
 
+/** Humans who pressed «Готов» on the screen the view shows. */
+function readyIds(view: ClientViewState): readonly string[] {
+  if (view.phase === 'ROUND_RESULTS') return view.results?.readyIds ?? [];
+  if (view.phase === 'FINAL') return view.final?.readyIds ?? [];
+  return [];
+}
+
 /** Separates current timed audio from announcements that only belong to live transitions. */
 export class AudioDirector {
   private previous: ClientViewState | null = null;
@@ -83,6 +90,15 @@ export class AudioDirector {
       const old = new Set(confirmedOpponentIds(previous));
       if (confirmedOpponentIds(view).some((id) => !old.has(id))) this.output.cue('opponent');
     }
+    if (announce && !phaseChanged) this.announceReady(previous, view);
+  }
+
+  /** «Готов» sounds like a guess: the viewer's own is locked in, someone else's is announced. */
+  private announceReady(previous: ClientViewState, view: ClientViewState): void {
+    const old = new Set(readyIds(previous));
+    const fresh = readyIds(view).filter((id) => !old.has(id));
+    if (fresh.includes(view.viewerId)) this.output.cue('locked');
+    if (fresh.some((id) => id !== view.viewerId)) this.output.cue('opponent');
   }
 
   private background(view: ClientViewState): void {

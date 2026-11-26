@@ -20,6 +20,7 @@ import {
   updateBotMessageSchema,
 } from './bot-messages.ts';
 import { DIFFICULTY_PRESETS } from './bot-tools.ts';
+import { leaveFinalMessageSchema, nextRoundMessageSchema } from './ready-messages.ts';
 import type { PARTICIPANT_COLOR_IDS } from './colors.ts';
 import type { PlayStyle } from './play-style.ts';
 import type { BotAccounting, BotReasoning, BotTurnThumbView } from './bot-results.ts';
@@ -104,7 +105,7 @@ export const updateLobbyMessageSchema = z.object({
 });
 
 export const simpleSeqMessageSchema = z.object({
-  type: z.enum(['confirm_quota_reset', 'start_match', 'end_match', 'play_again']),
+  type: z.enum(['confirm_quota_reset', 'start_match', 'end_match']),
   seq: z.number().int().nonnegative(),
 });
 
@@ -145,16 +146,6 @@ export const submitGuessMessageSchema = z.object({
   lng: z.number().finite(),
 });
 
-export const nextRoundMessageSchema = z.object({
-  type: z.enum(['next_round', 'ready_next']),
-  seq: z.number().int().nonnegative(),
-  roundNumber: z.number().int().positive(),
-  /** next_round: the host has been asked and starts without those who are not ready. */
-  force: z.boolean().optional(),
-  /** ready_next: the match of the click; a click that arrives in a later match is dropped. */
-  matchId: z.string().max(64).optional(),
-});
-
 export const retryRoundMessageSchema = z.object({
   type: z.literal('retry_round'),
   seq: z.number().int().nonnegative(),
@@ -186,6 +177,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   setPinMessageSchema,
   submitGuessMessageSchema,
   nextRoundMessageSchema,
+  leaveFinalMessageSchema,
   retryRoundMessageSchema,
 ]);
 
@@ -406,6 +398,8 @@ export interface ClientViewState {
     plannedRounds: number;
     standings: FinalEntryView[];
     humanVsAi: { visible: boolean; humansTotal: number; aiTotal: number };
+    /** Humans who pressed «Готов» on this final screen. */
+    readyIds?: string[];
   };
 }
 

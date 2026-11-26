@@ -1,14 +1,17 @@
 <script lang="ts">
   import type { ClientViewState } from '$shared/protocol';
   import { formatNumberRu } from '../i18n/format';
+  import ReadyMark from './ReadyMark.svelte';
 
   type MatchStandings = NonNullable<NonNullable<ClientViewState['results']>['matchStandings']>;
 
   interface Props {
     standings: MatchStandings;
+    /** Humans who pressed «Готов» on this results screen. */
+    readyIds: readonly string[];
   }
 
-  let { standings }: Props = $props();
+  let { standings, readyIds }: Props = $props();
 </script>
 
 <div class="table-scroll">
@@ -22,9 +25,12 @@
     </thead>
     <tbody>
       {#each standings as entry (entry.id)}
-        <tr>
+        <tr class:ready-row={readyIds.includes(entry.id)}>
           <td class="rank-cell">{entry.rank}</td>
-          <td><span class="p-name">{entry.name}</span></td>
+          <td>
+            <span class="p-name">{entry.name}</span>
+            {#if readyIds.includes(entry.id)}<ReadyMark />{/if}
+          </td>
           <td class="num-col"><strong>{formatNumberRu(entry.totalScore)}</strong></td>
         </tr>
       {/each}
@@ -52,6 +58,9 @@
   .results-table td {
     padding: 0.55rem 0.5rem;
     border-bottom: 1px solid var(--line);
+  }
+  .ready-row td:first-child {
+    box-shadow: inset 3px 0 0 var(--ok);
   }
   .num-col {
     text-align: right !important;

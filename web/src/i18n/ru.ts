@@ -7,6 +7,10 @@ export const PRESET_LABELS: Record<DifficultyPreset, string> = {
   custom: 'Свои настройки',
 };
 
+function notPressedReady(names: readonly string[]): string {
+  return `${names.join(', ')} ${names.length === 1 ? 'ещё не нажал(а)' : 'ещё не нажали'} «Готов».`;
+}
+
 export const PERSONALITY_LABELS: Record<PersonalityPreset, string> = {
   neutral: 'Нейтральный',
   braggart: 'Хвастун',
@@ -176,10 +180,10 @@ export const RU = {
     finalBtn: 'К итогам',
     readyBtn: 'Готов',
     readyDone: 'Вы готовы',
+    readyMark: 'готов',
     readyCount: (ready: number, total: number) => `Готовы: ${String(ready)} из ${String(total)}`,
     notReadyTitle: 'Не все готовы',
-    notReadyBody: (names: string[]) =>
-      `${names.join(', ')} ${names.length === 1 ? 'ещё не нажал(а)' : 'ещё не нажали'} «Готов». Точно запускаем?`,
+    notReadyBody: (names: string[]) => `${notPressedReady(names)} Точно запускаем?`,
     notReadyGo: 'Запускать',
     notReadyCancel: 'Отмена',
     whyBtn: 'почему?',
@@ -194,7 +198,9 @@ export const RU = {
     earlyFinish: (played: number, planned: number) => `Сыграно ${played} из ${planned} раундов`,
     emptyFinal: 'Партия завершена до первого результата',
     playAgain: 'Ещё раз',
-    waitingHost: 'Ждём хоста',
+    waitHostLobby: 'Хост вернёт всех в лобби',
+    notReadyBody: (names: string[]) => `${notPressedReady(names)} Точно возвращаемся в лобби?`,
+    notReadyGo: 'В лобби',
     matchWriteErr: 'Партия не записана в историю. На экране итог верный',
   },
 } as const;

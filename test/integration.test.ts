@@ -485,7 +485,8 @@ test('full 2-round fake match via WebSocket writes redacted logs, serves/clears 
     const finalMsg = await host.waitFor((m) => m.type === 'state' && m.view.phase === 'FINAL');
     if (finalMsg.type === 'state') expect(finalMsg.view.final?.playedRounds).toBe(2);
 
-    host.ws.send(JSON.stringify({ type: 'play_again', seq: 999 }));
+    // The guest has not pressed «Готов»: the host goes back without them.
+    host.ws.send(JSON.stringify({ type: 'play_again', seq: 999, force: true }));
     await host.waitFor((m) => m.type === 'state' && m.view.phase === 'LOBBY');
     if (savedThumbUrl) expect((await fetch(`${srv.baseUrl}${savedThumbUrl}`)).status).toBe(404);
 

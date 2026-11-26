@@ -6,7 +6,8 @@
   import HostMenu from '../components/HostMenu.svelte';
   import ResultsTabs from '../components/ResultsTabs.svelte';
   import MatchStandings from '../components/MatchStandings.svelte';
-  import NextRoundFooter from '../components/NextRoundFooter.svelte';
+  import ReadyFooter from '../components/ReadyFooter.svelte';
+  import ReadyMark from '../components/ReadyMark.svelte';
   import ResultsMap from '../components/ResultsMap.svelte';
   import { formatDistanceRu, formatNumberRu } from '../i18n/format';
   import { attachGlobalKeys, prefersReducedMotion } from '../lib/keys';
@@ -51,6 +52,7 @@
   const anyoneAnswered = $derived(res?.entries.some((e) => e.lat !== null) ?? false);
   const isFinalRound = $derived(view.roundNumber >= view.totalRounds);
   const matchStandings = $derived(res?.matchStandings ?? []);
+  const readyIds = $derived(res?.readyIds ?? []);
 
   $effect(() => {
     if (!roundKey) return;
@@ -211,6 +213,7 @@
                   {/snippet}
                   <tr
                     class:selected-row={selectedId === entry.id}
+                    class:ready-row={readyIds.includes(entry.id)}
                     onclick={() => (selectedId = entry.id)}
                   >
                     <td class="rank-cell">{entry.rank}</td>
@@ -224,6 +227,7 @@
                           size="sm"
                         />
                         <span class="p-name">{entry.name}</span>
+                        {#if readyIds.includes(entry.id)}<ReadyMark />{/if}
                       </div>
                       {#if entry.isAi}<div class="why-inline">{@render whyButton()}</div>{/if}
                     </td>
@@ -268,11 +272,24 @@
           aria-labelledby="match-standings-tab"
           class="tab-panel"
         >
-          <MatchStandings standings={matchStandings} />
+          <MatchStandings standings={matchStandings} {readyIds} />
         </div>
       {/if}
 
-      <NextRoundFooter {view} {isFinalRound} {onNextRound} {onReady} />
+      <ReadyFooter
+        {view}
+        {readyIds}
+        waitText={isFinalRound ? RU.results.waitHostFinal : RU.results.waitHostNext}
+        goLabel={isFinalRound ? RU.results.finalBtn : RU.results.nextBtn}
+        goAnywayLabel={RU.results.notReadyGo}
+        question={RU.results.notReadyBody}
+        onGo={(force: boolean) => {
+          onNextRound(view.roundNumber, force);
+        }}
+        onReady={() => {
+          onReady(view.roundNumber, view.matchId);
+        }}
+      />
     </section>
   </main>
 {/if}
@@ -404,6 +421,10 @@
 
   .selected-row {
     background-color: var(--asphalt-700);
+  }
+
+  .ready-row td:first-child {
+    box-shadow: inset 3px 0 0 var(--ok);
   }
 
   .player-cell {

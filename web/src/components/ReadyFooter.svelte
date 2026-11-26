@@ -3,18 +3,27 @@
   import { RU } from '../i18n/ru';
   import LobbyDialog from './LobbyDialog.svelte';
 
+  /** The footer of a screen the host leaves for everyone: round results and the final screen. */
   interface Props {
     view: ClientViewState;
-    isFinalRound: boolean;
-    onNextRound: (roundNumber: number, force: boolean) => void;
-    onReady: (roundNumber: number, matchId: string) => void;
+    /** Humans who pressed «Готов» on this screen. */
+    readyIds: readonly string[];
+    /** Shown to guests: what the host's button will do. */
+    waitText: string;
+    goLabel: string;
+    /** The question's button that leaves without those who are not ready. */
+    goAnywayLabel: string;
+    question: (names: string[]) => string;
+    /** `force`: the host has seen the question. The server refuses an unforced leave while it waits. */
+    onGo: (force: boolean) => void;
+    onReady: () => void;
   }
 
-  let { view, isFinalRound, onNextRound, onReady }: Props = $props();
+  let { view, readyIds, waitText, goLabel, goAnywayLabel, question, onGo, onReady }: Props =
+    $props();
 
   let confirmOpen = $state(false);
 
-  const readyIds = $derived(view.results?.readyIds ?? []);
   // The host never marks themselves ready, and nobody waits for a player who has dropped off.
   const others = $derived(view.players.filter((p) => !p.isHost && p.connected));
   const notReady = $derived(others.filter((p) => !readyIds.includes(p.id)));
@@ -25,17 +34,16 @@
     if (notReady.length === 0) confirmOpen = false;
   });
 
-  /** `force`: the host has seen the question. The server refuses an unforced start while it waits. */
-  function next(force: boolean): void {
+  function go(force: boolean): void {
     confirmOpen = false;
-    onNextRound(view.roundNumber, force);
+    onGo(force);
   }
 </script>
 
-<footer class="next-footer">
+<footer class="ready-footer">
   <span class="muted" role="status">
     {#if !view.viewerIsHost}
-      {isFinalRound ? RU.results.waitHostFinal : RU.results.waitHostNext}
+      {waitText}
     {/if}
     {#if others.length > 0}
       <span class="count"
@@ -49,20 +57,13 @@
       class="btn btn-primary"
       onclick={() => {
         if (notReady.length > 0) confirmOpen = true;
-        else next(false);
+        else go(false);
       }}
     >
-      {isFinalRound ? RU.results.finalBtn : RU.results.nextBtn}
+      {goLabel}
     </button>
   {:else}
-    <button
-      type="button"
-      class="btn btn-primary"
-      disabled={iAmReady}
-      onclick={() => {
-        onReady(view.roundNumber, view.matchId);
-      }}
-    >
+    <button type="button" class="btn btn-primary" disabled={iAmReady} onclick={onReady}>
       {iAmReady ? RU.results.readyDone : RU.results.readyBtn}
     </button>
   {/if}
@@ -75,7 +76,7 @@
       confirmOpen = false;
     }}
   >
-    <p class="question">{RU.results.notReadyBody(notReady.map((p) => p.name))}</p>
+    <p class="question">{question(notReady.map((p) => p.name))}</p>
     <div class="actions">
       <button
         type="button"
@@ -90,17 +91,17 @@
         type="button"
         class="btn btn-primary"
         onclick={() => {
-          next(true);
+          go(true);
         }}
       >
-        {RU.results.notReadyGo}
+        {goAnywayLabel}
       </button>
     </div>
   </LobbyDialog>
 {/if}
 
 <style>
-  .next-footer {
+  .ready-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;

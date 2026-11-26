@@ -464,3 +464,43 @@ test('results do not replay the viewer, heard confirmations or restored confirma
   director.update(restored, 5_100, true);
   expect(output.cues).toEqual(beforeDisconnect);
 });
+
+function finalReady(readyIds: string[]): ClientViewState {
+  const final = {
+    playedRounds: 1,
+    plannedRounds: 1,
+    standings: [],
+    humanVsAi: { visible: false, humansTotal: 0, aiTotal: 0 },
+    readyIds,
+  };
+  return view({ phase: 'FINAL', gen: 3, active: undefined, final });
+}
+
+// Value: protects=«Готов» is heard on the results and final screens: someone else's click plays
+// the opponent sound, the viewer's own the locked sound, each once; fails_when=a ready click is
+// silent, replays on a repeated view, or a restored snapshot announces old clicks; why_new=the
+// button had no sound; seam=none; no_claim=actual audio output.
+test('ready clicks on the results and final screens are announced once each', () => {
+  const output = new FakeOutput();
+  const director = new AudioDirector(output);
+  const results = (ids: string[]) => ({
+    ...resultsAt(1_000),
+    results: {
+      ...(resultsAt(1_000).results as NonNullable<ClientViewState['results']>),
+      readyIds: ids,
+    },
+  });
+  director.update(results([]), 1_000, true);
+  director.update(results(['g']), 1_100, true);
+  director.update(results(['g']), 1_200, true);
+  expect(output.cues).toEqual(['opponent']);
+  director.update(results(['g', 'me']), 1_300, true);
+  expect(output.cues).toEqual(['opponent', 'locked']);
+
+  director.update(finalReady([]), 2_000, true);
+  output.cues = [];
+  director.update(finalReady(['g']), 2_100, true);
+  director.update(null, 2_200, false);
+  director.update(finalReady(['g', 'h2']), 2_300, true);
+  expect(output.cues).toEqual(['opponent']);
+});

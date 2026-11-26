@@ -286,7 +286,8 @@ export function dispatchEngineClientMessage(
     case 'end_match':
       return shell.dispatch({ type: 'end_match', playerId }) ?? 'ok';
     case 'play_again':
-      return shell.dispatch({ type: 'play_again', playerId }) ?? 'ok';
+    case 'ready_lobby':
+      return shell.dispatch({ type: msg.type, playerId, force: msg.force, gen: msg.gen }) ?? 'ok';
     default:
       return 'invalid';
   }

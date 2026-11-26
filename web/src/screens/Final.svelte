@@ -5,6 +5,8 @@
   import BotCard from '../components/BotCard.svelte';
   import HostMenu from '../components/HostMenu.svelte';
   import Leaderboard from '../components/Leaderboard.svelte';
+  import ReadyFooter from '../components/ReadyFooter.svelte';
+  import ReadyMark from '../components/ReadyMark.svelte';
   import { formatDistanceRu, formatNumberRu } from '../i18n/format';
   import { attachGlobalKeys, prefersReducedMotion } from '../lib/keys';
   import { RU } from '../i18n/ru';
@@ -14,17 +16,21 @@
     view: ClientViewState;
     onEditProfile: (e: MouseEvent) => void;
     onResetBotWins: (id: string) => void;
-    onPlayAgain: () => void;
+    /** `force`: the host has been asked about the players who are not ready. */
+    onPlayAgain: (force: boolean) => void;
+    /** `gen`: the final screen the guest pressed «Готов» on. */
+    onReady: (gen: number) => void;
     onEndMatch: () => void;
   }
 
-  let { view, onPlayAgain, onEndMatch, onEditProfile, onResetBotWins }: Props = $props();
+  let { view, onPlayAgain, onReady, onEndMatch, onEditProfile, onResetBotWins }: Props = $props();
 
   let inspectedCard = $state<{ roundNumber: number; botId: string } | null>(null);
   let lastTriggerBtn = $state<HTMLButtonElement | null>(null);
   let confettiPlayed = false;
 
   const fin = $derived(view.final);
+  const readyIds = $derived(fin?.readyIds ?? []);
   const inspectedEntry = $derived(
     fin?.standings
       .find((row) => row.id === inspectedCard?.botId)
@@ -138,7 +144,7 @@
             </thead>
             <tbody>
               {#each fin.standings as row (row.id)}
-                <tr>
+                <tr class:ready-row={readyIds.includes(row.id)}>
                   <td class="sticky-col">
                     <div class="who">
                       <span class="rk">#{row.rank}</span>
@@ -150,6 +156,7 @@
                         size="sm"
                       />
                       <span>{row.name}</span>
+                      {#if readyIds.includes(row.id)}<ReadyMark />{/if}
                     </div>
                   </td>
                   {#each roundNums as rn (rn)}
@@ -224,15 +231,18 @@
       </section>
     {/if}
 
-    <footer class="actions">
-      {#if view.viewerIsHost}
-        <button type="button" class="btn btn-primary again-btn" onclick={onPlayAgain}>
-          {RU.final.playAgain}
-        </button>
-      {:else}
-        <p class="sub-line" role="status">{RU.final.waitingHost}</p>
-      {/if}
-    </footer>
+    <ReadyFooter
+      {view}
+      {readyIds}
+      waitText={RU.final.waitHostLobby}
+      goLabel={RU.final.playAgain}
+      goAnywayLabel={RU.final.notReadyGo}
+      question={RU.final.notReadyBody}
+      onGo={onPlayAgain}
+      onReady={() => {
+        onReady(view.gen);
+      }}
+    />
   </main>
 {/if}
 
@@ -373,13 +383,7 @@
     color: var(--paper-dim);
   }
 
-  .actions {
-    display: flex;
-    justify-content: center;
-  }
-
-  .again-btn {
-    min-width: 220px;
-    font-size: 1.05rem;
+  .ready-row .sticky-col {
+    box-shadow: inset 3px 0 0 var(--ok);
   }
 </style>

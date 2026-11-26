@@ -149,8 +149,11 @@
   const handleReadyNext = (rn: number, matchId: string): void => {
     store.readyNext(rn, matchId);
   };
-  const handlePlayAgain = (): void => {
-    store.playAgain();
+  const handlePlayAgain = (force: boolean): void => {
+    store.playAgain(force);
+  };
+  const handleReadyLobby = (gen: number): void => {
+    store.readyLobby(gen);
   };
 </script>
 
@@ -313,6 +316,7 @@
     <Final
       {view}
       onPlayAgain={handlePlayAgain}
+      onReady={handleReadyLobby}
       onEndMatch={handleEndMatch}
       onEditProfile={openProfile}
       onResetBotWins={(id: string) => {
