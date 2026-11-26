@@ -2,6 +2,30 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.4.1] - 2026-11-26
+
+### Added
+
+- Find a region by typing. «Регион» in «Настройки партии» opens a list with a search field: type a few letters of a country or continent and pick it with the arrow keys and Enter. A letter typed on the closed button opens the list with that letter.
+- A line under the map explains what «Глушь» and «Север» mean and how they differ from the other maps.
+- Measure where the round search finds Street View with `bun run scan:coverage`. It rewrites `server/maps/coverage.data.json`; run `bun run build:map-availability` after it.
+
+### Changed
+
+- «Стандартная» and «Глушь» start rounds only in countries where the search finds Street View panoramas, and the region list offers only those countries: 103 for «Стандартная», 101 for «Глушь». Before, a match in a country without coverage (mainland China, Iran) spent its whole search on nothing and ended with an error. Countries with thin coverage, Pakistan among them, are off the list for now.
+- «Аэропорты мира», «Столицы», «Города» and the other place maps leave out places in countries where the scan found next to no panoramas.
+- The guess map shows Google's place icons (hospitals, parks, shops) and uses a crosshair cursor, so a pin is easier to aim.
+- Sound keeps playing while the game's tab is in the background, so a player in another window still hears a rival's answer and the start of the round.
+- The bots are told that every panorama is official Google Street View, so they stop guessing countries Google has not covered.
+
+### Fixed
+
+- A pin moved in the last second of a round counts. Before, a click as the timer reached zero could arrive after the round had closed, and the older pin was scored. The map and «Угадать» now lock when the timer shows zero.
+- The answer sound and the «ответил» tag of a bot appear when the bot gives its final answer, not when its process exits several seconds later.
+- The compass strip moves smoothly while the view turns.
+- A standard round no longer repeats a country while another country of the region has not been played.
+- A short server error of the Street View lookup is tried again and no longer reads as "no panorama here".
+
 ## [0.4.0] - 2026-11-25
 
 ### Added
