@@ -2,6 +2,14 @@
 
 Notable changes to this locally run application are recorded here. Releases are identified by Git tags.
 
+## [0.4.3] - 2026-11-27
+
+### Added
+
+- Tell the host you are ready to go back to the lobby. The final screen now has «Готов» for every player except the host, who has «Ещё раз», and a line shows how many are ready. If the host presses «Ещё раз» while a connected player is not ready, a question names them («Дима ещё не нажал(а) «Готов». Точно возвращаемся в лобби?») with «В лобби» and «Отмена». A «Готов» pressed on the last round's results does not carry over to the final screen.
+- Hear when someone is ready. Another player's «Готов» plays the same sound as a rival's answer, and your own plays the sound of a locked guess, on the results screen and on the final screen.
+- See who is ready. A ready player gets a green «✓ готов» mark and a stripe beside their row in the round table, the «Рейтинг за игру» tab and the final table.
+
 ## [0.4.2] - 2026-11-26
 
 ### Added
