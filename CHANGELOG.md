@@ -20,7 +20,7 @@ Notable changes to this locally run application are recorded here. Releases are 
 
 ### Fixed
 
-- A pin moved in the last second of a round counts. Before, a click as the timer reached zero could arrive after the round had closed, and the older pin was scored. The map and «Угадать» now lock when the timer shows zero.
+- A pin moved in the last second of a round counts. Before, a click as the timer reached zero could arrive after the round had closed, and the older pin was scored. The map now locks when the timer shows zero, and a guess sent after that keeps its point without ending the round early.
 - The answer sound and the «ответил» tag of a bot appear when the bot gives its final answer, not when its process exits several seconds later.
 - The compass strip moves smoothly while the view turns.
 - A standard round no longer repeats a country while another country of the region has not been played.
