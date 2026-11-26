@@ -7,6 +7,7 @@ import {
 } from '../../shared/protocol.ts';
 import type { SettingsFile } from '../../shared/storage-schemas.ts';
 import { reduce } from './reduce.ts';
+import { projectView } from './view.ts';
 import { createInitialRoomState, type RoomState, type RoundTarget } from './types.ts';
 
 function makeSettings(overrides: Partial<SettingsFile> = {}): SettingsFile {
@@ -453,7 +454,8 @@ test('only a finalized bot guess pushes; bot completion keeps the normal early-e
   expect(finished.state.phase).toBe('ROUND_RESULTS');
 });
 
-test('round results stay until the host presses next; no auto-advance timer', () => {
+/** A two-human room on the results screen of round 1: host «h» answered, guest «g» joined after. */
+function resultsRoomWithGuest(): RoomState {
   let s = makeRoom();
   s = reduce(
     s,
@@ -477,7 +479,7 @@ test('round results stay until the host presses next; no auto-advance timer', ()
   expect(s.phase).toBe('ROUND_RESULTS');
   expect(ended.effects.some((e) => e.type.startsWith('schedule_results'))).toBe(false);
 
-  const guest = reduce(
+  return reduce(
     s,
     {
       type: 'player_join',
@@ -489,6 +491,10 @@ test('round results stay until the host presses next; no auto-advance timer', ()
     },
     6000,
   ).state;
+}
+
+test('round results stay until the host presses next; no auto-advance timer', () => {
+  const guest = resultsRoomWithGuest();
   const byGuest = reduce(guest, { type: 'next_round', playerId: 'g', roundNumber: 1 }, 7000);
   expect(byGuest.ack).toBe('forbidden');
   expect(byGuest.state.phase).toBe('ROUND_RESULTS');
@@ -496,6 +502,37 @@ test('round results stay until the host presses next; no auto-advance timer', ()
   const byHost = reduce(guest, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 10 * 60_000);
   expect(byHost.ack).toBe('ok');
   expect(byHost.state.phase).toBe('ROUND_LOADING');
+});
+
+// Value: protects=«Готов» marks a guest as ready for the host to see and does nothing else: it
+// never moves the match on, the host cannot mark themselves, and a click for another round is
+// dropped; fails_when=a guest's click starts the next round, or a stale click from the previous
+// results screen marks the guest ready on the new one; why_new=the message is new; seam=none;
+// no_claim=the host's confirmation dialog (browser test in game-flow.spec.ts).
+test('a guest marks themselves ready on the results screen without moving the match on', () => {
+  let s = resultsRoomWithGuest();
+  expect(projectView(s, 'g').results?.readyIds).toEqual([]);
+
+  const ready = reduce(s, { type: 'ready_next', playerId: 'g', roundNumber: 1 }, 7000);
+  expect(ready.ack).toBe('ok');
+  expect(ready.effects).toEqual([]);
+  s = ready.state;
+  expect(s.phase).toBe('ROUND_RESULTS');
+  expect(projectView(s, 'h').results?.readyIds).toEqual(['g']);
+
+  const again = reduce(s, { type: 'ready_next', playerId: 'g', roundNumber: 1 }, 7100);
+  expect(again.ack).toBe('ok');
+  expect(again.state.results?.readyIds).toEqual(['g']);
+
+  expect(reduce(s, { type: 'ready_next', playerId: 'h', roundNumber: 1 }, 7200).ack).toBe(
+    'forbidden',
+  );
+  expect(reduce(s, { type: 'ready_next', playerId: 'x', roundNumber: 1 }, 7200).ack).toBe(
+    'forbidden',
+  );
+  const stale = reduce(s, { type: 'ready_next', playerId: 'g', roundNumber: 2 }, 7300);
+  expect(stale.ack).toBe('round_over');
+  expect(stale.state.results?.readyIds).toEqual(['g']);
 });
 
 test('last human disconnecting in ROUND_LOADING holds countdown and mapsError resets cleanly', () => {

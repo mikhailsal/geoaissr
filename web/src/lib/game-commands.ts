@@ -66,6 +66,10 @@ export abstract class GameCommands {
     this.client.sendSequenced('next_round', { roundNumber });
   }
 
+  readyNext(roundNumber: number): void {
+    this.client.sendSequenced('ready_next', { roundNumber });
+  }
+
   playAgain(): void {
     this.client.sendSequenced('play_again');
   }

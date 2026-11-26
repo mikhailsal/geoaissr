@@ -146,7 +146,7 @@ export const submitGuessMessageSchema = z.object({
 });
 
 export const nextRoundMessageSchema = z.object({
-  type: z.literal('next_round'),
+  type: z.enum(['next_round', 'ready_next']),
   seq: z.number().int().nonnegative(),
   roundNumber: z.number().int().positive(),
 });
@@ -377,6 +377,8 @@ export interface ClientViewState {
   };
   results?: {
     completion?: RoundCompletion;
+    /** Humans who pressed «Готов» on this results screen. */
+    readyIds?: string[];
     targetLat: number;
     targetLng: number;
     countryNameRu: string;

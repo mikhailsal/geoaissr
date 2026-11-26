@@ -124,6 +124,8 @@ export interface ActiveRoundState {
 
 export interface RoundResultsState {
   completion: RoundCompletion;
+  /** Humans who pressed «Готов» on this results screen; absent in a state saved before 0.4.2. */
+  readyIds?: string[];
   roundNumber: number;
   target: RoundTarget;
   entries: RoundResultEntryView[];
@@ -340,7 +342,7 @@ export type EngineEvent =
       kind: 'round' | 'wait' | 'bot_budget';
       botId?: string;
     }
-  | { type: 'next_round'; playerId: string; roundNumber: number }
+  | { type: 'next_round' | 'ready_next'; playerId: string; roundNumber: number }
   | { type: 'end_match'; playerId: string }
   | { type: 'play_again'; playerId: string }
   | { type: 'bot_wins_reset_result'; botId: string; at: string; ok: boolean }

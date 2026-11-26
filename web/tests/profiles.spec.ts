@@ -426,6 +426,7 @@ test('profile edits accept occupied values and code remains visible during a mat
     await guest.getByRole('button', { name: 'Угадать', exact: true }).click();
     await expect(host.getByText(/Правильный ответ:/)).toBeVisible({ timeout: 12_000 });
     await host.getByRole('button', { name: 'К итогам', exact: true }).click();
+    await host.getByRole('dialog').getByRole('button', { name: 'Запускать' }).click();
     await expect(guest.getByRole('button', { name: 'Профиль', exact: true })).toBeVisible();
     await guest.getByRole('button', { name: 'Профиль', exact: true }).click();
     await expect(guest.getByLabel('Имя', { exact: true })).toHaveValue('Общее');

@@ -272,7 +272,8 @@ export function dispatchEngineClientMessage(
         }) ?? 'ok'
       );
     case 'next_round':
-      return shell.dispatch({ type: 'next_round', playerId, roundNumber: msg.roundNumber }) ?? 'ok';
+    case 'ready_next':
+      return shell.dispatch({ type: msg.type, playerId, roundNumber: msg.roundNumber }) ?? 'ok';
     case 'end_match':
       return shell.dispatch({ type: 'end_match', playerId }) ?? 'ok';
     case 'play_again':

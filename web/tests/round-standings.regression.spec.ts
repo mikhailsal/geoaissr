@@ -161,6 +161,8 @@ test('host can hide between-round standings for guests while keeping final stand
       await expect(viewer.getByTestId('match-standings-table')).toHaveCount(0);
     }
 
+    await guest.getByRole('button', { name: 'Готов', exact: true }).click();
+    await expect(page.getByText('Готовы: 1 из 1')).toBeVisible();
     await page.getByRole('button', { name: 'К итогам', exact: true }).click();
     for (const viewer of [page, guest]) {
       await expect(viewer.locator('.podium-grid')).toBeVisible({ timeout: 12_000 });

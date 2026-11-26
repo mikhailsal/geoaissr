@@ -146,6 +146,9 @@
   const handleNextRound = (rn: number): void => {
     store.nextRound(rn);
   };
+  const handleReadyNext = (rn: number): void => {
+    store.readyNext(rn);
+  };
   const handlePlayAgain = (): void => {
     store.playAgain();
   };
@@ -301,6 +304,7 @@
       onSelectBotCard={handleSelectBotCard}
       onCloseBotCard={handleCloseBotCard}
       onNextRound={handleNextRound}
+      onReady={handleReadyNext}
       onEndMatch={handleEndMatch}
       onMapLoaded={handleResultsMapLoaded}
       onClientError={handleClientError}
