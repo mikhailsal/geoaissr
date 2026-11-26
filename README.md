@@ -129,6 +129,8 @@ Use **Участники** to manage the roster and **Настройки пар�
 
 In **Настройки партии**, the host can enable **Пуш: сократить время после ответа** and enter 1–60 seconds in **Оставить после пуша (с)**. The default is 15 seconds. A confirmed guess caps the remaining time for everyone. Placing a pin or confirming when less time remains keeps the existing deadline. Players still guessing hear the usual warning in the final 15 seconds. Clear **Разрешить ИИ пушить** to let only humans trigger the shorter clock. Push is off by default.
 
+On the round results screen every player except the host has a **«Готов»** button where the host has **«Дальше»**, and a line shows how many are ready. The host who presses **«Дальше»** while a connected player has not pressed **«Готов»** is asked to confirm and can start anyway; the server refuses an unconfirmed start in that case. A player who has dropped off is not waited for.
+
 After each round, open **Рейтинг за игру** to see the cumulative standings. The host can turn off **Показывать рейтинг между раундами** under **Настройки партии** to reveal the standings only at the end.
 
 The trophy beside each avatar counts wins from the last six hours. Only complete matches with exactly one first-place finisher count; ties and early finishes do not. Human wins follow the profile UUID, and AI wins follow the bot slot even after a rename. The host can reset an individual bot's count in the lobby or final results. Matches and reset timestamps persist on the server; a storage error is reported in the room.
@@ -141,7 +143,7 @@ Browser storage remains origin-specific. On a new hostname, browser, or cleared 
 - **Enter** in an active round — submit the placed marker («Угадать», "Guess").
 - **M** — expand/collapse the minimap in a round (or open the map sheet on a narrow screen `< 900px`).
 - **Space** on the round results screen — instantly show all arcs and pins without waiting for the animation.
-- **Esc** — close the profile editor, an open AI bot «почему?» ("why?") card, or the host dropdown menu, returning focus to its button.
+- **Esc** — close an open dialog (it takes the key before any screen shortcut), the profile editor, an open AI bot «почему?» ("why?") card, or the host dropdown menu, returning focus to its button.
 - The interface supports `prefers-reduced-motion: reduce`, `Tab` navigation, `aria-live` announcements of timer/status changes, text contrast >= 4.5:1 and distinct avatar shapes (a circle for humans, a square with a processor icon for AI).
 
 Detailed CLI error codes are described in [docs/errors.md](docs/errors.md).
