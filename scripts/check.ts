@@ -4,7 +4,13 @@ import path from 'node:path';
 interface Step {
   name: string;
   cmd: string[];
-  displayCmd: string;
+}
+
+interface StepResult {
+  step: Step;
+  exitCode: number;
+  output: string;
+  seconds: number;
 }
 
 function collectShellFiles(dir: string, out: string[]): void {
@@ -65,61 +71,81 @@ function runShellcheck(): void {
   console.log(`shellcheck: ok (${files.length} scripts checked)`);
 }
 
-function runStep(step: Step): void {
-  console.log(`==> Running ${step.name}...`);
-  const res = Bun.spawnSync(step.cmd, { stdout: 'inherit', stderr: 'inherit' });
-  if (res.exitCode !== 0) {
-    console.error(`\ncheck failed at step: ${step.name}\n  Repeat with: ${step.displayCmd}`);
-    process.exit(res.exitCode);
-  }
+const CACHE_DIR = 'node_modules/.cache/geoaissr-check';
+
+const STEPS: Step[] = [
+  {
+    name: 'eslint',
+    // gstack-shortcut(dec-5a8d2e7c-940d-4ffe-bd04-38db264480b5): the content cache can keep a
+    // stale pass for file B after a type change in file A; CI runs uncached and is the
+    // authority. Upgrade (drop --cache here) when CI catches a lint error a green pre-push missed.
+    cmd: [
+      'bunx',
+      'eslint',
+      '.',
+      '--max-warnings',
+      '0',
+      '--cache',
+      '--cache-strategy',
+      'content',
+      '--cache-location',
+      `${CACHE_DIR}/eslint`,
+    ],
+  },
+  {
+    name: 'prettier',
+    cmd: [
+      'bunx',
+      'prettier',
+      '--check',
+      '.',
+      '--cache',
+      '--cache-location',
+      `${CACHE_DIR}/prettier`,
+    ],
+  },
+  { name: 'tsc-server', cmd: ['bunx', 'tsc', '--noEmit', '-p', 'tsconfig.server.json'] },
+  { name: 'tsc-web', cmd: ['bunx', 'tsc', '--noEmit', '-p', 'tsconfig.web.json'] },
+  { name: 'svelte-check', cmd: ['bunx', 'svelte-check', '--tsconfig', './tsconfig.web.json'] },
+  { name: 'check-size', cmd: ['bun', 'run', 'scripts/check-size.ts'] },
+  { name: 'check-colors', cmd: ['bun', 'run', 'scripts/check-colors.ts'] },
+];
+
+/** Runs one step with its output buffered, so parallel steps do not interleave. */
+async function runStep(step: Step): Promise<StepResult> {
+  const started = performance.now();
+  const proc = Bun.spawn(step.cmd, { stdout: 'pipe', stderr: 'pipe', env: process.env });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  const seconds = (performance.now() - started) / 1000;
+  return { step, exitCode, output: stdout + stderr, seconds };
 }
 
-function main(): void {
+function report(results: StepResult[]): number {
+  const failed = results.filter((r) => r.exitCode !== 0);
+  for (const r of results) {
+    const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`;
+    console.log(`==> ${r.step.name}: ${status} in ${r.seconds.toFixed(1)}s`);
+    // Passing steps stay quiet; a failing step prints everything it said.
+    if (r.exitCode !== 0 && r.output.trim() !== '') console.log(r.output.trimEnd());
+  }
+  for (const r of failed) {
+    console.error(`\ncheck failed at step: ${r.step.name}\n  Repeat with: ${r.step.cmd.join(' ')}`);
+  }
+  return failed[0]?.exitCode ?? 0;
+}
+
+async function main(): Promise<void> {
+  // The fast guards run first and stop the run on their own.
   checkEnvNotTracked();
   runShellcheck();
-
-  const steps: Step[] = [
-    {
-      name: 'eslint',
-      cmd: ['bunx', 'eslint', '.', '--max-warnings', '0'],
-      displayCmd: 'bunx eslint . --max-warnings 0',
-    },
-    {
-      name: 'prettier',
-      cmd: ['bunx', 'prettier', '--check', '.'],
-      displayCmd: 'bunx prettier --check .',
-    },
-    {
-      name: 'tsc-server',
-      cmd: ['bunx', 'tsc', '--noEmit', '-p', 'tsconfig.server.json'],
-      displayCmd: 'bunx tsc --noEmit -p tsconfig.server.json',
-    },
-    {
-      name: 'tsc-web',
-      cmd: ['bunx', 'tsc', '--noEmit', '-p', 'tsconfig.web.json'],
-      displayCmd: 'bunx tsc --noEmit -p tsconfig.web.json',
-    },
-    {
-      name: 'svelte-check',
-      cmd: ['bunx', 'svelte-check', '--tsconfig', './tsconfig.web.json'],
-      displayCmd: 'bunx svelte-check --tsconfig ./tsconfig.web.json',
-    },
-    {
-      name: 'check-size',
-      cmd: ['bun', 'run', 'scripts/check-size.ts'],
-      displayCmd: 'bun run scripts/check-size.ts',
-    },
-    {
-      name: 'check-colors',
-      cmd: ['bun', 'run', 'scripts/check-colors.ts'],
-      displayCmd: 'bun run scripts/check-colors.ts',
-    },
-  ];
-
-  for (const step of steps) {
-    runStep(step);
-  }
+  const results = await Promise.all(STEPS.map(runStep));
+  const exitCode = report(results);
+  if (exitCode !== 0) process.exit(exitCode);
   console.log('All quality checks passed!');
 }
 
-main();
+await main();
