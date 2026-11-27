@@ -172,20 +172,16 @@ Deferred during the review of the `PLAN.md` plan (CEO phase of /autoplan, 2026-1
 
 The owner put these aside to build the Detective play style first. Nothing here is started.
 
-### Flaky tests in CI
+### Fake-mode time scale for E2E rounds
 
-**What:** Fix five tests that fail from time to time on unchanged code.
+**What:** Let `--fake` runs shorten the round intro (6.8 s) and the countdown (3 s), for example through the `timing` option the unit tests already pass to `createInitialRoomState`.
 
-- `server/proc/spawn.test.ts`, "stops entire detached process group": it reads the pid file as soon as the file exists, before the shell has written the pid. A fix (wait for a positive pid) is on the branch of PR #24, commit `e6079b0`.
-- `web/tests/lobby-characters.spec.ts:228`, avatar drag: it expects exactly 4 `avatar_turn` messages and sometimes gets 5. The cause is not established.
-- `web/tests/lobby-character-inspection.spec.ts:128`, AI tabs.
-- `web/tests/audio.spec.ts`, lobby music hand-off: GitHub issue #21.
-- `web/tests/audio.spec.ts:282`, native lobby music loop: in a full local run on 2026-11-24 a source ended 2 ms before the next one was scheduled to start (`ended` 5.5554 s, start 5.5578 s). It passed on the rerun.
+**Why:** Every round an E2E test plays waits about 10 s of fixed wall time; long match tests spend most of their time there.
 
-**Why:** Each failure costs a CI rerun of about 10 minutes and hides real failures.
+**Context:** `shared/round-timing.ts`, `RoomState.timing` (`server/engine/types.ts`), `StartGeoServerDeps.timing` (`server/cli/start.ts`). The audio E2E tests check what plays during the intro and countdown, so they need the real lengths or must read the scaled ones. Revisit if the three E2E shards in CI stay above 7 minutes.
 
 **Effort:** S
-**Priority:** P2
+**Priority:** P3
 
 ### Long move: replies and error statuses
 
@@ -332,6 +328,12 @@ The owner put these aside to build the Detective play style first. Nothing here 
 **Priority:** P3
 
 ## Completed
+
+### Flaky tests in CI
+
+**What:** Fix the tests that failed from time to time on unchanged code, before E2E and unit tests run in parallel with `retries: 0`.
+
+**Done (2026-11-28):** the spawn test already waited for the pid on `main`. `audio.spec.ts` (GitHub issue #21) read `ended` at the start of a render quantum and expected the next track exactly one loop later; it now allows one quantum and a whole number of loops. The AI tabs test compares settled frames over two viewports. The avatar drag test waits until every drag packet has reached the server before it pauses delivery. The rapid-click test no longer counts receipts or times their spread. `restart()` in `web/tests/helpers.ts` retries a port another worker took.
 
 ### Sounds
 

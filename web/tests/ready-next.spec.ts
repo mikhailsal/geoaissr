@@ -106,7 +106,8 @@ async function askBeforeNextRound(host: Page, guest: Page): Promise<void> {
   await expect(host.locator('header').getByText('раунд 2 из 2')).toBeVisible({ timeout: 12_000 });
 }
 
-/** On the final screen the ready click is gone; a guest who closes the tab is not waited for. */
+/** On the final screen the last round's ready click is gone, a new one is counted and marked; a
+ * guest who closes the tab is not waited for. */
 async function askBeforeGoingToLobby(
   host: Page,
   guest: Page,
@@ -125,6 +126,13 @@ async function askBeforeGoingToLobby(
   await lobbyQuestion.getByRole('button', { name: 'Отмена' }).click();
   await expect(lobbyQuestion).toHaveCount(0);
   await expect(host.getByRole('button', { name: 'Ещё раз' })).toBeVisible();
+
+  // The final screen has its own ready click, counted and marked for the host.
+  await guest.getByRole('button', { name: 'Готов', exact: true }).click();
+  await expect(guest.getByRole('button', { name: 'Вы готовы' })).toBeDisabled();
+  await expect(host.getByText('Готовы: 1 из 1')).toBeVisible();
+  const guestRow = host.getByRole('row').filter({ hasText: 'Дима' });
+  await expect(guestRow.getByText('✓ готов')).toBeVisible();
 
   // The guest closes the tab on the final screen. Nobody is left to wait for.
   await guestCtx.close();
