@@ -15,14 +15,21 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
   else
     range=("$remote_sha..$local_sha")
   fi
-  while read -r commit; do
-    hits=$(git ls-tree -r --name-only "$commit" |
-      grep -E '(^|/)\.env(\.[^/]*)?$' | grep -vE '(^|/)\.env\.example$' || true)
+  # A remote tip missing locally (the branch moved since the last fetch) makes the range
+  # unreadable; refuse the push rather than check nothing.
+  if ! commits=$(git rev-list "${range[@]}"); then
+    echo "push rejected: cannot list the outgoing commits of $local_sha; run git fetch and retry" >&2
+    exit 1
+  fi
+  for commit in $commits; do
+    # NUL-separated names: Git quotes non-ASCII paths in line output.
+    hits=$(git ls-tree -r -z --name-only "$commit" |
+      grep -zE '(^|/)\.env(\.[^/]*)?$' | grep -zvE '(^|/)\.env\.example$' | tr '\0' ' ' || true)
     if [ -n "$hits" ]; then
-      echo "push rejected: commit $commit contains: $hits" >&2
+      echo "push rejected: commit $commit contains: ${hits% }" >&2
       found=1
     fi
-  done < <(git rev-list "${range[@]}")
+  done
 done
 
 if [ "$found" -ne 0 ]; then

@@ -85,3 +85,18 @@ test('commits already on the remote are not checked again', () => {
   const head = commit(dir, 'next', { 'b.txt': 'y' });
   expect(prePush(dir, head, pushed).code).toBe(0);
 });
+
+test('a .env under a non-ASCII folder is found, and an unreadable range rejects the push', () => {
+  const dir = repo();
+  commit(dir, 'base', { 'README.md': 'x' });
+  const withEnv = commit(dir, 'oops', { 'секреты/.env': 'KEY=secret' });
+  const head = commit(dir, 'untrack', { 'секреты/.env': null });
+  const found = prePush(dir, head, ZERO);
+  expect(found.code).toBe(1);
+  expect(found.err).toContain(`commit ${withEnv} contains: секреты/.env`);
+
+  // The remote moved since the last fetch: its tip is not in the local object database.
+  const unknown = prePush(dir, head, 'f'.repeat(40));
+  expect(unknown.code).toBe(1);
+  expect(unknown.err).toContain('cannot list the outgoing commits');
+});
