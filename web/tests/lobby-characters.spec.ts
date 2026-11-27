@@ -174,16 +174,65 @@ test('rapid avatar clicks boost both renderers and stop arriving when the guest 
   }
 });
 
+type TurnTraffic = Map<Page, { seen: Set<number>; acked: Set<number> }>;
+
+/** Runs in the page: counts sent avatar_turn frames and publishes the robot's yaw. */
+function installTurnProbes(): void {
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const send = WebSocket.prototype.send;
+  WebSocket.prototype.send = function (data) {
+    if (typeof data === 'string' && data.includes('"avatar_turn"')) {
+      document.documentElement.dataset.turnsSent = String(
+        Number(document.documentElement.dataset.turnsSent ?? 0) + 1,
+      );
+    }
+    send.call(this, data);
+  };
+  window.Worker = class extends Worker {
+    override postMessage(data: unknown): void {
+      if (typeof data === 'object' && data !== null && 'state' in data) {
+        const state = data.state as { appearance: { base: string }; yaw: number } | null;
+        if (state?.appearance.base === 'robot')
+          document.documentElement.dataset.botYaw = String(state.yaw);
+      }
+      super.postMessage(data);
+    }
+  };
+}
+
+/**
+ * Waits until the proxy has seen and the server has acknowledged every avatar_turn the pages sent.
+ * A drag's last packet can still be in flight to the proxy when the test moves on; once delivery
+ * is paused it would be counted as one of the concurrent key turns.
+ */
+async function settleTurns(traffic: TurnTraffic): Promise<void> {
+  await expect
+    .poll(async () => {
+      for (const [page, { seen, acked }] of traffic) {
+        const sent = Number(await page.locator('html').getAttribute('data-turns-sent')) || 0;
+        if (seen.size !== sent || [...seen].some((seq) => !acked.has(seq))) return false;
+      }
+      return true;
+    })
+    .toBe(true);
+}
+
 async function observeBotTurns(pages: Page[]) {
   let delayTurns = false;
   const delayed: Array<() => void> = [];
   const turns: Array<{ seq: number; yaw: number; broadcasts: number; acknowledged: boolean }> = [];
+  // Every avatar_turn a page sent (at any time) and which of them the server acknowledged.
+  const traffic: TurnTraffic = new Map(
+    pages.map((page) => [page, { seen: new Set<number>(), acked: new Set<number>() }]),
+  );
   for (const page of pages) {
+    const log = traffic.get(page);
     await page.routeWebSocket('**/ws', (client) => {
       const room = client.connectToServer();
       const pageTurns: typeof turns = [];
       client.onMessage((message) => {
         const turn = JSON.parse(message.toString()) as { seq?: number; type: string; yaw?: number };
+        if (turn.type === 'avatar_turn' && turn.seq !== undefined) log?.seen.add(turn.seq);
         if (
           delayTurns &&
           turn.type === 'avatar_turn' &&
@@ -202,6 +251,7 @@ async function observeBotTurns(pages: Page[]) {
           seq?: number;
           yaw?: number;
         };
+        if (response.type === 'ack' && response.seq !== undefined) log?.acked.add(response.seq);
         const turn =
           response.type === 'avatar_turn'
             ? turns.find(({ yaw }) => yaw === response.yaw)
@@ -219,20 +269,10 @@ async function observeBotTurns(pages: Page[]) {
         } else client.send(message);
       });
     });
-    await page.addInitScript(() => {
-      window.Worker = class extends Worker {
-        override postMessage(data: unknown): void {
-          if (typeof data === 'object' && data !== null && 'state' in data) {
-            const state = data.state as { appearance: { base: string }; yaw: number } | null;
-            if (state?.appearance.base === 'robot')
-              document.documentElement.dataset.botYaw = String(state.yaw);
-          }
-          super.postMessage(data);
-        }
-      };
-    });
+    await page.addInitScript(installTurnProbes);
   }
   return {
+    settle: () => settleTurns(traffic),
     pause() {
       delayTurns = true;
     },
@@ -292,6 +332,7 @@ test('dragging an avatar sends its angle to the other player and releases withou
       );
     }
     // Both players finish an independent turn before either sees the other's input.
+    await turns.settle();
     turns.pause();
     const hostButton = host.getByRole('button', { name: 'Повернуть на 360°: Клод', exact: true });
     await Promise.all([hostButton.press('ArrowRight'), button.press('ArrowLeft')]);
