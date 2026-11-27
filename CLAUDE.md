@@ -22,7 +22,7 @@ A single root `package.json` (no workspaces):
 
 ## Quality gates and limits
 
-`.githooks/pre-commit` and `.githooks/pre-push` (`bun run check`) run before every commit and push:
+`bun run check` runs the gates below. It runs in two places: the CI job `check` (`.github/workflows/ci.yml`) and the pre-push hook `.githooks/pre-push`. There is no pre-commit hook: commits stay fast, the gate runs once per push. Steps 1-2 run first; the rest run in parallel, and a failing step prints its output and the command to repeat it. Locally eslint and prettier keep a content cache in `node_modules/.cache/geoaissr-check/`; CI starts from a clean checkout and runs them uncached. Before `bun run check`, the pre-push hook runs `scripts/check-pushed-env.sh`, which rejects the push if any outgoing commit contains a `.env` file (even one untracked later).
 
 1. `.env` is not tracked by git.
 2. `shellcheck` for shell scripts (`.githooks/*`, `scripts/*.sh`).
@@ -38,10 +38,10 @@ A single root `package.json` (no workspaces):
 ## Commands
 
 - `bun run setup:dev` — prepare the developer environment (dependencies, hooks, Playwright Chromium, `shellcheck` check).
-- `bun run hooks:install` — install `.githooks/pre-commit` and `.githooks/pre-push`.
+- `bun run hooks:install` — install the `.githooks/pre-push` hook.
 - `bun run check` — full quality-gate run (on failure prints the step and the exact command to repeat).
-- `bun run test` — unit and integration tests (`bun test`, no network or keys).
-- `bun run test:e2e` — end-to-end Playwright tests (in `--fake` mode, no network or keys).
+- `bun run test` — unit and integration tests (`bun test --parallel`, no network or keys).
+- `bun run test:e2e` — end-to-end Playwright tests (in `--fake` mode, no network or keys). Locally half the cores as workers; `PW_WORKERS=1 bun run test:e2e` runs them one at a time, `-- --shard=1/3` runs a third.
 - `bun run dev --fake` — local development without Google keys, tunnel or subscriptions.
 - `bun run doctor` / `bun run doctor --json` — check keys, `cloudflared`, harnesses.
 - `bun run start` — build the client, start the server and tunnel (`--no-tunnel`, `--public-url`, `--port`, `--no-open`).
@@ -51,6 +51,17 @@ A single root `package.json` (no workspaces):
 - `bun run scan:retro` — measure where panoramas older than 2012 are still found and rewrite `server/maps/retro.data.json` (about half an hour of free lookups, needs the server key). `--only EST,IRL --out <path>` measures some countries into a file of its own; only a scan of every country rewrites the tracked dataset.
 - `bun run scan:coverage` — measure in which countries the round search finds Street View panoramas (in towns and on open land) and rewrite `server/maps/coverage.data.json` (about half an hour of free lookups, needs the server key). The lobby lists only the countries the scan found playable, and the standard and wild maps start rounds only there. Run `bun run build:map-availability` after it. `--only` and `--out` work as in `scan:retro`.
 - `bun run eval:bots` — measure one bot configuration (finish rate, time, error, pin movement) on the licensed panorama dataset; flags and metrics in [docs/evals/README.md](./docs/evals/README.md).
+
+## Testing
+
+- Where each suite runs:
+  - `bun run check` and `bun run test` run locally (pre-push runs `check`) and in CI.
+  - `bun run test:e2e` runs in CI, in 3 shards with 2 workers each. Locally run it on demand: the E2E files of the area you changed, or the whole suite when a change touches shared client code.
+- `/ship` lanes are `bun run check` and `bun run test`; do not run the full E2E suite in `/ship`, CI runs it on the same tree.
+- Push early: open the pull request (a draft is fine) right after the first push, so CI runs while the review goes on. CI runs only for pull requests and for `main`.
+- Playwright runs with `retries: 0`. A flaky test is fixed (test or code), not retried; until it is fixed it is listed in TODOS.md.
+- Tests must not wait real production timeouts when a shorter injected one proves the same behavior.
+- `bun run test` runs files in parallel with a 15 s per-test timeout: tests that spawn a Bun process slow down under load, and the timeout is not what they check.
 
 ## Data storage and errors
 

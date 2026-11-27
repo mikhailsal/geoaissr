@@ -48,7 +48,7 @@ A multiplayer geography guessing game for 1–8 people and up to 3 AI opponents 
    - Dynamic Street View Panorama Loads: **250 / day**
    - Street View Static API: **500 / day**
 
-Never commit `.env` to git (the `bun run check` check and the pre-commit hook block an accidental commit).
+Never commit `.env` to git (`bun run check` fails while `.env` is tracked, and the pre-push hook rejects a push whose commits contain it).
 
 ---
 
