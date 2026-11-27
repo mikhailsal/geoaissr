@@ -112,6 +112,36 @@ async function stopFakeProcess(proc: ChildProcess): Promise<void> {
   });
 }
 
+const PORT_TAKEN = /EADDRINUSE|address already in use|is port \d+ in use|уже занят/i;
+
+/**
+ * Relaunches the fixture server on a port it just freed. Another parallel worker may take the
+ * port in between, so a start that exits early with a taken-port message is retried for about
+ * two seconds, then fails with an error that names the port.
+ */
+async function relaunchOnPort(
+  configDir: string,
+  dataDir: string,
+  port: number,
+): Promise<{ proc: ChildProcess; hostUrl: string; guestUrl: string }> {
+  const attempts = 5;
+  let lastError = '';
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const proc = launchFakeProcess(configDir, dataDir, port);
+    try {
+      return { proc, ...(await waitForUrls(proc)) };
+    } catch (err) {
+      await stopFakeProcess(proc);
+      lastError = err instanceof Error ? err.message : String(err);
+      if (!PORT_TAKEN.test(lastError)) throw err;
+      if (attempt < attempts) await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  throw new Error(
+    `Cannot restart the fake server: port ${port} taken by another process.\n${lastError}`,
+  );
+}
+
 interface FakeServerOptions {
   seedBot?: boolean;
   rounds?: number;
@@ -191,8 +221,8 @@ export async function startIsolatedFakeServer(opts?: FakeServerOptions): Promise
     },
     restart: async () => {
       await stopFakeProcess(proc);
-      proc = launchFakeProcess(configDir, dataDir, Number(parsed.port || 80));
-      ({ hostUrl, guestUrl } = await waitForUrls(proc));
+      const port = Number(parsed.port || 80);
+      ({ proc, hostUrl, guestUrl } = await relaunchOnPort(configDir, dataDir, port));
     },
     stop: async () => {
       await stopFakeProcess(proc);
