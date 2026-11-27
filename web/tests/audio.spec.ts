@@ -319,7 +319,9 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
       expect(source.duration).toBe(0.5);
       expect(next.at).toBeCloseTo(source.at + source.duration - source.offset, 3);
       expect(playback.stops.find(({ id }) => id === source.id)?.when).toBe(next.at);
-      expect(playback.ended[source.id]).toBeGreaterThanOrEqual(next.at);
+      // `ended` is the context time at the start of the render quantum that finished the source,
+      // so it can read up to one quantum before the exact scheduled stop.
+      expect(playback.ended[source.id]).toBeGreaterThanOrEqual(next.at - playback.quantum);
     }
 
     await musicControls.mute.click();

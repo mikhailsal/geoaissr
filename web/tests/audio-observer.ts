@@ -18,6 +18,8 @@ interface DecodeTrace {
 
 interface SourceTrace {
   now: number;
+  /** One render quantum (128 frames) in seconds: the resolution of `ended` timestamps. */
+  quantum: number;
   starts: AudioStart[];
   ended: Record<number, number>;
   stops: { id: number; at: number; when: number }[];
@@ -116,7 +118,8 @@ function installSourceObserver(): void {
     const gains = Object.fromEntries(
       Array.from(activeGains, ([id, node]) => [id, node.gain.value]),
     );
-    return { now, starts, ended, stops, live, gains };
+    const quantum = 128 / (context?.sampleRate ?? 44_100);
+    return { now, quantum, starts, ended, stops, live, gains };
   };
   /* eslint-disable @typescript-eslint/unbound-method */
   const start = AudioBufferSourceNode.prototype.start;
