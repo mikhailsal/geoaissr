@@ -102,7 +102,7 @@ async function settledFrame(canvas: Locator, switchTab = false) {
 }
 
 async function previewFrame(canvas: Locator, switchTab = false) {
-  return canvas.evaluate(async (node: HTMLCanvasElement, changeTab) => {
+  return canvas.evaluate((node: HTMLCanvasElement, changeTab) => {
     if (changeTab) {
       const nextTab = node
         .closest('dialog')
