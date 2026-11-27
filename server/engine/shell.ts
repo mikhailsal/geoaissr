@@ -20,6 +20,8 @@ import { projectView } from './view.ts';
 
 export interface ShellDeps {
   now?: () => number;
+  /** Test seam: how long a round stays open after its shown end (default LATE_PIN_GRACE_MS). */
+  latePinGraceMs?: number;
   matchRecords?: MatchRecord[];
   onStateChange?: (state: RoomState, version: number) => void;
   onAsyncError?: (context: string, err: unknown) => void;
@@ -271,7 +273,10 @@ function runScheduleEffect(ctx: EffectContext, effect: ScheduleEffect): void {
   timers.deadline = clearTimer(timers.deadline);
   // Players see the round end at `atMs`; the round closes a moment later so that a pin sent in
   // its last second still counts. A wait for bots has no human pin left to arrive.
-  const fireAt = effect.kind === 'round' ? effect.atMs + LATE_PIN_GRACE_MS : effect.atMs;
+  const fireAt =
+    effect.kind === 'round'
+      ? effect.atMs + (ctx.deps.latePinGraceMs ?? LATE_PIN_GRACE_MS)
+      : effect.atMs;
   timers.deadline = scheduleDelay(ctx, fireAt, () => {
     ctx.dispatch({
       type: 'deadline_tick',

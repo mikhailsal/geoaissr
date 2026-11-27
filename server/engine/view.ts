@@ -73,7 +73,8 @@ function projectLoading(state: RoomState): ClientViewState['loading'] {
     waitingFor,
     startedLoadingAt: active.startedLoadingAt,
     countdownStartsAt: active.countdownStartsAt,
-    countdownSeconds: active.countdownStartsAt !== null ? COUNTDOWN_MS / 1000 : null,
+    countdownSeconds:
+      active.countdownStartsAt !== null ? (state.timing?.countdownMs ?? COUNTDOWN_MS) / 1000 : null,
     prepError: active.prepError,
     panoId: active.target?.panoId,
     fakeSceneIndex: active.target?.fakeSceneIndex,

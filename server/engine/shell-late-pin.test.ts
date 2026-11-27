@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test';
-import { LATE_PIN_GRACE_MS } from '../../shared/round-timing.ts';
 import { createDefaultSettings } from '../../shared/storage-schemas.ts';
 import { buildQuotaMetric } from '../storage/quota.ts';
 import { reduce } from './reduce.ts';
@@ -60,16 +59,18 @@ function activeRoundOfTwo(now: number): RoomState {
   return reduce(s, { type: 'countdown_done', ...round }, now).state;
 }
 
+const GRACE_MS = 100;
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Value: protects=a pin that reaches the server just after the shown end of the round is still
 // scored; fails_when=the round closes at the shown deadline again and the older pin is scored;
-// why_new=no test ran the round deadline through the shell's real timer; seam=none;
+// why_new=no test ran the round deadline through the shell's real timer; seam=ShellDeps.latePinGraceMs (100 ms instead of the shared one second);
 // no_claim=the browser's pin throttle and the network delay themselves.
 test('a pin sent in the last second of a round still counts', async () => {
   const state = activeRoundOfTwo(Date.now());
   expect(state.phase).toBe('ROUND_ACTIVE');
   const shell = createRoomShell(state, {
+    latePinGraceMs: GRACE_MS,
     saveSettings: () => undefined,
     confirmQuotaReset: () => Promise.resolve(quota),
     prepareRound: () => new Promise(() => {}),
@@ -90,11 +91,11 @@ test('a pin sent in the last second of a round still counts', async () => {
       shell.dispatch({ type: 'submit_guess', playerId: 'host', roundNumber: 1, lat: 1, lng: 1 }),
     ).toBe('ok');
     const shownEnd = shell.getState().loadingOrActive?.endsAt ?? 0;
-    await sleep(shownEnd - Date.now() + LATE_PIN_GRACE_MS / 2);
+    await sleep(shownEnd - Date.now() + GRACE_MS / 2);
     // The timer on the players' screens has run out, the last pin is still on its way.
     expect(Date.now()).toBeGreaterThan(shownEnd);
     expect(shell.dispatch({ ...early, lat: 10, lng: 20 })).toBe('ok');
-    await sleep(LATE_PIN_GRACE_MS);
+    await sleep(GRACE_MS);
     expect(shell.getState().phase).toBe('ROUND_RESULTS');
     const entry = shell.getView('guest').results?.entries.find((e) => e.id === 'guest');
     expect(entry?.lat).toBe(10);

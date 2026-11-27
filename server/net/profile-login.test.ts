@@ -1,10 +1,10 @@
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { defaultAvatar } from '../../shared/avatar.ts';
 import { formatProfileToken } from '../../shared/profile-token.ts';
-import type { ServerMessage } from '../../shared/protocol.ts';
+import { UNAUTH_TIMEOUT_MS, type ServerMessage } from '../../shared/protocol.ts';
 import { createDefaultSettings, type StoredProfile } from '../../shared/storage-schemas.ts';
 import { createRoomShell } from '../engine/shell.ts';
 import { createInitialRoomState } from '../engine/types.ts';
@@ -16,9 +16,10 @@ import { loadSettings } from '../storage/settings.ts';
 import { buildQuotaSummaryForRoom, createQuotaManager } from '../storage/quota.ts';
 import { startAppHttpServer } from './http.ts';
 import { createAuthRateLimiter } from './rate-limit.ts';
+import { scheduleUnauthClose } from './ws-actions.ts';
 import { createWsRoomCoordinator } from './ws.ts';
 
-function fixture(dir: string, suffix = '') {
+function fixture(dir: string, suffix = '', unauthTimeoutMs?: number) {
   const logger = createServerLogger(path.join(dir, 'logs'));
   const profiles = new ProfileStore(path.join(dir, 'profiles.json'), (tokens) => {
     logger.registerSecrets([], tokens);
@@ -74,6 +75,7 @@ function fixture(dir: string, suffix = '') {
     fakeMode: true,
     quotaManager: quota,
     rateLimiter,
+    unauthTimeoutMs,
   });
   const server = startAppHttpServer({
     port: 0,
@@ -596,15 +598,28 @@ test('corrupt registry and multiple-seat identity reject login without selecting
   }
 });
 // I8 protects: unauthenticated sockets time out before either authentication path;
-// fails_when: the new path leaves idle sockets alive past the shared timeout;
+// fails_when: the new path leaves idle sockets alive past the shared timeout, or the default wiring stops using the shared timeout;
 // no_claim: local server/WS and isolated files with fake dependencies; not a public tunnel or paid model.
-// why_new=Permanent profile credentials add an authority and persistence contract absent from earlier coverage; seam=none.
+// why_new=Permanent profile credentials add an authority and persistence contract absent from earlier coverage; seam=unauthTimeoutMs on the coordinator (200 ms here); the default is asserted separately.
 test('idle sockets retain the shared unauthenticated timeout', async () => {
-  const dir = temporary();
-  const f = fixture(dir);
+  const delays: unknown[] = [];
+  const spy = spyOn(globalThis, 'setTimeout').mockImplementation(((
+    _handler: unknown,
+    ms: unknown,
+  ) => delays.push(ms)) as unknown as typeof setTimeout);
   try {
-    const idle = await connect(f.url);
-    expect(await idle.closeCode()).toBe(4001);
+    scheduleUnauthClose({ data: { authenticated: true } } as never, {} as never);
+  } finally {
+    spy.mockRestore();
+  }
+  expect(delays).toEqual([UNAUTH_TIMEOUT_MS]);
+  const timeoutMs = 200;
+  const dir = temporary();
+  const f = fixture(dir, '', timeoutMs);
+  try {
+    const startedAt = Date.now();
+    expect(await (await connect(f.url)).closeCode()).toBe(4001);
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(timeoutMs - 20);
   } finally {
     f.stop();
     rmSync(dir, { recursive: true, force: true });

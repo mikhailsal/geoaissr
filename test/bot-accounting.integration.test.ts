@@ -122,6 +122,7 @@ test('CLI exposes usage and delayed pricing to host and guest result views', asy
     { ...parseStartArgs(['--fake', '--no-tunnel', '--no-open']), port: 0 },
     {
       skipClientBuild: true,
+      timing: { roundIntroMs: 300, countdownMs: 200 },
       estimateBotCost: (model, usage) => {
         requests.push({ model, usage });
         return pending;

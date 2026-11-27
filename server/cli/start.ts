@@ -48,6 +48,8 @@ import {
 import { printStartupBanner } from './start-banner.ts';
 
 export interface StartGeoServerDeps {
+  /** Test seam: shorter round intro and countdown (default: shared constants). */
+  timing?: { roundIntroMs: number; countdownMs: number };
   skipClientBuild?: boolean;
   fakeStepDelayMs?: number;
   probe?: CommandProbe;
@@ -171,6 +173,7 @@ function createServerPipeline(opts: PipelineBuildOpts) {
     quotaSummary: buildQuotaSummaryForState(quotaManager),
     tunnel: computeInitialTunnelView(cli, guestToken, cli.port),
     availableHarnesses,
+    timing: deps.timing,
   });
   let wsCoordRef: ReturnType<typeof createWsRoomCoordinator> | null = null;
   let botRunnerRef: BotRunner | null = null;

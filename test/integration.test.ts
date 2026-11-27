@@ -453,6 +453,8 @@ test('full 2-round fake match via WebSocket writes redacted logs, serves/clears 
     {
       skipClientBuild: true,
       fakeStepDelayMs: 30,
+      // Short countdown: the match still runs the real timers, only the three seconds shrink.
+      timing: { roundIntroMs: ROUND_INTRO_MS, countdownMs: 200 },
     },
   );
   const wsUrl = srv.baseUrl.replace('http://', 'ws://') + '/ws';

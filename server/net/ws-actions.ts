@@ -341,10 +341,11 @@ export function checkUpgradeCapacity(
   return { ok: true };
 }
 
-/** Close unauthenticated sockets after UNAUTH_TIMEOUT_MS and record auth failure. */
+/** Close unauthenticated sockets after `timeoutMs` (default UNAUTH_TIMEOUT_MS; tests pass less) and record auth failure. */
 export function scheduleUnauthClose(
   ws: ServerWebSocket<WsClientData>,
   rateLimiter: RateLimiter,
+  timeoutMs: number = UNAUTH_TIMEOUT_MS,
 ): ReturnType<typeof setTimeout> {
   return setTimeout(() => {
     if (!ws.data.authenticated) {
@@ -363,5 +364,5 @@ export function scheduleUnauthClose(
       }
       ws.close(4001, 'unauth_timeout');
     }
-  }, UNAUTH_TIMEOUT_MS);
+  }, timeoutMs);
 }

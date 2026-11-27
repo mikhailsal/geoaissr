@@ -143,7 +143,10 @@ function maybeStartCountdown(state: RoomState, now: number, forceTimeout: boolea
   if (!areAllPlayingHumansPanoReady(state) && !timedOut) {
     return { state, effects: [] };
   }
-  const countdownStartsAt = Math.max(now, active.startedLoadingAt + ROUND_INTRO_MS);
+  const countdownStartsAt = Math.max(
+    now,
+    active.startedLoadingAt + (state.timing?.roundIntroMs ?? ROUND_INTRO_MS),
+  );
   const nextActive: ActiveRoundState = {
     ...active,
     countdownStartsAt,
@@ -155,7 +158,7 @@ function maybeStartCountdown(state: RoomState, now: number, forceTimeout: boolea
         type: 'schedule_countdown',
         matchId: state.matchId,
         gen: state.gen,
-        atMs: countdownStartsAt + COUNTDOWN_MS,
+        atMs: countdownStartsAt + (state.timing?.countdownMs ?? COUNTDOWN_MS),
       },
     ],
   };
