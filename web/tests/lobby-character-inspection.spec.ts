@@ -83,9 +83,9 @@ test('foreign wardrobe, profile and AI settings show the owner’s controls and 
 });
 
 /** Polls until two consecutive reads agree, so ResizeObserver and the renderer worker have settled. */
-async function settledFrame(canvas: Locator, switchTab = false) {
+async function settledFrame(canvas: Locator) {
   let previous = '';
-  let frame = await previewFrame(canvas, switchTab);
+  let frame = await previewFrame(canvas);
   await expect
     .poll(
       async () => {
@@ -102,13 +102,15 @@ async function settledFrame(canvas: Locator, switchTab = false) {
 }
 
 async function previewFrame(canvas: Locator, switchTab = false) {
-  return canvas.evaluate((node: HTMLCanvasElement, changeTab) => {
+  return canvas.evaluate(async (node: HTMLCanvasElement, changeTab) => {
     if (changeTab) {
       const nextTab = node
         .closest('dialog')
         ?.querySelector<HTMLButtonElement>('nav button[aria-pressed="false"]');
       if (!nextTab) throw new Error('No other character tab');
       nextTab.click();
+      // Read the first updated layout before ResizeObserver or a renderer worker replaces the bitmap.
+      await Promise.resolve();
     }
     const { width, height } = node;
     const box = node.getBoundingClientRect();
@@ -145,7 +147,7 @@ async function previewFrame(canvas: Locator, switchTab = false) {
   }, switchTab);
 }
 
-test('changing AI tabs preserves the bitmap aspect and visible robot proportions after the tab settles', async ({
+test('changing AI tabs preserves the bitmap aspect and visible robot proportions from the first frame', async ({
   page,
 }) => {
   const server = await startIsolatedFakeServer({ seedBot: true });
@@ -163,7 +165,7 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
       const before = await settledFrame(canvas);
       expect(before.paintedRows).toBeGreaterThan(60);
       for (const name of ['Настройки ИИ', 'Гардероб']) {
-        const first = await settledFrame(canvas, true);
+        const first = await previewFrame(canvas, true);
         await expect(
           dialog.getByRole('button', { name, exact: true, pressed: true }),
         ).toBeVisible();
@@ -172,6 +174,9 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
         );
         expect(first.aspectError).toBeLessThan(0.02);
         expect(first.silhouette / before.silhouette).toBeCloseTo(1, 1);
+        const settled = await settledFrame(canvas);
+        expect(settled.aspectError).toBeLessThan(0.02);
+        expect(settled.silhouette / before.silhouette).toBeCloseTo(1, 1);
       }
       await dialog.getByRole('button', { name: 'Вернуть сохранённый образ' }).click();
     }
