@@ -176,8 +176,9 @@ test('startBlockedReasons blocks quota exceeded and host mapsError in real mode'
   expect(reduce(s, { type: 'start_match', playerId: 'h' }, 301).ack).toBe('invalid');
 });
 
-function finishRoundWithBot() {
+function finishRoundWithBot(rounds = 1) {
   let s = makeBaseRoom();
+  s = { ...s, settings: { ...s.settings, rounds } };
   s = reduce(
     s,
     { type: 'player_join', playerId: 'h', secret: 's1', name: 'Хост', color: 'p-1', isHost: true },
@@ -279,6 +280,55 @@ test('between-round standings follow final tie rules and the host visibility set
     projectView({ ...s, settings: { ...s.settings, showMatchStandings: false } }, 'h').results
       ?.matchStandings,
   ).toBeUndefined();
+});
+
+test('match standings add up every played round and rank by the total', () => {
+  // Round 1: the bot is exact (5000) and the host is a little off.
+  const { state: afterOne, botId } = finishRoundWithBot(2);
+  const roundOne = projectView(afterOne, 'h').results?.entries ?? [];
+  let s = reduce(afterOne, { type: 'next_round', playerId: 'h', roundNumber: 1 }, 6000).state;
+  const target = { matchId: 'm-view', gen: s.gen, roundNumber: 2 };
+  s = reduce(s, { type: 'round_prepared', ...target, target: TARGET }, 6100).state;
+  s = reduce(s, { type: 'pano_loaded', playerId: 'h', roundNumber: 2 }, 6200).state;
+  s = reduce(s, { type: 'countdown_done', matchId: 'm-view', gen: s.gen }, 9200).state;
+  // Round 2: the host is exact and the bot is on another continent.
+  const far = { lat: -33.9, lng: 151.2, explanation: 'Сидней' };
+  s = reduce(
+    s,
+    { type: 'bot_guess_recorded', ...target, gen: s.gen, botId, guess: far },
+    9500,
+  ).state;
+  const done = {
+    type: 'bot_finished',
+    ...target,
+    gen: s.gen,
+    botId,
+    aborted: false,
+    reason: 'done',
+  };
+  s = reduce(s, done as Parameters<typeof reduce>[1], 9600).state;
+  s = reduce(
+    s,
+    { type: 'submit_guess', playerId: 'h', roundNumber: 2, lat: TARGET.lat, lng: TARGET.lng },
+    9700,
+  ).state;
+  expect(s.phase).toBe('ROUND_RESULTS');
+
+  const results = projectView(s, 'h').results;
+  const roundTwo = results?.entries ?? [];
+  const score = (entries: typeof roundOne, id: string) =>
+    entries.find((entry) => entry.id === id)?.roundScore ?? -1;
+  expect(score(roundTwo, 'h')).toBe(5000);
+  expect(score(roundOne, botId)).toBe(5000);
+  const hostTotal = score(roundOne, 'h') + score(roundTwo, 'h');
+  const botTotal = score(roundOne, botId) + score(roundTwo, botId);
+  // The host lost round 1 but leads overall, so a standings table that kept only the latest
+  // round, or only the first, would rank them the other way round.
+  expect(hostTotal).toBeGreaterThan(botTotal);
+  expect(results?.matchStandings).toEqual([
+    { id: 'h', name: 'Хост', rank: 1, totalScore: hostTotal },
+    { id: botId, name: expect.any(String) as string, rank: 2, totalScore: botTotal },
+  ]);
 });
 
 // Value: protects=authoritative result completion time and participants; fails_when=scored pins, drafts or failed bots enter confirmation metadata; why_new=score rows do not distinguish confirmations; seam=none; no_claim=client audio playback.
