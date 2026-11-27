@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Reads the pushed refs from stdin; must run before anything else consumes it.
+scripts/check-pushed-env.sh
 bun run check
