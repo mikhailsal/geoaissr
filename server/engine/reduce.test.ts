@@ -589,6 +589,68 @@ test('a «Готов» that arrives after the host moved on is dropped', () => {
   expect(late.state).toBe(moved);
 });
 
+// Value: protects=«Готов» on the final screen marks a guest for the host and the host's «Ещё раз»
+// waits for it as «Дальше» does; fails_when=a guest's click leaves the final screen, the host's
+// plain click returns to the lobby over a guest still reading, a click on an earlier final screen
+// counts, or the marks survive into the next final; why_new=the final screen had no «Готов»;
+// seam=none; no_claim=the host's confirmation dialog (web/tests/ready-next.spec.ts).
+test('a guest marks themselves ready on the final screen and the host is held for it', () => {
+  const fin = reduce(resultsRoomWithGuest(), { type: 'end_match', playerId: 'h' }, 7000).state;
+  expect(fin.phase).toBe('FINAL');
+  expect(projectView(fin, 'h').final?.readyIds).toEqual([]);
+
+  const plain = reduce(fin, { type: 'play_again', playerId: 'h' }, 7100);
+  expect(plain.ack).toBe('forbidden');
+  expect(plain.state).toBe(fin);
+
+  const stale = reduce(fin, { type: 'ready_lobby', playerId: 'g', gen: fin.gen - 1 }, 7200);
+  expect(stale.ack).toBe('invalid');
+  expect(stale.state).toBe(fin);
+  expect(reduce(fin, { type: 'ready_lobby', playerId: 'h', gen: fin.gen }, 7200).ack).toBe(
+    'forbidden',
+  );
+
+  const ready = reduce(fin, { type: 'ready_lobby', playerId: 'g', gen: fin.gen }, 7300);
+  expect(ready.ack).toBe('ok');
+  expect(ready.effects).toEqual([]);
+  expect(ready.state.phase).toBe('FINAL');
+  expect(projectView(ready.state, 'h').final?.readyIds).toEqual(['g']);
+  const again = reduce(ready.state, { type: 'ready_lobby', playerId: 'g', gen: fin.gen }, 7350);
+  expect(again.ack).toBe('ok');
+  expect(again.state).toBe(ready.state);
+
+  const lobby = reduce(ready.state, { type: 'play_again', playerId: 'h' }, 7400);
+  expect(lobby.ack).toBe('ok');
+  expect(lobby.state.phase).toBe('LOBBY');
+  expect(lobby.state.finalReadyIds).toEqual([]);
+  expect(reduce(lobby.state, { type: 'ready_lobby', playerId: 'g', gen: fin.gen }, 7500).ack).toBe(
+    'invalid',
+  );
+
+  const forced = reduce(fin, { type: 'play_again', playerId: 'h', force: true }, 7600);
+  expect(forced.ack).toBe('ok');
+  expect(forced.state.phase).toBe('LOBBY');
+
+  // Nobody waits for a guest who has dropped off.
+  const gone = reduce(fin, { type: 'player_disconnect', playerId: 'g' }, 7700).state;
+  expect(reduce(gone, { type: 'play_again', playerId: 'h' }, 7800).ack).toBe('ok');
+});
+
+// Value: protects=marks from an earlier final screen are gone when the last round's results lead
+// to a new one; fails_when=advanceFromResults stops resetting finalReadyIds; why_new=the test above
+// enters FINAL through end_match only; seam=none; no_claim=none beyond protects.
+test('the final screen reached from the last round starts with nobody ready', () => {
+  const room = resultsRoomWithGuest();
+  const last = { ...room, settings: { ...room.settings, rounds: 1 }, finalReadyIds: ['g'] };
+  const fin = reduce(
+    last,
+    { type: 'next_round', playerId: 'h', roundNumber: 1, force: true },
+    7000,
+  ).state;
+  expect(fin.phase).toBe('FINAL');
+  expect(projectView(fin, 'h').final?.readyIds).toEqual([]);
+});
+
 test('last human disconnecting in ROUND_LOADING holds countdown and mapsError resets cleanly', () => {
   let s = makeRoom();
   s = reduce(

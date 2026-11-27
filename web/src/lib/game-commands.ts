@@ -71,7 +71,13 @@ export abstract class GameCommands {
     this.client.sendSequenced('ready_next', { roundNumber, matchId });
   }
 
-  playAgain(): void {
-    this.client.sendSequenced('play_again');
+  /** `force`: the host has been asked about the players who are not ready. */
+  playAgain(force: boolean): void {
+    this.client.sendSequenced('play_again', { force });
+  }
+
+  /** `gen`: the final screen clicked on; the server drops a click on an earlier one. */
+  readyLobby(gen: number): void {
+    this.client.sendSequenced('ready_lobby', { gen });
   }
 }

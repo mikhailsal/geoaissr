@@ -191,6 +191,7 @@ function projectFinal(state: RoomState, viewerIsHost: boolean): ClientViewState[
       humansTotal: state.humanVsAiTotal.humans,
       aiTotal: state.humanVsAiTotal.ai,
     },
+    readyIds: state.finalReadyIds ?? [],
   };
 }
 

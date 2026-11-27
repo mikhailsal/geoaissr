@@ -1,6 +1,6 @@
 import { handleProfileAction } from './profile.ts';
 import { handleBotAccounting } from './bot-accounting.ts';
-import { handleEndMatch, handlePlayAgain } from './final.ts';
+import { handleEndMatch, handlePlayAgain, handleReadyLobby, someoneNotReady } from './final.ts';
 import {
   handleAddBot,
   handleApplyBotPreset,
@@ -260,10 +260,9 @@ function handleNextRound(
   if (!player?.isHost) return { state, effects: [], ack: 'forbidden' };
   // The host's screen can be behind: a guest may come back between its last view and the click.
   // Without `force` the click is refused, and the next one meets the question about that guest.
-  const waiting = Object.values(state.players).some(
-    (p) => !p.isHost && p.connected && !readyIds.includes(p.id),
-  );
-  if (waiting && !event.force) return { state, effects: [], ack: 'forbidden' };
+  if (!event.force && someoneNotReady(state, readyIds)) {
+    return { state, effects: [], ack: 'forbidden' };
+  }
   return { ...advanceFromResults(state, now), ack: 'ok' };
 }
 
@@ -443,7 +442,9 @@ export function reduce(state: RoomState, event: EngineEvent, now = Date.now()): 
     case 'end_match':
       return handleEndMatch(state, event.playerId, now);
     case 'play_again':
-      return handlePlayAgain(state, event.playerId, now);
+      return handlePlayAgain(state, event, now);
+    case 'ready_lobby':
+      return handleReadyLobby(state, event);
     default:
       return { state, effects: [] };
   }

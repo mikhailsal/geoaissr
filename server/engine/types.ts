@@ -170,6 +170,8 @@ export interface RoomState {
   roundNumber: number;
   loadingOrActive: ActiveRoundState | null;
   results: RoundResultsState | null;
+  /** Humans who pressed «Готов» on the final screen; reset each time the room enters FINAL. */
+  finalReadyIds?: string[];
   playedRounds: RoundArchiveRecord[];
   humanVsAiTotal: { humans: number; ai: number };
 }
@@ -350,7 +352,7 @@ export type EngineEvent =
       matchId?: string;
     }
   | { type: 'end_match'; playerId: string }
-  | { type: 'play_again'; playerId: string }
+  | { type: 'play_again' | 'ready_lobby'; playerId: string; force?: boolean; gen?: number }
   | { type: 'bot_wins_reset_result'; botId: string; at: string; ok: boolean }
   | { type: 'match_write_result'; ok: boolean; error?: string; record?: MatchRecord };
 

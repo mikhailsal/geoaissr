@@ -254,6 +254,7 @@ test('full 2-round match satisfies T53 map telemetry, axe WCAG AA, and BotCard/S
     expect(guestMaps.getCount()).toBeLessThanOrEqual(2);
 
     await hostPage.getByRole('button', { name: 'Ещё раз' }).click();
+    await hostPage.getByRole('dialog').getByRole('button', { name: 'В лобби' }).click();
     await expect(hostPage.getByRole('button', { name: 'Участники', exact: true })).toBeVisible({
       timeout: 10_000,
     });

@@ -795,7 +795,7 @@ test('a guest can drag a lobby participant, release immediately, and then boost 
       [6, 'end_match'],
       [7, 'play_again'],
     ] as const) {
-      host.c.send({ type, seq });
+      host.c.send({ type, seq, force: true });
       expect((await host.c.next('ack')).result).toBe('ok');
     }
     const nextLobby = await register(f);

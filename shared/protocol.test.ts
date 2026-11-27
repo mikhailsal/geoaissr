@@ -29,3 +29,20 @@ test('ready_next parses like next_round and needs a positive round number', () =
     expect(clientMessageSchema.safeParse({ type, seq: 1, roundNumber: 0 }).success).toBe(false);
   }
 });
+
+// Value: protects=the wire accepts «Ещё раз» with or without force and «Готов» on the final screen
+// with its gen, and still accepts the plain play_again older clients send; fails_when=play_again
+// is dropped from the union or ready_lobby loses its gen; why_new=the final screen's «Готов» is
+// new; seam=none; no_claim=server forwarding (exercised by web/tests/ready-next.spec.ts).
+test('play_again and ready_lobby parse with their optional fields', () => {
+  for (const msg of [
+    { type: 'play_again', seq: 1 },
+    { type: 'play_again', seq: 1, force: true },
+    { type: 'ready_lobby', seq: 1, gen: 7 },
+  ]) {
+    expect(clientMessageSchema.safeParse(msg).success).toBe(true);
+  }
+  expect(clientMessageSchema.safeParse({ type: 'ready_lobby', seq: 1, gen: -1 }).success).toBe(
+    false,
+  );
+});

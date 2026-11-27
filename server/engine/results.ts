@@ -410,7 +410,7 @@ export function advanceFromResults(state: RoomState, now: number): ReduceOutput 
       effects.push({ type: 'append_match_record', record });
     }
     return {
-      state: { ...state, gen: state.gen + 1, phase: 'FINAL', results: null },
+      state: { ...state, gen: state.gen + 1, phase: 'FINAL', results: null, finalReadyIds: [] },
       effects,
     };
   }
