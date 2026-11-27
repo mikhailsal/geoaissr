@@ -1,12 +1,13 @@
 import { defineConfig } from '@playwright/test';
 
 // Every test starts its own fake server on port 0 with its own data dir
-// (`web/tests/helpers.ts`), so files run side by side. CI runs 3 shards with 2 workers each;
-// locally Playwright uses half the cores. `PW_WORKERS` overrides both.
+// (`web/tests/helpers.ts`), so files run side by side: 2 workers, locally and in each of the 3 CI
+// shards. More workers slow the long match tests past their 45 s deadline on an 8-core machine.
+// `PW_WORKERS` overrides the count (a number or a percentage of the cores).
 function workerCount(): number | string {
   const fromEnv = process.env.PW_WORKERS;
   if (fromEnv !== undefined) return fromEnv.endsWith('%') ? fromEnv : Number(fromEnv);
-  return process.env.CI ? 2 : '50%';
+  return 2;
 }
 
 export default defineConfig({

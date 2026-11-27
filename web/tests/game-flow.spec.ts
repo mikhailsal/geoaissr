@@ -200,8 +200,6 @@ async function playRoundTwoAndFinal(hostPage: Page, guestPage: Page): Promise<vo
 test('full 2-round match satisfies T53 map telemetry, axe WCAG AA, and BotCard/Space/Esc flows', async ({
   browser,
 }) => {
-  // The whole match takes about 35 s alone; parallel workers share the CPU and need more room.
-  test.setTimeout(120_000);
   const hostCtx = await browser.newContext({
     viewport: { width: 1280, height: 720 },
     permissions: ['clipboard-read', 'clipboard-write'],

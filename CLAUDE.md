@@ -41,7 +41,7 @@ A single root `package.json` (no workspaces):
 - `bun run hooks:install` — install the `.githooks/pre-push` hook.
 - `bun run check` — full quality-gate run (on failure prints the step and the exact command to repeat).
 - `bun run test` — unit and integration tests (`bun test --parallel`, no network or keys).
-- `bun run test:e2e` — end-to-end Playwright tests (in `--fake` mode, no network or keys). Locally half the cores as workers; `PW_WORKERS=1 bun run test:e2e` runs them one at a time, `-- --shard=1/3` runs a third.
+- `bun run test:e2e` — end-to-end Playwright tests (in `--fake` mode, no network or keys). It runs 2 workers; `PW_WORKERS=1 bun run test:e2e` runs one at a time, `-- --shard=1/3` runs a third.
 - `bun run dev --fake` — local development without Google keys, tunnel or subscriptions.
 - `bun run doctor` / `bun run doctor --json` — check keys, `cloudflared`, harnesses.
 - `bun run start` — build the client, start the server and tunnel (`--no-tunnel`, `--public-url`, `--port`, `--no-open`).

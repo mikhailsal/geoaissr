@@ -12,7 +12,7 @@ No change in the game. This release speeds up how changes are checked and merged
 - `bun run check` runs its steps in parallel and keeps an eslint and prettier cache in `node_modules/.cache/`: a repeat run takes about 17 s instead of about 2 minutes. CI runs the checks without a cache.
 - `bun run test` runs test files in parallel (about 15 s instead of 52 s). Tests that waited real timeouts (the unauthenticated socket timeout, the round intro and countdown, the late-pin grace) now take shorter ones from the test.
 - CI runs the checks, the unit tests and three E2E shards as separate jobs. A new push to a pull request cancels the run of the previous push; every run on `main` completes.
-- E2E tests run with several workers (half the cores locally, 2 per CI shard). The known flaky E2E tests are fixed, two E2E tests that replayed a whole match are folded into others, and the price format and the two-round standings sum are checked by unit tests.
+- E2E tests run with 2 workers, locally and in each CI shard. The known flaky E2E tests are fixed, two E2E tests that replayed a whole match are folded into others, and the price format and the two-round standings sum are checked by unit tests.
 
 ## [0.4.3] - 2026-11-27
 
