@@ -3,6 +3,7 @@
   import type { RoundResultEntryView } from '$shared/protocol';
   import { formatNumberRu } from '../i18n/format';
   import { roleTokensLine } from '../lib/detective-format';
+  import { formatApiPrice } from '../lib/price';
   let { entry }: { entry: RoundResultEntryView } = $props();
   const roleLine = $derived(roleTokensLine(entry));
   let root: HTMLDivElement;
@@ -64,10 +65,9 @@
     }}
   >
     <Coins size={16} aria-hidden="true" />
-    {entry.tokenUsage ? formatNumberRu(entry.tokenUsage.totalTokens) : 'н/д'} · {entry.costUsd !=
-    null
-      ? `~$${entry.costUsd.toFixed(3)}`
-      : 'н/д'}
+    {entry.tokenUsage ? formatNumberRu(entry.tokenUsage.totalTokens) : 'н/д'} · {formatApiPrice(
+      entry.costUsd,
+    )}
   </button>
   {#if open}
     <div

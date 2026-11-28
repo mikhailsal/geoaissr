@@ -174,6 +174,8 @@ export interface RoomState {
   finalReadyIds?: string[];
   playedRounds: RoundArchiveRecord[];
   humanVsAiTotal: { humans: number; ai: number };
+  /** Test seam: overrides the shared round intro and countdown lengths (default: shared constants). */
+  timing?: { roundIntroMs: number; countdownMs: number };
 }
 
 export type EngineEvent =
@@ -428,8 +430,10 @@ export function createInitialRoomState(opts: {
   quotaSummary: QuotaSummaryView;
   tunnel: TunnelStatusView;
   availableHarnesses: HarnessCatalogEntry[];
+  timing?: RoomState['timing'];
 }): RoomState {
   return {
+    ...(opts.timing ? { timing: opts.timing } : {}),
     wins6h: {
       byProfileId: Object.create(null) as Record<string, number>,
       byBotId: Object.create(null) as Record<string, number>,

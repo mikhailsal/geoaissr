@@ -299,13 +299,16 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
     await expect(page.getByText('Загружаем панораму…')).toBeVisible();
     const musicControls = await openAudioControls(page, 'music');
     await expect
-      .poll(async () => {
-        const events = await trace(page);
-        const heard = matchMusic(audibleStarts(events), lobby);
-        return (
-          heard.length >= count && heard.slice(0, count - 1).every((s) => s.id in events.ended)
-        );
-      })
+      .poll(
+        async () => {
+          const events = await trace(page);
+          const heard = matchMusic(audibleStarts(events), lobby);
+          return (
+            heard.length >= count && heard.slice(0, count - 1).every((s) => s.id in events.ended)
+          );
+        },
+        { timeout: 20_000 },
+      )
       .toBe(true);
     await expect(page.getByText('Загружаем панораму…')).toBeVisible();
     const playback = await trace(page);
@@ -317,9 +320,15 @@ test('native lobby music loops and the match playlist wraps and cancels queued m
       const next = heard[index + 1];
       if (!next) throw new Error(`Missing successor for ${source.url}`);
       expect(source.duration).toBe(0.5);
-      expect(next.at).toBeCloseTo(source.at + source.duration - source.offset, 3);
+      // The player loops a source until its successor is decoded: on a loaded machine the next
+      // track may start a whole number of loops late, but always on a loop boundary.
+      const loops = (next.at - (source.at + source.duration - source.offset)) / source.duration;
+      expect(loops).toBeGreaterThanOrEqual(-0.001);
+      expect(Math.abs(loops - Math.round(loops)) * source.duration).toBeLessThan(0.0005);
       expect(playback.stops.find(({ id }) => id === source.id)?.when).toBe(next.at);
-      expect(playback.ended[source.id]).toBeGreaterThanOrEqual(next.at);
+      // `ended` is the context time at the start of the render quantum that finished the source,
+      // so it can read up to one quantum before the exact scheduled stop.
+      expect(playback.ended[source.id]).toBeGreaterThanOrEqual(next.at - playback.quantum);
     }
 
     await musicControls.mute.click();

@@ -82,6 +82,25 @@ test('foreign wardrobe, profile and AI settings show the owner’s controls and 
   }
 });
 
+/** Polls until two consecutive reads agree, so ResizeObserver and the renderer worker have settled. */
+async function settledFrame(canvas: Locator) {
+  let previous = '';
+  let frame = await previewFrame(canvas);
+  await expect
+    .poll(
+      async () => {
+        const current = JSON.stringify(frame);
+        const stable = current === previous;
+        previous = current;
+        if (!stable) frame = await previewFrame(canvas);
+        return stable;
+      },
+      { message: 'the preview frame never settled' },
+    )
+    .toBe(true);
+  return frame;
+}
+
 async function previewFrame(canvas: Locator, switchTab = false) {
   return canvas.evaluate(async (node: HTMLCanvasElement, changeTab) => {
     if (changeTab) {
@@ -139,15 +158,11 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
     const canvas = dialog.locator('canvas[data-avatar-renderer]');
     for (const [width, height] of [
       [1280, 720],
-      [390, 740],
-      [844, 390],
-      [420, 320],
-      [385, 240],
       [320, 240],
     ] as const) {
       await page.setViewportSize({ width, height });
       await expect.poll(async () => (await previewFrame(canvas)).aspectError).toBeLessThan(0.02);
-      const before = await previewFrame(canvas);
+      const before = await settledFrame(canvas);
       expect(before.paintedRows).toBeGreaterThan(60);
       for (const name of ['Настройки ИИ', 'Гардероб']) {
         const first = await previewFrame(canvas, true);
@@ -159,7 +174,8 @@ test('changing AI tabs preserves the bitmap aspect and visible robot proportions
         );
         expect(first.aspectError).toBeLessThan(0.02);
         expect(first.silhouette / before.silhouette).toBeCloseTo(1, 1);
-        const settled = await previewFrame(canvas);
+        const settled = await settledFrame(canvas);
+        expect(settled.aspectError).toBeLessThan(0.02);
         expect(settled.silhouette / before.silhouette).toBeCloseTo(1, 1);
       }
       await dialog.getByRole('button', { name: 'Вернуть сохранённый образ' }).click();

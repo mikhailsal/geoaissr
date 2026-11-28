@@ -91,8 +91,10 @@ test('renders transparent bot snapshot and supports accounting interactions', as
     await page.keyboard.press('Escape');
     await expect(card.locator('.zoomed-preview')).toHaveCount(0);
     const badge = card.getByRole('button', { name: 'Расход токенов и оценка стоимости' });
+    await expect(badge).toContainText('· ~$');
     await badge.click();
     const details = card.getByRole('region', { name: 'Расход токенов и оценка стоимости' });
+    await expect(details).not.toContainText('не фактическая стоимость подписки');
     await expect(details).toContainText('Input: 1');
     await expect(details).toContainText('provider/model (приблизительное совпадение)');
     await expect(details).toContainText('API-цена для справки');

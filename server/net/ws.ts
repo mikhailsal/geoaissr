@@ -323,6 +323,7 @@ export function createWsRoomCoordinator(opts: {
   quotaManager: QuotaManager;
   rateLimiter: RateLimiter;
   botRunner?: BotRunner;
+  unauthTimeoutMs?: number;
 }): WsRoomCoordinator {
   const sockets = new Set<ServerWebSocket<WsClientData>>();
   const pendingSince = new Map<ServerWebSocket<WsClientData>, number>();
@@ -368,7 +369,7 @@ export function createWsRoomCoordinator(opts: {
     openSocket(ws) {
       sockets.add(ws);
       pendingSince.set(ws, Date.now());
-      ws.data.authTimer = scheduleUnauthClose(ws, opts.rateLimiter);
+      ws.data.authTimer = scheduleUnauthClose(ws, opts.rateLimiter, opts.unauthTimeoutMs);
     },
     closeSocket(ws) {
       if (ws.data.authTimer) clearTimeout(ws.data.authTimer);

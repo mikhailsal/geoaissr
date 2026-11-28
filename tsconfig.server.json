@@ -34,6 +34,7 @@
     "web/src/lib/detective-format.ts",
     "web/src/lib/journal-format.ts",
     "web/src/lib/play-style.ts",
+    "web/src/lib/price.ts",
     "web/src/lib/region-options.ts",
     "web/src/lib/audio-catalog.ts",
     "web/src/lib/audio-director.ts",
